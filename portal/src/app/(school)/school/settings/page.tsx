@@ -1,0 +1,74 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { schoolsService } from "@/services/schools.service";
+import { useToast } from "@/providers/toast-provider";
+import { ApiClientError } from "@/lib/api-client";
+import { useAuth } from "@/providers/auth-provider";
+
+export default function SettingsPage() {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const schoolId = user?.schoolId ?? "";
+  const school = useQuery({
+    queryKey: ["school", schoolId],
+    queryFn: () => schoolsService.getById(schoolId),
+    enabled: Boolean(schoolId),
+  });
+
+  useEffect(() => {
+    if (!school.data) return;
+    setName(school.data.name ?? "");
+    setEmail(school.data.email ?? "");
+    setPhone(school.data.phone ?? "");
+    setAddress(school.data.address ?? "");
+    setCity(school.data.city ?? "");
+  }, [school.data]);
+
+  const save = useMutation({
+    mutationFn: () => schoolsService.update(schoolId, { name, email, phone, address, city }),
+    onSuccess: () => {
+      toast({ title: "Settings saved", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["school", schoolId] });
+    },
+    onError: (err) => toast({ title: "Save failed", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
+  });
+
+  if (school.isLoading) {
+    return <div className="space-y-4 p-8"><Skeleton className="h-10 w-64" /><Skeleton className="h-64 w-full" /></div>;
+  }
+
+  return (
+    <div className="p-8">
+      <PageHeader title="Settings" description="School contact details used on ID cards and reports" />
+      <Card className="max-w-xl">
+        <CardContent className="space-y-3 pt-6">
+          <Label>Name</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+          <Label>Email</Label>
+          <Input value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Label>Phone</Label>
+          <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <Label>Address</Label>
+          <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+          <Label>City</Label>
+          <Input value={city} onChange={(e) => setCity(e.target.value)} />
+          <Button disabled={save.isPending || !schoolId} onClick={() => save.mutate()}>Save</Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

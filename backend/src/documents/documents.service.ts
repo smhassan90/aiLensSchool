@@ -1,0 +1,520 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { AttendanceStatus, LessonStatus, Prisma } from '@prisma/client';
+import { PrismaService } from '../database/prisma.service';
+import { AuditService } from '../audit/audit.service';
+import { TenantService } from '../common/services/tenant.service';
+import { HomeworkGenerationService } from '../ai/services/homework-generation.service';
+import { AuthUser } from '../common/types/auth-user.type';
+import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import {
+  CreateDiaryDto,
+  GenerateDiaryDto,
+  GenerateHomeworkDto,
+  GenerateIdCardDto,
+  GenerateReportCardDto,
+} from './dto/documents.dto';
+
+function letterGrade(avg: number) {
+  if (avg >= 85) return 'A';
+  if (avg >= 70) return 'B';
+  if (avg >= 55) return 'C';
+  if (avg >= 40) return 'D';
+  return 'F';
+}
+
+@Injectable()
+export class DocumentsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly tenant: TenantService,
+    private readonly homeworkAi: HomeworkGenerationService,
+  ) {}
+
+  async createDiary(dto: CreateDiaryDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const section = await this.prisma.section.findFirst({
+      where: { id: dto.sectionId, schoolId },
+    });
+    if (!section) {
+      throw new NotFoundException({ code: 'SECTION_NOT_FOUND', message: 'Section not found' });
+    }
+
+    const diary = await this.prisma.homeDiary.upsert({
+      where: { sectionId_date: { sectionId: dto.sectionId, date: new Date(dto.date) } },
+      create: {
+        schoolId,
+        branchId: dto.branchId,
+        academicYearId: dto.academicYearId,
+        sectionId: dto.sectionId,
+        date: new Date(dto.date),
+        title: dto.title ?? `Home diary ${dto.date}`,
+        lessonSummary: dto.lessonSummary ?? '',
+        homeworkNotes: dto.homeworkNotes ?? '',
+        teacherRemarks: dto.teacherRemarks,
+        createdById: user.id,
+      },
+      update: {
+        title: dto.title,
+        lessonSummary: dto.lessonSummary,
+        homeworkNotes: dto.homeworkNotes,
+        teacherRemarks: dto.teacherRemarks,
+      },
+      include: { section: { include: { grade: true } } },
+    });
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'HOME_DIARY_SAVED',
+      entityType: 'HomeDiary',
+      entityId: diary.id,
+    });
+    return diary;
+  }
+
+  async generateDiary(dto: GenerateDiaryDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const date = new Date(dto.date);
+    const lessons = await this.prisma.dailyLesson.findMany({
+      where: {
+        schoolId,
+        sectionId: dto.sectionId,
+        date,
+        status: LessonStatus.CONFIRMED,
+      },
+      include: { subject: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const homework = await this.prisma.homework.findMany({
+      where: { schoolId, sectionId: dto.sectionId, dueDate: { gte: date } },
+      include: { subject: true },
+      take: 10,
+      orderBy: { dueDate: 'asc' },
+    });
+
+    const lessonSummary = lessons.length
+      ? lessons
+          .map(
+            (l) =>
+              `${l.subject.name}: ${l.aiSummary ?? l.topicName ?? l.chapterName ?? 'Lesson delivered'}`,
+          )
+          .join('\n')
+      : 'No confirmed lessons recorded for this date.';
+
+    const homeworkNotes = homework.length
+      ? homework.map((h) => `${h.subject.name}: ${h.title}${h.description ? ` — ${h.description}` : ''}`).join('\n')
+      : 'No homework assigned.';
+
+    return this.createDiary(
+      {
+        ...dto,
+        title: `Home diary ${dto.date}`,
+        lessonSummary,
+        homeworkNotes,
+        teacherRemarks: lessons.length
+          ? 'Generated from today’s confirmed lessons and assigned homework.'
+          : 'Generated with limited lesson data. Please review before sharing.',
+      },
+      user,
+    );
+  }
+
+  async listDiaries(
+    user: AuthUser,
+    query: PaginationDto & { sectionId?: string; date?: string; studentId?: string },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 30;
+    let sectionId = query.sectionId;
+    if (query.studentId && !sectionId) {
+      const enrollment = await this.prisma.studentEnrollment.findFirst({
+        where: { studentId: query.studentId, status: 'ACTIVE' },
+      });
+      sectionId = enrollment?.sectionId;
+    }
+    const where: Prisma.HomeDiaryWhereInput = {
+      schoolId,
+      ...(sectionId ? { sectionId } : {}),
+      ...(query.date ? { date: new Date(query.date) } : {}),
+    };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.homeDiary.findMany({
+        where,
+        orderBy: { date: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { section: { include: { grade: true } } },
+      }),
+      this.prisma.homeDiary.count({ where }),
+    ]);
+    return paginate(items, total, page, limit);
+  }
+
+  async generateHomework(dto: GenerateHomeworkDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const subject = await this.prisma.subject.findFirst({
+      where: { id: dto.subjectId, schoolId },
+    });
+    if (!subject) {
+      throw new NotFoundException({ code: 'SUBJECT_NOT_FOUND', message: 'Subject not found' });
+    }
+
+    let lessonSummary = 'Complete today’s class practice at home.';
+    let lessonId = dto.lessonId;
+    if (lessonId) {
+      const lesson = await this.prisma.dailyLesson.findFirst({
+        where: { id: lessonId, schoolId },
+      });
+      lessonSummary = lesson?.aiSummary ?? lesson?.topicName ?? lessonSummary;
+    } else {
+      const latest = await this.prisma.dailyLesson.findFirst({
+        where: {
+          schoolId,
+          sectionId: dto.sectionId,
+          subjectId: dto.subjectId,
+          status: LessonStatus.CONFIRMED,
+        },
+        orderBy: { date: 'desc' },
+      });
+      if (latest) {
+        lessonSummary = latest.aiSummary ?? latest.topicName ?? lessonSummary;
+        lessonId = latest.id;
+      }
+    }
+
+    const generated = await this.homeworkAi.generate({
+      schoolId,
+      userId: user.id,
+      lessonSummary,
+      subjectName: subject.name,
+    });
+
+    const homework = await this.prisma.homework.create({
+      data: {
+        schoolId,
+        branchId: dto.branchId,
+        academicYearId: dto.academicYearId,
+        sectionId: dto.sectionId,
+        subjectId: dto.subjectId,
+        lessonId,
+        createdById: user.id,
+        title: generated.title ?? `${subject.name} homework`,
+        description: generated.description ?? lessonSummary,
+        dueDate: new Date(dto.dueDate),
+        publishedAt: new Date(),
+      },
+      include: { subject: true, section: true },
+    });
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'HOMEWORK_GENERATED',
+      entityType: 'Homework',
+      entityId: homework.id,
+    });
+    return homework;
+  }
+
+  async generateReportCards(dto: GenerateReportCardDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const termLabel = dto.termLabel ?? 'Term 1';
+    const enrollments = await this.prisma.studentEnrollment.findMany({
+      where: {
+        academicYearId: dto.academicYearId,
+        status: 'ACTIVE',
+        student: { schoolId },
+        ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
+        ...(dto.studentId ? { studentId: dto.studentId } : {}),
+      },
+      include: { student: true, section: true, grade: true },
+    });
+    if (!enrollments.length) {
+      throw new BadRequestException({
+        code: 'NO_ENROLLMENTS',
+        message: 'No students found to generate report cards',
+      });
+    }
+
+    const cards = [];
+    for (const enrollment of enrollments) {
+      const results = await this.prisma.quizResult.findMany({
+        where: {
+          studentId: enrollment.studentId,
+          quiz: { academicYearId: dto.academicYearId, schoolId },
+        },
+        include: { quiz: { include: { subject: true } } },
+      });
+      const attendance = await this.prisma.attendance.findMany({
+        where: { studentId: enrollment.studentId, academicYearId: dto.academicYearId },
+      });
+      const present = attendance.filter((a) => a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.LATE).length;
+      const attendanceRate = attendance.length ? (present / attendance.length) * 100 : 0;
+
+      const bySubject = new Map<string, { total: number; count: number; name: string }>();
+      for (const result of results) {
+        const subjectId = result.quiz.subjectId;
+        const current = bySubject.get(subjectId) ?? { total: 0, count: 0, name: result.quiz.subject.name };
+        current.total += Number(result.percentage);
+        current.count += 1;
+        bySubject.set(subjectId, current);
+      }
+      const lines = [...bySubject.entries()].map(([subjectId, value]) => {
+        const average = value.count ? value.total / value.count : 0;
+        return {
+          subjectId,
+          average: Number(average.toFixed(2)),
+          quizzesTaken: value.count,
+          gradeLetter: letterGrade(average),
+        };
+      });
+      const overall = lines.length
+        ? lines.reduce((sum, line) => sum + line.average, 0) / lines.length
+        : 0;
+
+      const card = await this.prisma.reportCard.upsert({
+        where: {
+          studentId_academicYearId_termLabel: {
+            studentId: enrollment.studentId,
+            academicYearId: dto.academicYearId,
+            termLabel,
+          },
+        },
+        create: {
+          schoolId,
+          branchId: enrollment.student.branchId,
+          academicYearId: dto.academicYearId,
+          studentId: enrollment.studentId,
+          gradeId: enrollment.gradeId,
+          sectionId: enrollment.sectionId,
+          termLabel,
+          overallPercentage: Number(overall.toFixed(2)),
+          attendanceRate: Number(attendanceRate.toFixed(2)),
+          remarks: overall >= 70 ? 'Good progress. Keep it up.' : 'Needs more practice and regular attendance.',
+          generatedById: user.id,
+          lines: { create: lines },
+        },
+        update: {
+          overallPercentage: Number(overall.toFixed(2)),
+          attendanceRate: Number(attendanceRate.toFixed(2)),
+          generatedById: user.id,
+          lines: {
+            deleteMany: {},
+            create: lines,
+          },
+        },
+        include: {
+          student: true,
+          grade: true,
+          section: true,
+          academicYear: true,
+          lines: { include: { subject: true } },
+        },
+      });
+      cards.push(card);
+    }
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'REPORT_CARDS_GENERATED',
+      entityType: 'ReportCard',
+      metadata: { count: cards.length, termLabel },
+    });
+    return { generated: cards.length, items: cards };
+  }
+
+  async listReportCards(
+    user: AuthUser,
+    query: PaginationDto & { studentId?: string; sectionId?: string; academicYearId?: string },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
+    const where: Prisma.ReportCardWhereInput = {
+      schoolId,
+      ...(query.studentId ? { studentId: query.studentId } : {}),
+      ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+      ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+    };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.reportCard.findMany({
+        where,
+        orderBy: { generatedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          student: true,
+          grade: true,
+          section: true,
+          academicYear: true,
+          lines: { include: { subject: true } },
+        },
+      }),
+      this.prisma.reportCard.count({ where }),
+    ]);
+    return paginate(items, total, page, limit);
+  }
+
+  async generateIdCards(dto: GenerateIdCardDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    if (!school) {
+      throw new NotFoundException({ code: 'SCHOOL_NOT_FOUND', message: 'School not found' });
+    }
+
+    const cards = [];
+    if (dto.teacherId) {
+      const teacher = await this.prisma.teacherProfile.findFirst({
+        where: { id: dto.teacherId, schoolId },
+        include: { user: true, branch: true },
+      });
+      if (!teacher) {
+        throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
+      }
+      cards.push(
+        await this.upsertTeacherCard(schoolId, teacher, user.id),
+      );
+    } else {
+      const students = await this.prisma.student.findMany({
+        where: {
+          schoolId,
+          status: 'ACTIVE',
+          ...(dto.studentId ? { id: dto.studentId } : {}),
+          ...(dto.sectionId
+            ? { enrollments: { some: { sectionId: dto.sectionId, status: 'ACTIVE' } } }
+            : {}),
+        },
+        include: {
+          branch: true,
+          enrollments: {
+            where: { status: 'ACTIVE' },
+            include: { grade: true, section: true },
+            take: 1,
+          },
+          parents: { include: { parent: { include: { user: true } } }, take: 1 },
+        },
+      });
+      if (!students.length) {
+        throw new BadRequestException({ code: 'NO_STUDENTS', message: 'No students found for ID cards' });
+      }
+      for (const student of students) {
+        cards.push(await this.upsertStudentCard(school, student, user.id));
+      }
+    }
+
+    return { generated: cards.length, items: cards };
+  }
+
+  async listIdCards(user: AuthUser, query: PaginationDto & { studentId?: string; search?: string }) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
+    const where: Prisma.IdCardWhereInput = {
+      schoolId,
+      ...(query.studentId ? { studentId: query.studentId } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { cardNumber: { contains: query.search } },
+              { student: { firstName: { contains: query.search } } },
+              { student: { lastName: { contains: query.search } } },
+              { student: { studentCode: { contains: query.search } } },
+            ],
+          }
+        : {}),
+    };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.idCard.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          student: {
+            include: {
+              enrollments: {
+                where: { status: 'ACTIVE' },
+                include: { grade: true, section: true },
+                take: 1,
+              },
+            },
+          },
+          teacher: { include: { user: true } },
+          school: { select: { name: true, code: true, city: true } },
+          branch: { select: { name: true } },
+        },
+      }),
+      this.prisma.idCard.count({ where }),
+    ]);
+    return paginate(items, total, page, limit);
+  }
+
+  private async upsertStudentCard(
+    school: { id: string; name: string },
+    student: {
+      id: string;
+      branchId: string;
+      studentCode: string;
+    },
+    userId: string,
+  ) {
+    const cardNumber = `STU-${student.studentCode}`;
+    return this.prisma.idCard.upsert({
+      where: { schoolId_cardNumber: { schoolId: school.id, cardNumber } },
+      create: {
+        schoolId: school.id,
+        branchId: student.branchId,
+        holderType: 'STUDENT',
+        studentId: student.id,
+        cardNumber,
+        generatedById: userId,
+      },
+      update: { generatedById: userId },
+      include: {
+        student: {
+          include: {
+            enrollments: {
+              where: { status: 'ACTIVE' },
+              include: { grade: true, section: true },
+              take: 1,
+            },
+          },
+        },
+        school: { select: { name: true, code: true, city: true } },
+        branch: { select: { name: true } },
+      },
+    });
+  }
+
+  private async upsertTeacherCard(
+    schoolId: string,
+    teacher: { id: string; branchId: string; employeeCode: string },
+    userId: string,
+  ) {
+    const cardNumber = `TCH-${teacher.employeeCode}`;
+    return this.prisma.idCard.upsert({
+      where: { schoolId_cardNumber: { schoolId, cardNumber } },
+      create: {
+        schoolId,
+        branchId: teacher.branchId,
+        holderType: 'TEACHER',
+        teacherId: teacher.id,
+        cardNumber,
+        generatedById: userId,
+      },
+      update: { generatedById: userId },
+      include: {
+        teacher: { include: { user: true } },
+        school: { select: { name: true, code: true, city: true } },
+        branch: { select: { name: true } },
+      },
+    });
+  }
+}

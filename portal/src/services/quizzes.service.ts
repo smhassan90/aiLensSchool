@@ -1,0 +1,53 @@
+import { apiClient, buildQuery } from "@/lib/api-client";
+import type { Paginated, Quiz } from "@/lib/types";
+
+export interface GenerateQuizPayload {
+  academicYearId: string;
+  sectionId: string;
+  subjectId: string;
+  branchId: string;
+  lessonDateFrom: string;
+  lessonDateTo: string;
+  questionCount?: number;
+  title?: string;
+}
+
+export interface UpdateQuizQuestionPayload {
+  id: string;
+  included?: boolean;
+  questionText?: string;
+  marks?: number;
+  correctAnswer?: string;
+  type?: string;
+}
+
+export const quizzesService = {
+  list(params?: { page?: number; limit?: number; sectionId?: string; status?: string }) {
+    return apiClient<Paginated<Quiz>>(`/quizzes${buildQuery(params ?? {})}`);
+  },
+
+  getById(id: string) {
+    return apiClient<Quiz>(`/quizzes/${id}`);
+  },
+
+  generate(payload: GenerateQuizPayload) {
+    return apiClient<Quiz>("/quizzes/generate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateQuestions(id: string, questions: UpdateQuizQuestionPayload[]) {
+    return apiClient<Quiz>(`/quizzes/${id}/questions`, {
+      method: "PATCH",
+      body: JSON.stringify({ questions }),
+    });
+  },
+
+  publish(id: string, dueAt?: string) {
+    return apiClient<Quiz>(`/quizzes/${id}/publish`, {
+      method: "POST",
+      body: JSON.stringify({ dueAt }),
+    });
+  },
+};

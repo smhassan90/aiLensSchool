@@ -1,0 +1,126 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnpm-store/
+.npm/
+.yarn-integrity
+
+# Env / secrets — keep *.example
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.local
+
+# Build / cache
+dist/
+build/
+out/
+.next/
+.nuxt/
+.turbo/
+.cache/
+.parcel-cache/
+.eslintcache
+.prettiercache
+.jest/
+*.tsbuildinfo
+next-env.d.ts
+expo-env.d.ts
+
+# Tests / coverage
+coverage/
+.nyc_output/
+*.lcov
+junit.xml
+
+# Logs / debug
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+*.pid
+*.pid.lock
+*.heapsnapshot
+.node_repl_history
+*.tgz
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editors
+.idea/
+*.swp
+*.swo
+*~
+*.bak
+.project
+.classpath
+.settings/
+*.sublime-workspace
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.cursor/
+
+# Prisma local DBs (keep schema + migrations)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Uploads / temp
+uploads/
+tmp/
+temp/
+.temp/
+*.tmp
+
+# Certs / keys
+*.pem
+*.key
+*.p8
+*.p12
+*.jks
+*.keystore
+*.mobileprovision
+*.crt
+!*.example.key
+
+# Docker / local data dumps
+dump.rdb
+*.sql.gz
+
+# Vercel / tooling
+.vercel/
+.tools/
+.serverless/
+.fusebox/
+.dynamodb/
+
+# Mobile (Expo generated native + secrets)
+.expo/
+.expo-shared/
+web-build/
+ios/
+android/
+**/local.properties
+*.orig.*

@@ -1,0 +1,8 @@
+{
+  "expo": {
+    "name": "SMS Parent",
+    "slug": "sms-parent",
+    "scheme": "smsparent",
+    "version": "1.0.0"
+  }
+}
