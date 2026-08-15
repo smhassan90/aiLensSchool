@@ -156,7 +156,8 @@ export class QuizzesService {
 
     const totalMarks = aiQuiz.questions.reduce((sum, q) => sum + q.marks, 0);
 
-    const quiz = await this.prisma.$transaction(async (tx) => {
+    const quiz = await this.prisma.$transaction(
+      async (tx) => {
       const created = await tx.quiz.create({
         data: {
           schoolId,
@@ -203,7 +204,9 @@ export class QuizzesService {
       }
 
       return created;
-    });
+      },
+      { maxWait: 15_000, timeout: 60_000 },
+    );
 
     await this.audit.log({
       actorUserId: user.id,
@@ -219,7 +222,19 @@ export class QuizzesService {
   }
 
   async updateQuestions(id: string, dto: UpdateQuizQuestionsDto, user: AuthUser) {
-    const quiz = await this.findOne(id, user);
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        schoolId: true,
+        status: true,
+        questions: { select: { id: true, included: true, marks: true } },
+      },
+    });
+    if (!quiz) {
+      throw new NotFoundException({ code: 'QUIZ_NOT_FOUND', message: 'Quiz not found' });
+    }
+    this.tenant.assertSchoolAccess(user, quiz.schoolId);
     if (quiz.status !== QuizStatus.DRAFT) {
       throw new BadRequestException({
         code: 'QUIZ_NOT_DRAFT',
@@ -227,9 +242,18 @@ export class QuizzesService {
       });
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      for (const q of dto.questions) {
-        await tx.quizQuestion.update({
+    const owned = new Map(quiz.questions.map((item) => [item.id, item]));
+    const unknown = dto.questions.find((item) => !owned.has(item.id));
+    if (unknown) {
+      throw new BadRequestException({
+        code: 'QUESTION_NOT_IN_QUIZ',
+        message: 'One or more questions do not belong to this quiz',
+      });
+    }
+
+    await Promise.all(
+      dto.questions.map((q) =>
+        this.prisma.quizQuestion.update({
           where: { id: q.id },
           data: {
             included: q.included,
@@ -238,13 +262,31 @@ export class QuizzesService {
             correctAnswer: q.correctAnswer,
             type: q.type,
           },
-        });
-      }
-      const included = await tx.quizQuestion.findMany({
-        where: { quizId: id, included: true },
+        }),
+      ),
+    );
+
+    const totalMarks = dto.questions.reduce((sum, q) => {
+      const current = owned.get(q.id);
+      const included = q.included ?? current?.included ?? false;
+      if (!included) return sum;
+      return sum + Number(q.marks ?? current?.marks ?? 0);
+    }, 0);
+
+    const title = dto.title?.trim();
+    if (dto.title !== undefined && !title) {
+      throw new BadRequestException({
+        code: 'TITLE_REQUIRED',
+        message: 'Enter a name for this draft',
       });
-      const totalMarks = included.reduce((sum, item) => sum + Number(item.marks), 0);
-      await tx.quiz.update({ where: { id }, data: { totalMarks } });
+    }
+
+    await this.prisma.quiz.update({
+      where: { id },
+      data: {
+        totalMarks,
+        ...(title ? { title } : {}),
+      },
     });
 
     return this.findOne(id, user);
@@ -267,24 +309,28 @@ export class QuizzesService {
       });
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const published = await tx.quiz.update({
-        where: { id },
-        data: {
-          status: QuizStatus.PUBLISHED,
-          publishedAt: new Date(),
-          dueAt: dto.dueAt ? new Date(dto.dueAt) : null,
-        },
+    const dueAt = dto.immediate ? null : dto.dueAt ? new Date(dto.dueAt) : null;
+    if (dueAt && Number.isNaN(dueAt.getTime())) {
+      throw new BadRequestException({
+        code: 'INVALID_DUE_AT',
+        message: 'Enter a valid date and time',
       });
+    }
 
-      await tx.quizAssignment.create({
-        data: {
-          quizId: id,
-          sectionId: quiz.sectionId,
-        },
-      });
+    const updated = await this.prisma.quiz.update({
+      where: { id },
+      data: {
+        status: QuizStatus.PUBLISHED,
+        publishedAt: new Date(),
+        dueAt,
+      },
+    });
 
-      return published;
+    await this.prisma.quizAssignment.create({
+      data: {
+        quizId: id,
+        sectionId: quiz.sectionId,
+      },
     });
 
     const parents = await this.prisma.studentParent.findMany({
@@ -350,24 +396,27 @@ export class QuizzesService {
         schoolId: this.tenant.requireSchoolId(user),
       };
       const [items, total] = await pageQuery(
-        this.prisma.quiz.findMany({
-          where,
-          orderBy: { publishedAt: 'desc' },
-          skip: (page - 1) * limit,
-          take: limit,
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            createdAt: true,
-            publishedAt: true,
-            sectionId: true,
-            subjectId: true,
-            subject: { select: { id: true, name: true } },
-            section: { select: { id: true, name: true } },
-          },
-        }),
-        this.prisma.quiz.count({ where }),
+        (skip, take) =>
+          this.prisma.quiz.findMany({
+            where,
+            orderBy: { publishedAt: 'desc' },
+            skip,
+            take,
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              createdAt: true,
+              publishedAt: true,
+              sectionId: true,
+              subjectId: true,
+              subject: { select: { id: true, name: true } },
+              section: { select: { id: true, name: true } },
+            },
+          }),
+        () => this.prisma.quiz.count({ where }),
+        page,
+        limit,
       );
       return paginate(items, total, page, limit);
     }
@@ -383,26 +432,29 @@ export class QuizzesService {
     };
 
     const [items, total] = await pageQuery(
-      this.prisma.quiz.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          createdAt: true,
-          publishedAt: true,
-          sectionId: true,
-          subjectId: true,
-          createdById: true,
-          subject: { select: { id: true, name: true } },
-          section: { select: { id: true, name: true } },
-          _count: { select: { questions: true, assignments: true } },
-        },
-      }),
-      this.prisma.quiz.count({ where }),
+      (skip, take) =>
+        this.prisma.quiz.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take,
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            createdAt: true,
+            publishedAt: true,
+            sectionId: true,
+            subjectId: true,
+            createdById: true,
+            subject: { select: { id: true, name: true } },
+            section: { select: { id: true, name: true } },
+            _count: { select: { questions: true, assignments: true } },
+          },
+        }),
+      () => this.prisma.quiz.count({ where }),
+      page,
+      limit,
     );
     return paginate(items, total, page, limit);
   }

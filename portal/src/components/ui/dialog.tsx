@@ -26,13 +26,15 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="fixed inset-0 bg-black/50"
         onClick={() => onOpenChange(false)}
         aria-hidden
       />
-      <div className="relative z-50 w-full max-w-lg">{children}</div>
+      <div className="relative z-50 flex max-h-full w-full justify-center overflow-y-auto">
+        {children}
+      </div>
     </div>
   );
 }
@@ -47,7 +49,7 @@ export function DialogContent({
   onClose?: () => void;
 }) {
   return (
-    <div className={cn("mx-4 rounded-lg border bg-card p-6 shadow-lg", className)}>
+    <div className={cn("relative my-auto w-full max-w-lg rounded-lg border bg-card p-6 shadow-lg", className)}>
       {onClose && (
         <Button
           variant="ghost"

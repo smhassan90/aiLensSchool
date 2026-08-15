@@ -42,17 +42,17 @@ export const quizzesService = {
     });
   },
 
-  updateQuestions(id: string, questions: UpdateQuizQuestionPayload[]) {
+  updateQuestions(id: string, questions: UpdateQuizQuestionPayload[], title?: string) {
     return apiClient<Quiz>(`/quizzes/${id}/questions`, {
       method: "PATCH",
-      body: JSON.stringify({ questions }),
+      body: JSON.stringify({ questions, title }),
     });
   },
 
-  publish(id: string, dueAt?: string) {
+  publish(id: string, payload?: { dueAt?: string; immediate?: boolean }) {
     return apiClient<Quiz>(`/quizzes/${id}/publish`, {
       method: "POST",
-      body: JSON.stringify({ dueAt }),
+      body: JSON.stringify(payload ?? {}),
     });
   },
 };

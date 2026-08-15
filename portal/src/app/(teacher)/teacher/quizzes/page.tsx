@@ -210,7 +210,7 @@ export default function TeacherQuizzesPage() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto" onClose={() => setDialogOpen(false)}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" onClose={() => setDialogOpen(false)}>
           <DialogHeader>
             <DialogTitle>Generate Quiz</DialogTitle>
             <DialogDescription>

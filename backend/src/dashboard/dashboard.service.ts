@@ -67,35 +67,33 @@ export class DashboardService {
       subject: { select: { name: true } },
     } as const;
 
-    const [classSubjects, assistantClassSubjects, quizCount, homeworkCount, latestResults] =
-      await Promise.all([
-        this.prisma.classSubject.findMany({
-          where: { teacher: { userId: user.id } },
-          select: classSelect,
-        }),
-        this.prisma.classSubject.findMany({
-          where: { assistantTeacher: { userId: user.id } },
-          select: classSelect,
-        }),
-        this.prisma.quiz.count({ where: { schoolId, createdById: user.id } }),
-        this.prisma.homework.count({ where: { schoolId, createdById: user.id } }),
-        this.prisma.quizResult.findMany({
-          where: { quiz: { schoolId, createdById: user.id } },
-          orderBy: { submittedAt: 'desc' },
-          take: 8,
-          select: {
-            id: true,
-            percentage: true,
-            student: { select: { firstName: true, lastName: true } },
-            quiz: { select: { title: true } },
-          },
-        }),
-      ]);
+    const [classSubjects, quizCount, homeworkCount, latestResults] = await Promise.all([
+      this.prisma.classSubject.findMany({
+        where: {
+          OR: [{ teacher: { userId: user.id } }, { assistantTeacher: { userId: user.id } }],
+        },
+        select: {
+          ...classSelect,
+          teacher: { select: { userId: true } },
+          assistantTeacher: { select: { userId: true } },
+        },
+      }),
+      this.prisma.quiz.count({ where: { schoolId, createdById: user.id } }),
+      this.prisma.homework.count({ where: { schoolId, createdById: user.id } }),
+      this.prisma.quizResult.findMany({
+        where: { quiz: { schoolId, createdById: user.id } },
+        orderBy: { submittedAt: 'desc' },
+        take: 8,
+        select: {
+          id: true,
+          percentage: true,
+          student: { select: { firstName: true, lastName: true } },
+          quiz: { select: { title: true } },
+        },
+      }),
+    ]);
 
-    const classes = [
-      ...classSubjects.map((item) => ({ ...item, role: 'TEACHER' as const })),
-      ...assistantClassSubjects.map((item) => ({ ...item, role: 'ASSISTANT' as const })),
-    ].map((item) => ({
+    const classes = classSubjects.map((item) => ({
       sectionId: item.sectionId,
       subjectId: item.subjectId,
       academicYearId: item.academicYearId,
@@ -104,7 +102,7 @@ export class DashboardService {
       gradeName: item.section.grade?.name ?? '—',
       gradeId: item.section.grade?.id,
       subjectName: item.subject.name,
-      role: item.role,
+      role: item.teacher?.userId === user.id ? ('TEACHER' as const) : ('ASSISTANT' as const),
     }));
 
     return {

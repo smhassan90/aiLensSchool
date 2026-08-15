@@ -339,28 +339,31 @@ export class LessonsService {
         ...(query.subjectId ? { subjectId: query.subjectId } : {}),
       };
       const [items, total] = await pageQuery(
-        this.prisma.dailyLesson.findMany({
-          where,
-          orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-          skip: (page - 1) * limit,
-          take: limit,
-          select: {
-            id: true,
-            date: true,
-            status: true,
-            topicName: true,
-            chapterName: true,
-            sectionId: true,
-            subjectId: true,
-            gradeId: true,
-            teacherId: true,
-            subject: { select: { id: true, name: true } },
-            section: { select: { id: true, name: true } },
-            grade: { select: { id: true, name: true } },
-            teacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
-          },
-        }),
-        this.prisma.dailyLesson.count({ where }),
+        (skip, take) =>
+          this.prisma.dailyLesson.findMany({
+            where,
+            orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+            skip,
+            take,
+            select: {
+              id: true,
+              date: true,
+              status: true,
+              topicName: true,
+              chapterName: true,
+              sectionId: true,
+              subjectId: true,
+              gradeId: true,
+              teacherId: true,
+              subject: { select: { id: true, name: true } },
+              section: { select: { id: true, name: true } },
+              grade: { select: { id: true, name: true } },
+              teacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
+            },
+          }),
+        () => this.prisma.dailyLesson.count({ where }),
+        page,
+        limit,
       );
       return paginate(items, total, page, limit);
     }
@@ -381,28 +384,31 @@ export class LessonsService {
     };
 
     const [items, total] = await pageQuery(
-      this.prisma.dailyLesson.findMany({
-        where,
-        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          date: true,
-          status: true,
-          topicName: true,
-          chapterName: true,
-          sectionId: true,
-          subjectId: true,
-          gradeId: true,
-          teacherId: true,
-          subject: { select: { id: true, name: true } },
-          section: { select: { id: true, name: true } },
-          grade: { select: { id: true, name: true } },
-          teacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
-        },
-      }),
-      this.prisma.dailyLesson.count({ where }),
+      (skip, take) =>
+        this.prisma.dailyLesson.findMany({
+          where,
+          orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+          skip,
+          take,
+          select: {
+            id: true,
+            date: true,
+            status: true,
+            topicName: true,
+            chapterName: true,
+            sectionId: true,
+            subjectId: true,
+            gradeId: true,
+            teacherId: true,
+            subject: { select: { id: true, name: true } },
+            section: { select: { id: true, name: true } },
+            grade: { select: { id: true, name: true } },
+            teacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
+          },
+        }),
+      () => this.prisma.dailyLesson.count({ where }),
+      page,
+      limit,
     );
 
     return paginate(items, total, page, limit);

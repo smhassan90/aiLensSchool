@@ -78,7 +78,7 @@ export function QuizMixFields({
         </p>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3">
             <CountField id="mcqCount" label="Choose the best answer" value={mcqCount} onChange={onMcqChange} />
             <CountField id="fillBlankCount" label="Fill in the blanks" value={fillBlankCount} onChange={onFillBlankChange} />
             <CountField id="shortAnswerCount" label="Simple text" value={shortAnswerCount} onChange={onShortAnswerChange} />

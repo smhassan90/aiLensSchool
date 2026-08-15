@@ -27,8 +27,29 @@ export interface PaginatedResult<T> {
   totalPages: number;
 }
 
-export function pageQuery<T>(find: Promise<T[]>, count: Promise<number>) {
-  return Promise.all([find, count]);
+export function pageQuery<T>(find: Promise<T[]>, count: Promise<number>): Promise<[T[], number]>;
+export function pageQuery<T>(
+  find: (skip: number, take: number) => Promise<T[]>,
+  count: () => Promise<number>,
+  page: number,
+  limit: number,
+): Promise<[T[], number]>;
+export async function pageQuery<T>(
+  find: Promise<T[]> | ((skip: number, take: number) => Promise<T[]>),
+  count: Promise<number> | (() => Promise<number>),
+  page = 1,
+  limit = 20,
+): Promise<[T[], number]> {
+  if (typeof find === 'function') {
+    const skip = (page - 1) * limit;
+    const items = await find(skip, limit);
+    if (items.length < limit) {
+      return [items, skip + items.length];
+    }
+    const total = typeof count === 'function' ? await count() : await count;
+    return [items, total];
+  }
+  return Promise.all([find, count as Promise<number>]);
 }
 
 export function paginate<T>(

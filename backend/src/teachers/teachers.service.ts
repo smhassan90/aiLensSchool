@@ -165,29 +165,32 @@ export class TeachersService {
     };
 
     const [items, total] = await pageQuery(
-      this.prisma.teacherProfile.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          employeeCode: true,
-          status: true,
-          user: {
-            select: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-              phone: true,
-              status: true,
+      (skip, take) =>
+        this.prisma.teacherProfile.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take,
+          select: {
+            id: true,
+            employeeCode: true,
+            status: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+                status: true,
+              },
             },
+            branch: { select: { id: true, name: true } },
           },
-          branch: { select: { id: true, name: true } },
-        },
-      }),
-      this.prisma.teacherProfile.count({ where }),
+        }),
+      () => this.prisma.teacherProfile.count({ where }),
+      page,
+      limit,
     );
 
     return paginate(items, total, page, limit);

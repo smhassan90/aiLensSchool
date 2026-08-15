@@ -95,17 +95,20 @@ export class BranchesService {
     };
 
     const [items, total] = await pageQuery(
-      this.prisma.branch.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        include: {
-          school: { select: { id: true, name: true, code: true } },
-          _count: { select: { students: true, teachers: true, sections: true } },
-        },
-      }),
-      this.prisma.branch.count({ where }),
+      (skip, take) =>
+        this.prisma.branch.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take,
+          include: {
+            school: { select: { id: true, name: true, code: true } },
+            _count: { select: { students: true, teachers: true, sections: true } },
+          },
+        }),
+      () => this.prisma.branch.count({ where }),
+      page,
+      limit,
     );
 
     return paginate(items, total, page, limit);

@@ -72,13 +72,16 @@ export class AcademicsService {
     const limit = query.limit ?? 20;
     const where: Prisma.AcademicYearWhereInput = { schoolId };
     const [items, total] = await pageQuery(
-      this.prisma.academicYear.findMany({
-        where,
-        orderBy: { startDate: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.academicYear.count({ where }),
+      (skip, take) =>
+        this.prisma.academicYear.findMany({
+          where,
+          orderBy: { startDate: 'desc' },
+          skip,
+          take,
+        }),
+      () => this.prisma.academicYear.count({ where }),
+      page,
+      limit,
     );
     return paginate(items, total, page, limit);
   }
@@ -167,20 +170,23 @@ export class AcademicsService {
     const limit = query.limit ?? 20;
     const where: Prisma.GradeWhereInput = { schoolId };
     const [items, total] = await pageQuery(
-      this.prisma.grade.findMany({
-        where,
-        orderBy: { level: 'asc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          name: true,
-          level: true,
-          _count: { select: { sections: true, enrollments: true } },
-          sections: { orderBy: { name: 'asc' }, select: { id: true, name: true } },
-        },
-      }),
-      this.prisma.grade.count({ where }),
+      (skip, take) =>
+        this.prisma.grade.findMany({
+          where,
+          orderBy: { level: 'asc' },
+          skip,
+          take,
+          select: {
+            id: true,
+            name: true,
+            level: true,
+            _count: { select: { sections: true, enrollments: true } },
+            sections: { orderBy: { name: 'asc' }, select: { id: true, name: true } },
+          },
+        }),
+      () => this.prisma.grade.count({ where }),
+      page,
+      limit,
     );
     return paginate(items, total, page, limit);
   }
@@ -266,30 +272,33 @@ export class AcademicsService {
       ...(query.gradeId ? { gradeId: query.gradeId } : {}),
     };
     const [items, total] = await pageQuery(
-      this.prisma.section.findMany({
-        where,
-        orderBy: { name: 'asc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          name: true,
-          gradeId: true,
-          branchId: true,
-          capacity: true,
-          grade: { select: { id: true, name: true, level: true } },
-          branch: { select: { id: true, name: true } },
-          _count: { select: { enrollments: true, classSubjects: true } },
-          classSubjects: {
-            select: {
-              subjectId: true,
-              academicYearId: true,
-              subject: { select: { id: true, name: true } },
+      (skip, take) =>
+        this.prisma.section.findMany({
+          where,
+          orderBy: { name: 'asc' },
+          skip,
+          take,
+          select: {
+            id: true,
+            name: true,
+            gradeId: true,
+            branchId: true,
+            capacity: true,
+            grade: { select: { id: true, name: true, level: true } },
+            branch: { select: { id: true, name: true } },
+            _count: { select: { enrollments: true, classSubjects: true } },
+            classSubjects: {
+              select: {
+                subjectId: true,
+                academicYearId: true,
+                subject: { select: { id: true, name: true } },
+              },
             },
           },
-        },
-      }),
-      this.prisma.section.count({ where }),
+        }),
+      () => this.prisma.section.count({ where }),
+      page,
+      limit,
     );
     return paginate(items, total, page, limit);
   }
@@ -338,20 +347,23 @@ export class AcademicsService {
       ...(query.gradeId ? { gradeId: query.gradeId } : {}),
     };
     const [items, total] = await pageQuery(
-      this.prisma.subject.findMany({
-        where,
-        orderBy: { name: 'asc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          gradeId: true,
-          grade: { select: { id: true, name: true } },
-        },
-      }),
-      this.prisma.subject.count({ where }),
+      (skip, take) =>
+        this.prisma.subject.findMany({
+          where,
+          orderBy: { name: 'asc' },
+          skip,
+          take,
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            gradeId: true,
+            grade: { select: { id: true, name: true } },
+          },
+        }),
+      () => this.prisma.subject.count({ where }),
+      page,
+      limit,
     );
     return paginate(items, total, page, limit);
   }
@@ -449,26 +461,29 @@ export class AcademicsService {
       ...(query.gradeId ? { gradeId: query.gradeId } : {}),
     };
     const [items, total] = await pageQuery(
-      this.prisma.studentEnrollment.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          status: true,
-          createdAt: true,
-          studentId: true,
-          gradeId: true,
-          sectionId: true,
-          academicYearId: true,
-          student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
-          grade: { select: { id: true, name: true } },
-          section: { select: { id: true, name: true } },
-          academicYear: { select: { id: true, name: true } },
-        },
-      }),
-      this.prisma.studentEnrollment.count({ where }),
+      (skip, take) =>
+        this.prisma.studentEnrollment.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take,
+          select: {
+            id: true,
+            status: true,
+            createdAt: true,
+            studentId: true,
+            gradeId: true,
+            sectionId: true,
+            academicYearId: true,
+            student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
+            grade: { select: { id: true, name: true } },
+            section: { select: { id: true, name: true } },
+            academicYear: { select: { id: true, name: true } },
+          },
+        }),
+      () => this.prisma.studentEnrollment.count({ where }),
+      page,
+      limit,
     );
     return paginate(items, total, page, limit);
   }
@@ -562,14 +577,17 @@ export class AcademicsService {
       ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
     };
     const [items, total] = await pageQuery(
-      this.prisma.classSubject.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        include: this.classSubjectInclude(),
-      }),
-      this.prisma.classSubject.count({ where }),
+      (skip, take) =>
+        this.prisma.classSubject.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take,
+          include: this.classSubjectInclude(),
+        }),
+      () => this.prisma.classSubject.count({ where }),
+      page,
+      limit,
     );
     return paginate(items, total, page, limit);
   }

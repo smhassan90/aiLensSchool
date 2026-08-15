@@ -142,7 +142,7 @@ export function SchoolShell({ children }: { children: React.ReactNode }) {
         <header className="flex items-center border-b px-6 py-3 print:hidden">
           <GlobalSearch />
         </header>
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="min-w-0 flex-1 overflow-auto">{children}</main>
       </div>
     </div>
   );

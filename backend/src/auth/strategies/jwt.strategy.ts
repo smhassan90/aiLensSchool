@@ -13,7 +13,7 @@ interface JwtPayload {
   roles: RoleName[];
 }
 
-const AUTH_CACHE_TTL_MS = 60_000;
+const AUTH_CACHE_TTL_MS = 120_000;
 const authCache = new Map<string, { user: AuthUser; expiresAt: number }>();
 
 @Injectable()

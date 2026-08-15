@@ -142,7 +142,7 @@ export default function SchoolQuizzesPage() {
         )}
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto" onClose={() => setOpen(false)}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" onClose={() => setOpen(false)}>
           <DialogHeader><DialogTitle>Generate quiz</DialogTitle></DialogHeader>
           <div className="space-y-3">
             {catalogError ? (

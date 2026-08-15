@@ -127,9 +127,19 @@ export class UpdateQuizQuestionsDto {
   @ValidateNested({ each: true })
   @Type(() => UpdateQuestionDto)
   questions!: UpdateQuestionDto[];
+
+  @ApiPropertyOptional({ description: 'Draft quiz name' })
+  @IsOptional()
+  @IsString()
+  title?: string;
 }
 
 export class PublishQuizDto {
+  @ApiPropertyOptional({ description: 'Publish now with no due date' })
+  @IsOptional()
+  @IsBoolean()
+  immediate?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsDateString()

@@ -20,6 +20,7 @@ export interface CreateStudentPayload {
   gradeId: string;
   sectionId: string;
   academicYearId: string;
+  address?: string;
   father?: {
     firstName: string;
     lastName?: string;

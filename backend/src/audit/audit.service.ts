@@ -18,19 +18,21 @@ interface AuditInput {
 export class AuditService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async log(input: AuditInput) {
-    return this.prisma.auditLog.create({
-      data: {
-        actorUserId: input.actorUserId ?? undefined,
-        schoolId: input.schoolId ?? undefined,
-        branchId: input.branchId ?? undefined,
-        action: input.action,
-        entityType: input.entityType,
-        entityId: input.entityId ?? undefined,
-        metadata: input.metadata,
-        ipAddress: input.ipAddress ?? undefined,
-      },
-    });
+  log(input: AuditInput) {
+    void this.prisma.auditLog
+      .create({
+        data: {
+          actorUserId: input.actorUserId ?? undefined,
+          schoolId: input.schoolId ?? undefined,
+          branchId: input.branchId ?? undefined,
+          action: input.action,
+          entityType: input.entityType,
+          entityId: input.entityId ?? undefined,
+          metadata: input.metadata,
+          ipAddress: input.ipAddress ?? undefined,
+        },
+      })
+      .catch(() => undefined);
   }
 
   async findAll(query: PaginationDto & { schoolId?: string; action?: string }) {

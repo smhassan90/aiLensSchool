@@ -34,6 +34,7 @@ const schema = z
     gradeId: z.string().min(1, "Select a class"),
     sectionId: z.string().min(1, "Select a section"),
     academicYearId: z.string().min(1, "Select an academic year"),
+    address: z.string().optional(),
     fatherFirstName: z.string().optional(),
     fatherLastName: z.string().optional(),
     fatherPhone: z.string().optional(),
@@ -95,6 +96,7 @@ export default function NewStudentPage() {
         gradeId: values.gradeId,
         sectionId: values.sectionId,
         academicYearId: values.academicYearId,
+        address: values.address?.trim() || undefined,
         father: values.fatherFirstName?.trim()
           ? {
               firstName: values.fatherFirstName.trim(),
@@ -187,6 +189,10 @@ export default function NewStudentPage() {
                   <option value="FEMALE">Female</option>
                   <option value="OTHER">Other</option>
                 </Select>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="address">Home address</Label>
+                <Input id="address" {...register("address")} placeholder="House / street, area, city" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="branchId">Branch</Label>

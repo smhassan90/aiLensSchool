@@ -186,6 +186,10 @@ export default function IdCardsPage() {
                 <p className="truncate"><span className="text-slate-500">Email:</span> {parent.email}</p>
               </div>
             </div>
+            <div className="border-t border-teal-700/20 bg-slate-50 px-3 py-1.5 text-[10px] leading-3.5 text-slate-700">
+              <span className="font-semibold uppercase tracking-wide text-teal-800">Address </span>
+              <span className="break-words">{student.address?.trim() || "—"}</span>
+            </div>
           </div>
 
           <div className="flex gap-2 print:hidden">

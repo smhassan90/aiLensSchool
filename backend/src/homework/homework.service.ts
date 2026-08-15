@@ -105,24 +105,27 @@ export class HomeworkService {
         schoolId: this.tenant.requireSchoolId(user),
       };
       const [items, total] = await pageQuery(
-        this.prisma.homework.findMany({
-          where,
-          orderBy: { dueDate: 'desc' },
-          skip: (page - 1) * limit,
-          take: limit,
-          select: {
-            id: true,
-            title: true,
-            dueDate: true,
-            sectionId: true,
-            subjectId: true,
-            lessonId: true,
-            createdAt: true,
-            subject: { select: { id: true, name: true } },
-            section: { select: { id: true, name: true } },
-          },
-        }),
-        this.prisma.homework.count({ where }),
+        (skip, take) =>
+          this.prisma.homework.findMany({
+            where,
+            orderBy: { dueDate: 'desc' },
+            skip,
+            take,
+            select: {
+              id: true,
+              title: true,
+              dueDate: true,
+              sectionId: true,
+              subjectId: true,
+              lessonId: true,
+              createdAt: true,
+              subject: { select: { id: true, name: true } },
+              section: { select: { id: true, name: true } },
+            },
+          }),
+        () => this.prisma.homework.count({ where }),
+        page,
+        limit,
       );
       return paginate(items, total, page, limit);
     }
@@ -138,24 +141,27 @@ export class HomeworkService {
     };
 
     const [items, total] = await pageQuery(
-      this.prisma.homework.findMany({
-        where,
-        orderBy: { dueDate: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          title: true,
-          dueDate: true,
-          sectionId: true,
-          subjectId: true,
-          lessonId: true,
-          createdAt: true,
-          subject: { select: { id: true, name: true } },
-          section: { select: { id: true, name: true } },
-        },
-      }),
-      this.prisma.homework.count({ where }),
+      (skip, take) =>
+        this.prisma.homework.findMany({
+          where,
+          orderBy: { dueDate: 'desc' },
+          skip,
+          take,
+          select: {
+            id: true,
+            title: true,
+            dueDate: true,
+            sectionId: true,
+            subjectId: true,
+            lessonId: true,
+            createdAt: true,
+            subject: { select: { id: true, name: true } },
+            section: { select: { id: true, name: true } },
+          },
+        }),
+      () => this.prisma.homework.count({ where }),
+      page,
+      limit,
     );
     return paginate(items, total, page, limit);
   }

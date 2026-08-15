@@ -3,8 +3,13 @@ import { PrismaClient } from '@prisma/client';
 
 function databaseUrl() {
   const url = process.env.DATABASE_URL ?? '';
-  if (!url || url.includes('connection_limit=')) return url;
-  return `${url}${url.includes('?') ? '&' : '?'}connection_limit=15`;
+  if (!url) return url;
+  const parts: string[] = [];
+  if (!url.includes('connection_limit=')) parts.push('connection_limit=15');
+  if (!url.includes('pool_timeout=')) parts.push('pool_timeout=20');
+  if (!url.includes('connect_timeout=')) parts.push('connect_timeout=10');
+  if (!parts.length) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}${parts.join('&')}`;
 }
 
 @Injectable()
@@ -12,6 +17,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   constructor() {
     super({
       datasources: { db: { url: databaseUrl() } },
+      transactionOptions: {
+        maxWait: 15_000,
+        timeout: 60_000,
+      },
     });
   }
 

@@ -95,6 +95,7 @@ export interface Student {
   admissionNumber: string;
   status: string;
   photoUrl?: string | null;
+  address?: string | null;
   branch?: { id: string; name: string };
   grade?: { id: string; name: string };
   section?: { id: string; name: string };
@@ -258,6 +259,55 @@ export interface Quiz {
   questions?: QuizQuestion[];
   section?: { id: string; name: string };
   subject?: { id: string; name: string };
+}
+
+export interface QuizAnalysisStudent {
+  studentId: string;
+  firstName: string;
+  lastName: string;
+  studentCode: string;
+  score: number | null;
+  totalMarks: number;
+  percentage: number | null;
+  submittedAt: string | null;
+  status: "SUBMITTED" | "NOT_ATTEMPTED";
+}
+
+export interface QuizAnalysisQuestion {
+  id: string;
+  number: number;
+  questionText: string;
+  type: string;
+  marks: number;
+  correctAnswer?: string | null;
+  correctCount: number;
+  wrongCount: number;
+  unansweredCount: number;
+  missedCount: number;
+  missedPercent: number;
+  correctPercent: number;
+  needsAttention: boolean;
+  missedBy: Array<{ id: string; name: string }>;
+}
+
+export interface QuizAnalysis {
+  quizId: string;
+  title: string;
+  totalMarks: number;
+  classSize: number;
+  totalStudentsAttempted: number;
+  notAttemptedCount: number;
+  averagePercentage: number;
+  highestPercentage: number;
+  lowestPercentage: number;
+  scoreBands: Array<{
+    key: string;
+    label: string;
+    count: number;
+    students: Array<{ id: string; name: string }>;
+  }>;
+  students: QuizAnalysisStudent[];
+  questions: QuizAnalysisQuestion[];
 }
 
 export interface Parent {

@@ -268,10 +268,9 @@ export class InsightsService {
     if (!parent) {
       throw new NotFoundException({ code: 'PARENT_NOT_FOUND', message: 'Parent not found' });
     }
-    const children = [];
-    for (const link of parent.students) {
-      children.push(await this.studentOverview(link.student.id, user));
-    }
+    const children = await Promise.all(
+      parent.students.map((link) => this.studentOverview(link.student.id, user)),
+    );
     return {
       parent: {
         id: parent.id,

@@ -1,0 +1,6 @@
+uploads
+test
+coverage
+*.md
+.env
+.env.*

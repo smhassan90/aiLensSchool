@@ -488,6 +488,7 @@ export class DocumentsService {
               studentCode: true,
               admissionNumber: true,
               photoUrl: true,
+              address: true,
               enrollments: {
                 where: { status: 'ACTIVE' },
                 take: 1,

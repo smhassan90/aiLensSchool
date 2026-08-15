@@ -74,6 +74,11 @@ export class CreateStudentDto {
   @IsString()
   academicYearId!: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  address?: string;
+
   @ApiPropertyOptional({ type: CreateParentInlineDto })
   @IsOptional()
   @ValidateNested()

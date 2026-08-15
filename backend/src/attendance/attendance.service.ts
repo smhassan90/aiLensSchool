@@ -88,16 +88,19 @@ export class AttendanceService {
     };
 
     const [items, total] = await pageQuery(
-      this.prisma.attendance.findMany({
-        where,
-        orderBy: { date: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        include: {
-          student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
-        },
-      }),
-      this.prisma.attendance.count({ where }),
+      (skip, take) =>
+        this.prisma.attendance.findMany({
+          where,
+          orderBy: { date: 'desc' },
+          skip,
+          take,
+          include: {
+            student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
+          },
+        }),
+      () => this.prisma.attendance.count({ where }),
+      page,
+      limit,
     );
     return paginate(items, total, page, limit);
   }

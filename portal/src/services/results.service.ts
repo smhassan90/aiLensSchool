@@ -1,5 +1,5 @@
 import { apiClient, buildQuery } from "@/lib/api-client";
-import type { Paginated } from "@/lib/types";
+import type { Paginated, QuizAnalysis } from "@/lib/types";
 
 export interface QuizResultRow {
   id: string;
@@ -16,6 +16,6 @@ export const resultsService = {
     return apiClient<Paginated<QuizResultRow>>(`/results${buildQuery(params ?? {})}`);
   },
   quizStats(quizId: string) {
-    return apiClient(`/results/quiz/${quizId}/stats`);
+    return apiClient<QuizAnalysis>(`/results/quiz/${quizId}/stats`);
   },
 };

@@ -106,13 +106,34 @@ Demo school: **ABC School** with Main Campus and Second Campus branches. `parent
 4. **Parent (mobile)** → select child → view lessons, homework, quizzes, results
 5. **Billing** → `MAX(active_students × rate, minimum_monthly_fee)` per branch
 
-## Environment Variables
+## CI/CD (GitHub → Vercel)
 
-See `.env.example` in each project:
+Pushing to `main` deploys **portal** and **backend** as separate Vercel projects. Pull requests get preview deployments. Only the app whose files changed is deployed.
 
-- `backend/.env.example` — database, JWT, Redis, AI, storage, CORS
-- `portal/.env.example` — `NEXT_PUBLIC_API_URL`
-- `mobile/.env.example` — `EXPO_PUBLIC_API_URL`
+### 1. GitHub secrets
+
+In the GitHub repo: **Settings → Secrets and variables → Actions**. Add:
+
+| Secret | Where to find it |
+|--------|------------------|
+| `VERCEL_TOKEN` | [Vercel account tokens](https://vercel.com/account/tokens) |
+| `VERCEL_ORG_ID` | Vercel team/org settings, or `.vercel/project.json` after `vercel link` |
+| `VERCEL_PORTAL_PROJECT_ID` | Portal project → Settings → General → Project ID |
+| `VERCEL_BACKEND_PROJECT_ID` | Backend project → Settings → General → Project ID |
+
+App env vars (`DATABASE_URL`, `JWT_*`, `NEXT_PUBLIC_API_URL`, `CORS_ORIGINS`, …) stay in each **Vercel project → Settings → Environment Variables**, not in GitHub.
+
+### 2. Vercel project Root Directory
+
+These GitHub Actions run inside `portal/` and `backend/`. In each Vercel project, **Root Directory must be empty** (not `portal` or `backend`). That matches projects created with `vercel` from those folders.
+
+If a project is instead linked to the monorepo root with Root Directory `portal` / `backend`, change the workflow `working-directory` to the repo root for that job.
+
+### 3. Avoid double deploys
+
+If the GitHub repo is also connected in Vercel (**Project → Settings → Git**), turn off automatic Git deployments there. Otherwise every push deploys twice (Vercel Git + GitHub Actions).
+
+You can also deploy manually: **Actions → Deploy to Vercel → Run workflow**.
 
 ## AI Configuration
 

@@ -91,6 +91,7 @@ export class StudentsService {
           lastName: dto.lastName,
           dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
           gender: dto.gender,
+          address: dto.address?.trim() || null,
           status: StudentStatus.ACTIVE,
         },
       });
@@ -311,32 +312,36 @@ export class StudentsService {
     };
 
     const [items, total] = await pageQuery(
-      this.prisma.student.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          studentCode: true,
-          admissionNumber: true,
-          status: true,
-          photoUrl: true,
-          createdAt: true,
-          branch: { select: { id: true, name: true } },
-          enrollments: {
-            where: { status: EnrollmentStatus.ACTIVE },
-            take: 1,
-            select: {
-              grade: { select: { id: true, name: true } },
-              section: { select: { id: true, name: true } },
+      (skip, take) =>
+        this.prisma.student.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take,
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            studentCode: true,
+            admissionNumber: true,
+            status: true,
+            photoUrl: true,
+            address: true,
+            createdAt: true,
+            branch: { select: { id: true, name: true } },
+            enrollments: {
+              where: { status: EnrollmentStatus.ACTIVE },
+              take: 1,
+              select: {
+                grade: { select: { id: true, name: true } },
+                section: { select: { id: true, name: true } },
+              },
             },
           },
-        },
-      }),
-      this.prisma.student.count({ where }),
+        }),
+      () => this.prisma.student.count({ where }),
+      page,
+      limit,
     );
 
     const mapped = items.map((student) => {

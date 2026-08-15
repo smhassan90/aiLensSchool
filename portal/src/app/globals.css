@@ -123,7 +123,7 @@
 
 @media print {
   @page {
-    size: 86mm 54mm;
+    size: 86mm 58mm;
     margin: 0;
   }
 
@@ -145,7 +145,7 @@
     position: absolute;
     inset: 0;
     width: 86mm;
-    height: 54mm;
+    height: 58mm;
     margin: 0;
     box-shadow: none !important;
     break-inside: avoid;
