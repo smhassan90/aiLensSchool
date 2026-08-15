@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/layout/page-loader";
+
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
@@ -14,7 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
 import { academicsService } from "@/services/academics.service";
 import { Users } from "lucide-react";
 
@@ -38,11 +39,7 @@ export default function SectionsPage() {
 
       <div className="rounded-lg border bg-card">
         {sections.isLoading ? (
-          <div className="space-y-3 p-6">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
+          <PageLoader variant="panel" />
         ) : !sections.data?.items.length ? (
           <EmptyState
             icon={<Users className="h-10 w-10" />}

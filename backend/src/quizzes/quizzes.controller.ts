@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { QuizStatus, RoleName } from '@prisma/client';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
@@ -35,6 +35,7 @@ export class QuizzesController {
 
   @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)
   @Post('generate')
+  @HttpCode(HttpStatus.OK)
   generate(@Body() dto: GenerateQuizDto, @CurrentUser() user: AuthUser) {
     return this.quizzesService.generateFromLessons(dto, user);
   }

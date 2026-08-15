@@ -27,6 +27,10 @@ export interface PaginatedResult<T> {
   totalPages: number;
 }
 
+export function pageQuery<T>(find: Promise<T[]>, count: Promise<number>) {
+  return Promise.all([find, count]);
+}
+
 export function paginate<T>(
   items: T[],
   total: number,

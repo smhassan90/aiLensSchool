@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/layout/page-loader";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { studentsService, type ParentCredential } from "@/services/students.service";
 import { branchesService } from "@/services/branches.service";
@@ -143,10 +143,7 @@ export default function NewStudentPage() {
       />
 
       {loadingMeta ? (
-        <div className="mx-auto max-w-3xl space-y-4">
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-48 w-full" />
-        </div>
+        <PageLoader variant="page" />
       ) : (
         <form
           onSubmit={handleSubmit((v) => mutation.mutate(v))}

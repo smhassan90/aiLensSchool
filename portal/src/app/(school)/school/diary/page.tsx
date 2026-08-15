@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageLoader } from "@/components/layout/page-loader";
 import { documentsService } from "@/services/documents.service";
 import { academicsService } from "@/services/academics.service";
 import { useToast } from "@/providers/toast-provider";
@@ -64,7 +65,9 @@ export default function DiaryPage() {
           <Button disabled={!sectionId || generate.isPending} onClick={() => generate.mutate()}>Generate from lessons</Button>
         </div>
       </div>
-      {!diaries.data?.items.length ? (
+      {diaries.isLoading ? (
+        <PageLoader variant="panel" />
+      ) : !diaries.data?.items.length ? (
         <EmptyState icon={<NotebookPen className="h-10 w-10" />} title="No diaries yet" description="Select a section and generate from today’s lessons." />
       ) : (
         <div className="space-y-4">

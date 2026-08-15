@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/layout/page-loader";
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -21,7 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -138,11 +139,7 @@ export default function ClassesPage() {
 
       <div className="rounded-lg border bg-card">
         {classes.isLoading ? (
-          <div className="space-y-3 p-6">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
+          <PageLoader variant="panel" />
         ) : !classes.data?.items.length ? (
           <EmptyState
             icon={<BookOpen className="h-10 w-10" />}

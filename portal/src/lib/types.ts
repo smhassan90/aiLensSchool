@@ -78,6 +78,15 @@ export interface Branch {
   status: string;
 }
 
+export interface StudentParentLink {
+  relationship?: string;
+  isPrimary?: boolean;
+  parent?: {
+    phone?: string;
+    user?: { firstName: string; lastName: string; email?: string; phone?: string };
+  };
+}
+
 export interface Student {
   id: string;
   firstName: string;
@@ -85,10 +94,12 @@ export interface Student {
   studentCode: string;
   admissionNumber: string;
   status: string;
+  photoUrl?: string | null;
   branch?: { id: string; name: string };
   grade?: { id: string; name: string };
   section?: { id: string; name: string };
   enrollments?: Enrollment[];
+  parents?: StudentParentLink[];
 }
 
 export interface Teacher {
@@ -221,12 +232,19 @@ export interface Lesson {
   grade?: { id: string; name: string };
 }
 
+export interface QuizOption {
+  id?: string;
+  optionText: string;
+  isCorrect?: boolean;
+  order?: number;
+}
+
 export interface QuizQuestion {
   id: string;
   questionText: string;
   type: string;
-  marks: number;
-  options?: string[];
+  marks: number | string;
+  options?: QuizOption[];
   correctAnswer?: string;
   included: boolean;
 }

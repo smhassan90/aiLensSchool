@@ -116,6 +116,10 @@ export class GenerateHomeworkDto {
   @IsString()
   branchId!: string;
 
+  @ApiProperty({ description: 'Topic title used later when generating quizzes' })
+  @IsString()
+  title!: string;
+
   @ApiProperty()
   @IsDateString()
   dueDate!: string;

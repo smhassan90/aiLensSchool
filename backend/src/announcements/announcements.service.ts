@@ -4,7 +4,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateAnnouncementDto, UpdateAnnouncementDto } from './dto/announcement.dto';
 
 @Injectable()
@@ -82,7 +82,7 @@ export class AnnouncementsService {
       schoolId,
       ...(query.status ? { status: query.status } : {}),
     };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.announcement.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -90,7 +90,7 @@ export class AnnouncementsService {
         take: limit,
       }),
       this.prisma.announcement.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 

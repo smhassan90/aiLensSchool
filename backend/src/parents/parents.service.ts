@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class ParentsService {
@@ -45,7 +45,7 @@ export class ParentsService {
         : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.parentProfile.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -79,7 +79,7 @@ export class ParentsService {
         },
       }),
       this.prisma.parentProfile.count({ where }),
-    ]);
+    );
 
     return paginate(items, total, page, limit);
   }

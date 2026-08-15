@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadGatewayException, Inject, Injectable } from '@nestjs/common';
 import { AIRequestStatus, AIRequestType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AI_PROVIDER, AiProvider } from '../providers/ai.provider';
@@ -17,6 +17,10 @@ export class QuizGenerationService {
     lessonSummaries: string[];
     subjectName?: string;
     questionCount?: number;
+    quickGenerate?: boolean;
+    mcqCount?: number;
+    fillBlankCount?: number;
+    shortAnswerCount?: number;
   }): Promise<QuizOutput> {
     const request = await this.prisma.aIRequest.create({
       data: {
@@ -34,6 +38,10 @@ export class QuizGenerationService {
         lessonSummaries: input.lessonSummaries,
         subjectName: input.subjectName,
         questionCount: input.questionCount,
+        quickGenerate: input.quickGenerate,
+        mcqCount: input.mcqCount,
+        fillBlankCount: input.fillBlankCount,
+        shortAnswerCount: input.shortAnswerCount,
       });
 
       await this.prisma.aIRequest.update({
@@ -58,7 +66,10 @@ export class QuizGenerationService {
         where: { id: request.id },
         data: { status: AIRequestStatus.FAILED, errorMessage: message },
       });
-      throw error;
+      throw new BadGatewayException({
+        code: 'QUIZ_GENERATION_FAILED',
+        message,
+      });
     }
   }
 }

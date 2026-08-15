@@ -50,3 +50,104 @@
     scrollbar-width: thin;
   }
 }
+
+@keyframes lens-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes lens-spin-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes lens-glow {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes lens-core {
+  0%,
+  100% {
+    transform: scale(0.94);
+  }
+  50% {
+    transform: scale(1);
+  }
+}
+
+@keyframes loader-phrase {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  12%,
+  82% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.lens-spin {
+  animation: lens-spin 1.8s linear infinite;
+}
+
+.lens-spin-rev {
+  animation: lens-spin-rev 2.6s linear infinite;
+}
+
+.lens-glow {
+  animation: lens-glow 2.8s ease-in-out infinite;
+}
+
+.lens-core {
+  animation: lens-core 2.4s ease-in-out infinite;
+}
+
+.loader-phrase {
+  animation: loader-phrase 2.4s ease-in-out;
+}
+
+@media print {
+  @page {
+    size: 86mm 54mm;
+    margin: 0;
+  }
+
+  html,
+  body {
+    background: white !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-id-card,
+  #printable-id-card * {
+    visibility: visible;
+  }
+
+  #printable-id-card {
+    position: absolute;
+    inset: 0;
+    width: 86mm;
+    height: 54mm;
+    margin: 0;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+}

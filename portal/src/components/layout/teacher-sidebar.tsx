@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
+import { BrandMark } from "@/components/brand/brand-mark";
 
 const navItems = [
   { href: "/teacher/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -32,15 +33,7 @@ export function TeacherSidebar() {
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r bg-card">
       <div className="border-b px-6 py-5">
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <BookOpen className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="font-display text-sm font-semibold">Teacher Hub</p>
-            <p className="text-xs text-muted-foreground">Classroom tools</p>
-          </div>
-        </div>
+        <BrandMark subtitle="Teacher Hub" />
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">

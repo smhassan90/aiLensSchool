@@ -6,9 +6,14 @@ export interface GenerateQuizPayload {
   sectionId: string;
   subjectId: string;
   branchId: string;
-  lessonDateFrom: string;
-  lessonDateTo: string;
+  lessonDateFrom?: string;
+  lessonDateTo?: string;
+  homeworkIds?: string[];
   questionCount?: number;
+  quickGenerate?: boolean;
+  mcqCount?: number;
+  fillBlankCount?: number;
+  shortAnswerCount?: number;
   title?: string;
 }
 

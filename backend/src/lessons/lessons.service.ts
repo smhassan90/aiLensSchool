@@ -15,7 +15,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { LessonProcessingService } from '../ai/services/lesson-processing.service';
 import { ParentsService } from '../parents/parents.service';
 import { CreateLessonDto, LessonQueryDto, ScanLessonDto } from './dto/lesson.dto';
@@ -338,22 +338,30 @@ export class LessonsService {
         ...(query.date ? { date: new Date(query.date) } : {}),
         ...(query.subjectId ? { subjectId: query.subjectId } : {}),
       };
-      const [items, total] = await this.prisma.$transaction([
+      const [items, total] = await pageQuery(
         this.prisma.dailyLesson.findMany({
           where,
           orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
           skip: (page - 1) * limit,
           take: limit,
-          include: {
-            subject: true,
-            section: true,
-            grade: true,
-            teacher: { include: { user: { select: { firstName: true, lastName: true } } } },
-            concepts: true,
+          select: {
+            id: true,
+            date: true,
+            status: true,
+            topicName: true,
+            chapterName: true,
+            sectionId: true,
+            subjectId: true,
+            gradeId: true,
+            teacherId: true,
+            subject: { select: { id: true, name: true } },
+            section: { select: { id: true, name: true } },
+            grade: { select: { id: true, name: true } },
+            teacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
           },
         }),
         this.prisma.dailyLesson.count({ where }),
-      ]);
+      );
       return paginate(items, total, page, limit);
     }
 
@@ -372,22 +380,30 @@ export class LessonsService {
       ...(query.date ? { date: new Date(query.date) } : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.dailyLesson.findMany({
         where,
         orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * limit,
         take: limit,
-        include: {
-          subject: true,
-          section: true,
-          grade: true,
-          teacher: { include: { user: { select: { firstName: true, lastName: true } } } },
-          concepts: true,
+        select: {
+          id: true,
+          date: true,
+          status: true,
+          topicName: true,
+          chapterName: true,
+          sectionId: true,
+          subjectId: true,
+          gradeId: true,
+          teacherId: true,
+          subject: { select: { id: true, name: true } },
+          section: { select: { id: true, name: true } },
+          grade: { select: { id: true, name: true } },
+          teacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
         },
       }),
       this.prisma.dailyLesson.count({ where }),
-    ]);
+    );
 
     return paginate(items, total, page, limit);
   }

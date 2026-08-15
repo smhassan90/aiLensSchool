@@ -8,7 +8,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import {
   AssignFeesDto,
   CreateFeeStructureDto,
@@ -61,7 +61,7 @@ export class FeesService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
     const where = { schoolId };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.feeStructure.findMany({
         where,
         orderBy: { name: 'asc' },
@@ -69,7 +69,7 @@ export class FeesService {
         take: limit,
       }),
       this.prisma.feeStructure.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 
@@ -191,21 +191,26 @@ export class FeesService {
         : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.studentFee.findMany({
         where,
         orderBy: { dueDate: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
-        include: {
+        select: {
+          id: true,
+          amount: true,
+          paidAmount: true,
+          dueDate: true,
+          status: true,
+          periodLabel: true,
           student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
-          feeStructure: true,
+          feeStructure: { select: { id: true, name: true } },
           section: { select: { id: true, name: true } },
-          payments: { orderBy: { paidAt: 'desc' }, take: 5 },
         },
       }),
       this.prisma.studentFee.count({ where }),
-    ]);
+    );
 
     return paginate(
       items.map((item) => ({

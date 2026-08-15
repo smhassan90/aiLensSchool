@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/layout/page-loader";
 import { schoolsService } from "@/services/schools.service";
 import {
   Building2,
@@ -18,12 +18,10 @@ function StatCard({
   title,
   value,
   icon: Icon,
-  loading,
 }: {
   title: string;
   value: string | number;
   icon: React.ComponentType<{ className?: string }>;
-  loading?: boolean;
 }) {
   return (
     <Card>
@@ -32,11 +30,7 @@ function StatCard({
         <Icon className="h-4 w-4 text-primary" />
       </CardHeader>
       <CardContent>
-        {loading ? (
-          <Skeleton className="h-8 w-20" />
-        ) : (
-          <p className="text-3xl font-semibold tracking-tight">{value}</p>
-        )}
+        <p className="text-3xl font-semibold tracking-tight">{value}</p>
       </CardContent>
     </Card>
   );
@@ -61,21 +55,27 @@ export default function SuperAdminDashboardPage() {
         </div>
       )}
 
+      {isLoading ? (
+        <PageLoader
+          variant="page"
+          phrases={["Counting schools and people", "Checking platform activity", "Almost ready"]}
+        />
+      ) : (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Total Schools" value={data?.totalSchools ?? 0} icon={School} loading={isLoading} />
-        <StatCard title="Active Schools" value={data?.activeSchools ?? 0} icon={Building2} loading={isLoading} />
-        <StatCard title="Branches" value={data?.totalBranches ?? 0} icon={GitBranch} loading={isLoading} />
-        <StatCard title="Students" value={data?.totalStudents ?? 0} icon={GraduationCap} loading={isLoading} />
-        <StatCard title="Teachers" value={data?.totalTeachers ?? 0} icon={Users} loading={isLoading} />
-        <StatCard title="Parents" value={data?.totalParents ?? 0} icon={Users} loading={isLoading} />
-        <StatCard title="AI Requests" value={data?.aiRequests ?? 0} icon={Sparkles} loading={isLoading} />
+        <StatCard title="Total Schools" value={data?.totalSchools ?? 0} icon={School} />
+        <StatCard title="Active Schools" value={data?.activeSchools ?? 0} icon={Building2} />
+        <StatCard title="Branches" value={data?.totalBranches ?? 0} icon={GitBranch} />
+        <StatCard title="Students" value={data?.totalStudents ?? 0} icon={GraduationCap} />
+        <StatCard title="Teachers" value={data?.totalTeachers ?? 0} icon={Users} />
+        <StatCard title="Parents" value={data?.totalParents ?? 0} icon={Users} />
+        <StatCard title="AI Requests" value={data?.aiRequests ?? 0} icon={Sparkles} />
         <StatCard
           title="Monthly Revenue"
           value={data?.monthlyRevenue != null ? `PKR ${Number(data.monthlyRevenue).toLocaleString()}` : "—"}
           icon={Building2}
-          loading={isLoading}
         />
       </div>
+      )}
     </div>
   );
 }

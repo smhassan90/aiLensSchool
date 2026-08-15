@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/layout/page-loader";
+
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -7,7 +9,6 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { insightsService } from "@/services/insights.service";
 import { BarChart, StackedAttendanceChart } from "@/components/charts/simple-charts";
 import { ArrowLeft } from "lucide-react";
@@ -31,7 +32,7 @@ export default function ClassAnalyticsPage() {
   });
 
   if (query.isLoading) {
-    return <div className="space-y-4 p-8"><Skeleton className="h-10 w-64" /><Skeleton className="h-80 w-full" /></div>;
+    return <PageLoader variant="page" />;
   }
   if (!query.data) return <div className="p-8">Class not found.</div>;
   const data = query.data;

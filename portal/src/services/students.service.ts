@@ -1,4 +1,4 @@
-import { apiClient, buildQuery } from "@/lib/api-client";
+import { apiClient, apiUpload, buildQuery } from "@/lib/api-client";
 import type { Paginated, Student } from "@/lib/types";
 
 export interface ParentCredential {
@@ -53,5 +53,9 @@ export const studentsService = {
 
   getById(id: string) {
     return apiClient<Student>(`/students/${id}`);
+  },
+
+  uploadPhoto(id: string, file: File) {
+    return apiUpload<Student>(`/students/${id}/photo`, file);
   },
 };

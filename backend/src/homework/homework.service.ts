@@ -8,7 +8,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { ParentsService } from '../parents/parents.service';
 
@@ -104,16 +104,26 @@ export class HomeworkService {
         sectionId: enrollment.sectionId,
         schoolId: this.tenant.requireSchoolId(user),
       };
-      const [items, total] = await this.prisma.$transaction([
+      const [items, total] = await pageQuery(
         this.prisma.homework.findMany({
           where,
           orderBy: { dueDate: 'desc' },
           skip: (page - 1) * limit,
           take: limit,
-          include: { subject: true, section: true },
+          select: {
+            id: true,
+            title: true,
+            dueDate: true,
+            sectionId: true,
+            subjectId: true,
+            lessonId: true,
+            createdAt: true,
+            subject: { select: { id: true, name: true } },
+            section: { select: { id: true, name: true } },
+          },
         }),
         this.prisma.homework.count({ where }),
-      ]);
+      );
       return paginate(items, total, page, limit);
     }
 
@@ -127,16 +137,26 @@ export class HomeworkService {
         : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.homework.findMany({
         where,
         orderBy: { dueDate: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
-        include: { subject: true, section: true, lesson: true },
+        select: {
+          id: true,
+          title: true,
+          dueDate: true,
+          sectionId: true,
+          subjectId: true,
+          lessonId: true,
+          createdAt: true,
+          subject: { select: { id: true, name: true } },
+          section: { select: { id: true, name: true } },
+        },
       }),
       this.prisma.homework.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 

@@ -12,14 +12,15 @@ Return ONLY valid JSON matching:
 }`;
 
 export const QUIZ_GENERATION_PROMPT = `You are an educational quiz generator for school teachers.
-Given confirmed lesson summaries, generate age-appropriate quiz questions.
+Given homework topic titles and lesson summaries, generate age-appropriate quiz questions.
+Follow the question-type instructions in the user message exactly.
 Return ONLY valid JSON matching:
 {
   "title": string,
   "description": string?,
   "questions": [
     {
-      "type": "MCQ" | "FILL_IN_THE_BLANK" | "TRUE_FALSE" | "SHORT_ANSWER",
+      "type": "MCQ" | "FILL_IN_THE_BLANK" | "SHORT_ANSWER",
       "questionText": string,
       "marks": number,
       "correctAnswer": string?,

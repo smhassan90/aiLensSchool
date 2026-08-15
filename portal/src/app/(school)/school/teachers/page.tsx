@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/layout/page-loader";
+
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
@@ -13,7 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
 import { teachersService } from "@/services/teachers.service";
 import { UserSquare2, Plus } from "lucide-react";
@@ -47,11 +48,7 @@ export default function TeachersPage() {
 
       <div className="rounded-lg border bg-card">
         {isLoading ? (
-          <div className="space-y-3 p-6">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
+          <PageLoader variant="panel" />
         ) : !data?.items.length ? (
           <EmptyState
             icon={<UserSquare2 className="h-10 w-10" />}

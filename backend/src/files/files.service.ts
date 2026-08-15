@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { LocalStorageService } from './local-storage.service';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
@@ -51,7 +51,7 @@ export class FilesService {
     const where: Prisma.FileAssetWhereInput = {
       ...(user.schoolId ? { schoolId: user.schoolId } : {}),
     };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.fileAsset.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -59,7 +59,7 @@ export class FilesService {
         take: limit,
       }),
       this.prisma.fileAsset.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 }

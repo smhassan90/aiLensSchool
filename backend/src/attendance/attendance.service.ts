@@ -4,7 +4,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
 import { ParentsService } from '../parents/parents.service';
 
@@ -87,7 +87,7 @@ export class AttendanceService {
       ...(query.date ? { date: new Date(query.date) } : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.attendance.findMany({
         where,
         orderBy: { date: 'desc' },
@@ -98,7 +98,7 @@ export class AttendanceService {
         },
       }),
       this.prisma.attendance.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 }

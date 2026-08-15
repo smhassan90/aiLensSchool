@@ -31,6 +31,7 @@ export const documentsService = {
     sectionId: string;
     subjectId: string;
     branchId: string;
+    title: string;
     dueDate: string;
     lessonId?: string;
   }) {

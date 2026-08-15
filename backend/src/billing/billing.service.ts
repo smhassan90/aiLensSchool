@@ -7,7 +7,7 @@ import { InvoiceStatus, Prisma, StudentStatus } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import {
   CreatePricingPlanDto,
   GenerateInvoiceDto,
@@ -75,14 +75,14 @@ export class BillingService {
   async listPlans(query: PaginationDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.pricingPlan.findMany({
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
       this.prisma.pricingPlan.count(),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 
@@ -208,7 +208,7 @@ export class BillingService {
     const where: Prisma.InvoiceWhereInput = {
       ...(query.schoolId ? { schoolId: query.schoolId } : {}),
     };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.invoice.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -217,7 +217,7 @@ export class BillingService {
         include: { items: true, school: { select: { id: true, name: true, code: true } } },
       }),
       this.prisma.invoice.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 }

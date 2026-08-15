@@ -18,8 +18,9 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateParentInlineDto, CreateStudentDto } from './dto/create-student.dto';
+import { FilesService } from '../files/files.service';
 import {
   buildParentUsername,
   generateParentPassword,
@@ -32,6 +33,7 @@ export class StudentsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly tenant: TenantService,
+    private readonly files: FilesService,
   ) {}
 
   async create(dto: CreateStudentDto, user: AuthUser) {
@@ -308,24 +310,34 @@ export class StudentsService {
         : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.student.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
-        include: {
-          branch: true,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          studentCode: true,
+          admissionNumber: true,
+          status: true,
+          photoUrl: true,
+          createdAt: true,
+          branch: { select: { id: true, name: true } },
           enrollments: {
             where: { status: EnrollmentStatus.ACTIVE },
-            include: { grade: true, section: true, academicYear: true },
             take: 1,
+            select: {
+              grade: { select: { id: true, name: true } },
+              section: { select: { id: true, name: true } },
+            },
           },
-          parents: { include: { parent: { include: { user: true } } } },
         },
       }),
       this.prisma.student.count({ where }),
-    ]);
+    );
 
     const mapped = items.map((student) => {
       const active = student.enrollments[0];
@@ -349,6 +361,24 @@ export class StudentsService {
       },
     });
     return this.tenant.assertOwnedOrThrow(user, student, 'STUDENT_NOT_FOUND');
+  }
+
+  async updatePhoto(id: string, file: Express.Multer.File | undefined, user: AuthUser) {
+    await this.findOne(id, user);
+    const asset = await this.files.upload(file, user);
+    return this.prisma.student.update({
+      where: { id },
+      data: { photoUrl: asset.url },
+      include: {
+        branch: true,
+        enrollments: {
+          where: { status: EnrollmentStatus.ACTIVE },
+          include: { grade: true, section: true, academicYear: true },
+          take: 1,
+        },
+        parents: { include: { parent: { include: { user: true } } } },
+      },
+    });
   }
 
   async assertParentOwnsStudent(parentUserId: string, studentId: string) {

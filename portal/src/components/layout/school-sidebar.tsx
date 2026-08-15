@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import { GlobalSearch } from "@/components/layout/global-search";
+import { BrandMark } from "@/components/brand/brand-mark";
 
 const navGroups = [
   {
@@ -81,17 +82,9 @@ export function SchoolSidebar() {
   const { user, logout } = useAuth();
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r bg-card">
+    <aside className="flex h-screen w-64 shrink-0 flex-col border-r bg-card print:hidden">
       <div className="border-b px-6 py-5">
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <GraduationCap className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="font-display text-sm font-semibold">School Portal</p>
-            <p className="text-xs text-muted-foreground">Administration</p>
-          </div>
-        </div>
+        <BrandMark subtitle="Administration" />
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto p-3 scrollbar-thin">
@@ -146,7 +139,7 @@ export function SchoolShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-background">
       <SchoolSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center border-b px-6 py-3">
+        <header className="flex items-center border-b px-6 py-3 print:hidden">
           <GlobalSearch />
         </header>
         <main className="flex-1 overflow-auto">{children}</main>

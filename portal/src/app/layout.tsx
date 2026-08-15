@@ -16,8 +16,15 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "SMS Portal",
-  description: "School Management System Portal",
+  title: {
+    default: "AiSchoolLens",
+    template: "%s · AiSchoolLens",
+  },
+  description: "AI-powered school management, lesson capture, and learning insights.",
+  applicationName: "AiSchoolLens",
+  icons: {
+    icon: "/brand/favicon.svg",
+  },
 };
 
 export default function RootLayout({

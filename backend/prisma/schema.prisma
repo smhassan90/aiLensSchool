@@ -506,6 +506,7 @@ model Student {
   dateOfBirth     DateTime?     @map("date_of_birth") @db.Date
   gender          Gender?
   status          StudentStatus @default(ACTIVE)
+  photoUrl        String?       @map("photo_url")
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 

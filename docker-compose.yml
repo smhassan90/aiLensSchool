@@ -7,7 +7,7 @@ services:
       - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: school_management
+      MYSQL_DATABASE: sms
       MYSQL_USER: sms
       MYSQL_PASSWORD: smspassword
     volumes:

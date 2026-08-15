@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
 import { getRoleRedirectPath } from "@/lib/auth";
 import type { RoleName } from "@/lib/types";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/layout/page-loader";
 
 interface AuthGuardProps {
   allowedRoles: RoleName[];
@@ -32,13 +32,10 @@ export function AuthGuard({ allowedRoles, loginPath, children }: AuthGuardProps)
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-8">
-        <div className="w-full max-w-md space-y-4">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-3/4" />
-        </div>
-      </div>
+      <PageLoader
+        variant="screen"
+        phrases={["Opening your workspace", "Checking your session", "Almost there"]}
+      />
     );
   }
 

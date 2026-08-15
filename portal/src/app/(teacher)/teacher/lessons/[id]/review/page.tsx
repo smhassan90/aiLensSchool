@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/layout/page-loader";
+
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -7,7 +9,6 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { lessonsService } from "@/services/lessons.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
@@ -44,9 +45,7 @@ export default function ReviewLessonPage() {
 
   if (isLoading) {
     return (
-      <div className="p-8">
-        <Skeleton className="mx-auto h-96 max-w-3xl" />
-      </div>
+      <PageLoader variant="page" />
     );
   }
 

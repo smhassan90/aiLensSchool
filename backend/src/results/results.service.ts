@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { ParentsService } from '../parents/parents.service';
 
 @Injectable()
@@ -63,7 +63,7 @@ export class ResultsService {
         ...(query.quizId ? { quizId: query.quizId } : {}),
         quiz: { schoolId: this.tenant.requireSchoolId(user) },
       };
-      const [items, total] = await this.prisma.$transaction([
+      const [items, total] = await pageQuery(
         this.prisma.quizResult.findMany({
           where,
           orderBy: { submittedAt: 'desc' },
@@ -72,7 +72,7 @@ export class ResultsService {
           include: { quiz: { select: { id: true, title: true, subjectId: true } } },
         }),
         this.prisma.quizResult.count({ where }),
-      ]);
+      );
       return paginate(items, total, page, limit);
     }
 
@@ -82,7 +82,7 @@ export class ResultsService {
       ...(query.quizId ? { quizId: query.quizId } : {}),
       ...(query.studentId ? { studentId: query.studentId } : {}),
     };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.quizResult.findMany({
         where,
         orderBy: { submittedAt: 'desc' },
@@ -94,7 +94,7 @@ export class ResultsService {
         },
       }),
       this.prisma.quizResult.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 }

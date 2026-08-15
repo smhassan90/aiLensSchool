@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageLoader } from "@/components/layout/page-loader";
 import { feesService } from "@/services/fees.service";
 import { academicsService } from "@/services/academics.service";
 import { useToast } from "@/providers/toast-provider";
@@ -95,7 +96,9 @@ export default function FeesPage() {
         <Input placeholder="Search student name or code" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <div className="rounded-lg border bg-card">
-        {!fees.data?.items.length ? (
+        {fees.isLoading ? (
+          <PageLoader variant="panel" />
+        ) : !fees.data?.items.length ? (
           <EmptyState icon={<Wallet className="h-10 w-10" />} title="No fee records" description="Create a fee type and assign it to a class." />
         ) : (
           <Table>

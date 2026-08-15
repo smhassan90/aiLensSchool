@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageLoader } from "@/components/layout/page-loader";
 import { resultsService } from "@/services/results.service";
 import { formatDate } from "@/lib/utils";
 import { Trophy } from "lucide-react";
@@ -26,7 +27,9 @@ export default function TeacherResultsPage() {
         <Input placeholder="Search student or quiz" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <div className="rounded-lg border bg-card">
-        {!items.length ? (
+        {results.isLoading ? (
+          <PageLoader variant="panel" />
+        ) : !items.length ? (
           <EmptyState icon={<Trophy className="h-10 w-10" />} title="No results" description="Published quizzes will appear here after attempts." />
         ) : (
           <Table>

@@ -48,7 +48,7 @@ docker compose up -d
 ```
 
 This starts:
-- **MySQL 8** on `localhost:3306` (db: `school_management`, user: `sms`, password: `smspassword`)
+- **MySQL 8** on `localhost:3306` (db: `sms`, user: `sms`, password: `smspassword`)
 - **Redis 7** on `localhost:6379`
 
 ### 2. Backend

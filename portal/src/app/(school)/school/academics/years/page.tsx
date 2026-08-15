@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/layout/page-loader";
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,7 +21,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -93,11 +94,7 @@ export default function AcademicYearsPage() {
 
       <div className="rounded-lg border bg-card">
         {years.isLoading ? (
-          <div className="space-y-3 p-6">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
+          <PageLoader variant="panel" />
         ) : !years.data?.items.length ? (
           <EmptyState
             icon={<Calendar className="h-10 w-10" />}

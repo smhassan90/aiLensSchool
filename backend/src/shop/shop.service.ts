@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateProductCategoryDto, CreateProductDto } from './dto/shop.dto';
 
 @Injectable()
@@ -25,7 +25,7 @@ export class ShopService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const where: Prisma.ProductCategoryWhereInput = { schoolId };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.productCategory.findMany({
         where,
         orderBy: { name: 'asc' },
@@ -33,7 +33,7 @@ export class ShopService {
         take: limit,
       }),
       this.prisma.productCategory.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 
@@ -58,7 +58,7 @@ export class ShopService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const where: Prisma.ProductWhereInput = { schoolId };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.product.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -67,7 +67,7 @@ export class ShopService {
         include: { category: true },
       }),
       this.prisma.product.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 }

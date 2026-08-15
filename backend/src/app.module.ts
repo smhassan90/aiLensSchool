@@ -32,6 +32,7 @@ import { CommonModule } from './common/common.module';
 import { FeesModule } from './fees/fees.module';
 import { DocumentsModule } from './documents/documents.module';
 import { InsightsModule } from './insights/insights.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { HealthController } from './health.controller';
@@ -46,6 +47,10 @@ import { HealthController } from './health.controller';
             ? { target: 'pino-pretty', options: { singleLine: true } }
             : undefined,
         autoLogging: true,
+        serializers: {
+          req: (req) => ({ method: req.method, url: req.url }),
+          res: (res) => ({ statusCode: res.statusCode }),
+        },
       },
     }),
     ThrottlerModule.forRootAsync({
@@ -99,6 +104,7 @@ import { HealthController } from './health.controller';
     FeesModule,
     DocumentsModule,
     InsightsModule,
+    DashboardModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -15,7 +15,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { QuizGenerationService } from '../ai/services/quiz-generation.service';
 import { NotificationService } from '../notifications/notifications.service';
 import { ParentsService } from '../parents/parents.service';
@@ -25,6 +25,7 @@ import {
   UpdateQuizQuestionsDto,
 } from './dto/quiz.dto';
 import { NotificationType } from '@prisma/client';
+import { normalizeGeneratedQuestion } from '../ai/quiz-mix';
 
 @Injectable()
 export class QuizzesService {
@@ -67,24 +68,76 @@ export class QuizzesService {
       }
     }
 
-    const lessons = await this.prisma.dailyLesson.findMany({
-      where: {
-        schoolId,
-        sectionId: dto.sectionId,
-        subjectId: dto.subjectId,
-        status: LessonStatus.CONFIRMED,
-        date: {
-          gte: new Date(`${dto.lessonDateFrom}T00:00:00.000`),
-          lte: new Date(`${dto.lessonDateTo}T23:59:59.999`),
-        },
-      },
-      orderBy: { date: 'asc' },
-    });
+    const topicSummaries: string[] = [];
+    let topicTitle: string | undefined;
+    let rangeFrom = dto.lessonDateFrom ? new Date(dto.lessonDateFrom) : undefined;
+    let rangeTo = dto.lessonDateTo ? new Date(dto.lessonDateTo) : undefined;
 
-    if (!lessons.length) {
+    if (dto.homeworkIds?.length) {
+      const homework = await this.prisma.homework.findMany({
+        where: {
+          id: { in: dto.homeworkIds },
+          schoolId,
+          sectionId: dto.sectionId,
+          subjectId: dto.subjectId,
+        },
+        include: { lesson: true },
+        orderBy: { dueDate: 'asc' },
+      });
+      if (!homework.length) {
+        throw new BadRequestException({
+          code: 'NO_HOMEWORK_TOPICS',
+          message: 'No matching homework topics were found for this class',
+        });
+      }
+      topicTitle = homework.map((item) => item.title).join(', ');
+      for (const item of homework) {
+        const lessonBit = item.lesson?.aiSummary ?? item.lesson?.topicName ?? '';
+        topicSummaries.push(
+          [`Topic: ${item.title}`, item.description, lessonBit ? `Lesson: ${lessonBit}` : '']
+            .filter(Boolean)
+            .join('\n'),
+        );
+      }
+      const dueDates = homework.map((item) => item.dueDate);
+      rangeFrom ??= new Date(Math.min(...dueDates.map((d) => d.getTime())));
+      rangeTo ??= new Date(Math.max(...dueDates.map((d) => d.getTime())));
+    }
+
+    if (dto.lessonDateFrom && dto.lessonDateTo) {
+      const lessons = await this.prisma.dailyLesson.findMany({
+        where: {
+          schoolId,
+          sectionId: dto.sectionId,
+          subjectId: dto.subjectId,
+          status: LessonStatus.CONFIRMED,
+          date: {
+            gte: new Date(`${dto.lessonDateFrom}T00:00:00.000`),
+            lte: new Date(`${dto.lessonDateTo}T23:59:59.999`),
+          },
+        },
+        orderBy: { date: 'asc' },
+      });
+      topicSummaries.push(
+        ...lessons.map(
+          (l) =>
+            `${l.date.toISOString().slice(0, 10)}: ${l.aiSummary ?? l.topicName ?? l.chapterName ?? 'Lesson'}`,
+        ),
+      );
+    }
+
+    if (!topicSummaries.length) {
       throw new BadRequestException({
-        code: 'NO_CONFIRMED_LESSONS',
-        message: 'No confirmed lessons in the selected date range',
+        code: 'NO_QUIZ_TOPICS',
+        message: 'Select homework topics or a lesson date range to generate a quiz',
+      });
+    }
+
+    const customTotal = (dto.mcqCount ?? 0) + (dto.fillBlankCount ?? 0) + (dto.shortAnswerCount ?? 0);
+    if (dto.quickGenerate === false && customTotal < 1) {
+      throw new BadRequestException({
+        code: 'QUESTION_MIX_REQUIRED',
+        message: 'Choose question counts, or use Quick generate',
       });
     }
 
@@ -92,12 +145,13 @@ export class QuizzesService {
     const aiQuiz = await this.quizGeneration.generate({
       schoolId,
       userId: user.id,
-      lessonSummaries: lessons.map(
-        (l) =>
-          `${l.date.toISOString().slice(0, 10)}: ${l.aiSummary ?? l.topicName ?? l.chapterName ?? 'Lesson'}`,
-      ),
+      lessonSummaries: topicSummaries,
       subjectName: subject?.name,
-      questionCount: dto.questionCount ?? 5,
+      questionCount: dto.questionCount,
+      quickGenerate: dto.quickGenerate,
+      mcqCount: dto.mcqCount,
+      fillBlankCount: dto.fillBlankCount,
+      shortAnswerCount: dto.shortAnswerCount,
     });
 
     const totalMarks = aiQuiz.questions.reduce((sum, q) => sum + q.marks, 0);
@@ -110,25 +164,25 @@ export class QuizzesService {
           academicYearId: dto.academicYearId,
           sectionId: dto.sectionId,
           subjectId: dto.subjectId,
-          title: dto.title ?? aiQuiz.title,
+          title: dto.title ?? topicTitle ?? aiQuiz.title,
           description: aiQuiz.description,
           status: QuizStatus.DRAFT,
           createdById: user.id,
-          lessonDateFrom: new Date(dto.lessonDateFrom),
-          lessonDateTo: new Date(dto.lessonDateTo),
+          lessonDateFrom: rangeFrom,
+          lessonDateTo: rangeTo,
           totalMarks,
         },
       });
 
       for (let i = 0; i < aiQuiz.questions.length; i++) {
-        const q = aiQuiz.questions[i];
+        const q = normalizeGeneratedQuestion(aiQuiz.questions[i]);
         const question = await tx.quizQuestion.create({
           data: {
             quizId: created.id,
             type: q.type as QuestionType,
             questionText: q.questionText,
-            marks: q.marks,
-            correctAnswer: q.correctAnswer,
+            marks: Number(q.marks) || 1,
+            correctAnswer: q.correctAnswer ?? q.options?.find((opt) => opt.isCorrect)?.optionText,
             order: i,
             source: QuestionSource.AI,
             included: true,
@@ -136,12 +190,14 @@ export class QuizzesService {
         });
         if (q.options?.length) {
           await tx.quizOption.createMany({
-            data: q.options.map((opt, idx) => ({
-              questionId: question.id,
-              optionText: opt.optionText,
-              isCorrect: opt.isCorrect,
-              order: idx,
-            })),
+            data: q.options
+              .map((opt, idx) => ({
+                questionId: question.id,
+                optionText: opt.optionText.trim(),
+                isCorrect: Boolean(opt.isCorrect),
+                order: idx,
+              }))
+              .filter((opt) => opt.optionText),
           });
         }
       }
@@ -156,7 +212,7 @@ export class QuizzesService {
       action: 'QUIZ_GENERATED',
       entityType: 'Quiz',
       entityId: quiz.id,
-      metadata: { lessonCount: lessons.length, neverAutoPublished: true },
+      metadata: { topicCount: topicSummaries.length, neverAutoPublished: true },
     });
 
     return this.findOne(quiz.id, user);
@@ -293,16 +349,26 @@ export class QuizzesService {
         status: QuizStatus.PUBLISHED,
         schoolId: this.tenant.requireSchoolId(user),
       };
-      const [items, total] = await this.prisma.$transaction([
+      const [items, total] = await pageQuery(
         this.prisma.quiz.findMany({
           where,
           orderBy: { publishedAt: 'desc' },
           skip: (page - 1) * limit,
           take: limit,
-          include: { subject: true, section: true },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            createdAt: true,
+            publishedAt: true,
+            sectionId: true,
+            subjectId: true,
+            subject: { select: { id: true, name: true } },
+            section: { select: { id: true, name: true } },
+          },
         }),
         this.prisma.quiz.count({ where }),
-      ]);
+      );
       return paginate(items, total, page, limit);
     }
 
@@ -316,20 +382,28 @@ export class QuizzesService {
         : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.quiz.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
-        include: {
-          subject: true,
-          section: true,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          createdAt: true,
+          publishedAt: true,
+          sectionId: true,
+          subjectId: true,
+          createdById: true,
+          subject: { select: { id: true, name: true } },
+          section: { select: { id: true, name: true } },
           _count: { select: { questions: true, assignments: true } },
         },
       }),
       this.prisma.quiz.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 

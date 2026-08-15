@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageLoader } from "@/components/layout/page-loader";
 import { documentsService } from "@/services/documents.service";
 import { academicsService } from "@/services/academics.service";
 import { useToast } from "@/providers/toast-provider";
@@ -67,7 +68,9 @@ export default function ReportCardsPage() {
           <Button disabled={generate.isPending || !year} onClick={() => generate.mutate()}>Generate</Button>
         </div>
       </div>
-      {!cards.data?.items.length ? (
+      {cards.isLoading ? (
+        <PageLoader variant="panel" />
+      ) : !cards.data?.items.length ? (
         <EmptyState icon={<CreditCard className="h-10 w-10" />} title="No report cards" description="Generate from quiz results and attendance." />
       ) : (
         <div className="space-y-6">

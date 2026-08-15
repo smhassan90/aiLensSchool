@@ -16,7 +16,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateSchoolDto } from './dto/create-school.dto';
 import { UpdateSchoolDto } from './dto/update-school.dto';
 
@@ -161,7 +161,7 @@ export class SchoolsService {
         : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.school.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -173,7 +173,7 @@ export class SchoolsService {
         },
       }),
       this.prisma.school.count({ where }),
-    ]);
+    );
 
     return paginate(items, total, page, limit);
   }
@@ -237,6 +237,9 @@ export class SchoolsService {
   }
 
   async dashboardStats() {
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
     const [
       totalSchools,
       activeSchools,
@@ -248,6 +251,7 @@ export class SchoolsService {
       overdueInvoices,
       aiAgg,
       notificationCount,
+      monthlyRevenue,
     ] = await Promise.all([
       this.prisma.school.count(),
       this.prisma.school.count({ where: { status: SchoolStatus.ACTIVE } }),
@@ -264,15 +268,11 @@ export class SchoolsService {
         _sum: { estimatedCost: true },
       }),
       this.prisma.notification.count({ where: { sentAt: { not: null } } }),
+      this.prisma.payment.aggregate({
+        where: { status: 'COMPLETED', paidAt: { gte: monthStart } },
+        _sum: { amount: true },
+      }),
     ]);
-
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
-    const monthlyRevenue = await this.prisma.payment.aggregate({
-      where: { status: 'COMPLETED', paidAt: { gte: monthStart } },
-      _sum: { amount: true },
-    });
 
     return {
       totalSchools,

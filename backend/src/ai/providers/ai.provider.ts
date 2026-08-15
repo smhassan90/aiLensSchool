@@ -21,6 +21,10 @@ export interface AiProvider {
     lessonSummaries: string[];
     subjectName?: string;
     questionCount?: number;
+    quickGenerate?: boolean;
+    mcqCount?: number;
+    fillBlankCount?: number;
+    shortAnswerCount?: number;
   }): Promise<AiCompletionResult<QuizOutput>>;
 
   generateHomework(input: {

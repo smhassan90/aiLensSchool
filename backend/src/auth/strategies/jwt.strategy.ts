@@ -13,6 +13,9 @@ interface JwtPayload {
   roles: RoleName[];
 }
 
+const AUTH_CACHE_TTL_MS = 60_000;
+const authCache = new Map<string, { user: AuthUser; expiresAt: number }>();
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -27,19 +30,34 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload): Promise<AuthUser> {
+    const cached = authCache.get(payload.sub);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.user;
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      include: { roles: { include: { role: true } } },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        schoolId: true,
+        mustChangePassword: true,
+        status: true,
+      },
     });
 
     if (!user || user.status !== UserStatus.ACTIVE) {
+      authCache.delete(payload.sub);
       throw new UnauthorizedException({
         code: 'UNAUTHORIZED',
         message: 'Invalid or inactive user',
       });
     }
 
-    return {
+    const authUser: AuthUser = {
       id: user.id,
       email: user.email,
       username: user.username,
@@ -47,7 +65,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       lastName: user.lastName,
       schoolId: user.schoolId,
       mustChangePassword: user.mustChangePassword,
-      roles: user.roles.map((r) => r.role.name),
+      roles: payload.roles ?? [],
     };
+    authCache.set(payload.sub, { user: authUser, expiresAt: Date.now() + AUTH_CACHE_TTL_MS });
+    return authUser;
   }
 }

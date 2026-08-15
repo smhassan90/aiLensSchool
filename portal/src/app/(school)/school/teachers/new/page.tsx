@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/layout/page-loader";
+
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { teachersService } from "@/services/teachers.service";
 import { branchesService } from "@/services/branches.service";
 import { useToast } from "@/providers/toast-provider";
@@ -80,7 +81,7 @@ export default function NewTeacherPage() {
       />
 
       {branches.isLoading ? (
-        <Skeleton className="mx-auto h-64 max-w-2xl" />
+        <PageLoader variant="page" />
       ) : (
         <form
           onSubmit={handleSubmit((v) => mutation.mutate(v))}

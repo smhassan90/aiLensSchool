@@ -7,7 +7,9 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Max,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -31,19 +33,56 @@ export class GenerateQuizDto {
   @IsString()
   branchId!: string;
 
-  @ApiProperty()
-  @IsDateString()
-  lessonDateFrom!: string;
+  @ApiPropertyOptional({ type: [String], description: 'Homework IDs whose titles are the quiz topics' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  homeworkIds?: string[];
 
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @ValidateIf((dto: GenerateQuizDto) => !dto.homeworkIds?.length)
   @IsDateString()
-  lessonDateTo!: string;
+  lessonDateFrom?: string;
+
+  @ApiPropertyOptional()
+  @ValidateIf((dto: GenerateQuizDto) => !dto.homeworkIds?.length)
+  @IsDateString()
+  lessonDateTo?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsInt()
   @Min(1)
   questionCount?: number;
+
+  @ApiPropertyOptional({ description: 'Let AI choose the mix of question types' })
+  @IsOptional()
+  @IsBoolean()
+  quickGenerate?: boolean;
+
+  @ApiPropertyOptional({ description: 'Choose-the-best-answer (MCQ) count' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  mcqCount?: number;
+
+  @ApiPropertyOptional({ description: 'Fill-in-the-blank count' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  fillBlankCount?: number;
+
+  @ApiPropertyOptional({ description: 'Simple text / short-answer count' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  shortAnswerCount?: number;
 
   @ApiPropertyOptional()
   @IsOptional()

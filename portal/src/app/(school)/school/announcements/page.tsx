@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageLoader } from "@/components/layout/page-loader";
 import { communicationsService } from "@/services/communications.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
@@ -56,7 +57,9 @@ export default function AnnouncementsPage() {
         actions={<Button onClick={() => setOpen(true)}>New announcement</Button>}
       />
       <div className="rounded-lg border bg-card">
-        {!list.data?.items.length ? (
+        {list.isLoading ? (
+          <PageLoader variant="panel" />
+        ) : !list.data?.items.length ? (
           <EmptyState icon={<Megaphone className="h-10 w-10" />} title="No announcements" description="Create a notice and publish it to parents and staff." />
         ) : (
           <Table>

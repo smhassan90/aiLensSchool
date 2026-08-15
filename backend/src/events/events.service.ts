@@ -4,7 +4,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateEventDto, UpdateEventDto } from './dto/event.dto';
 
 @Injectable()
@@ -63,7 +63,7 @@ export class EventsService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const where: Prisma.EventWhereInput = { schoolId };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.event.findMany({
         where,
         orderBy: { startDate: 'asc' },
@@ -71,7 +71,7 @@ export class EventsService {
         take: limit,
       }),
       this.prisma.event.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 

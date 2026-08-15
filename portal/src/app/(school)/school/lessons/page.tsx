@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageLoader } from "@/components/layout/page-loader";
 import { lessonsService } from "@/services/lessons.service";
 import { formatDate } from "@/lib/utils";
 import { BookOpen } from "lucide-react";
@@ -15,7 +16,9 @@ export default function LessonsPage() {
     <div className="p-8">
       <PageHeader title="Lessons" description="Confirmed and in-progress classroom lessons" />
       <div className="rounded-lg border bg-card">
-        {!lessons.data?.items.length ? (
+        {lessons.isLoading ? (
+          <PageLoader variant="panel" />
+        ) : !lessons.data?.items.length ? (
           <EmptyState icon={<BookOpen className="h-10 w-10" />} title="No lessons" description="Teachers record lessons from the teacher hub." />
         ) : (
           <Table>

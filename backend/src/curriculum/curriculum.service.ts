@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class CurriculumService {
@@ -16,16 +16,26 @@ export class CurriculumService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const where = { schoolId };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.curriculum.findMany({
         where,
-        include: { subject: true, grade: true, chapters: { include: { topics: true } } },
+        select: {
+          id: true,
+          name: true,
+          schoolId: true,
+          subjectId: true,
+          gradeId: true,
+          createdAt: true,
+          subject: { select: { id: true, name: true } },
+          grade: { select: { id: true, name: true } },
+          _count: { select: { chapters: true } },
+        },
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.curriculum.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 

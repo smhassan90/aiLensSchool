@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/layout/page-loader";
+
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -10,11 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { quizzesService } from "@/services/quizzes.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
+import { QuizReviewQuestion } from "@/components/quizzes/quiz-review-question";
 import { ArrowLeft, Send } from "lucide-react";
 
 export default function SchoolQuizDetailPage() {
@@ -86,9 +88,7 @@ export default function SchoolQuizDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="p-8">
-        <Skeleton className="mx-auto h-96 max-w-4xl" />
-      </div>
+      <PageLoader variant="page" />
     );
   }
 
@@ -138,35 +138,23 @@ export default function SchoolQuizDetailPage() {
           <TabsContent value="questions">
             <div className="space-y-4">
               {quiz.questions?.map((q, index) => (
-                <Card key={q.id} className={!q.included ? "opacity-60" : undefined}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-4">
-                      <CardTitle className="text-base font-medium">
-                        Q{index + 1}. {q.questionText}
-                      </CardTitle>
-                      {quiz.status !== "PUBLISHED" && (
-                        <Button
-                          size="sm"
-                          variant={q.included ? "default" : "outline"}
-                          onClick={() => toggleQuestion(q.id)}
-                        >
-                          {q.included ? "Included" : "Excluded"}
-                        </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground">
-                    <span className="mr-4">Type: {q.type}</span>
-                    <span>Marks: {q.marks}</span>
-                    {q.options && q.options.length > 0 && (
-                      <ul className="mt-2 list-inside list-disc">
-                        {q.options.map((opt, i) => (
-                          <li key={i}>{typeof opt === "string" ? opt : String(opt)}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
+                <QuizReviewQuestion
+                  key={q.id}
+                  question={q}
+                  index={index}
+                  dimmed={!q.included}
+                  action={
+                    quiz.status !== "PUBLISHED" ? (
+                      <Button
+                        size="sm"
+                        variant={q.included ? "default" : "outline"}
+                        onClick={() => toggleQuestion(q.id)}
+                      >
+                        {q.included ? "Included" : "Excluded"}
+                      </Button>
+                    ) : undefined
+                  }
+                />
               ))}
             </div>
             {quiz.status !== "PUBLISHED" && (

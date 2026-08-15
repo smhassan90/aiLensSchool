@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/layout/page-loader";
+
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -20,23 +22,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { QuizMixFields } from "@/components/quizzes/quiz-mix-fields";
 import { quizzesService } from "@/services/quizzes.service";
+import { homeworkService } from "@/services/homework.service";
 import { teachersService } from "@/services/teachers.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
 import { FileQuestion, Plus } from "lucide-react";
 
-const generateSchema = z.object({
-  classKey: z.string().min(1, "Select a class"),
-  lessonDateFrom: z.string().min(1, "Required"),
-  lessonDateTo: z.string().min(1, "Required"),
-  questionCount: z.coerce.number().min(1).max(30).optional(),
-  title: z.string().optional(),
-});
+const generateSchema = z
+  .object({
+    classKey: z.string().min(1, "Select a class"),
+    homeworkIds: z.array(z.string()).min(1, "Select at least one topic"),
+    title: z.string().optional(),
+    quickGenerate: z.boolean(),
+    mcqCount: z.coerce.number().min(0).max(20),
+    fillBlankCount: z.coerce.number().min(0).max(20),
+    shortAnswerCount: z.coerce.number().min(0).max(20),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      !value.quickGenerate &&
+      value.mcqCount + value.fillBlankCount + value.shortAnswerCount < 1
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["mcqCount"],
+        message: "Enter at least one question, or use Quick generate",
+      });
+    }
+  });
 
 type GenerateForm = z.infer<typeof generateSchema>;
 
@@ -59,14 +77,32 @@ export default function TeacherQuizzesPage() {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<GenerateForm>({
     resolver: zodResolver(generateSchema),
     defaultValues: {
-      questionCount: 10,
-      lessonDateFrom: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10),
-      lessonDateTo: new Date().toISOString().slice(0, 10),
+      homeworkIds: [],
+      quickGenerate: true,
+      mcqCount: 3,
+      fillBlankCount: 1,
+      shortAnswerCount: 1,
     },
+  });
+
+  const classKey = watch("classKey");
+  const selectedHomeworkIds = watch("homeworkIds") ?? [];
+  const selectedClass = classes.data?.find((c) => `${c.sectionId}:${c.subjectId}` === classKey);
+  const topics = useQuery({
+    queryKey: ["homework-topics", selectedClass?.sectionId, selectedClass?.subjectId],
+    queryFn: () =>
+      homeworkService.list({
+        sectionId: selectedClass?.sectionId,
+        subjectId: selectedClass?.subjectId,
+        limit: 100,
+      }),
+    enabled: Boolean(selectedClass),
   });
 
   const generateMutation = useMutation({
@@ -80,10 +116,16 @@ export default function TeacherQuizzesPage() {
         sectionId: cls.sectionId,
         subjectId: cls.subjectId,
         branchId: cls.branchId,
-        lessonDateFrom: values.lessonDateFrom,
-        lessonDateTo: values.lessonDateTo,
-        questionCount: values.questionCount,
+        homeworkIds: values.homeworkIds,
         title: values.title,
+        quickGenerate: values.quickGenerate,
+        ...(values.quickGenerate
+          ? { questionCount: 8 }
+          : {
+              mcqCount: values.mcqCount,
+              fillBlankCount: values.fillBlankCount,
+              shortAnswerCount: values.shortAnswerCount,
+            }),
       });
     },
     onSuccess: (quiz) => {
@@ -106,7 +148,7 @@ export default function TeacherQuizzesPage() {
     <div className="p-8">
       <PageHeader
         title="Quizzes"
-        description="Generate quizzes from confirmed lessons and publish to students"
+        description="Select homework topics and generate a quiz from those titles"
         actions={
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -123,11 +165,7 @@ export default function TeacherQuizzesPage() {
 
       <div className="rounded-lg border bg-card">
         {isLoading ? (
-          <div className="space-y-3 p-6">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
+          <PageLoader variant="panel" />
         ) : !data?.items.length ? (
           <EmptyState
             icon={<FileQuestion className="h-10 w-10" />}
@@ -172,11 +210,11 @@ export default function TeacherQuizzesPage() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent onClose={() => setDialogOpen(false)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto" onClose={() => setDialogOpen(false)}>
           <DialogHeader>
             <DialogTitle>Generate Quiz</DialogTitle>
             <DialogDescription>
-              AI will create questions from confirmed lessons in the date range.
+              Choose homework topic titles. The quiz will be generated from those topics.
             </DialogDescription>
           </DialogHeader>
           <form
@@ -185,7 +223,12 @@ export default function TeacherQuizzesPage() {
           >
             <div className="space-y-2">
               <Label htmlFor="classKey">Class</Label>
-              <Select id="classKey" {...register("classKey")}>
+              <Select
+                id="classKey"
+                {...register("classKey", {
+                  onChange: () => setValue("homeworkIds", []),
+                })}
+              >
                 <option value="">Select class</option>
                 {classes.data?.map((cls) => (
                   <option key={`${cls.sectionId}:${cls.subjectId}`} value={`${cls.sectionId}:${cls.subjectId}`}>
@@ -193,27 +236,65 @@ export default function TeacherQuizzesPage() {
                   </option>
                 ))}
               </Select>
+              {classes.isError ? (
+                <p className="text-sm text-destructive">Could not load classes. Sign out and sign in again.</p>
+              ) : !classes.isLoading && !classes.data?.length ? (
+                <p className="text-sm text-muted-foreground">
+                  No classes assigned to you yet. Ask the school admin to assign a subject to your teacher profile.
+                </p>
+              ) : null}
               {errors.classKey && <p className="text-sm text-destructive">{errors.classKey.message}</p>}
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="lessonDateFrom">From</Label>
-                <Input id="lessonDateFrom" type="date" {...register("lessonDateFrom")} />
+            <div className="space-y-2">
+              <Label>Topics</Label>
+              <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3">
+                {!classKey ? (
+                  <p className="text-sm text-muted-foreground">Select a class to see homework topics.</p>
+                ) : topics.isLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading topics…</p>
+                ) : !topics.data?.items.length ? (
+                  <p className="text-sm text-muted-foreground">No homework topics yet. Give homework with a title first.</p>
+                ) : (
+                  topics.data.items.map((item) => {
+                    const checked = selectedHomeworkIds.includes(item.id);
+                    return (
+                      <label key={item.id} className="flex items-start gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={checked}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                              ? [...selectedHomeworkIds, item.id]
+                              : selectedHomeworkIds.filter((id) => id !== item.id);
+                            setValue("homeworkIds", next, { shouldValidate: true });
+                          }}
+                        />
+                        <span>
+                          <span className="font-medium">{item.title}</span>
+                          <span className="block text-xs text-muted-foreground">Due {formatDate(item.dueDate)}</span>
+                        </span>
+                      </label>
+                    );
+                  })
+                )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="lessonDateTo">To</Label>
-                <Input id="lessonDateTo" type="date" {...register("lessonDateTo")} />
-              </div>
+              {errors.homeworkIds && <p className="text-sm text-destructive">{errors.homeworkIds.message}</p>}
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="questionCount">Questions</Label>
-                <Input id="questionCount" type="number" min={1} max={30} {...register("questionCount")} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="title">Title (optional)</Label>
-                <Input id="title" {...register("title")} placeholder="Weekly Quiz" />
-              </div>
+            <QuizMixFields
+              quickGenerate={watch("quickGenerate")}
+              mcqCount={watch("mcqCount")}
+              fillBlankCount={watch("fillBlankCount")}
+              shortAnswerCount={watch("shortAnswerCount")}
+              onQuickGenerateChange={(value) => setValue("quickGenerate", value, { shouldValidate: true })}
+              onMcqChange={(value) => setValue("mcqCount", value, { shouldValidate: true })}
+              onFillBlankChange={(value) => setValue("fillBlankCount", value, { shouldValidate: true })}
+              onShortAnswerChange={(value) => setValue("shortAnswerCount", value, { shouldValidate: true })}
+            />
+            {errors.mcqCount && <p className="text-sm text-destructive">{errors.mcqCount.message}</p>}
+            <div className="space-y-2">
+              <Label htmlFor="title">Quiz title (optional)</Label>
+              <Input id="title" {...register("title")} placeholder="Uses selected topics if empty" />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>

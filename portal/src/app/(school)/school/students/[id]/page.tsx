@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/layout/page-loader";
+
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -8,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
 import { insightsService } from "@/services/insights.service";
 import { formatDate } from "@/lib/utils";
 import { BarChart } from "@/components/charts/simple-charts";
@@ -42,7 +43,7 @@ export default function Student360Page() {
   });
 
   if (query.isLoading) {
-    return <div className="space-y-4 p-8"><Skeleton className="h-10 w-64" /><Skeleton className="h-72 w-full" /></div>;
+    return <PageLoader variant="page" />;
   }
   if (!query.data) {
     return <div className="p-8">Student not found.</div>;

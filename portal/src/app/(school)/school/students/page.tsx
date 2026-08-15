@@ -15,8 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageLoader } from "@/components/layout/page-loader";
 import { studentsService } from "@/services/students.service";
 import { GraduationCap, Plus } from "lucide-react";
 
@@ -65,11 +65,7 @@ export default function StudentsPage() {
 
       <div className="rounded-lg border bg-card">
         {isLoading ? (
-          <div className="space-y-3 p-6">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
+          <PageLoader variant="panel" />
         ) : !data?.items.length ? (
           <EmptyState
             icon={<GraduationCap className="h-10 w-10" />}

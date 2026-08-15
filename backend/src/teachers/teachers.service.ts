@@ -9,7 +9,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 
 @Injectable()
@@ -164,13 +164,16 @@ export class TeachersService {
         : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.teacherProfile.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
-        include: {
+        select: {
+          id: true,
+          employeeCode: true,
+          status: true,
           user: {
             select: {
               id: true,
@@ -181,17 +184,11 @@ export class TeachersService {
               status: true,
             },
           },
-          branch: true,
-          classSubjects: {
-            include: { section: true, subject: true, academicYear: true },
-          },
-          assistantClassSubjects: {
-            include: { section: true, subject: true, academicYear: true },
-          },
+          branch: { select: { id: true, name: true } },
         },
       }),
       this.prisma.teacherProfile.count({ where }),
-    ]);
+    );
 
     return paginate(items, total, page, limit);
   }
@@ -224,25 +221,19 @@ export class TeachersService {
   }
 
   async myClasses(user: AuthUser) {
+    const classSelect = {
+      sectionId: true,
+      subjectId: true,
+      academicYearId: true,
+      branchId: true,
+      section: { select: { id: true, name: true, grade: { select: { id: true, name: true } } } },
+      subject: { select: { id: true, name: true } },
+    } as const;
     const profile = await this.prisma.teacherProfile.findUnique({
       where: { userId: user.id },
-      include: {
-        classSubjects: {
-          include: {
-            section: { include: { grade: true } },
-            subject: true,
-            academicYear: true,
-            branch: true,
-          },
-        },
-        assistantClassSubjects: {
-          include: {
-            section: { include: { grade: true } },
-            subject: true,
-            academicYear: true,
-            branch: true,
-          },
-        },
+      select: {
+        classSubjects: { select: classSelect },
+        assistantClassSubjects: { select: classSelect },
       },
     });
     if (!profile) {

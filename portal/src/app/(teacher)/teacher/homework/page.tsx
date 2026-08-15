@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageLoader } from "@/components/layout/page-loader";
 import { homeworkService } from "@/services/homework.service";
 import { documentsService } from "@/services/documents.service";
 import { teachersService } from "@/services/teachers.service";
@@ -23,6 +24,7 @@ export default function TeacherHomeworkPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [classKey, setClassKey] = useState("");
+  const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState(new Date(Date.now() + 86400000).toISOString().slice(0, 10));
   const homework = useQuery({ queryKey: ["homework"], queryFn: () => homeworkService.list({ limit: 50 }) });
   const classes = useQuery({ queryKey: ["teacher-classes"], queryFn: () => teachersService.myClasses() });
@@ -36,6 +38,7 @@ export default function TeacherHomeworkPage() {
         sectionId: selected.sectionId,
         subjectId: selected.subjectId,
         branchId: selected.branchId,
+        title: title.trim(),
         dueDate,
       });
     },
@@ -43,15 +46,18 @@ export default function TeacherHomeworkPage() {
       toast({ title: "Homework generated", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["homework"] });
       setOpen(false);
+      setTitle("");
     },
     onError: (err) => toast({ title: "Generation failed", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
   });
 
   return (
     <div className="p-8">
-      <PageHeader title="Homework" description="Generate practice from your latest confirmed lesson" actions={<Button onClick={() => setOpen(true)}>Generate homework</Button>} />
+      <PageHeader title="Homework" description="Give each assignment a topic title so it can be selected when generating a quiz" actions={<Button onClick={() => setOpen(true)}>Give homework</Button>} />
       <div className="rounded-lg border bg-card">
-        {!homework.data?.items.length ? (
+        {homework.isLoading ? (
+          <PageLoader variant="panel" />
+        ) : !homework.data?.items.length ? (
           <EmptyState icon={<ClipboardList className="h-10 w-10" />} title="No homework" description="Generate from a lesson summary." />
         ) : (
           <Table>
@@ -71,7 +77,7 @@ export default function TeacherHomeworkPage() {
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent onClose={() => setOpen(false)}>
-          <DialogHeader><DialogTitle>Generate homework</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Give homework</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <Label>Class</Label>
             <Select value={classKey} onChange={(e) => setClassKey(e.target.value)}>
@@ -82,9 +88,18 @@ export default function TeacherHomeworkPage() {
                 </option>
               ))}
             </Select>
+            <Label htmlFor="homework-title">Topic title</Label>
+            <Input
+              id="homework-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Fractions — adding unlike denominators"
+            />
             <Label>Due date</Label>
             <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-            <Button disabled={generate.isPending || !classKey} onClick={() => generate.mutate()}>Generate</Button>
+            <Button disabled={generate.isPending || !classKey || !title.trim()} onClick={() => generate.mutate()}>
+              {generate.isPending ? "Saving…" : "Give homework"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -12,6 +12,7 @@ import {
   QUIZ_GENERATION_PROMPT,
   STUDENT_ANALYSIS_PROMPT,
 } from '../prompts';
+import { mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
 
 interface OpenAiChatResponse {
   choices?: Array<{ message?: { content?: string } }>;
@@ -59,15 +60,20 @@ export class OpenAiProvider implements AiProvider {
     lessonSummaries: string[];
     subjectName?: string;
     questionCount?: number;
+    quickGenerate?: boolean;
+    mcqCount?: number;
+    fillBlankCount?: number;
+    shortAnswerCount?: number;
   }): Promise<AiCompletionResult<QuizOutput>> {
+    const mix = resolveQuizMix(input);
     if (!this.apiKey) {
       // Mock path ONLY when OPENAI_API_KEY is missing — enables local E2E without billed AI.
-      return this.mockQuiz(input.subjectName, input.questionCount ?? 5);
+      return this.mockQuiz(input.subjectName, mix);
     }
 
     const content = await this.chat(
       QUIZ_GENERATION_PROMPT,
-      `Subject: ${input.subjectName ?? 'General'}\nQuestion count: ${input.questionCount ?? 5}\n\nLessons:\n${input.lessonSummaries.join('\n---\n')}`,
+      `Subject: ${input.subjectName ?? 'General'}\n${quizMixInstructions(mix)}\n\nLessons:\n${input.lessonSummaries.join('\n---\n')}`,
     );
     const parsed = QuizOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
     return {
@@ -175,25 +181,16 @@ export class OpenAiProvider implements AiProvider {
     };
   }
 
-  private mockQuiz(subjectName?: string, count = 5): AiCompletionResult<QuizOutput> {
+  private mockQuiz(
+    subjectName: string | undefined,
+    mix: ReturnType<typeof resolveQuizMix>,
+  ): AiCompletionResult<QuizOutput> {
     this.logger.warn('OPENAI_API_KEY missing — returning deterministic mock quiz output');
-    const questions = Array.from({ length: Math.min(Math.max(count, 1), 10) }, (_, i) => ({
-      type: 'MCQ' as const,
-      questionText: `${subjectName ?? 'Subject'} question ${i + 1}: What is the main idea?`,
-      marks: 1,
-      correctAnswer: 'Option A',
-      options: [
-        { optionText: 'Option A', isCorrect: true },
-        { optionText: 'Option B', isCorrect: false },
-        { optionText: 'Option C', isCorrect: false },
-        { optionText: 'Option D', isCorrect: false },
-      ],
-    }));
     return {
       data: QuizOutputSchema.parse({
         title: `${subjectName ?? 'Subject'} Quiz`,
         description: 'Auto-generated draft quiz for teacher review (mock AI).',
-        questions,
+        questions: mockQuestionsForMix(subjectName, mix),
       }),
       provider: 'mock',
       model: 'deterministic-mock',

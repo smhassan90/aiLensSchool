@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 
 export interface CreateNotificationInput {
   schoolId?: string | null;
@@ -44,7 +44,7 @@ export class NotificationService {
       userId: user.id,
       ...(query.unreadOnly ? { readAt: null } : {}),
     };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.notification.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -52,7 +52,7 @@ export class NotificationService {
         take: limit,
       }),
       this.prisma.notification.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 

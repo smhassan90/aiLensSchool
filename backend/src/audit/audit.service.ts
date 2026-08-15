@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 
 interface AuditInput {
   actorUserId?: string | null;
@@ -40,7 +40,7 @@ export class AuditService {
       ...(query.schoolId ? { schoolId: query.schoolId } : {}),
       ...(query.action ? { action: query.action } : {}),
     };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.auditLog.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -51,7 +51,7 @@ export class AuditService {
         },
       }),
       this.prisma.auditLog.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 }

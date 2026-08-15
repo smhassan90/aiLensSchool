@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageLoader } from "@/components/layout/page-loader";
 import { communicationsService } from "@/services/communications.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
@@ -55,7 +56,9 @@ export default function EventsPage() {
     <div className="p-8">
       <PageHeader title="Events" description="School calendar" actions={<Button onClick={() => setOpen(true)}>New event</Button>} />
       <div className="rounded-lg border bg-card">
-        {!list.data?.items.length ? (
+        {list.isLoading ? (
+          <PageLoader variant="panel" />
+        ) : !list.data?.items.length ? (
           <EmptyState icon={<Calendar className="h-10 w-10" />} title="No events" description="Add parent meetings, exams and holidays." />
         ) : (
           <Table>

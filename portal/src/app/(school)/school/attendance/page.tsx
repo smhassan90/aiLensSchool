@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { attendanceService } from "@/services/attendance.service";
 import { academicsService } from "@/services/academics.service";
+import { PageLoader } from "@/components/layout/page-loader";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 
@@ -83,6 +84,9 @@ export default function AttendancePage() {
       </div>
       {sectionId && (
         <div className="rounded-lg border bg-card">
+          {enrollments.isLoading || existing.isLoading ? (
+            <PageLoader variant="panel" />
+          ) : (
           <Table>
             <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
             <TableBody>
@@ -98,6 +102,7 @@ export default function AttendancePage() {
               ))}
             </TableBody>
           </Table>
+          )}
         </div>
       )}
     </div>

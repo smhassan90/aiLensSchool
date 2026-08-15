@@ -1,5 +1,7 @@
 "use client";
 
+import { PageLoader } from "@/components/layout/page-loader";
+
 import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import { useParams } from "next/navigation";
@@ -23,7 +25,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -245,10 +246,7 @@ export default function ClassDetailPage() {
 
   if (gradeQuery.isLoading) {
     return (
-      <div className="space-y-4 p-8">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-64 w-full" />
-      </div>
+      <PageLoader variant="page" />
     );
   }
 

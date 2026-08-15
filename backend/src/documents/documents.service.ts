@@ -9,7 +9,7 @@ import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { HomeworkGenerationService } from '../ai/services/homework-generation.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { PaginationDto, paginate } from '../common/dto/pagination.dto';
+import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import {
   CreateDiaryDto,
   GenerateDiaryDto,
@@ -143,20 +143,36 @@ export class DocumentsService {
       ...(sectionId ? { sectionId } : {}),
       ...(query.date ? { date: new Date(query.date) } : {}),
     };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.homeDiary.findMany({
         where,
         orderBy: { date: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
-        include: { section: { include: { grade: true } } },
+        select: {
+          id: true,
+          date: true,
+          title: true,
+          lessonSummary: true,
+          homeworkNotes: true,
+          teacherRemarks: true,
+          sectionId: true,
+          section: { select: { id: true, name: true, grade: { select: { id: true, name: true } } } },
+        },
       }),
       this.prisma.homeDiary.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 
   async generateHomework(dto: GenerateHomeworkDto, user: AuthUser) {
+    const title = dto.title?.trim();
+    if (!title) {
+      throw new BadRequestException({
+        code: 'HOMEWORK_TITLE_REQUIRED',
+        message: 'Homework title is required so it can be selected as a quiz topic',
+      });
+    }
     const schoolId = this.tenant.requireSchoolId(user);
     const subject = await this.prisma.subject.findFirst({
       where: { id: dto.subjectId, schoolId },
@@ -204,7 +220,7 @@ export class DocumentsService {
         subjectId: dto.subjectId,
         lessonId,
         createdById: user.id,
-        title: generated.title ?? `${subject.name} homework`,
+        title,
         description: generated.description ?? lessonSummary,
         dueDate: new Date(dto.dueDate),
         publishedAt: new Date(),
@@ -343,22 +359,34 @@ export class DocumentsService {
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
       ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
     };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.reportCard.findMany({
         where,
         orderBy: { generatedAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
-        include: {
-          student: true,
-          grade: true,
-          section: true,
-          academicYear: true,
-          lines: { include: { subject: true } },
+        select: {
+          id: true,
+          termLabel: true,
+          overallPercentage: true,
+          attendanceRate: true,
+          remarks: true,
+          generatedAt: true,
+          student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
+          grade: { select: { id: true, name: true } },
+          section: { select: { id: true, name: true } },
+          academicYear: { select: { id: true, name: true } },
+          lines: {
+            select: {
+              average: true,
+              gradeLetter: true,
+              subject: { select: { name: true } },
+            },
+          },
         },
       }),
       this.prisma.reportCard.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 
@@ -426,11 +454,26 @@ export class DocumentsService {
               { student: { firstName: { contains: query.search } } },
               { student: { lastName: { contains: query.search } } },
               { student: { studentCode: { contains: query.search } } },
+              { student: { admissionNumber: { contains: query.search } } },
+              {
+                student: {
+                  parents: {
+                    some: {
+                      parent: {
+                        OR: [
+                          { phone: { contains: query.search } },
+                          { user: { phone: { contains: query.search } } },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
             ],
           }
         : {}),
     };
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await pageQuery(
       this.prisma.idCard.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -438,21 +481,48 @@ export class DocumentsService {
         take: limit,
         include: {
           student: {
-            include: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              studentCode: true,
+              admissionNumber: true,
+              photoUrl: true,
               enrollments: {
                 where: { status: 'ACTIVE' },
-                include: { grade: true, section: true },
                 take: 1,
+                select: {
+                  grade: { select: { id: true, name: true } },
+                  section: { select: { id: true, name: true } },
+                },
+              },
+              parents: {
+                select: {
+                  relationship: true,
+                  isPrimary: true,
+                  parent: {
+                    select: {
+                      phone: true,
+                      user: { select: { firstName: true, lastName: true, email: true, phone: true } },
+                    },
+                  },
+                },
               },
             },
           },
-          teacher: { include: { user: true } },
+          teacher: {
+            select: {
+              id: true,
+              employeeCode: true,
+              user: { select: { firstName: true, lastName: true, email: true, phone: true } },
+            },
+          },
           school: { select: { name: true, code: true, city: true } },
           branch: { select: { name: true } },
         },
       }),
       this.prisma.idCard.count({ where }),
-    ]);
+    );
     return paginate(items, total, page, limit);
   }
 
@@ -485,6 +555,7 @@ export class DocumentsService {
               include: { grade: true, section: true },
               take: 1,
             },
+            parents: { include: { parent: { include: { user: true } } } },
           },
         },
         school: { select: { name: true, code: true, city: true } },
