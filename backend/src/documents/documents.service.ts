@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -16,7 +17,12 @@ import {
   GenerateHomeworkDto,
   GenerateIdCardDto,
   GenerateReportCardDto,
+  PreviewDiaryDto,
+  PreviewHomeworkDto,
 } from './dto/documents.dto';
+import { ParentsService } from '../parents/parents.service';
+import { TeacherGradeStyleService } from '../common/services/teacher-grade-style.service';
+import { applyDiaryStyle, generateStyledHomework } from '../lessons/teacher-content-style';
 
 function letterGrade(avg: number) {
   if (avg >= 85) return 'A';
@@ -33,6 +39,8 @@ export class DocumentsService {
     private readonly audit: AuditService,
     private readonly tenant: TenantService,
     private readonly homeworkAi: HomeworkGenerationService,
+    private readonly parentsService: ParentsService,
+    private readonly gradeStyle: TeacherGradeStyleService,
   ) {}
 
   async createDiary(dto: CreateDiaryDto, user: AuthUser) {
@@ -78,6 +86,24 @@ export class DocumentsService {
   }
 
   async generateDiary(dto: GenerateDiaryDto, user: AuthUser) {
+    const draft = await this.buildDiaryDraft(dto, user);
+    return this.createDiary(
+      {
+        ...dto,
+        title: draft.title,
+        lessonSummary: draft.lessonSummary,
+        homeworkNotes: draft.homeworkNotes,
+        teacherRemarks: draft.teacherRemarks,
+      },
+      user,
+    );
+  }
+
+  async previewDiary(dto: PreviewDiaryDto, user: AuthUser) {
+    return this.buildDiaryDraft(dto, user);
+  }
+
+  private async buildDiaryDraft(dto: PreviewDiaryDto, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
     const date = new Date(dto.date);
     const lessons = await this.prisma.dailyLesson.findMany({
@@ -85,9 +111,12 @@ export class DocumentsService {
         schoolId,
         sectionId: dto.sectionId,
         date,
-        status: LessonStatus.CONFIRMED,
+        OR: [
+          { status: { in: [LessonStatus.CONFIRMED, LessonStatus.READY_FOR_REVIEW] } },
+          ...(dto.lessonId ? [{ id: dto.lessonId }] : []),
+        ],
       },
-      include: { subject: true },
+      include: { subject: true, sources: { select: { ocrText: true, manualText: true } } },
       orderBy: { createdAt: 'asc' },
     });
     const homework = await this.prisma.homework.findMany({
@@ -97,31 +126,153 @@ export class DocumentsService {
       orderBy: { dueDate: 'asc' },
     });
 
-    const lessonSummary = lessons.length
+    let lessonSummary = lessons.length
       ? lessons
-          .map(
-            (l) =>
-              `${l.subject.name}: ${l.aiSummary ?? l.topicName ?? l.chapterName ?? 'Lesson delivered'}`,
-          )
-          .join('\n')
+          .map((l) => {
+            const pageText = l.sources
+              .map((source) => source.ocrText?.trim() || source.manualText?.trim() || '')
+              .filter(Boolean)
+              .join('\n');
+            const body = pageText || l.topicName || l.chapterName || 'Lesson delivered';
+            return `${l.subject.name}:\n${body}`;
+          })
+          .join('\n\n')
       : 'No confirmed lessons recorded for this date.';
 
-    const homeworkNotes = homework.length
+    let homeworkNotes = homework.length
       ? homework.map((h) => `${h.subject.name}: ${h.title}${h.description ? ` — ${h.description}` : ''}`).join('\n')
       : 'No homework assigned.';
 
-    return this.createDiary(
-      {
-        ...dto,
-        title: `Home diary ${dto.date}`,
-        lessonSummary,
-        homeworkNotes,
-        teacherRemarks: lessons.length
-          ? 'Generated from today’s confirmed lessons and assigned homework.'
-          : 'Generated with limited lesson data. Please review before sharing.',
+    if (this.tenant.isTeacher(user) && !this.tenant.isSchoolAdmin(user)) {
+      const teacher = await this.prisma.teacherProfile.findUnique({ where: { userId: user.id } });
+      const gradeId = lessons[0]?.gradeId;
+      if (teacher && gradeId) {
+        const saved = await this.gradeStyle.get(teacher.id, gradeId);
+        const instruction = dto.instruction?.trim() || saved?.diaryStyle || undefined;
+        if (dto.instruction?.trim()) {
+          await this.gradeStyle.remember({
+            teacherId: teacher.id,
+            gradeId,
+            schoolId,
+            diaryStyle: dto.instruction,
+          });
+        }
+        if (instruction) {
+          lessonSummary = applyDiaryStyle(lessonSummary, instruction);
+          homeworkNotes = applyDiaryStyle(homeworkNotes, instruction);
+        }
+      }
+    } else if (dto.instruction?.trim()) {
+      lessonSummary = applyDiaryStyle(lessonSummary, dto.instruction);
+      homeworkNotes = applyDiaryStyle(homeworkNotes, dto.instruction);
+    }
+
+    return {
+      academicYearId: dto.academicYearId,
+      sectionId: dto.sectionId,
+      branchId: dto.branchId,
+      date: dto.date,
+      title: `Home diary ${dto.date}`,
+      lessonSummary,
+      homeworkNotes,
+      teacherRemarks: lessons.length
+        ? 'Generated from today’s lessons and assigned homework.'
+        : 'Generated with limited lesson data. Please review before sharing.',
+    };
+  }
+
+  async previewHomework(dto: PreviewHomeworkDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const lesson = await this.prisma.dailyLesson.findFirst({
+      where: { id: dto.lessonId, schoolId },
+      include: {
+        subject: true,
+        grade: true,
+        concepts: true,
+        sources: { select: { ocrText: true, manualText: true } },
       },
-      user,
-    );
+    });
+    if (!lesson) {
+      throw new NotFoundException({ code: 'LESSON_NOT_FOUND', message: 'Lesson not found' });
+    }
+    this.tenant.assertSchoolAccess(user, lesson.schoolId);
+
+    const teacher = await this.prisma.teacherProfile.findUnique({ where: { userId: user.id } });
+    if (this.tenant.isTeacher(user) && !this.tenant.isSchoolAdmin(user)) {
+      if (!teacher || teacher.id !== lesson.teacherId) {
+        throw new ForbiddenException({
+          code: 'LESSON_OWNER_REQUIRED',
+          message: 'Only the assigned lesson teacher can generate homework',
+        });
+      }
+    }
+
+    const extractedText =
+      lesson.sources
+        .map((source) => source.ocrText?.trim() || source.manualText?.trim() || '')
+        .filter(Boolean)
+        .join('\n\n') ||
+      lesson.topicName ||
+      lesson.chapterName ||
+      '';
+    const keyPoints = lesson.concepts.map((concept) => concept.name);
+    const lessonContent = [
+      extractedText,
+      keyPoints.length ? `Key points:\n${keyPoints.map((point) => `- ${point}`).join('\n')}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    const saved = teacher ? await this.gradeStyle.get(teacher.id, lesson.gradeId) : null;
+    const instruction = dto.instruction?.trim() || saved?.homeworkStyle || undefined;
+    if (teacher && dto.instruction?.trim()) {
+      await this.gradeStyle.remember({
+        teacherId: teacher.id,
+        gradeId: lesson.gradeId,
+        schoolId,
+        homeworkStyle: dto.instruction,
+      });
+    }
+
+    const fallback = generateStyledHomework({
+      subjectName: lesson.subject.name,
+      topicName: lesson.topicName,
+      extractedText,
+      keyPoints,
+      instruction,
+      gradeName: lesson.grade?.name,
+    });
+
+    let generated = fallback;
+    try {
+      generated = await this.homeworkAi.generate({
+        schoolId,
+        userId: user.id,
+        lessonSummary: lessonContent,
+        subjectName: lesson.subject.name,
+        gradeName: lesson.grade?.name,
+        styleInstruction: instruction,
+      });
+      if (!generated.description?.trim() || generated.description.trim().length < 20) {
+        generated = fallback;
+      }
+    } catch {
+      generated = fallback;
+    }
+
+    const dueDate =
+      dto.dueDate ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    return {
+      lessonId: lesson.id,
+      academicYearId: lesson.academicYearId,
+      sectionId: lesson.sectionId,
+      subjectId: lesson.subjectId,
+      branchId: lesson.branchId,
+      title: generated.title,
+      description: generated.description ?? lessonContent,
+      dueDate,
+    };
   }
 
   async listDiaries(
@@ -129,14 +280,27 @@ export class DocumentsService {
     query: PaginationDto & { sectionId?: string; date?: string; studentId?: string },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
+    if (this.tenant.isParent(user)) {
+      if (!query.studentId) {
+        throw new ForbiddenException({
+          code: 'STUDENT_ID_REQUIRED',
+          message: 'studentId is required for parent diary list',
+        });
+      }
+      await this.parentsService.assertParentOwnsStudent(user.id, query.studentId);
+    }
     const page = query.page ?? 1;
     const limit = query.limit ?? 30;
     let sectionId = query.sectionId;
     if (query.studentId && !sectionId) {
       const enrollment = await this.prisma.studentEnrollment.findFirst({
         where: { studentId: query.studentId, status: 'ACTIVE' },
+        orderBy: { createdAt: 'desc' },
       });
       sectionId = enrollment?.sectionId;
+    }
+    if (this.tenant.isParent(user) && !sectionId) {
+      return paginate([], 0, page, limit);
     }
     const where: Prisma.HomeDiaryWhereInput = {
       schoolId,
@@ -351,6 +515,15 @@ export class DocumentsService {
     query: PaginationDto & { studentId?: string; sectionId?: string; academicYearId?: string },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
+    if (this.tenant.isParent(user)) {
+      if (!query.studentId) {
+        throw new ForbiddenException({
+          code: 'STUDENT_ID_REQUIRED',
+          message: 'studentId is required for parent report cards',
+        });
+      }
+      await this.parentsService.assertParentOwnsStudent(user.id, query.studentId);
+    }
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
     const where: Prisma.ReportCardWhereInput = {

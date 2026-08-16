@@ -8,10 +8,10 @@ export async function fetchEvents(params?: {
   return apiFetch<PaginatedResult<EventItem>>(`/events${buildQuery(params ?? {})}`);
 }
 
-export function isUpcomingEvent(event: EventItem): boolean {
-  return new Date(event.startDate) >= new Date();
+export async function fetchEventById(id: string): Promise<EventItem> {
+  return apiFetch<EventItem>(`/events/${id}`);
 }
 
-export function findEventById(events: EventItem[], id: string): EventItem | undefined {
-  return events.find((event) => event.id === id);
+export function isUpcomingEvent(event: EventItem): boolean {
+  return new Date(event.startDate) >= new Date();
 }

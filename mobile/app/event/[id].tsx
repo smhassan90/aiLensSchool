@@ -4,19 +4,14 @@ import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui';
 import { colors, spacing } from '@/constants/theme';
-import { fetchEvents, findEventById } from '@/services/events.service';
+import { fetchEventById } from '@/services/events.service';
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const query = useQuery({
     queryKey: ['event', id],
-    queryFn: async () => {
-      const list = await fetchEvents({ limit: 100 });
-      const item = findEventById(list.items, id!);
-      if (!item) throw new Error('Not found');
-      return item;
-    },
+    queryFn: () => fetchEventById(id!),
     enabled: !!id,
   });
 

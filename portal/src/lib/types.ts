@@ -223,14 +223,29 @@ export interface Lesson {
   id: string;
   date: string;
   status: string;
+  academicYearId?: string;
+  sectionId?: string;
+  subjectId?: string;
+  branchId?: string;
+  gradeId?: string;
   chapterName?: string;
   topicName?: string;
   teacherNotes?: string;
   aiSummary?: string;
   aiKeyPoints?: string[];
+  extractedText?: string;
+  pageFrom?: number | null;
+  pageTo?: number | null;
+  concepts?: Array<{ id: string; name: string }>;
+  sources?: Array<{ ocrText?: string | null; manualText?: string | null }>;
   section?: { id: string; name: string };
   subject?: { id: string; name: string };
   grade?: { id: string; name: string };
+  gradeStyle?: {
+    keyPointStyle?: string | null;
+    homeworkStyle?: string | null;
+    diaryStyle?: string | null;
+  } | null;
 }
 
 export interface QuizOption {

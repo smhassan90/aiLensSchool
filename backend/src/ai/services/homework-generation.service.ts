@@ -15,6 +15,8 @@ export class HomeworkGenerationService {
     userId?: string | null;
     lessonSummary: string;
     subjectName?: string;
+    gradeName?: string;
+    styleInstruction?: string;
   }) {
     const request = await this.prisma.aIRequest.create({
       data: {
@@ -31,6 +33,8 @@ export class HomeworkGenerationService {
       const result = await this.ai.generateHomework({
         lessonSummary: input.lessonSummary,
         subjectName: input.subjectName,
+        gradeName: input.gradeName,
+        styleInstruction: input.styleInstruction,
       });
       await this.prisma.aIRequest.update({
         where: { id: request.id },

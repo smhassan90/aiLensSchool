@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -14,6 +15,7 @@ import {
   CreateFeeStructureDto,
   RecordPaymentDto,
 } from './dto/fees.dto';
+import { ParentsService } from '../parents/parents.service';
 
 function money(value: Prisma.Decimal | number | string) {
   return Number(value);
@@ -25,6 +27,7 @@ export class FeesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly tenant: TenantService,
+    private readonly parentsService: ParentsService,
   ) {}
 
   async createStructure(dto: CreateFeeStructureDto, user: AuthUser) {
@@ -170,6 +173,15 @@ export class FeesService {
     },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
+    if (this.tenant.isParent(user)) {
+      if (!query.studentId) {
+        throw new ForbiddenException({
+          code: 'STUDENT_ID_REQUIRED',
+          message: 'studentId is required for parent fee list',
+        });
+      }
+      await this.parentsService.assertParentOwnsStudent(user.id, query.studentId);
+    }
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
     const where: Prisma.StudentFeeWhereInput = {

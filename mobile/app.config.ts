@@ -2,7 +2,7 @@ import { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'SMS Parent',
+  name: 'AiSchoolLens Parent',
   slug: 'sms-parent',
   version: '1.0.0',
   orientation: 'portrait',

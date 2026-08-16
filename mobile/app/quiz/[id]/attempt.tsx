@@ -14,9 +14,9 @@ export default function QuizAttemptScreen() {
   const studentId = selectedChildId ?? '';
 
   const quizQuery = useQuery({
-    queryKey: ['quiz', id],
-    queryFn: () => fetchQuizById(id!),
-    enabled: !!id,
+    queryKey: ['quiz', id, studentId],
+    queryFn: () => fetchQuizById(id!, studentId),
+    enabled: !!id && !!studentId,
   });
 
   const resultQuery = useQuery({

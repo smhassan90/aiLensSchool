@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import {
   AIRequestStatus,
+  LessonSourceType,
   LessonStatus,
   Prisma,
 } from '@prisma/client';
@@ -18,7 +19,18 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { LessonProcessingService } from '../ai/services/lesson-processing.service';
 import { ParentsService } from '../parents/parents.service';
-import { CreateLessonDto, LessonQueryDto, ScanLessonDto } from './dto/lesson.dto';
+import { PageOcrService } from './page-ocr.service';
+import { formatOcrLesson } from './lesson-text-formatter';
+import {
+  CreateLessonDto,
+  ExtractLessonDto,
+  LessonQueryDto,
+  RegenerateKeyPointsDto,
+  ScanLessonDto,
+  UpdateLessonDto,
+} from './dto/lesson.dto';
+import { TeacherGradeStyleService } from '../common/services/teacher-grade-style.service';
+import { applyKeyPointStyle } from './teacher-content-style';
 
 @Injectable()
 export class LessonsService {
@@ -31,6 +43,8 @@ export class LessonsService {
     private readonly lessonProcessing: LessonProcessingService,
     private readonly config: ConfigService,
     private readonly parentsService: ParentsService,
+    private readonly pageOcr: PageOcrService,
+    private readonly gradeStyle: TeacherGradeStyleService,
   ) {}
 
   private async requireTeacherProfile(userId: string) {
@@ -65,6 +79,391 @@ export class LessonsService {
       });
     }
     return assignment;
+  }
+
+  private parseOptionalInt(value?: string) {
+    if (!value || value.trim() === '') return undefined;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  private structureFromPageText(
+    ocrText: string,
+    subjectName: string,
+    pageFrom?: number,
+    pageTo?: number,
+    teacherNotes?: string,
+  ) {
+    const formatted = formatOcrLesson(ocrText, subjectName);
+    return {
+      chapterName: formatted.chapterName,
+      topicName: formatted.topicName,
+      summary: formatted.summary,
+      concepts: formatted.concepts,
+      pageFrom,
+      pageTo,
+      teacherNotesSuggestion: teacherNotes,
+    };
+  }
+
+  private extractedTextFromSources(
+    sources?: Array<{ ocrText?: string | null; manualText?: string | null }>,
+  ) {
+    return (
+      sources
+        ?.map((source) => source.ocrText?.trim() || source.manualText?.trim() || '')
+        .filter(Boolean)
+        .join('\n\n') ?? ''
+    );
+  }
+
+  private presentLesson<
+    T extends { sources?: Array<{ ocrText?: string | null; manualText?: string | null }> },
+  >(lesson: T) {
+    return {
+      ...lesson,
+      extractedText: this.extractedTextFromSources(lesson.sources),
+    };
+  }
+
+  private async presentLessonWithStyle<
+    T extends {
+      teacherId: string;
+      gradeId: string;
+      sources?: Array<{ ocrText?: string | null; manualText?: string | null }>;
+    },
+  >(lesson: T) {
+    const gradeStyle = await this.gradeStyle.get(lesson.teacherId, lesson.gradeId);
+    return {
+      ...this.presentLesson(lesson),
+      gradeStyle,
+    };
+  }
+
+  private async loadPresented(id: string) {
+    const lesson = await this.prisma.dailyLesson.findUnique({
+      where: { id },
+      include: {
+        sources: true,
+        concepts: true,
+        subject: true,
+        section: true,
+        grade: true,
+        teacher: { include: { user: { select: { firstName: true, lastName: true } } } },
+      },
+    });
+    if (!lesson) {
+      throw new NotFoundException({ code: 'LESSON_NOT_FOUND', message: 'Lesson not found' });
+    }
+    return this.presentLessonWithStyle(lesson);
+  }
+
+  async extractFromPhotos(dto: ExtractLessonDto, files: Express.Multer.File[], user: AuthUser) {
+    if (!files?.length) {
+      throw new BadRequestException({
+        code: 'PHOTOS_REQUIRED',
+        message: 'Upload at least one photo of the pages taught today',
+      });
+    }
+    if (!dto?.academicYearId || !dto.gradeId || !dto.sectionId || !dto.subjectId || !dto.branchId || !dto.date) {
+      throw new BadRequestException({
+        code: 'CLASS_REQUIRED',
+        message: 'Select a class and date before extracting the lesson',
+      });
+    }
+
+    const lessonDate = new Date(dto.date);
+    if (Number.isNaN(lessonDate.getTime())) {
+      throw new BadRequestException({
+        code: 'INVALID_DATE',
+        message: 'Lesson date is invalid',
+      });
+    }
+
+    try {
+      return await this.saveExtractedLesson(dto, files, user, lessonDate);
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      this.logger.error(
+        `Lesson extract failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new BadRequestException({
+        code: 'LESSON_EXTRACT_FAILED',
+        message: error instanceof Error ? error.message : 'Could not extract lesson from photos',
+      });
+    }
+  }
+
+  private async saveExtractedLesson(
+    dto: ExtractLessonDto,
+    files: Express.Multer.File[],
+    user: AuthUser,
+    lessonDate: Date,
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.requireTeacherProfile(user.id);
+    await this.assertTeacherAssignment({
+      teacherId: teacher.id,
+      sectionId: dto.sectionId,
+      subjectId: dto.subjectId,
+      academicYearId: dto.academicYearId,
+    });
+
+    const [subject, grade] = await Promise.all([
+      this.prisma.subject.findUnique({ where: { id: dto.subjectId } }),
+      this.prisma.grade.findUnique({ where: { id: dto.gradeId } }),
+    ]);
+    if (!subject || !grade) {
+      throw new BadRequestException({
+        code: 'CLASS_NOT_FOUND',
+        message: 'Subject or grade was not found',
+      });
+    }
+
+    const pageFrom = this.parseOptionalInt(dto.pageFrom);
+    const pageTo = this.parseOptionalInt(dto.pageTo);
+    const teacherNotes = dto.teacherNotes?.trim() || undefined;
+    const ocrText = await this.pageOcr.readPages(files);
+    if (ocrText.replace(/\s+/g, '').length < 20) {
+      throw new BadRequestException({
+        code: 'PAGE_TEXT_UNREADABLE',
+        message: 'Could not read text from the photos. Please upload clearer pictures of the textbook pages.',
+      });
+    }
+
+    const local = this.structureFromPageText(ocrText, subject.name, pageFrom, pageTo, teacherNotes);
+    const polished = await this.lessonProcessing.process({
+      schoolId,
+      userId: user.id,
+      sourceText: local.summary,
+      subjectName: subject.name,
+      gradeName: grade.name,
+    });
+    const polishedLooksReal =
+      polished.summary.trim().length > 40 &&
+      !/photos were not saved|photographed textbook page/i.test(polished.summary);
+    const output = {
+      ...local,
+      chapterName: polishedLooksReal ? polished.chapterName || local.chapterName : local.chapterName,
+      topicName: polishedLooksReal ? polished.topicName || local.topicName : local.topicName,
+      summary: polishedLooksReal ? polished.summary : local.summary,
+      concepts:
+        polishedLooksReal && polished.concepts.length ? polished.concepts : local.concepts,
+      teacherNotesSuggestion: polished.teacherNotesSuggestion ?? local.teacherNotesSuggestion,
+    };
+    const savedStyle = await this.gradeStyle.get(teacher.id, dto.gradeId);
+    if (savedStyle?.keyPointStyle) {
+      output.concepts = applyKeyPointStyle(output.concepts, savedStyle.keyPointStyle);
+    }
+    const extractedText = output.summary;
+
+    const lesson = await this.prisma.dailyLesson.create({
+      data: {
+        schoolId,
+        branchId: dto.branchId,
+        academicYearId: dto.academicYearId,
+        gradeId: dto.gradeId,
+        sectionId: dto.sectionId,
+        subjectId: dto.subjectId,
+        teacherId: teacher.id,
+        createdById: user.id,
+        date: lessonDate,
+        chapterName: output.chapterName,
+        topicName: output.topicName,
+        teacherNotes: output.teacherNotesSuggestion ?? teacherNotes,
+        aiSummary: output.summary,
+        pageFrom: output.pageFrom ?? pageFrom,
+        pageTo: output.pageTo ?? pageTo,
+        status: LessonStatus.READY_FOR_REVIEW,
+        sources: {
+          create: {
+            type: LessonSourceType.TEXTBOOK_IMAGE,
+            ocrText: extractedText,
+            pageFrom: output.pageFrom ?? pageFrom,
+            pageTo: output.pageTo ?? pageTo,
+          },
+        },
+        concepts: output.concepts.length
+          ? { create: output.concepts.map((name) => ({ name })) }
+          : undefined,
+      },
+    });
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      branchId: dto.branchId,
+      action: 'LESSON_EXTRACTED_FROM_PHOTOS',
+      entityType: 'DailyLesson',
+      entityId: lesson.id,
+    });
+
+    return this.loadPresented(lesson.id);
+  }
+
+  async updateLesson(id: string, dto: UpdateLessonDto, user: AuthUser) {
+    const teacher = await this.requireTeacherProfile(user.id);
+    const lesson = await this.prisma.dailyLesson.findUnique({
+      where: { id },
+      include: { sources: true },
+    });
+    if (!lesson) {
+      throw new NotFoundException({ code: 'LESSON_NOT_FOUND', message: 'Lesson not found' });
+    }
+    this.tenant.assertSchoolAccess(user, lesson.schoolId);
+    if (lesson.teacherId !== teacher.id) {
+      throw new ForbiddenException({
+        code: 'LESSON_OWNER_REQUIRED',
+        message: 'Only the assigned lesson teacher can update this lesson',
+      });
+    }
+    if (lesson.status === LessonStatus.CONFIRMED) {
+      throw new BadRequestException({
+        code: 'LESSON_ALREADY_CONFIRMED',
+        message: 'Confirmed lessons cannot be edited',
+      });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.dailyLesson.update({
+        where: { id },
+        data: {
+          chapterName: dto.chapterName,
+          topicName: dto.topicName,
+          teacherNotes: dto.teacherNotes,
+          aiSummary: dto.aiSummary,
+          pageFrom: dto.pageFrom,
+          pageTo: dto.pageTo,
+        },
+      });
+
+      if (dto.extractedText !== undefined) {
+        const source = lesson.sources[0];
+        if (source) {
+          await tx.lessonSource.update({
+            where: { id: source.id },
+            data: { ocrText: dto.extractedText },
+          });
+        } else {
+          await tx.lessonSource.create({
+            data: {
+              lessonId: id,
+              type: LessonSourceType.MANUAL_TEXT,
+              ocrText: dto.extractedText,
+              manualText: dto.extractedText,
+            },
+          });
+        }
+      }
+
+      if (dto.concepts) {
+        await tx.lessonConcept.deleteMany({ where: { lessonId: id } });
+        const names = dto.concepts.map((name) => name.trim()).filter(Boolean);
+        if (names.length) {
+          await tx.lessonConcept.createMany({
+            data: names.map((name) => ({ lessonId: id, name })),
+          });
+        }
+      }
+    });
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId: lesson.schoolId,
+      branchId: lesson.branchId,
+      action: 'LESSON_UPDATED',
+      entityType: 'DailyLesson',
+      entityId: id,
+    });
+
+    return this.loadPresented(id);
+  }
+
+  async regenerateKeyPoints(id: string, dto: RegenerateKeyPointsDto, user: AuthUser) {
+    const teacher = await this.requireTeacherProfile(user.id);
+    const lesson = await this.prisma.dailyLesson.findUnique({
+      where: { id },
+      include: { sources: true, concepts: true, subject: true, grade: true },
+    });
+    if (!lesson) {
+      throw new NotFoundException({ code: 'LESSON_NOT_FOUND', message: 'Lesson not found' });
+    }
+    this.tenant.assertSchoolAccess(user, lesson.schoolId);
+    if (lesson.teacherId !== teacher.id) {
+      throw new ForbiddenException({
+        code: 'LESSON_OWNER_REQUIRED',
+        message: 'Only the assigned lesson teacher can update this lesson',
+      });
+    }
+    if (lesson.status === LessonStatus.CONFIRMED) {
+      throw new BadRequestException({
+        code: 'LESSON_ALREADY_CONFIRMED',
+        message: 'Confirmed lessons cannot be edited',
+      });
+    }
+
+    const extractedText = this.extractedTextFromSources(lesson.sources);
+    const saved = await this.gradeStyle.get(teacher.id, lesson.gradeId);
+    const instruction = dto.instruction?.trim() || saved?.keyPointStyle || undefined;
+    if (dto.instruction?.trim()) {
+      await this.gradeStyle.remember({
+        teacherId: teacher.id,
+        gradeId: lesson.gradeId,
+        schoolId: lesson.schoolId,
+        keyPointStyle: dto.instruction,
+      });
+    }
+
+    const current = lesson.concepts.map((concept) => concept.name);
+    const localConcepts = current.length
+      ? current
+      : this.structureFromPageText(extractedText, lesson.subject.name).concepts;
+    let concepts = applyKeyPointStyle(localConcepts, instruction);
+
+    if (extractedText.trim().length > 20) {
+      const polished = await this.lessonProcessing.process({
+        schoolId: lesson.schoolId,
+        userId: user.id,
+        sourceText: [
+          'Write key points only. Do not write a lesson summary.',
+          instruction ? `Teacher instruction: ${instruction}` : '',
+          '',
+          extractedText,
+        ]
+          .filter((line) => line !== '')
+          .join('\n'),
+        subjectName: lesson.subject.name,
+        gradeName: lesson.grade.name,
+      });
+      const looksReal =
+        polished.concepts.length > 0 &&
+        !polished.concepts.some((name) => /main idea from the photographed pages/i.test(name));
+      if (looksReal) {
+        concepts = applyKeyPointStyle(polished.concepts, instruction);
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.lessonConcept.deleteMany({ where: { lessonId: id } });
+      if (concepts.length) {
+        await tx.lessonConcept.createMany({
+          data: concepts.map((name) => ({ lessonId: id, name })),
+        });
+      }
+    });
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId: lesson.schoolId,
+      branchId: lesson.branchId,
+      action: 'LESSON_KEY_POINTS_REGENERATED',
+      entityType: 'DailyLesson',
+      entityId: id,
+    });
+
+    return this.loadPresented(id);
   }
 
   async createManual(dto: CreateLessonDto, user: AuthUser) {
@@ -254,10 +653,7 @@ export class LessonsService {
       throw error;
     }
 
-    return this.prisma.dailyLesson.findUnique({
-      where: { id: lessonId },
-      include: { concepts: true, sources: true },
-    });
+    return this.loadPresented(lessonId);
   }
 
   async confirm(id: string, user: AuthUser) {
@@ -292,7 +688,7 @@ export class LessonsService {
       });
     }
 
-    const updated = await this.prisma.dailyLesson.update({
+    await this.prisma.dailyLesson.update({
       where: { id },
       data: {
         status: LessonStatus.CONFIRMED,
@@ -309,7 +705,7 @@ export class LessonsService {
       entityId: id,
     });
 
-    return updated;
+    return this.loadPresented(id);
   }
 
   async findAll(user: AuthUser, query: PaginationDto & LessonQueryDto) {
@@ -325,9 +721,7 @@ export class LessonsService {
         });
       }
       await this.parentsService.assertParentOwnsStudent(user.id, query.studentId);
-      const enrollment = await this.prisma.studentEnrollment.findFirst({
-        where: { studentId: query.studentId, status: 'ACTIVE' },
-      });
+      const enrollment = await this.parentsService.getActiveEnrollment(user.id, query.studentId);
       if (!enrollment) {
         return paginate([], 0, page, limit);
       }
@@ -442,6 +836,6 @@ export class LessonsService {
         });
       }
     }
-    return owned;
+    return this.presentLessonWithStyle(owned);
   }
 }

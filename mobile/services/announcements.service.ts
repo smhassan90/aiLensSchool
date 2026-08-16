@@ -11,9 +11,6 @@ export async function fetchAnnouncements(params?: {
   );
 }
 
-export function findAnnouncementById(
-  items: Announcement[],
-  id: string,
-): Announcement | undefined {
-  return items.find((item) => item.id === id);
+export async function fetchAnnouncementById(id: string): Promise<Announcement> {
+  return apiFetch<Announcement>(`/announcements/${id}`);
 }

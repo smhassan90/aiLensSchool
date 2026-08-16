@@ -163,4 +163,23 @@ export class ParentsService {
     }
     return parent;
   }
+
+  async getActiveEnrollment(parentUserId: string, studentId: string) {
+    await this.assertParentOwnsStudent(parentUserId, studentId);
+    return this.prisma.studentEnrollment.findFirst({
+      where: { studentId, status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async assertParentChildInSection(parentUserId: string, studentId: string, sectionId: string) {
+    const enrollment = await this.getActiveEnrollment(parentUserId, studentId);
+    if (!enrollment || enrollment.sectionId !== sectionId) {
+      throw new ForbiddenException({
+        code: 'CHILD_ACCESS_DENIED',
+        message: 'This item is not for the selected child',
+      });
+    }
+    return enrollment;
+  }
 }

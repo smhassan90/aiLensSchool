@@ -4,19 +4,14 @@ import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui';
 import { colors, spacing } from '@/constants/theme';
-import { fetchAnnouncements, findAnnouncementById } from '@/services/announcements.service';
+import { fetchAnnouncementById } from '@/services/announcements.service';
 
 export default function AnnouncementDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const query = useQuery({
-    queryKey: ['announcements', id],
-    queryFn: async () => {
-      const list = await fetchAnnouncements({ limit: 100 });
-      const item = findAnnouncementById(list.items, id!);
-      if (!item) throw new Error('Not found');
-      return item;
-    },
+    queryKey: ['announcement', id],
+    queryFn: () => fetchAnnouncementById(id!),
     enabled: !!id,
   });
 

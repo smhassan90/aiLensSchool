@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AnnouncementStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -80,7 +80,11 @@ export class AnnouncementsService {
     const limit = query.limit ?? 20;
     const where: Prisma.AnnouncementWhereInput = {
       schoolId,
-      ...(query.status ? { status: query.status } : {}),
+      ...(this.tenant.isParent(user)
+        ? { status: AnnouncementStatus.PUBLISHED }
+        : query.status
+          ? { status: query.status }
+          : {}),
     };
     const [items, total] = await pageQuery(
       this.prisma.announcement.findMany({
@@ -103,6 +107,12 @@ export class AnnouncementsService {
       });
     }
     this.tenant.assertSchoolAccess(user, announcement.schoolId);
+    if (this.tenant.isParent(user) && announcement.status !== AnnouncementStatus.PUBLISHED) {
+      throw new ForbiddenException({
+        code: 'ANNOUNCEMENT_NOT_AVAILABLE',
+        message: 'Announcement is not available',
+      });
+    }
     return announcement;
   }
 }

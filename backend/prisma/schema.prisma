@@ -393,6 +393,7 @@ model School {
   homeDiaries             HomeDiary[]
   reportCards             ReportCard[]
   idCards                 IdCard[]
+  teacherGradeStyles      TeacherGradeStyle[]
   pricingPlanId           String?            @map("pricing_plan_id")
   pricingPlan             PricingPlan?       @relation(fields: [pricingPlanId], references: [id])
 
@@ -585,12 +586,34 @@ model TeacherProfile {
   assistantClassSubjects ClassSubject[] @relation("ClassSubjectAssistantTeacher")
   lessons                DailyLesson[]
   idCards                IdCard[]
+  gradeStyles            TeacherGradeStyle[]
 
   @@unique([schoolId, employeeCode])
   @@index([schoolId])
   @@index([branchId])
   @@index([status])
   @@map("teacher_profiles")
+}
+
+model TeacherGradeStyle {
+  id            String   @id @default(uuid())
+  teacherId     String   @map("teacher_id")
+  gradeId       String   @map("grade_id")
+  schoolId      String   @map("school_id")
+  keyPointStyle String?  @map("key_point_style") @db.Text
+  homeworkStyle String?  @map("homework_style") @db.Text
+  diaryStyle    String?  @map("diary_style") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  teacher TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  grade   Grade          @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  school  School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, gradeId])
+  @@index([schoolId])
+  @@index([gradeId])
+  @@map("teacher_grade_styles")
 }
 
 // ===================== ACADEMICS =====================
@@ -658,6 +681,7 @@ model Grade {
   announcements Announcement[]
   events      Event[]
   reportCards ReportCard[]
+  teacherStyles TeacherGradeStyle[]
 
   @@unique([schoolId, name])
   @@index([schoolId])

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   AiCompletionResult,
   AiProvider,
+  LessonImageInput,
 } from './ai.provider';
 import { LessonOutput, LessonOutputSchema } from '../schemas/lesson-output.schema';
 import { QuizOutput, QuizOutputSchema } from '../schemas/quiz-output.schema';
@@ -35,15 +36,17 @@ export class OpenAiProvider implements AiProvider {
     sourceText: string;
     subjectName?: string;
     gradeName?: string;
+    images?: LessonImageInput[];
   }): Promise<AiCompletionResult<LessonOutput>> {
     if (!this.apiKey) {
       // Mock path ONLY when OPENAI_API_KEY is missing — enables local E2E without billed AI.
-      return this.mockLesson(input.sourceText);
+      return this.mockLesson(input.sourceText, input.images?.length);
     }
 
     const content = await this.chat(
       LESSON_PROCESSING_PROMPT,
-      `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\nSource:\n${input.sourceText}`,
+      `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\nSource:\n${input.sourceText}\n\nTranscribe the photographed textbook pages and extract the taught lesson.`,
+      input.images,
     );
     const parsed = LessonOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
     return {
@@ -89,13 +92,17 @@ export class OpenAiProvider implements AiProvider {
   async generateHomework(input: {
     lessonSummary: string;
     subjectName?: string;
+    gradeName?: string;
+    styleInstruction?: string;
   }): Promise<AiCompletionResult<{ title: string; description: string }>> {
     if (!this.apiKey) {
       // Mock path ONLY when OPENAI_API_KEY is missing.
       return {
         data: {
           title: `${input.subjectName ?? 'Subject'} practice`,
-          description: `Complete exercises based on: ${input.lessonSummary.slice(0, 120)}`,
+          description: input.styleInstruction
+            ? `${input.styleInstruction}\n\nComplete exercises based on: ${input.lessonSummary.slice(0, 240)}`
+            : `Complete exercises based on: ${input.lessonSummary.slice(0, 120)}`,
         },
         provider: 'mock',
         model: 'deterministic-mock',
@@ -107,7 +114,15 @@ export class OpenAiProvider implements AiProvider {
 
     const content = await this.chat(
       HOMEWORK_GENERATION_PROMPT,
-      `Subject: ${input.subjectName ?? 'General'}\n\n${input.lessonSummary}`,
+      [
+        `Subject: ${input.subjectName ?? 'General'}`,
+        input.gradeName ? `Grade: ${input.gradeName}` : '',
+        input.styleInstruction ? `Teacher style instruction: ${input.styleInstruction}` : '',
+        '',
+        input.lessonSummary,
+      ]
+        .filter((line) => line !== '')
+        .join('\n'),
     );
     const parsed = JSON.parse(this.extractJson(content.text)) as {
       title: string;
@@ -160,17 +175,20 @@ export class OpenAiProvider implements AiProvider {
     };
   }
 
-  private mockLesson(sourceText: string): AiCompletionResult<LessonOutput> {
+  private mockLesson(sourceText: string, imageCount = 0): AiCompletionResult<LessonOutput> {
     this.logger.warn('OPENAI_API_KEY missing — returning deterministic mock lesson output');
     const snippet = sourceText.slice(0, 80).replace(/\s+/g, ' ').trim() || 'Untitled topic';
+    const photoNote = imageCount
+      ? `Content taken from ${imageCount} photographed textbook page(s). Original photos were not saved. `
+      : '';
     return {
       data: LessonOutputSchema.parse({
         chapterName: 'Chapter 1',
         topicName: snippet.slice(0, 40) || 'Introduction',
-        summary: `Lesson covers key ideas from the provided material: ${snippet}`,
+        summary: `${photoNote}Lesson covers key ideas from the provided material: ${snippet}`,
         concepts: ['Core concept A', 'Core concept B', 'Practice application'],
         pageFrom: 1,
-        pageTo: 3,
+        pageTo: Math.max(3, imageCount || 3),
         teacherNotesSuggestion: 'Review vocabulary and assign short practice questions.',
       }),
       provider: 'mock',
@@ -200,7 +218,20 @@ export class OpenAiProvider implements AiProvider {
     };
   }
 
-  private async chat(system: string, user: string) {
+  private async chat(system: string, user: string, images?: LessonImageInput[]) {
+    const userContent =
+      images?.length
+        ? [
+            { type: 'text', text: user },
+            ...images.slice(0, 10).map((image) => ({
+              type: 'image_url',
+              image_url: {
+                url: `data:${image.mimeType};base64,${image.buffer.toString('base64')}`,
+              },
+            })),
+          ]
+        : user;
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -213,7 +244,7 @@ export class OpenAiProvider implements AiProvider {
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: system },
-          { role: 'user', content: user },
+          { role: 'user', content: userContent },
         ],
       }),
     });

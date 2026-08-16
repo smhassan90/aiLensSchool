@@ -9,6 +9,8 @@ import {
   GenerateHomeworkDto,
   GenerateIdCardDto,
   GenerateReportCardDto,
+  PreviewDiaryDto,
+  PreviewHomeworkDto,
 } from './dto/documents.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -66,6 +68,12 @@ export class DocumentsController {
   }
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)
+  @Post('diaries/preview')
+  previewDiary(@Body() dto: PreviewDiaryDto, @CurrentUser() user: AuthUser) {
+    return this.documents.previewDiary(dto, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)
   @Post('diaries/generate')
   generateDiary(@Body() dto: GenerateDiaryDto, @CurrentUser() user: AuthUser) {
     return this.documents.generateDiary(dto, user);
@@ -75,6 +83,12 @@ export class DocumentsController {
   @Get('diaries')
   listDiaries(@Query() query: DiaryQueryDto, @CurrentUser() user: AuthUser) {
     return this.documents.listDiaries(user, query);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)
+  @Post('homework/preview')
+  previewHomework(@Body() dto: PreviewHomeworkDto, @CurrentUser() user: AuthUser) {
+    return this.documents.previewHomework(dto, user);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)

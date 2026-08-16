@@ -12,17 +12,18 @@ import { fetchHomework, isHomeworkPending } from '@/services/homework.service';
 import { fetchQuizzes, isQuizNew } from '@/services/quizzes.service';
 import { fetchEvents, isUpcomingEvent } from '@/services/events.service';
 import { fetchNotifications } from '@/services/notifications.service';
+import { fetchAnnouncements } from '@/services/announcements.service';
+import { Announcement, EventItem, Homework, LessonSummary, Quiz } from '@/types/api';
 
 export default function HomeScreen() {
   const { user } = useAuth();
   const { selectedChild, selectedChildId, isLoading: childLoading } = useChild();
 
   const studentId = selectedChildId ?? '';
-  const sectionId = selectedChild?.enrollments?.[0]?.section.id;
 
   const lessonsQuery = useQuery({
-    queryKey: ['home', 'lessons', studentId, sectionId],
-    queryFn: () => fetchLessonsForStudent(studentId, sectionId),
+    queryKey: ['home', 'lessons', studentId],
+    queryFn: () => fetchLessonsForStudent(studentId),
     enabled: !!studentId,
   });
 
@@ -41,6 +42,11 @@ export default function HomeScreen() {
   const eventsQuery = useQuery({
     queryKey: ['home', 'events'],
     queryFn: () => fetchEvents({ limit: 5 }),
+  });
+
+  const announcementsQuery = useQuery({
+    queryKey: ['home', 'announcements'],
+    queryFn: () => fetchAnnouncements({ limit: 5 }),
   });
 
   const notificationsQuery = useQuery({
@@ -65,6 +71,7 @@ export default function HomeScreen() {
   const newQuizzes = (quizzesQuery.data?.items ?? []).filter(isQuizNew);
   const upcomingEvents = (eventsQuery.data?.items ?? []).filter(isUpcomingEvent).slice(0, 3);
   const unreadCount = notificationsQuery.data?.total ?? 0;
+  const latestAnnouncements = announcementsQuery.data?.items ?? [];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -95,7 +102,7 @@ export default function HomeScreen() {
         ) : todayLessons.length === 0 ? (
           <EmptyState title="No lessons today" subtitle="Check the diary for recent activity." />
         ) : (
-          todayLessons.map((lesson) => (
+          todayLessons.map((lesson: LessonSummary) => (
             <Card key={lesson.id} onPress={() => router.push(`/lesson/${lesson.id}`)}>
               <Text style={styles.cardTitle}>{lesson.topicName ?? lesson.chapterName ?? 'Lesson'}</Text>
               <Text style={styles.cardMeta}>{lesson.subject?.name ?? 'Subject'}</Text>
@@ -112,7 +119,7 @@ export default function HomeScreen() {
         ) : pendingHomework.length === 0 ? (
           <EmptyState title="All caught up" subtitle="No pending homework right now." />
         ) : (
-          pendingHomework.slice(0, 3).map((item) => (
+          pendingHomework.slice(0, 3).map((item: Homework) => (
             <Card key={item.id} onPress={() => router.push(`/homework/${item.id}`)}>
               <Text style={styles.cardTitle}>{item.title}</Text>
               <Text style={styles.cardMeta}>
@@ -131,7 +138,7 @@ export default function HomeScreen() {
         ) : newQuizzes.length === 0 ? (
           <EmptyState title="No new quizzes" />
         ) : (
-          newQuizzes.slice(0, 3).map((quiz) => (
+          newQuizzes.slice(0, 3).map((quiz: Quiz) => (
             <Card key={quiz.id} onPress={() => router.push(`/quiz/${quiz.id}`)}>
               <View style={styles.row}>
                 <Text style={styles.cardTitle}>{quiz.title}</Text>
@@ -142,13 +149,32 @@ export default function HomeScreen() {
           ))
         )}
 
+        <SectionTitle
+          title="Announcements"
+          action={<Text style={styles.link} onPress={() => router.push('/announcements')}>See all</Text>}
+        />
+        {announcementsQuery.isLoading ? (
+          <LoadingState message="Loading announcements…" />
+        ) : latestAnnouncements.length === 0 ? (
+          <EmptyState title="No announcements" />
+        ) : (
+          latestAnnouncements.slice(0, 3).map((item: Announcement) => (
+            <Card key={item.id} onPress={() => router.push(`/announcement/${item.id}`)}>
+              <Text style={styles.cardTitle}>{item.title}</Text>
+              <Text style={styles.cardMeta}>
+                {new Date(item.publishAt ?? item.createdAt).toLocaleDateString()}
+              </Text>
+            </Card>
+          ))
+        )}
+
         <SectionTitle title="Upcoming events" />
         {eventsQuery.isLoading ? (
           <LoadingState message="Loading events…" />
         ) : upcomingEvents.length === 0 ? (
           <EmptyState title="No upcoming events" />
         ) : (
-          upcomingEvents.map((event) => (
+          upcomingEvents.map((event: EventItem) => (
             <Card key={event.id} onPress={() => router.push(`/event/${event.id}`)}>
               <Text style={styles.cardTitle}>{event.title}</Text>
               <Text style={styles.cardMeta}>

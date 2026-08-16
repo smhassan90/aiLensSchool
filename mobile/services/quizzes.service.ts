@@ -6,12 +6,12 @@ export async function fetchQuizzes(
   params?: { page?: number; limit?: number; status?: string },
 ): Promise<PaginatedResult<Quiz>> {
   return apiFetch<PaginatedResult<Quiz>>(
-    `/quizzes${buildQuery({ studentId, status: params?.status ?? 'PUBLISHED', ...params })}`,
+    `/quizzes${buildQuery({ status: 'PUBLISHED', ...params, studentId })}`,
   );
 }
 
-export async function fetchQuizById(id: string): Promise<Quiz> {
-  return apiFetch<Quiz>(`/quizzes/${id}`);
+export async function fetchQuizById(id: string, studentId: string): Promise<Quiz> {
+  return apiFetch<Quiz>(`/quizzes/${id}${buildQuery({ studentId })}`);
 }
 
 export function isQuizNew(quiz: Quiz, days = 7): boolean {

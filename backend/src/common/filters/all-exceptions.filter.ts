@@ -36,7 +36,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
         }
       }
     } else if (exception instanceof Error) {
-      message = exception.message;
+      const multer = exception as Error & { code?: string; name?: string };
+      if (multer.name === 'MulterError') {
+        status = HttpStatus.BAD_REQUEST;
+        code = multer.code ?? 'UPLOAD_FAILED';
+        message =
+          multer.code === 'LIMIT_FILE_SIZE'
+            ? 'Each photo must be 15 MB or smaller'
+            : exception.message;
+      } else {
+        message = exception.message;
+      }
     }
 
     response.status(status).json({

@@ -10,8 +10,8 @@ export async function fetchHomework(
   );
 }
 
-export async function fetchHomeworkById(id: string): Promise<Homework> {
-  return apiFetch<Homework>(`/homework/${id}`);
+export async function fetchHomeworkById(id: string, studentId: string): Promise<Homework> {
+  return apiFetch<Homework>(`/homework/${id}${buildQuery({ studentId })}`);
 }
 
 export function isHomeworkPending(item: Homework): boolean {

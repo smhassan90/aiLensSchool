@@ -76,6 +76,15 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
+        <Pressable style={styles.linkRow} onPress={() => router.push('/announcements')}>
+          <Text style={styles.link}>Announcements</Text>
+        </Pressable>
+        <Pressable style={styles.linkRow} onPress={() => router.push('/fees')}>
+          <Text style={styles.link}>Fees</Text>
+        </Pressable>
+        <Pressable style={styles.linkRow} onPress={() => router.push('/report-cards')}>
+          <Text style={styles.link}>Report cards</Text>
+        </Pressable>
         <Pressable style={styles.linkRow} onPress={() => router.push('/settings')}>
           <Text style={styles.link}>Settings</Text>
         </Pressable>

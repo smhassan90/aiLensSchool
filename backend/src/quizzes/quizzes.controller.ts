@@ -48,8 +48,12 @@ export class QuizzesController {
 
   @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN, RoleName.PARENT)
   @Get(':id')
-  findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.quizzesService.findOne(id, user);
+  findOne(
+    @Param('id') id: string,
+    @Query('studentId') studentId: string | undefined,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.quizzesService.findOne(id, user, studentId);
   }
 
   @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)

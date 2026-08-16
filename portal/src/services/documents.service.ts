@@ -1,9 +1,44 @@
 import { apiClient, buildQuery } from "@/lib/api-client";
 import type { HomeDiary, IdCard, Paginated, ReportCard } from "@/lib/types";
 
+export interface HomeDiaryPreview {
+  academicYearId: string;
+  sectionId: string;
+  branchId: string;
+  date: string;
+  title: string;
+  lessonSummary: string;
+  homeworkNotes: string;
+  teacherRemarks?: string;
+}
+
+export interface HomeworkPreview {
+  lessonId: string;
+  academicYearId: string;
+  sectionId: string;
+  subjectId: string;
+  branchId: string;
+  title: string;
+  description: string;
+  dueDate: string;
+}
+
 export const documentsService = {
   listDiaries(params?: { sectionId?: string; date?: string; studentId?: string; limit?: number }) {
     return apiClient<Paginated<HomeDiary>>(`/documents/diaries${buildQuery(params ?? {})}`);
+  },
+  previewDiary(payload: {
+    academicYearId: string;
+    sectionId: string;
+    branchId: string;
+    date: string;
+    lessonId?: string;
+    instruction?: string;
+  }) {
+    return apiClient<HomeDiaryPreview>("/documents/diaries/preview", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
   generateDiary(payload: { academicYearId: string; sectionId: string; branchId: string; date: string }) {
     return apiClient<HomeDiary>("/documents/diaries/generate", {
@@ -36,6 +71,12 @@ export const documentsService = {
     lessonId?: string;
   }) {
     return apiClient("/documents/homework/generate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  previewHomework(payload: { lessonId: string; dueDate?: string; instruction?: string }) {
+    return apiClient<HomeworkPreview>("/documents/homework/preview", {
       method: "POST",
       body: JSON.stringify(payload),
     });

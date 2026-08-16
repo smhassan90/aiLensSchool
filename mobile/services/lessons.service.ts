@@ -2,22 +2,34 @@ import { apiFetch, buildQuery } from '@/lib/api';
 import { Homework, LessonSummary, PaginatedResult } from '@/types/api';
 import { fetchHomework } from '@/services/homework.service';
 
-/** Parent API has no direct lessons endpoint — derive summaries from homework when possible. */
 export async function fetchLessonsForStudent(
   studentId: string,
-  sectionId?: string,
+  params?: { date?: string; limit?: number },
 ): Promise<LessonSummary[]> {
+  const today = params?.date ?? new Date().toISOString().slice(0, 10);
   try {
-    const today = new Date().toISOString().slice(0, 10);
     const response = await apiFetch<PaginatedResult<LessonSummary>>(
-      `/lessons${buildQuery({ date: today, sectionId, limit: 20 })}`,
+      `/lessons${buildQuery({ studentId, date: today, limit: params?.limit ?? 20 })}`,
     );
     return response.items;
   } catch {
     const homework = await fetchHomework(studentId, { limit: 50 });
     return homework.items
       .filter((item) => item.lessonId)
-      .map(mapHomeworkToLesson);
+      .map(mapHomeworkToLesson)
+      .filter((lesson) => !params?.date || lesson.date.slice(0, 10) === params.date);
+  }
+}
+
+export async function fetchRecentLessons(studentId: string, limit = 20): Promise<LessonSummary[]> {
+  try {
+    const response = await apiFetch<PaginatedResult<LessonSummary>>(
+      `/lessons${buildQuery({ studentId, limit })}`,
+    );
+    return response.items;
+  } catch {
+    const homework = await fetchHomework(studentId, { limit });
+    return homework.items.filter((item) => item.lessonId).map(mapHomeworkToLesson);
   }
 }
 

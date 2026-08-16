@@ -3,6 +3,7 @@ import { getAccessToken } from '@/lib/storage';
 import { getCurrentUser, login as authLogin, logout as authLogout } from '@/lib/auth';
 import { AuthUser, MeResponse } from '@/types/api';
 import { registerPushNotifications } from '@/hooks/useNotifications';
+import { queryClient } from '@/providers/QueryProvider';
 
 interface AuthContextValue {
   user: MeResponse | null;
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const logout = useCallback(async () => {
     await authLogout();
+    queryClient.clear();
     setUser(null);
   }, []);
 

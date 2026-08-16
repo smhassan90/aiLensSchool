@@ -17,32 +17,40 @@ interface ChildContextValue {
 const ChildContext = createContext<ChildContextValue | undefined>(undefined);
 
 export function ChildProvider({ children }: PropsWithChildren) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [selectedChildId, setSelectedChildIdState] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   const query = useQuery({
-    queryKey: ['children'],
+    queryKey: ['children', user?.id],
     queryFn: fetchMyChildren,
     enabled: isAuthenticated,
   });
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setSelectedChildIdState(null);
+      setHydrated(true);
+      return;
+    }
     (async () => {
       const stored = await getSelectedChildId();
       if (stored) setSelectedChildIdState(stored);
       setHydrated(true);
     })();
-  }, []);
+  }, [isAuthenticated, user?.id]);
 
   useEffect(() => {
-    if (!query.data?.length || selectedChildId) return;
-    const primary = query.data.find((link) => link.isPrimary) ?? query.data[0];
+    if (!isAuthenticated || !query.data?.length || !hydrated) return;
+    const ids = query.data.map((link: ChildLink) => link.student.id);
+    const valid = selectedChildId && ids.includes(selectedChildId);
+    if (valid) return;
+    const primary = query.data.find((link: ChildLink) => link.isPrimary) ?? query.data[0];
     if (primary) {
       setSelectedChildIdState(primary.student.id);
       void persistSelectedChildId(primary.student.id);
     }
-  }, [query.data, selectedChildId]);
+  }, [query.data, selectedChildId, hydrated, isAuthenticated]);
 
   const selectChild = useCallback(async (studentId: string) => {
     setSelectedChildIdState(studentId);
@@ -51,21 +59,21 @@ export function ChildProvider({ children }: PropsWithChildren) {
 
   const selectedChild = useMemo(() => {
     if (!selectedChildId || !query.data) return null;
-    return query.data.find((link) => link.student.id === selectedChildId)?.student ?? null;
+    return query.data.find((link: ChildLink) => link.student.id === selectedChildId)?.student ?? null;
   }, [query.data, selectedChildId]);
 
   const value = useMemo<ChildContextValue>(
     () => ({
       children: query.data ?? [],
       selectedChild,
-      selectedChildId,
-      isLoading: !hydrated || query.isLoading,
+      selectedChildId: selectedChild ? selectedChildId : null,
+      isLoading: !hydrated || (isAuthenticated && query.isLoading),
       selectChild,
       refetchChildren: async () => {
         await query.refetch();
       },
     }),
-    [query, selectedChild, selectedChildId, hydrated, selectChild],
+    [query, selectedChild, selectedChildId, hydrated, selectChild, isAuthenticated],
   );
 
   return <ChildContext.Provider value={value}>{children}</ChildContext.Provider>;

@@ -33,7 +33,7 @@ export class AnnouncementsController {
     return this.announcementsService.findAll(user, query);
   }
 
-  @Roles(RoleName.SCHOOL_ADMIN)
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER, RoleName.PARENT)
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.announcementsService.findOne(id, user);

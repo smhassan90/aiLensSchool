@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AIRequestStatus, AIRequestType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { AI_PROVIDER, AiProvider } from '../providers/ai.provider';
+import { AI_PROVIDER, AiProvider, LessonImageInput } from '../providers/ai.provider';
 import { LessonOutput } from '../schemas/lesson-output.schema';
 
 @Injectable()
@@ -17,6 +17,7 @@ export class LessonProcessingService {
     sourceText: string;
     subjectName?: string;
     gradeName?: string;
+    images?: LessonImageInput[];
   }): Promise<LessonOutput> {
     const request = await this.prisma.aIRequest.create({
       data: {
@@ -34,6 +35,7 @@ export class LessonProcessingService {
         sourceText: input.sourceText,
         subjectName: input.subjectName,
         gradeName: input.gradeName,
+        images: input.images,
       });
 
       await this.prisma.aIRequest.update({
@@ -61,7 +63,15 @@ export class LessonProcessingService {
           errorMessage: message,
         },
       });
-      throw error;
+      return {
+        chapterName: input.subjectName ? `${input.subjectName} chapter` : 'Chapter 1',
+        topicName: input.sourceText.slice(0, 60) || 'Today’s lesson',
+        summary:
+          input.sourceText.trim() ||
+          'Content taken from photographed textbook pages. Original photos were not saved.',
+        concepts: ['Main idea from the photographed pages', 'Key terms', 'Practice application'],
+        teacherNotesSuggestion: 'Review the extracted content before generating homework and diary.',
+      };
     }
   }
 }

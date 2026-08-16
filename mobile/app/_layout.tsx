@@ -24,7 +24,12 @@ export default function RootLayout() {
               <Stack.Screen name="lesson/[id]" options={{ headerShown: true, title: 'Lesson' }} />
               <Stack.Screen name="homework/[id]" options={{ headerShown: true, title: 'Homework' }} />
               <Stack.Screen name="quiz/[id]/index" options={{ headerShown: true, title: 'Quiz' }} />
+              <Stack.Screen name="quiz/[id]/attempt" options={{ headerShown: true, title: 'Attempt' }} />
+              <Stack.Screen name="quiz/[id]/result" options={{ headerShown: true, title: 'Result' }} />
               <Stack.Screen name="announcement/[id]" options={{ headerShown: true, title: 'Announcement' }} />
+              <Stack.Screen name="announcements" options={{ headerShown: true, title: 'Announcements' }} />
+              <Stack.Screen name="fees" options={{ headerShown: true, title: 'Fees' }} />
+              <Stack.Screen name="report-cards" options={{ headerShown: true, title: 'Report cards' }} />
               <Stack.Screen name="event/[id]" options={{ headerShown: true, title: 'Event' }} />
               <Stack.Screen name="profile" options={{ headerShown: true, title: 'Profile' }} />
               <Stack.Screen name="settings" options={{ headerShown: true, title: 'Settings' }} />

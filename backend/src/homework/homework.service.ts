@@ -94,9 +94,7 @@ export class HomeworkService {
         });
       }
       await this.parentsService.assertParentOwnsStudent(user.id, query.studentId);
-      const enrollment = await this.prisma.studentEnrollment.findFirst({
-        where: { studentId: query.studentId, status: 'ACTIVE' },
-      });
+      const enrollment = await this.parentsService.getActiveEnrollment(user.id, query.studentId);
       if (!enrollment) {
         return paginate([], 0, page, limit);
       }
@@ -114,7 +112,9 @@ export class HomeworkService {
             select: {
               id: true,
               title: true,
+              description: true,
               dueDate: true,
+              publishedAt: true,
               sectionId: true,
               subjectId: true,
               lessonId: true,
@@ -166,7 +166,7 @@ export class HomeworkService {
     return paginate(items, total, page, limit);
   }
 
-  async findOne(id: string, user: AuthUser) {
+  async findOne(id: string, user: AuthUser, studentId?: string) {
     const homework = await this.prisma.homework.findUnique({
       where: { id },
       include: { subject: true, section: true, attachments: true },
@@ -175,6 +175,15 @@ export class HomeworkService {
       throw new NotFoundException({ code: 'HOMEWORK_NOT_FOUND', message: 'Homework not found' });
     }
     this.tenant.assertSchoolAccess(user, homework.schoolId);
+    if (this.tenant.isParent(user)) {
+      if (!studentId) {
+        throw new ForbiddenException({
+          code: 'STUDENT_ID_REQUIRED',
+          message: 'studentId is required for parent homework access',
+        });
+      }
+      await this.parentsService.assertParentChildInSection(user.id, studentId, homework.sectionId);
+    }
     return homework;
   }
 }

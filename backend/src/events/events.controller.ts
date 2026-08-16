@@ -26,7 +26,7 @@ export class EventsController {
     return this.eventsService.findAll(user, query);
   }
 
-  @Roles(RoleName.SCHOOL_ADMIN)
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER, RoleName.PARENT)
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.eventsService.findOne(id, user);

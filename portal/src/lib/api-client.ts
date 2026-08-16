@@ -161,6 +161,10 @@ export async function apiUpload<T>(path: string, file: File, fieldName = "file")
   return authorizedFetch<T>(path, { method: "POST", body });
 }
 
+export async function apiForm<T>(path: string, body: FormData, method = "POST"): Promise<T> {
+  return authorizedFetch<T>(path, { method, body });
+}
+
 export function buildQuery(params: Record<string, string | number | undefined | null>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {

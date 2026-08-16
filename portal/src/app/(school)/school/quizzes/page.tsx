@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageLoader } from "@/components/layout/page-loader";
+import { AiWait } from "@/components/layout/ai-wait";
 import { quizzesService } from "@/services/quizzes.service";
 import { homeworkService } from "@/services/homework.service";
 import { academicsService } from "@/services/academics.service";
@@ -141,9 +142,12 @@ export default function SchoolQuizzesPage() {
           </Table>
         )}
       </div>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" onClose={() => setOpen(false)}>
+      <Dialog open={open} onOpenChange={(next) => !generate.isPending && setOpen(next)}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" onClose={() => !generate.isPending && setOpen(false)}>
           <DialogHeader><DialogTitle>Generate quiz</DialogTitle></DialogHeader>
+          {generate.isPending ? (
+            <AiWait kind="quiz" />
+          ) : (
           <div className="space-y-3">
             {catalogError ? (
               <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -237,7 +241,6 @@ export default function SchoolQuizzesPage() {
             />
             <Button
               disabled={
-                generate.isPending ||
                 !activeSectionId ||
                 !activeSubjectId ||
                 homeworkIds.length === 0 ||
@@ -245,9 +248,10 @@ export default function SchoolQuizzesPage() {
               }
               onClick={() => generate.mutate()}
             >
-              {generate.isPending ? "Generating…" : quickGenerate ? "Quick generate" : "Generate"}
+              {quickGenerate ? "Quick generate" : "Generate"}
             </Button>
           </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

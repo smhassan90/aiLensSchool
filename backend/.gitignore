@@ -27,3 +27,4 @@ yarn-error.log*
 # local files
 /uploads
 /tmp
+/.tesseract-cache

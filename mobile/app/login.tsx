@@ -36,8 +36,8 @@ export default function LoginScreen() {
   } = useForm<LoginForm>({
     resolver: zodResolver(schema),
     defaultValues: {
-      username: 'abc.f.stu001',
-      password: 'Parent123!',
+      username: __DEV__ ? 'abc.f.stu001' : '',
+      password: __DEV__ ? 'Parent123!' : '',
     },
   });
 
@@ -69,8 +69,8 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.hero}>
-        <Text style={styles.brand}>SMS Parent</Text>
-        <Text style={styles.subtitle}>Stay connected with your child&apos;s school day</Text>
+        <Text style={styles.brand}>AiSchoolLens</Text>
+        <Text style={styles.subtitle}>Parent app — stay connected with your child&apos;s school day</Text>
       </View>
 
       <View style={styles.form}>

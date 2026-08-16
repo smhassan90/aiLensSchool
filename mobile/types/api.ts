@@ -104,6 +104,7 @@ export interface Quiz {
   status: string;
   totalMarks?: number;
   publishedAt?: string | null;
+  dueAt?: string | null;
   subject?: Subject;
   section?: Section;
   questions?: QuizQuestion[];
@@ -115,7 +116,24 @@ export interface QuizQuestion {
   type: string;
   marks: number;
   included: boolean;
+  correctAnswer?: string | null;
   options?: { id: string; optionText: string; isCorrect: boolean }[];
+}
+
+export interface QuizAnswer {
+  id: string;
+  questionId: string;
+  answerText?: string | null;
+  optionId?: string | null;
+  isCorrect?: boolean | null;
+  marksAwarded?: number | null;
+  question?: {
+    id: string;
+    questionText: string;
+    type: string;
+    marks: number;
+    correctAnswer?: string | null;
+  };
 }
 
 export interface QuizResult {
@@ -126,7 +144,9 @@ export interface QuizResult {
   totalMarks: number;
   percentage: number;
   submittedAt: string;
-  quiz?: { id: string; title: string; subjectId?: string };
+  summary?: string | null;
+  quiz?: { id: string; title: string; subjectId?: string; totalMarks?: number };
+  attempt?: { id: string; submittedAt?: string | null; answers?: QuizAnswer[] };
 }
 
 export interface NotificationItem {
@@ -165,7 +185,43 @@ export interface AttendanceRecord {
   status: string;
   studentId: string;
   sectionId: string;
+  notes?: string | null;
   remarks?: string | null;
+}
+
+export interface HomeDiary {
+  id: string;
+  date: string;
+  title: string;
+  lessonSummary?: string | null;
+  homeworkNotes?: string | null;
+  teacherRemarks?: string | null;
+  section?: { id: string; name: string; grade?: { id: string; name: string } };
+}
+
+export interface StudentFee {
+  id: string;
+  amount: number;
+  paidAmount: number;
+  balance: number;
+  dueDate: string;
+  status: string;
+  periodLabel?: string | null;
+  feeStructure?: { id: string; name: string };
+  section?: { id: string; name: string };
+}
+
+export interface ReportCard {
+  id: string;
+  termLabel: string;
+  overallPercentage?: number | null;
+  attendanceRate?: number | null;
+  remarks?: string | null;
+  generatedAt: string;
+  grade?: { id: string; name: string };
+  section?: { id: string; name: string };
+  academicYear?: { id: string; name: string };
+  lines?: { average?: number | null; gradeLetter?: string | null; subject?: { name: string } }[];
 }
 
 export interface LessonSummary {

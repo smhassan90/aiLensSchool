@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AiCompletionResult, AiProvider } from './ai.provider';
+import { AiCompletionResult, AiProvider, LessonImageInput } from './ai.provider';
 import { LessonOutput, LessonOutputSchema } from '../schemas/lesson-output.schema';
 import { QuizOutput, QuizOutputSchema } from '../schemas/quiz-output.schema';
 import {
@@ -26,17 +26,32 @@ export class CursorProvider implements AiProvider {
     sourceText: string;
     subjectName?: string;
     gradeName?: string;
+    images?: LessonImageInput[];
   }): Promise<AiCompletionResult<LessonOutput>> {
-    if (!this.apiKey) {
-      return this.mockLesson(input.sourceText);
+    if (!this.apiKey || (input.images?.length ?? 0) > 0) {
+      return this.textFallback(input);
     }
 
-    const content = await this.complete(
-      LESSON_PROCESSING_PROMPT,
-      `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\nSource:\n${input.sourceText}`,
-    );
-    const parsed = LessonOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
-    return { data: parsed, ...content.meta };
+    try {
+      const content = await this.withTimeout(
+        this.complete(
+          LESSON_PROCESSING_PROMPT,
+          `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\nClean and format this OCR lesson text:\n${input.sourceText}`,
+        ),
+        25_000,
+        'Lesson extraction',
+      );
+      const parsed = LessonOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
+      if (/photos were not saved|photographed textbook page/i.test(parsed.summary)) {
+        return this.textFallback(input);
+      }
+      return { data: parsed, ...content.meta };
+    } catch (error) {
+      this.logger.warn(
+        `Lesson AI cleanup failed, using formatted OCR: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return this.textFallback(input);
+    }
   }
 
   async generateQuiz(input: {
@@ -69,12 +84,16 @@ export class CursorProvider implements AiProvider {
   async generateHomework(input: {
     lessonSummary: string;
     subjectName?: string;
+    gradeName?: string;
+    styleInstruction?: string;
   }): Promise<AiCompletionResult<{ title: string; description: string }>> {
     if (!this.apiKey) {
       return {
         data: {
           title: `${input.subjectName ?? 'Subject'} practice`,
-          description: `Complete exercises based on: ${input.lessonSummary.slice(0, 120)}`,
+          description: input.styleInstruction
+            ? `${input.styleInstruction}\n\nComplete exercises based on: ${input.lessonSummary.slice(0, 240)}`
+            : `Complete exercises based on: ${input.lessonSummary.slice(0, 120)}`,
         },
         provider: 'mock',
         model: 'deterministic-mock',
@@ -86,7 +105,15 @@ export class CursorProvider implements AiProvider {
 
     const content = await this.complete(
       HOMEWORK_GENERATION_PROMPT,
-      `Subject: ${input.subjectName ?? 'General'}\n\n${input.lessonSummary}`,
+      [
+        `Subject: ${input.subjectName ?? 'General'}`,
+        input.gradeName ? `Grade: ${input.gradeName}` : '',
+        input.styleInstruction ? `Teacher style instruction: ${input.styleInstruction}` : '',
+        '',
+        input.lessonSummary,
+      ]
+        .filter((line) => line !== '')
+        .join('\n'),
     );
     const parsed = JSON.parse(this.extractJson(content.text)) as {
       title: string;
@@ -161,18 +188,68 @@ export class CursorProvider implements AiProvider {
     };
   }
 
-  private mockLesson(sourceText: string): AiCompletionResult<LessonOutput> {
-    this.logger.warn('CURSOR_API_KEY missing — returning deterministic mock lesson output');
-    const snippet = sourceText.slice(0, 80).replace(/\s+/g, ' ').trim() || 'Untitled topic';
+  private withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+      promise.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      );
+    });
+  }
+
+  private textFallback(input: {
+    sourceText: string;
+    subjectName?: string;
+    gradeName?: string;
+    images?: LessonImageInput[];
+  }): AiCompletionResult<LessonOutput> {
+    const text = input.sourceText.trim();
+    if (text.length > 40 && !/photos were not saved/i.test(text)) {
+      const firstLine = text.split(/\n/).map((line) => line.trim()).find((line) => line.length > 2 && !/^Page\s+\d+/i.test(line));
+      return {
+        data: LessonOutputSchema.parse({
+          chapterName: input.subjectName,
+          topicName: firstLine?.slice(0, 80) || `${input.subjectName ?? 'Lesson'}`,
+          summary: text,
+          concepts: [],
+          teacherNotesSuggestion: 'Review the formatted lesson and adjust key points if needed.',
+        }),
+        provider: 'ocr',
+        model: 'page-text',
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCost: 0,
+      };
+    }
+    return this.mockLesson(input.sourceText, input.images?.length, input.subjectName, input.gradeName);
+  }
+
+  private mockLesson(
+    sourceText: string,
+    imageCount = 0,
+    subjectName?: string,
+    gradeName?: string,
+  ): AiCompletionResult<LessonOutput> {
+    const snippet = sourceText.slice(0, 240).replace(/\s+/g, ' ').trim();
+    const photoNote = imageCount
+      ? `Content taken from ${imageCount} photographed textbook page(s) for ${subjectName ?? 'this subject'}${gradeName ? ` (${gradeName})` : ''}. Original photos were not saved.`
+      : 'Lesson covers key ideas from the provided material.';
     return {
       data: LessonOutputSchema.parse({
-        chapterName: 'Chapter 1',
-        topicName: snippet.slice(0, 40) || 'Introduction',
-        summary: `Lesson covers key ideas from the provided material: ${snippet}`,
-        concepts: ['Core concept A', 'Core concept B', 'Practice application'],
+        chapterName: subjectName ? `${subjectName} chapter` : 'Chapter 1',
+        topicName: snippet.slice(0, 60) || `${subjectName ?? 'Lesson'} — today's pages`,
+        summary: [photoNote, snippet].filter(Boolean).join(' '),
+        concepts: ['Main idea from the photographed pages', 'Key terms', 'Practice application'],
         pageFrom: 1,
-        pageTo: 3,
-        teacherNotesSuggestion: 'Review vocabulary and assign short practice questions.',
+        pageTo: Math.max(imageCount || 1, 1),
+        teacherNotesSuggestion: 'Review the extracted content and adjust before generating homework and diary.',
       }),
       provider: 'mock',
       model: 'deterministic-mock',

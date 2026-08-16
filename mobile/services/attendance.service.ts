@@ -5,9 +5,16 @@ export async function fetchAttendance(
   studentId: string,
   params?: { page?: number; limit?: number; date?: string },
 ): Promise<PaginatedResult<AttendanceRecord>> {
-  return apiFetch<PaginatedResult<AttendanceRecord>>(
+  const result = await apiFetch<PaginatedResult<AttendanceRecord>>(
     `/attendance${buildQuery({ studentId, ...params })}`,
   );
+  return {
+    ...result,
+    items: result.items.map((record) => ({
+      ...record,
+      remarks: record.remarks ?? record.notes ?? null,
+    })),
+  };
 }
 
 export function groupAttendanceByDate(

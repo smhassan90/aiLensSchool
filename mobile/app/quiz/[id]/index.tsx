@@ -7,16 +7,17 @@ import { useChild } from '@/providers/ChildProvider';
 import { colors, spacing } from '@/constants/theme';
 import { fetchQuizById } from '@/services/quizzes.service';
 import { fetchQuizResultForStudent } from '@/services/results.service';
+import { QuizQuestion } from '@/types/api';
 
 export default function QuizDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { selectedChildId } = useChild();
+  const { selectedChildId, selectedChild } = useChild();
   const studentId = selectedChildId ?? '';
 
   const quizQuery = useQuery({
-    queryKey: ['quiz', id],
-    queryFn: () => fetchQuizById(id!),
-    enabled: !!id,
+    queryKey: ['quiz', id, studentId],
+    queryFn: () => fetchQuizById(id!, studentId),
+    enabled: !!id && !!studentId,
   });
 
   const resultQuery = useQuery({
@@ -25,24 +26,35 @@ export default function QuizDetailScreen() {
     enabled: !!id && !!studentId,
   });
 
+  if (!studentId) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <EmptyState title="Select a child" subtitle="Quizzes are shown for the selected child only." />
+      </SafeAreaView>
+    );
+  }
+
   if (quizQuery.isLoading) return <LoadingState message="Loading quiz…" />;
   if (quizQuery.isError || !quizQuery.data) {
     return (
       <SafeAreaView style={styles.safe}>
-        <ErrorState message="Quiz not found" onRetry={() => quizQuery.refetch()} />
+        <ErrorState
+          message="This quiz is not available for the selected child."
+          onRetry={() => quizQuery.refetch()}
+        />
       </SafeAreaView>
     );
   }
 
   const quiz = quizQuery.data;
-  const includedQuestions = quiz.questions?.filter((q) => q.included) ?? [];
+  const includedQuestions = quiz.questions?.filter((q: QuizQuestion) => q.included) ?? [];
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>{quiz.title}</Text>
         <Text style={styles.meta}>
-          {quiz.subject?.name} · {quiz.totalMarks ?? includedQuestions.length} marks · {includedQuestions.length} questions
+          {selectedChild?.firstName} · {quiz.subject?.name} · {quiz.totalMarks ?? includedQuestions.length} marks
         </Text>
         <Badge label={quiz.status} tone={quiz.status === 'PUBLISHED' ? 'success' : 'default'} />
 
@@ -64,7 +76,7 @@ export default function QuizDetailScreen() {
         {includedQuestions.length === 0 ? (
           <EmptyState title="No questions to preview" />
         ) : (
-          includedQuestions.map((question, index) => (
+          includedQuestions.map((question: QuizQuestion, index: number) => (
             <Text key={question.id} style={styles.question}>
               {index + 1}. {question.questionText} ({question.marks} marks)
             </Text>

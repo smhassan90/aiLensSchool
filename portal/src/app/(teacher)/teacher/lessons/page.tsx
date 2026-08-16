@@ -24,11 +24,20 @@ function statusVariant(status: string) {
   switch (status) {
     case "CONFIRMED":
       return "success" as const;
+    case "READY_FOR_REVIEW":
     case "PENDING_REVIEW":
       return "warning" as const;
     default:
       return "secondary" as const;
   }
+}
+
+function statusLabel(status: string) {
+  return status.replaceAll("_", " ");
+}
+
+function canReview(status: string) {
+  return status === "READY_FOR_REVIEW" || status === "PENDING_REVIEW" || status === "DRAFT" || status === "CONFIRMED";
 }
 
 export default function TeacherLessonsPage() {
@@ -40,13 +49,13 @@ export default function TeacherLessonsPage() {
   return (
     <div className="p-8">
       <PageHeader
-        title="Lessons"
-        description="Create and review daily lesson records"
+        title="Today's Lessons"
+        description="Upload photos of pages taught today. Only the extracted content is saved."
         actions={
           <Link href="/teacher/lessons/new">
             <Button>
               <Plus className="h-4 w-4" />
-              New Lesson
+              Today's Lesson
             </Button>
           </Link>
         }
@@ -65,10 +74,10 @@ export default function TeacherLessonsPage() {
           <EmptyState
             icon={<BookOpen className="h-10 w-10" />}
             title="No lessons yet"
-            description="Create your first manual lesson record."
+            description="Upload photos of the pages you taught to extract today’s lesson."
             action={
               <Link href="/teacher/lessons/new">
-                <Button>New Lesson</Button>
+                <Button>Today's Lesson</Button>
               </Link>
             }
           />
@@ -92,12 +101,14 @@ export default function TeacherLessonsPage() {
                   <TableCell>{lesson.section?.name ?? "—"}</TableCell>
                   <TableCell>{lesson.topicName ?? lesson.chapterName ?? "—"}</TableCell>
                   <TableCell>
-                    <Badge variant={statusVariant(lesson.status)}>{lesson.status}</Badge>
+                    <Badge variant={statusVariant(lesson.status)}>{statusLabel(lesson.status)}</Badge>
                   </TableCell>
                   <TableCell>
-                    {lesson.status === "PENDING_REVIEW" && (
+                    {canReview(lesson.status) && (
                       <Link href={`/teacher/lessons/${lesson.id}/review`}>
-                        <Button size="sm" variant="outline">Review</Button>
+                        <Button size="sm" variant="outline">
+                          {lesson.status === "CONFIRMED" ? "Open" : "Review"}
+                        </Button>
                       </Link>
                     )}
                   </TableCell>

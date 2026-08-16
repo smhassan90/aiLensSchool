@@ -99,6 +99,50 @@ export class GenerateIdCardDto {
   sectionId?: string;
 }
 
+export class PreviewHomeworkDto {
+  @ApiProperty()
+  @IsString()
+  lessonId!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  dueDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  instruction?: string;
+}
+
+export class PreviewDiaryDto {
+  @ApiProperty()
+  @IsString()
+  academicYearId!: string;
+
+  @ApiProperty()
+  @IsString()
+  sectionId!: string;
+
+  @ApiProperty()
+  @IsString()
+  branchId!: string;
+
+  @ApiProperty()
+  @IsDateString()
+  date!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  lessonId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  instruction?: string;
+}
+
 export class GenerateHomeworkDto {
   @ApiProperty()
   @IsString()

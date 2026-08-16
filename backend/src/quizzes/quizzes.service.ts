@@ -383,10 +383,7 @@ export class QuizzesService {
           message: 'studentId is required for parent quiz list',
         });
       }
-      await this.parentsService.assertParentOwnsStudent(user.id, query.studentId);
-      const enrollment = await this.prisma.studentEnrollment.findFirst({
-        where: { studentId: query.studentId, status: 'ACTIVE' },
-      });
+      const enrollment = await this.parentsService.getActiveEnrollment(user.id, query.studentId);
       if (!enrollment) {
         return paginate([], 0, page, limit);
       }
@@ -405,7 +402,10 @@ export class QuizzesService {
             select: {
               id: true,
               title: true,
+              description: true,
               status: true,
+              totalMarks: true,
+              dueAt: true,
               createdAt: true,
               publishedAt: true,
               sectionId: true,
@@ -459,7 +459,7 @@ export class QuizzesService {
     return paginate(items, total, page, limit);
   }
 
-  async findOne(id: string, user: AuthUser) {
+  async findOne(id: string, user: AuthUser, studentId?: string) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id },
       include: {
@@ -474,11 +474,24 @@ export class QuizzesService {
     }
     this.tenant.assertSchoolAccess(user, quiz.schoolId);
     if (this.tenant.isParent(user)) {
+      if (!studentId) {
+        throw new ForbiddenException({
+          code: 'STUDENT_ID_REQUIRED',
+          message: 'studentId is required for parent quiz access',
+        });
+      }
+      await this.parentsService.assertParentChildInSection(user.id, studentId, quiz.sectionId);
       if (quiz.status !== QuizStatus.PUBLISHED) {
         throw new ForbiddenException({
           code: 'QUIZ_NOT_AVAILABLE',
           message: 'Quiz is not available',
         });
+      }
+      const submitted = await this.prisma.quizResult.findFirst({
+        where: { quizId: quiz.id, studentId },
+      });
+      if (submitted) {
+        return quiz;
       }
       return {
         ...quiz,

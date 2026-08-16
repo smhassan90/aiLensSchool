@@ -10,11 +10,18 @@ export interface AiCompletionResult<T> {
   estimatedCost: number;
 }
 
+export type LessonImageInput = {
+  buffer: Buffer;
+  mimeType: string;
+  filename: string;
+};
+
 export interface AiProvider {
   processLesson(input: {
     sourceText: string;
     subjectName?: string;
     gradeName?: string;
+    images?: LessonImageInput[];
   }): Promise<AiCompletionResult<LessonOutput>>;
 
   generateQuiz(input: {
@@ -30,6 +37,8 @@ export interface AiProvider {
   generateHomework(input: {
     lessonSummary: string;
     subjectName?: string;
+    gradeName?: string;
+    styleInstruction?: string;
   }): Promise<AiCompletionResult<{ title: string; description: string }>>;
 
   analyzeStudent(input: {

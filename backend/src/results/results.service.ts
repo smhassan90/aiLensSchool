@@ -205,7 +205,26 @@ export class ResultsService {
             orderBy: { submittedAt: 'desc' },
             skip,
             take,
-            include: { quiz: { select: { id: true, title: true, subjectId: true } } },
+            include: {
+              quiz: { select: { id: true, title: true, subjectId: true, totalMarks: true } },
+              attempt: {
+                include: {
+                  answers: {
+                    include: {
+                      question: {
+                        select: {
+                          id: true,
+                          questionText: true,
+                          type: true,
+                          marks: true,
+                          correctAnswer: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           }),
         () => this.prisma.quizResult.count({ where }),
         page,

@@ -3,17 +3,28 @@ import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Badge, EmptyState, ErrorState, LoadingState } from '@/components/ui';
+import { useChild } from '@/providers/ChildProvider';
 import { colors, spacing } from '@/constants/theme';
 import { fetchHomeworkById, isHomeworkPending } from '@/services/homework.service';
 
 export default function HomeworkDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { selectedChildId } = useChild();
+  const studentId = selectedChildId ?? '';
 
   const query = useQuery({
-    queryKey: ['homework', id],
-    queryFn: () => fetchHomeworkById(id!),
-    enabled: !!id,
+    queryKey: ['homework', id, studentId],
+    queryFn: () => fetchHomeworkById(id!, studentId),
+    enabled: !!id && !!studentId,
   });
+
+  if (!studentId) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <EmptyState title="Select a child" />
+      </SafeAreaView>
+    );
+  }
 
   if (query.isLoading) return <LoadingState message="Loading homework…" />;
   if (query.isError || !query.data) {

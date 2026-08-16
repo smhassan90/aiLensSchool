@@ -1,6 +1,7 @@
 "use client";
 
 import { PageLoader } from "@/components/layout/page-loader";
+import { AiWait } from "@/components/layout/ai-wait";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -209,14 +210,17 @@ export default function TeacherQuizzesPage() {
         )}
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" onClose={() => setDialogOpen(false)}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => !generateMutation.isPending && setDialogOpen(open)}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" onClose={() => !generateMutation.isPending && setDialogOpen(false)}>
           <DialogHeader>
             <DialogTitle>Generate Quiz</DialogTitle>
             <DialogDescription>
               Choose homework topic titles. The quiz will be generated from those topics.
             </DialogDescription>
           </DialogHeader>
+          {generateMutation.isPending ? (
+            <AiWait kind="quiz" />
+          ) : (
           <form
             onSubmit={handleSubmit((v) => generateMutation.mutate(v))}
             className="space-y-4"
@@ -300,11 +304,12 @@ export default function TeacherQuizzesPage() {
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={generateMutation.isPending}>
-                {generateMutation.isPending ? "Generating…" : "Generate"}
+              <Button type="submit">
+                Generate
               </Button>
             </div>
           </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
