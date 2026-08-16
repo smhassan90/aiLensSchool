@@ -20,9 +20,20 @@ async function createApp(): Promise<void> {
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!ready) {
-    ready = createApp();
+  try {
+    if (!ready) {
+      ready = createApp().catch((error) => {
+        ready = null;
+        throw error;
+      });
+    }
+    await ready;
+    server(req, res);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Bootstrap failed';
+    console.error('Vercel Nest bootstrap failed', error);
+    res.statusCode = 500;
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ success: false, error: { code: 'BOOTSTRAP_FAILED', message } }));
   }
-  await ready;
-  server(req, res);
 }

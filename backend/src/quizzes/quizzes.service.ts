@@ -22,6 +22,7 @@ import { ParentsService } from '../parents/parents.service';
 import {
   GenerateQuizDto,
   PublishQuizDto,
+  SubmitQuizDto,
   UpdateQuizQuestionsDto,
 } from './dto/quiz.dto';
 import { NotificationType } from '@prisma/client';
@@ -503,5 +504,102 @@ export class QuizzesService {
       };
     }
     return quiz;
+  }
+
+  async submitAttempt(id: string, dto: SubmitQuizDto, user: AuthUser) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id },
+      include: {
+        questions: { include: { options: true }, orderBy: { order: 'asc' } },
+      },
+    });
+    if (!quiz) {
+      throw new NotFoundException({ code: 'QUIZ_NOT_FOUND', message: 'Quiz not found' });
+    }
+    this.tenant.assertSchoolAccess(user, quiz.schoolId);
+    if (quiz.status !== QuizStatus.PUBLISHED) {
+      throw new BadRequestException({ code: 'QUIZ_NOT_AVAILABLE', message: 'Quiz is not available' });
+    }
+    await this.parentsService.assertParentChildInSection(user.id, dto.studentId, quiz.sectionId);
+
+    const existing = await this.prisma.quizResult.findFirst({
+      where: { quizId: id, studentId: dto.studentId },
+    });
+    if (existing) {
+      throw new BadRequestException({
+        code: 'QUIZ_ALREADY_SUBMITTED',
+        message: 'This child already has a result for this quiz',
+      });
+    }
+
+    const included = quiz.questions.filter((question) => question.included);
+    const answersByQuestion = new Map(dto.answers.map((answer) => [answer.questionId, answer]));
+    let score = 0;
+    const totalMarks = included.reduce((sum, question) => sum + Number(question.marks), 0);
+    const answerRows = included.map((question) => {
+      const given = answersByQuestion.get(question.id);
+      const selected = given?.optionId
+        ? question.options.find((option) => option.id === given.optionId)
+        : undefined;
+      const text = given?.answerText?.trim() ?? '';
+      let isCorrect = false;
+      if (question.type === QuestionType.MCQ) {
+        isCorrect = Boolean(selected?.isCorrect);
+      } else if (question.correctAnswer) {
+        isCorrect = text.toLowerCase() === question.correctAnswer.trim().toLowerCase();
+      }
+      const marksAwarded = isCorrect ? Number(question.marks) : 0;
+      score += marksAwarded;
+      return {
+        questionId: question.id,
+        optionId: selected?.id ?? null,
+        answerText: text || selected?.optionText || null,
+        isCorrect,
+        marksAwarded,
+      };
+    });
+
+    const percentage = totalMarks > 0 ? Number(((score / totalMarks) * 100).toFixed(2)) : 0;
+    const startedAt = new Date(Date.now() - 60_000);
+    const submittedAt = new Date();
+
+    const attempt = await this.prisma.quizAttempt.create({
+      data: {
+        quizId: id,
+        studentId: dto.studentId,
+        startedAt,
+        submittedAt,
+        timeTaken: 60,
+        answers: { create: answerRows },
+      },
+    });
+
+    const result = await this.prisma.quizResult.create({
+      data: {
+        quizId: id,
+        studentId: dto.studentId,
+        attemptId: attempt.id,
+        score,
+        totalMarks,
+        percentage,
+        startedAt,
+        submittedAt,
+        timeTaken: 60,
+      },
+      include: {
+        quiz: { select: { id: true, title: true, sectionId: true, subjectId: true } },
+      },
+    });
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId: quiz.schoolId,
+      branchId: quiz.branchId,
+      action: 'QUIZ_ATTEMPT_SUBMITTED',
+      entityType: 'QuizResult',
+      entityId: result.id,
+    });
+
+    return result;
   }
 }

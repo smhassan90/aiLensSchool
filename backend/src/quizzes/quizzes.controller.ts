@@ -6,6 +6,7 @@ import { QuizzesService } from './quizzes.service';
 import {
   GenerateQuizDto,
   PublishQuizDto,
+  SubmitQuizDto,
   UpdateQuizQuestionsDto,
 } from './dto/quiz.dto';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -74,5 +75,16 @@ export class QuizzesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.quizzesService.publish(id, dto, user);
+  }
+
+  @Roles(RoleName.PARENT)
+  @Post(':id/submit')
+  @HttpCode(HttpStatus.OK)
+  submit(
+    @Param('id') id: string,
+    @Body() dto: SubmitQuizDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.quizzesService.submitAttempt(id, dto, user);
   }
 }

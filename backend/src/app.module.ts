@@ -43,10 +43,10 @@ import { HealthController } from './health.controller';
     LoggerModule.forRoot({
       pinoHttp: {
         transport:
-          process.env.NODE_ENV !== 'production'
+          process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1'
             ? { target: 'pino-pretty', options: { singleLine: true } }
             : undefined,
-        autoLogging: true,
+        autoLogging: process.env.VERCEL !== '1',
         serializers: {
           req: (req) => ({ method: req.method, url: req.url }),
           res: (res) => ({ statusCode: res.statusCode }),
@@ -62,20 +62,26 @@ import { HealthController } from './health.controller';
         },
       ],
     }),
-    BullModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const redisUrl = config.get<string>('REDIS_URL') ?? 'redis://localhost:6379';
-        const url = new URL(redisUrl);
-        return {
-          connection: {
-            host: url.hostname,
-            port: Number(url.port || 6379),
-            password: url.password || undefined,
-          },
-        };
-      },
-    }),
+    ...(process.env.VERCEL === '1'
+      ? []
+      : [
+          BullModule.forRootAsync({
+            inject: [ConfigService],
+            useFactory: (config: ConfigService) => {
+              const redisUrl = config.get<string>('REDIS_URL')?.trim() || 'redis://127.0.0.1:6379';
+              const url = new URL(redisUrl);
+              return {
+                connection: {
+                  host: url.hostname,
+                  port: Number(url.port || 6379),
+                  password: url.password || undefined,
+                  maxRetriesPerRequest: 1,
+                },
+              };
+            },
+          }),
+          QueuesModule,
+        ]),
     DatabaseModule,
     CommonModule,
     AuthModule,
@@ -100,7 +106,6 @@ import { HealthController } from './health.controller';
     AiModule,
     AuditModule,
     ShopModule,
-    QueuesModule,
     FeesModule,
     DocumentsModule,
     InsightsModule,

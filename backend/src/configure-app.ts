@@ -35,7 +35,8 @@ export async function configureNestApp(app: NestExpressApplication): Promise<voi
         /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin) ||
         /^https?:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/i.test(origin) ||
         /^https?:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/i.test(origin);
-      callback(null, origins.includes(origin) || local);
+      const vercelHost = /\.vercel\.app$/i.test(origin);
+      callback(null, origins.includes(origin) || local || vercelHost);
     },
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],

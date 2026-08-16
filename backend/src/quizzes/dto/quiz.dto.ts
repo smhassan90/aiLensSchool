@@ -145,3 +145,31 @@ export class PublishQuizDto {
   @IsDateString()
   dueAt?: string;
 }
+
+export class QuizAnswerInputDto {
+  @ApiProperty()
+  @IsString()
+  questionId!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  optionId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  answerText?: string;
+}
+
+export class SubmitQuizDto {
+  @ApiProperty()
+  @IsString()
+  studentId!: string;
+
+  @ApiProperty({ type: [QuizAnswerInputDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => QuizAnswerInputDto)
+  answers!: QuizAnswerInputDto[];
+}

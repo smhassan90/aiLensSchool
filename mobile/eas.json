@@ -7,11 +7,17 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://ai-school-lens-backend.vercel.app/api/v1"
       }
     },
     "production": {
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://ai-school-lens-backend.vercel.app/api/v1"
       }
     }
   }
