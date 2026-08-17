@@ -46,7 +46,7 @@ export default function IdCardsPage() {
     enabled: search.length > 0,
   });
 
-  const matches = students.data?.items ?? [];
+  const matches = useMemo(() => students.data?.items ?? [], [students.data]);
   const selectedStudent = useMemo(
     () => matches.find((item) => item.id === selectedId) ?? matches[0] ?? null,
     [matches, selectedId],

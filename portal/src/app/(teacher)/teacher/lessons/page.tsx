@@ -55,7 +55,7 @@ export default function TeacherLessonsPage() {
           <Link href="/teacher/lessons/new">
             <Button>
               <Plus className="h-4 w-4" />
-              Today's Lesson
+              {"Today's Lesson"}
             </Button>
           </Link>
         }
@@ -77,7 +77,7 @@ export default function TeacherLessonsPage() {
             description="Upload photos of the pages you taught to extract today’s lesson."
             action={
               <Link href="/teacher/lessons/new">
-                <Button>Today's Lesson</Button>
+                <Button>{"Today's Lesson"}</Button>
               </Link>
             }
           />

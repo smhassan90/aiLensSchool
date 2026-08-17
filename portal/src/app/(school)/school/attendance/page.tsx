@@ -37,15 +37,15 @@ export default function AttendancePage() {
   const section = sections.data?.items.find((s) => s.id === sectionId);
   const year = years.data?.items.find((y) => y.isCurrent) ?? years.data?.items[0];
 
-  const students = enrollments.data?.items ?? [];
   const merged = useMemo(() => {
+    const students = enrollments.data?.items ?? [];
     const byStudent = new Map((existing.data?.items ?? []).map((row) => [row.student?.id, row.status]));
     return students.map((enr) => ({
       studentId: enr.studentId,
       name: enr.student ? `${enr.student.firstName} ${enr.student.lastName}` : enr.studentId,
       status: marks[enr.studentId] ?? byStudent.get(enr.studentId) ?? "PRESENT",
     }));
-  }, [students, existing.data, marks]);
+  }, [enrollments.data, existing.data, marks]);
 
   const save = useMutation({
     mutationFn: () =>
