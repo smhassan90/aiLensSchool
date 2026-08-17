@@ -1,21 +1,27 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { mkdir } from 'fs/promises';
 import { join } from 'path';
-import { createWorker, PSM, type Worker } from 'tesseract.js';
+
+type OcrWorker = {
+  setParameters: (params: Record<string, string>) => Promise<unknown>;
+  recognize: (source: string) => Promise<{ data: { text?: string } }>;
+  terminate: () => Promise<unknown>;
+};
 
 @Injectable()
 export class PageOcrService implements OnModuleDestroy {
   private readonly logger = new Logger(PageOcrService.name);
-  private workerPromise: Promise<Worker> | null = null;
+  private workerPromise: Promise<OcrWorker> | null = null;
 
   private async getWorker() {
     if (!this.workerPromise) {
       const cachePath = join(process.cwd(), '.tesseract-cache');
       this.workerPromise = (async () => {
+        const tesseract = await import('tesseract.js');
         await mkdir(cachePath, { recursive: true });
-        const worker = await createWorker('eng', 1, { cachePath });
+        const worker = (await tesseract.createWorker('eng', 1, { cachePath })) as OcrWorker;
         await worker.setParameters({
-          tessedit_pageseg_mode: PSM.AUTO,
+          tessedit_pageseg_mode: String(tesseract.PSM.AUTO),
           preserve_interword_spaces: '1',
           user_defined_dpi: '300',
         });
