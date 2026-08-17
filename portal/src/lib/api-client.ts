@@ -1,15 +1,42 @@
 import type { ApiErrorBody, ApiResponse } from "./types";
 import { clearAuthSession } from "./auth";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "https://ai-school-lens-backend.vercel.app/api/v1";
+const PRODUCTION_API_URL = "https://ai-school-lens-backend.vercel.app/api/v1";
 
-export const API_ORIGIN = API_URL.replace(/\/api\/v1\/?$/, "");
+function isLocalhostUrl(url: string) {
+  return /localhost|127\.0\.0\.1/.test(url);
+}
+
+function isBrowserOnLocalhost() {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  return host === "localhost" || host === "127.0.0.1";
+}
+
+/** Resolve at call time so a stale localhost bake-in cannot hijack the deployed portal. */
+export function getApiUrl(): string {
+  const fromEnv = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/$/, "");
+
+  if (typeof window !== "undefined" && !isBrowserOnLocalhost()) {
+    if (!fromEnv || isLocalhostUrl(fromEnv)) return PRODUCTION_API_URL;
+    return fromEnv;
+  }
+
+  if (process.env.VERCEL && (!fromEnv || isLocalhostUrl(fromEnv))) {
+    return PRODUCTION_API_URL;
+  }
+
+  return fromEnv || PRODUCTION_API_URL;
+}
+
+export function getApiOrigin(): string {
+  return getApiUrl().replace(/\/api\/v1\/?$/, "");
+}
 
 export function assetUrl(path?: string | null): string | null {
   if (!path) return null;
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
-  return `${API_ORIGIN}${path.startsWith("/") ? path : `/${path}`}`;
+  return `${getApiOrigin()}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 export class ApiClientError extends Error {
@@ -61,7 +88,7 @@ async function refreshAccessToken(): Promise<boolean> {
     const refreshToken = localStorage.getItem("refreshToken");
     if (!refreshToken) return false;
     try {
-      const response = await fetch(`${API_URL}/auth/refresh`, {
+      const response = await fetch(`${getApiUrl()}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
@@ -106,7 +133,7 @@ async function authorizedFetch<T>(path: string, init: RequestInit): Promise<T> {
   const headers = new Headers(init.headers);
   applyAuthHeader(headers);
 
-  let response = await fetch(`${API_URL}${path}`, { ...init, headers });
+  let response = await fetch(`${getApiUrl()}${path}`, { ...init, headers });
   let payload = await parsePayload<T>(response);
 
   if (response.status === 401 && !isPublicAuthPath(path)) {
@@ -114,7 +141,7 @@ async function authorizedFetch<T>(path: string, init: RequestInit): Promise<T> {
     if (refreshed) {
       const retryHeaders = new Headers(init.headers);
       applyAuthHeader(retryHeaders);
-      response = await fetch(`${API_URL}${path}`, { ...init, headers: retryHeaders });
+      response = await fetch(`${getApiUrl()}${path}`, { ...init, headers: retryHeaders });
       payload = await parsePayload<T>(response);
     } else {
       redirectToLogin();
