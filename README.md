@@ -125,9 +125,16 @@ App env vars (`DATABASE_URL`, `JWT_*`, `NEXT_PUBLIC_API_URL`, `CORS_ORIGINS`, �
 
 ### 2. Vercel project Root Directory
 
-These GitHub Actions run inside `portal/` and `backend/`. In each Vercel project, **Root Directory must be empty** (not `portal` or `backend`). That matches projects created with `vercel` from those folders.
+This repo is a monorepo. Next.js lives in `portal/package.json`, not at the repo root. In each Vercel project:
 
-If a project is instead linked to the monorepo root with Root Directory `portal` / `backend`, change the workflow `working-directory` to the repo root for that job.
+| Vercel project | Settings → General → Root Directory |
+|----------------|-------------------------------------|
+| Portal | `portal` |
+| Backend | `backend` |
+
+Leave **Include source files outside of the Root Directory** off unless a build truly needs files from another app.
+
+GitHub Actions run from the **repo root** and use that Root Directory setting. If Root Directory is empty, Vercel looks at the repo root, finds no `next` dependency, and fails with "No Next.js version detected".
 
 ### 3. Avoid double deploys
 
