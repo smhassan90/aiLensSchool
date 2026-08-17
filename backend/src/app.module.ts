@@ -28,6 +28,7 @@ import { AiModule } from './ai/ai.module';
 import { AuditModule } from './audit/audit.module';
 import { ShopModule } from './shop/shop.module';
 import { QueuesModule } from './queues/queues.module';
+import { areQueuesEnabled } from './queues/queues-enabled';
 import { CommonModule } from './common/common.module';
 import { FeesModule } from './fees/fees.module';
 import { DocumentsModule } from './documents/documents.module';
@@ -37,9 +38,16 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { HealthController } from './health.controller';
 
+const queuesEnabled = areQueuesEnabled();
+
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '.env.example'] }),
+    // Never load .env.example in production — it points Redis/MySQL at localhost and breaks Vercel.
+    ConfigModule.forRoot({
+      isGlobal: true,
+      ignoreEnvFile: process.env.VERCEL === '1' || process.env.NODE_ENV === 'production',
+      envFilePath: ['.env'],
+    }),
     LoggerModule.forRoot({
       pinoHttp: {
         transport:
@@ -62,20 +70,28 @@ import { HealthController } from './health.controller';
         },
       ],
     }),
-    BullModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const redisUrl = config.get<string>('REDIS_URL') ?? 'redis://localhost:6379';
-        const url = new URL(redisUrl);
-        return {
-          connection: {
-            host: url.hostname,
-            port: Number(url.port || 6379),
-            password: url.password || undefined,
-          },
-        };
-      },
-    }),
+    ...(queuesEnabled
+      ? [
+          BullModule.forRootAsync({
+            inject: [ConfigService],
+            useFactory: (config: ConfigService) => {
+              const redisUrl = config.get<string>('REDIS_URL') ?? 'redis://localhost:6379';
+              const url = new URL(redisUrl);
+              return {
+                connection: {
+                  host: url.hostname,
+                  port: Number(url.port || 6379),
+                  password: url.password || undefined,
+                  maxRetriesPerRequest: null,
+                  enableReadyCheck: false,
+                  lazyConnect: true,
+                },
+              };
+            },
+          }),
+          QueuesModule,
+        ]
+      : []),
     DatabaseModule,
     CommonModule,
     AuthModule,
@@ -100,7 +116,6 @@ import { HealthController } from './health.controller';
     AiModule,
     AuditModule,
     ShopModule,
-    QueuesModule,
     FeesModule,
     DocumentsModule,
     InsightsModule,
