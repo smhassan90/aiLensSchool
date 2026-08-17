@@ -561,18 +561,12 @@ export class LessonsService {
       },
     });
 
-    const redisUrl = this.config.get<string>('REDIS_URL');
-    // Process inline when Redis is unavailable / empty — keeps E2E working without a queue worker.
-    if (!redisUrl || redisUrl.trim() === '') {
-      await this.processLessonAsync(lesson.id);
-    } else {
-      // Fire-and-forget inline processing as fallback when no dedicated worker is wired yet.
-      void this.processLessonAsync(lesson.id).catch((err: unknown) => {
-        this.logger.error(
-          `Lesson async processing failed for ${lesson.id}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      });
-    }
+    // Always process inline for now (no dedicated worker). Safe when Redis/queues are disabled on Vercel.
+    void this.processLessonAsync(lesson.id).catch((err: unknown) => {
+      this.logger.error(
+        `Lesson async processing failed for ${lesson.id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    });
 
     await this.audit.log({
       actorUserId: user.id,

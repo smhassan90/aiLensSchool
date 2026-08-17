@@ -2,7 +2,7 @@ import type { ApiErrorBody, ApiResponse } from "./types";
 import { clearAuthSession } from "./auth";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
+  process.env.NEXT_PUBLIC_API_URL ?? "https://ai-school-lens-backend.vercel.app/api/v1";
 
 export const API_ORIGIN = API_URL.replace(/\/api\/v1\/?$/, "");
 

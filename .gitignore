@@ -1,4 +1,6 @@
+# =========================
 # Dependencies
+# =========================
 node_modules/
 .pnp
 .pnp.*
@@ -12,14 +14,36 @@ node_modules/
 .npm/
 .yarn-integrity
 
+# Prefer npm lockfiles (CI uses npm). Do not commit yarn.lock.
+yarn.lock
+**/yarn.lock
+
+# =========================
 # Env / secrets — keep *.example
+# =========================
 .env
 .env.*
 !.env.example
 !**/.env.example
 *.local
+.envrc
+*.pem
+*.key
+*.p8
+*.p12
+*.jks
+*.keystore
+*.mobileprovision
+*.crt
+!*.example.key
+credentials.json
+**/google-services.json
+**/GoogleService-Info.plist
+service-account*.json
 
-# Build / cache
+# =========================
+# Build / cache / generated
+# =========================
 dist/
 build/
 out/
@@ -34,14 +58,22 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 expo-env.d.ts
+*.map
 
+# =========================
 # Tests / coverage
+# =========================
 coverage/
 .nyc_output/
 *.lcov
 junit.xml
+test-results/
+playwright-report/
+playwright/.cache/
 
+# =========================
 # Logs / debug
+# =========================
 logs/
 *.log
 npm-debug.log*
@@ -56,15 +88,20 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 .node_repl_history
 *.tgz
 
+# =========================
 # OS
+# =========================
 .DS_Store
 .AppleDouble
 .LSOverride
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+$RECYCLE.BIN/
 
-# Editors
+# =========================
+# Editors / AI tooling
+# =========================
 .idea/
 *.swp
 *.swo
@@ -80,47 +117,71 @@ Desktop.ini
 !.vscode/launch.json
 !.vscode/extensions.json
 .cursor/
+.claude/
+.copilot/
+*.code-workspace
 
-# Prisma local DBs (keep schema + migrations)
+# =========================
+# Databases / dumps
+# =========================
 *.db
 *.db-journal
 *.sqlite
 *.sqlite3
+dump.rdb
+*.sql.gz
+*.dump
 
-# Uploads / temp
+# =========================
+# Uploads / temp / archives
+# =========================
 uploads/
 tmp/
 temp/
 .temp/
 *.tmp
+*.temp
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
 
-# Certs / keys
-*.pem
-*.key
-*.p8
-*.p12
-*.jks
-*.keystore
-*.mobileprovision
-*.crt
-!*.example.key
-
-# Docker / local data dumps
-dump.rdb
-*.sql.gz
-
-# Vercel / tooling
+# =========================
+# Vercel / cloud / local tools
+# =========================
 .vercel/
 .tools/
 .serverless/
 .fusebox/
 .dynamodb/
+.terraform/
+*.tfstate*
+.aws/
 
-# Mobile (Expo generated native + secrets)
+# =========================
+# Mobile (Expo / React Native)
+# =========================
 .expo/
 .expo-shared/
 web-build/
 ios/
 android/
+mobile/release/
 **/local.properties
 *.orig.*
+*.apk
+*.aab
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.hprof
+*.keystore
+*.jks
+
+# Gradle / native build noise (if android/ios ever committed)
+**/.gradle/
+**/Pods/
+**/DerivedData/
+*.xcuserstate
+**/xcuserdata/

@@ -6,16 +6,27 @@ web-build/
 expo-env.d.ts
 ios/
 android/
+release/
 
 .env
 .env.*
 !.env.example
 
 npm-debug.*
+yarn.lock
+
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
+*.keystore
 *.orig.*
+*.apk
+*.aab
+*.ipa
+*.hprof
+
 .DS_Store
+*.log
+.vercel/
