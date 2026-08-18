@@ -23,13 +23,14 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "AiSchoolLens",
-    template: "%s · AiSchoolLens",
+    default: "HawkNexa",
+    template: "%s · HawkNexa",
   },
   description: "AI-powered school management, lesson capture, and learning insights.",
-  applicationName: "AiSchoolLens",
+  applicationName: "HawkNexa",
   icons: {
-    icon: "/brand/favicon.svg",
+    icon: [{ url: "/brand/favicon.png", type: "image/png", sizes: "64x64" }],
+    apple: "/brand/icon.png",
   },
 };
 

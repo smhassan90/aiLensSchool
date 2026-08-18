@@ -163,7 +163,7 @@ export default function IdCardsPage() {
             className="w-[86mm] overflow-hidden rounded-xl border-2 border-teal-700 bg-white text-slate-900 shadow-md"
           >
             <div className="bg-teal-700 px-3 py-2 text-white">
-              <p className="text-[10px] uppercase tracking-[0.16em]">{card?.school?.name ?? "AiSchoolLens"}</p>
+              <p className="text-[10px] uppercase tracking-[0.16em]">{card?.school?.name ?? "HawkNexa"}</p>
               <p className="text-xs font-medium">Student Identity Card</p>
             </div>
             <div className="flex gap-3 p-3">

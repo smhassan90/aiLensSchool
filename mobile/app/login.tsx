@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -69,7 +70,13 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.hero}>
-        <Text style={styles.brand}>AiSchoolLens</Text>
+        <View style={styles.markPlate}>
+          <Image source={require('../assets/hawk.png')} style={styles.mark} />
+        </View>
+        <Text style={styles.brand}>
+          <Text style={styles.brandHawk}>Hawk</Text>
+          <Text style={styles.brandNexa}>Nexa</Text>
+        </Text>
         <Text style={styles.subtitle}>Parent app — stay connected with your child&apos;s school day</Text>
       </View>
 
@@ -134,10 +141,28 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     paddingHorizontal: spacing.lg,
   },
+  markPlate: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  mark: {
+    width: 48,
+    height: 48,
+  },
   brand: {
-    color: colors.white,
     fontSize: 32,
     fontWeight: '800',
+  },
+  brandHawk: {
+    color: colors.white,
+  },
+  brandNexa: {
+    color: '#fbbf24',
   },
   subtitle: {
     color: '#ccfbf1',

@@ -2,7 +2,7 @@ import { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'AiSchoolLens Parent',
+  name: 'HawkNexa Parent',
   slug: 'sms-parent',
   version: '1.0.0',
   orientation: 'portrait',
@@ -22,7 +22,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#0f766e',
+      backgroundColor: '#ffffff',
     },
     package: 'com.sms.parent',
     versionCode: 1,
