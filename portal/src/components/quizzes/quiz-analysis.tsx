@@ -88,7 +88,7 @@ export function QuizAnalysis({ quizId }: { quizId: string }) {
               <span className="text-base font-normal text-muted-foreground"> / {data.classSize}</span>
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {data.notAttemptedCount} not submitted
+              {data.notAttemptedCount} not  submitted
             </p>
           </CardContent>
         </Card>
