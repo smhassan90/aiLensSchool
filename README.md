@@ -160,7 +160,7 @@ Otherwise Vercel Git builds the monorepo root, finds no `next`, and fails with "
 
 If the GitHub repo is also connected in Vercel (**Project → Settings → Git**), turn off automatic Git deployments there. Otherwise every push deploys twice (Vercel Git + GitHub Actions).
 
-You can also deploy manually: **Actions → Deploy to Vercel → Run workflow**.
+You can also deploy manually: **GitHub → Actions → Deploy to Vercel → Run workflow**. After changing Vercel env vars, do that (or push a commit). Do not use **Redeploy** on an old Prebuilt deployment; it will not pick up the new variables.
 
 ## AI Configuration
 
