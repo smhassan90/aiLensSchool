@@ -1,0 +1,2 @@
+This folder exists so Vercel’s static-output check passes.
+All requests are rewritten to the Nest handler in /api.
