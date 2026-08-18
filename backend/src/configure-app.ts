@@ -59,6 +59,8 @@ export async function configureNestApp(app: NestExpressApplication): Promise<voi
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(app.get(HttpCacheInterceptor), new TransformInterceptor());
 
+  if (process.env.VERCEL === '1') return;
+
   const swaggerConfig = new DocumentBuilder()
     .setTitle('School Management + AI Learning API')
     .setDescription('Multi-tenant school management and AI learning platform')

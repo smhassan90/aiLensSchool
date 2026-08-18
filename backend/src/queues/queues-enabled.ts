@@ -3,6 +3,7 @@
  * On Vercel (or any host without remote Redis), skip BullMQ so the API can boot.
  */
 export function areQueuesEnabled(): boolean {
+  if (process.env.VERCEL === '1') return false;
   if (process.env.QUEUES_ENABLED === 'false') return false;
   if (process.env.QUEUES_ENABLED === 'true') return true;
 

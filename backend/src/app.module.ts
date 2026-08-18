@@ -49,17 +49,19 @@ const queuesEnabled = areQueuesEnabled();
       envFilePath: ['.env'],
     }),
     LoggerModule.forRoot({
-      pinoHttp: {
-        transport:
-          process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1'
-            ? { target: 'pino-pretty', options: { singleLine: true } }
-            : undefined,
-        autoLogging: process.env.VERCEL !== '1',
-        serializers: {
-          req: (req) => ({ method: req.method, url: req.url }),
-          res: (res) => ({ statusCode: res.statusCode }),
-        },
-      },
+      pinoHttp:
+        process.env.VERCEL === '1'
+          ? { level: 'warn', autoLogging: false }
+          : {
+              transport:
+                process.env.NODE_ENV !== 'production'
+                  ? { target: 'pino-pretty', options: { singleLine: true } }
+                  : undefined,
+              serializers: {
+                req: (req) => ({ method: req.method, url: req.url }),
+                res: (res) => ({ statusCode: res.statusCode }),
+              },
+            },
     }),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],

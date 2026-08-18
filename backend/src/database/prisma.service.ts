@@ -25,6 +25,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleInit() {
+    // On Vercel, connect on first query so a slow/blocked DB cannot kill the whole function at import.
+    if (process.env.VERCEL === '1') return;
     await this.$connect();
   }
 
