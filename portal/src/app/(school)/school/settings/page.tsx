@@ -1,10 +1,10 @@
 "use client";
 
-import { PageLoader } from "@/components/layout/page-loader";
-
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { PageLoader } from "@/components/layout/page-loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ import { useAuth } from "@/providers/auth-provider";
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -24,6 +24,8 @@ export default function SettingsPage() {
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const schoolId = user?.schoolId ?? "";
+  const showWizard = can("MANAGE_CLASSES");
+
   const school = useQuery({
     queryKey: ["school", schoolId],
     queryFn: () => schoolsService.getById(schoolId),
@@ -45,7 +47,12 @@ export default function SettingsPage() {
       toast({ title: "Settings saved", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["school", schoolId] });
     },
-    onError: (err) => toast({ title: "Save failed", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
+    onError: (err) =>
+      toast({
+        title: "Save failed",
+        description: err instanceof ApiClientError ? err.message : "",
+        variant: "error",
+      }),
   });
 
   if (school.isLoading) {
@@ -67,9 +74,26 @@ export default function SettingsPage() {
           <Input value={address} onChange={(e) => setAddress(e.target.value)} />
           <Label>City</Label>
           <Input value={city} onChange={(e) => setCity(e.target.value)} />
-          <Button disabled={save.isPending || !schoolId} onClick={() => save.mutate()}>Save</Button>
+          <Button disabled={save.isPending || !schoolId} onClick={() => save.mutate()}>
+            Save
+          </Button>
         </CardContent>
       </Card>
+      {showWizard ? (
+        <Card className="mt-6 max-w-xl">
+          <CardContent className="flex items-center justify-between gap-4 pt-6">
+            <div>
+              <p className="font-medium">First-time setup</p>
+              <p className="text-sm text-muted-foreground">
+                Create the year, classes, subjects and exam pattern in one go.
+              </p>
+            </div>
+            <Link href="/school/setup">
+              <Button variant="outline">Open wizard</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

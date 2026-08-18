@@ -20,13 +20,12 @@ import { AppShell } from "@/components/layout/app-shell";
 
 const navItems = [
   { href: "/teacher/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/teacher/classes", label: "My Classes", icon: Users },
+  { href: "/teacher/classes", label: "My classes", icon: Users },
   { href: "/teacher/attendance", label: "Attendance", icon: ClipboardCheck },
-  { href: "/teacher/lessons", label: "Today's Lessons", icon: BookOpen },
+  { href: "/teacher/lessons", label: "Lessons", icon: BookOpen },
   { href: "/teacher/homework", label: "Homework", icon: ClipboardList },
   { href: "/teacher/quizzes", label: "Quizzes", icon: FileQuestion },
-  { href: "/teacher/marks", label: "Marks", icon: Trophy },
-  { href: "/teacher/results", label: "Results", icon: Trophy },
+  { href: "/teacher/marks", label: "Tests & reports", icon: Trophy },
   { href: "/teacher/profile", label: "Profile", icon: User },
 ];
 

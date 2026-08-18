@@ -31,7 +31,7 @@ export default function TeachersPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Teachers"
-        description="Open a name to see lessons, attendance, quizzes and what to say."
+        description="Add a teacher from this page. Open a name to see progress."
         actions={
           can("MANAGE_TEACHERS") ? (
             <Link href="/school/teachers/new">

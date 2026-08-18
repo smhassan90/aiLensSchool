@@ -99,7 +99,7 @@ export default function SchoolDashboardPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {(data?.classTeachers ?? []).length === 0 && (
-            <p className="text-sm text-muted-foreground">Add a class teacher from Sections when you are ready.</p>
+            <p className="text-sm text-muted-foreground">Assign a class teacher from Classes when you are ready.</p>
           )}
           {(data?.classTeachers ?? []).map((row) => (
             <div key={row.sectionId} className="rounded-lg border p-3">

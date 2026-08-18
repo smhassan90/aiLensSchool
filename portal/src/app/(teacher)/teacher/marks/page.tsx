@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -82,9 +83,14 @@ export default function TeacherMarksPage() {
         title="Marks & report cards"
         description="Enter a test or exam once. Then generate this subject’s report card."
         actions={
-          <Button disabled={!selected || report.isPending} onClick={() => report.mutate()}>
-            {report.isPending ? "Making cards…" : "Report card for this subject"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/teacher/results">
+              <Button variant="outline">Quiz scores</Button>
+            </Link>
+            <Button disabled={!selected || report.isPending} onClick={() => report.mutate()}>
+              {report.isPending ? "Making cards…" : "Report card for this subject"}
+            </Button>
+          </div>
         }
       />
 

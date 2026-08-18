@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -22,7 +24,15 @@ export default function TeacherResultsPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <PageHeader title="Results" description="Quiz scores for your classes" />
+      <PageHeader
+        title="Quiz scores"
+        description="How students did on quizzes you published"
+        actions={
+          <Link href="/teacher/marks">
+            <Button variant="outline">Tests & reports</Button>
+          </Link>
+        }
+      />
       <div className="mb-4 max-w-md">
         <Input placeholder="Search student or quiz" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>

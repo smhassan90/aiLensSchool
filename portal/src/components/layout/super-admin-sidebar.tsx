@@ -4,12 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Activity,
-  Building2,
   CreditCard,
   FileText,
   GitBranch,
-  GraduationCap,
   LayoutDashboard,
   LogOut,
   Receipt,
