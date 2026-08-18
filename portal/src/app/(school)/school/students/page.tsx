@@ -35,7 +35,7 @@ export default function StudentsPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Students"
         description="Open a child to see progress, attendance, quizzes, report cards and fees in one window"

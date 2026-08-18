@@ -88,6 +88,11 @@ export class CreateSectionDto {
   @IsInt()
   @Min(1)
   capacity?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  classTeacherId?: string;
 }
 
 export class CreateSubjectDto {

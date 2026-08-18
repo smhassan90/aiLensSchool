@@ -56,7 +56,7 @@ export function SuperAdminGuard({ children }: { children: ReactNode }) {
 
 export function SchoolAdminGuard({ children }: { children: ReactNode }) {
   return (
-    <AuthGuard allowedRoles={["SCHOOL_ADMIN"]} loginPath="/login">
+    <AuthGuard allowedRoles={["SCHOOL_ADMIN", "PRINCIPAL"]} loginPath="/login">
       {children}
     </AuthGuard>
   );

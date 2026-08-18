@@ -119,7 +119,7 @@ export default function ClassesPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Classes"
         description="Create classes, add sections, then assign teachers and students"

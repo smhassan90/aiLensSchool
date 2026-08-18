@@ -26,7 +26,7 @@ export default function EnrollmentsPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Enrollments"
         description="Students are placed in a class and a section. Manage this from the class page."

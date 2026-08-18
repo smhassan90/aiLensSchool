@@ -43,7 +43,7 @@ export default function SuperAdminDashboardPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Platform Dashboard"
         description="Overview of schools, users, and platform activity"
@@ -61,7 +61,7 @@ export default function SuperAdminDashboardPage() {
           phrases={["Counting schools and people", "Checking platform activity", "Almost ready"]}
         />
       ) : (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Total Schools" value={data?.totalSchools ?? 0} icon={School} />
         <StatCard title="Active Schools" value={data?.activeSchools ?? 0} icon={Building2} />
         <StatCard title="Branches" value={data?.totalBranches ?? 0} icon={GitBranch} />

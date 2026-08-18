@@ -34,11 +34,11 @@ export default function TeacherClassAnalyticsPage() {
   if (query.isLoading) {
     return <PageLoader variant="page" />;
   }
-  if (!query.data) return <div className="p-8">Class not found.</div>;
+  if (!query.data) return <div className="p-4 sm:p-6 lg:p-8">Class not found.</div>;
   const data = query.data;
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={`${data.class.name} progress`}
         description="Attendance, quizzes and subjects for this class"

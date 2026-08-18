@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   BookOpen,
+  ClipboardCheck,
   ClipboardList,
   FileQuestion,
   LayoutDashboard,
@@ -15,13 +16,16 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import { BrandMark } from "@/components/brand/brand-mark";
+import { AppShell } from "@/components/layout/app-shell";
 
 const navItems = [
   { href: "/teacher/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/teacher/classes", label: "My Classes", icon: Users },
+  { href: "/teacher/attendance", label: "Attendance", icon: ClipboardCheck },
   { href: "/teacher/lessons", label: "Today's Lessons", icon: BookOpen },
   { href: "/teacher/homework", label: "Homework", icon: ClipboardList },
   { href: "/teacher/quizzes", label: "Quizzes", icon: FileQuestion },
+  { href: "/teacher/marks", label: "Marks", icon: Trophy },
   { href: "/teacher/results", label: "Results", icon: Trophy },
   { href: "/teacher/profile", label: "Profile", icon: User },
 ];
@@ -31,7 +35,7 @@ export function TeacherSidebar() {
   const { user, logout } = useAuth();
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r bg-card">
+    <aside className="flex h-full min-h-0 w-full shrink-0 flex-col border-r bg-card">
       <div className="border-b px-6 py-5">
         <BrandMark subtitle="Teacher Hub" />
       </div>
@@ -76,9 +80,11 @@ export function TeacherSidebar() {
 
 export function TeacherShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-background">
-      <TeacherSidebar />
-      <main className="min-w-0 flex-1 overflow-auto">{children}</main>
-    </div>
+    <AppShell
+      sidebar={<TeacherSidebar />}
+      header={<p className="truncate text-sm font-medium text-muted-foreground">Teacher Hub</p>}
+    >
+      {children}
+    </AppShell>
   );
 }

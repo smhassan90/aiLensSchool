@@ -27,6 +27,7 @@ import { StudentAnalysisService } from './services/student-analysis.service';
     StudentAnalysisService,
   ],
   exports: [
+    AI_PROVIDER,
     LessonProcessingService,
     QuizGenerationService,
     HomeworkGenerationService,

@@ -44,7 +44,7 @@ export function QuizDetailView({ quizId, listHref, listQueryKey }: QuizDetailVie
 
   if (isError || !quiz) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {(error as Error)?.message ?? "Quiz not found"}
         </div>
@@ -80,7 +80,7 @@ export function QuizDetailView({ quizId, listHref, listQueryKey }: QuizDetailVie
   );
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={quiz.title}
         description={`${quiz.subject?.name ?? ""} · Section ${quiz.section?.name ?? ""}`}

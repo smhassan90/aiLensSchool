@@ -205,7 +205,9 @@ export class AcademicsService {
             gradeId: true,
             branchId: true,
             capacity: true,
+            classTeacherId: true,
             branch: { select: { id: true, name: true } },
+            classTeacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
             _count: { select: { enrollments: true, classSubjects: true } },
           },
         },
@@ -238,6 +240,7 @@ export class AcademicsService {
           gradeId: dto.gradeId,
           name: dto.name,
           capacity: dto.capacity,
+          classTeacherId: dto.classTeacherId,
         },
         include: { grade: true, branch: true, _count: { select: { enrollments: true } } },
       });
@@ -284,8 +287,10 @@ export class AcademicsService {
             gradeId: true,
             branchId: true,
             capacity: true,
+            classTeacherId: true,
             grade: { select: { id: true, name: true, level: true } },
             branch: { select: { id: true, name: true } },
+            classTeacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
             _count: { select: { enrollments: true, classSubjects: true } },
             classSubjects: {
               select: {
@@ -590,5 +595,105 @@ export class AcademicsService {
       limit,
     );
     return paginate(items, total, page, limit);
+  }
+
+  async setClassTeacher(sectionId: string, classTeacherId: string | null, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const section = await this.prisma.section.findFirst({ where: { id: sectionId, schoolId } });
+    if (!section) throw new NotFoundException({ code: 'SECTION_NOT_FOUND', message: 'Section not found' });
+    if (classTeacherId) {
+      const teacher = await this.prisma.teacherProfile.findFirst({ where: { id: classTeacherId, schoolId } });
+      if (!teacher) throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
+    }
+    return this.prisma.section.update({
+      where: { id: sectionId },
+      data: { classTeacherId },
+      include: { grade: true, classTeacher: { include: { user: true } } },
+    });
+  }
+
+  async upsertQuizTarget(user: AuthUser, dto: { gradeId: string; subjectId: string; minQuizzes: number }) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    return this.prisma.quizTarget.upsert({
+      where: { gradeId_subjectId: { gradeId: dto.gradeId, subjectId: dto.subjectId } },
+      create: { schoolId, ...dto },
+      update: { minQuizzes: dto.minQuizzes },
+    });
+  }
+
+  listQuizTargets(user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    return this.prisma.quizTarget.findMany({
+      where: { schoolId },
+      include: { grade: { select: { name: true } }, subject: { select: { name: true } } },
+    });
+  }
+
+  async saveExamPattern(
+    user: AuthUser,
+    dto: { academicYearId: string; pattern: string; exams: Array<{ name: string; maxMarks: number; sequence: number }> },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    await this.prisma.schoolSettings.upsert({
+      where: { schoolId },
+      create: { schoolId, examPattern: dto.pattern },
+      update: { examPattern: dto.pattern },
+    });
+    await this.prisma.examConfig.deleteMany({ where: { schoolId, academicYearId: dto.academicYearId } });
+    await this.prisma.examConfig.createMany({
+      data: dto.exams.map((exam) => ({
+        schoolId,
+        academicYearId: dto.academicYearId,
+        name: exam.name,
+        maxMarks: exam.maxMarks,
+        sequence: exam.sequence,
+      })),
+    });
+    return this.prisma.examConfig.findMany({ where: { schoolId, academicYearId: dto.academicYearId }, orderBy: { sequence: 'asc' } });
+  }
+
+  listExamConfigs(user: AuthUser, academicYearId?: string) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    return this.prisma.examConfig.findMany({
+      where: { schoolId, ...(academicYearId ? { academicYearId } : {}) },
+      orderBy: { sequence: 'asc' },
+    });
+  }
+
+  addAssessment(
+    user: AuthUser,
+    dto: {
+      studentId: string;
+      subjectId: string;
+      sectionId: string;
+      academicYearId: string;
+      examConfigId?: string;
+      type: 'CLASS_TEST' | 'PHYSICAL_TEST' | 'TERM_EXAM' | 'OTHER';
+      title: string;
+      maxMarks: number;
+      marks: number;
+    },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    return this.prisma.assessmentMark.create({
+      data: { schoolId, recordedById: user.id, ...dto },
+    });
+  }
+
+  listAssessments(user: AuthUser, sectionId?: string, subjectId?: string) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    return this.prisma.assessmentMark.findMany({
+      where: {
+        schoolId,
+        ...(sectionId ? { sectionId } : {}),
+        ...(subjectId ? { subjectId } : {}),
+      },
+      orderBy: { assessedAt: 'desc' },
+      take: 80,
+      include: {
+        student: { select: { firstName: true, lastName: true } },
+        subject: { select: { name: true } },
+      },
+    });
   }
 }

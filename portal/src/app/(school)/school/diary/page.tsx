@@ -47,9 +47,9 @@ export default function DiaryPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader title="Home diary" description="Generate the daily class note from confirmed lessons and homework" />
-      <div className="mb-6 grid gap-3 sm:grid-cols-4">
+      <div className="mb-6 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <Label>Section</Label>
           <Select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>

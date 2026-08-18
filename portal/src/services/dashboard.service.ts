@@ -1,46 +1,63 @@
 import { apiClient } from "@/lib/api-client";
 
-export interface SchoolDashboardClass {
-  id: string;
-  name: string;
-  level: number;
-  _count: { sections: number; enrollments: number };
-}
-
-export interface DashboardResultRow {
-  id: string;
-  percentage: number;
-  student: { firstName: string; lastName: string };
-  quiz: { title: string };
-}
-
 export interface SchoolDashboardSummary {
   studentCount: number;
   teacherCount: number;
   classCount: number;
+  feesCollectedThisMonth: number;
+  feesRemainingThisMonth: number;
   feesOutstanding: number;
-  classes: SchoolDashboardClass[];
-  latestResults: DashboardResultRow[];
-}
-
-export interface TeacherDashboardClass {
-  sectionId: string;
-  subjectId: string;
-  academicYearId: string;
-  branchId: string;
-  sectionName: string;
-  gradeName: string;
-  gradeId?: string;
-  subjectName: string;
-  role: "TEACHER" | "ASSISTANT";
+  setupCompleted: boolean;
+  financeMonths: Array<{
+    key: string;
+    label: string;
+    collected: number;
+    expenseTotal: number;
+    expenses: Record<string, number>;
+  }>;
+  expenseCategories: string[];
+  classTeachers: Array<{
+    sectionId: string;
+    className: string;
+    students: number;
+    classTeacher: string | null;
+    subjects: Array<{ subject: string; teacher: string }>;
+  }>;
 }
 
 export interface TeacherDashboardSummary {
   classCount: number;
   quizCount: number;
   homeworkCount: number;
-  classes: TeacherDashboardClass[];
-  latestResults: DashboardResultRow[];
+  quizTarget: number | null;
+  missingLessonDays: number;
+  missingAttendanceSlots: number;
+  watchQuizzes: string[];
+  nextActions: string[];
+  classes: Array<{
+    sectionId: string;
+    subjectId: string;
+    academicYearId: string;
+    branchId: string;
+    sectionName: string;
+    gradeName: string;
+    gradeId?: string;
+    subjectName: string;
+    role: "TEACHER" | "ASSISTANT";
+  }>;
+  latestResults: Array<{
+    id: string;
+    percentage: number;
+    student: { firstName: string; lastName: string };
+    quiz: { title: string };
+  }>;
+}
+
+export interface CoachCards {
+  headline: string;
+  verdict: "strong" | "mixed" | "needs_support";
+  cards: Array<{ title: string; body: string; tone: "good" | "watch" | "act" }>;
+  sayToTeacher: string;
 }
 
 export const dashboardService = {
@@ -49,5 +66,8 @@ export const dashboardService = {
   },
   teacher() {
     return apiClient<TeacherDashboardSummary>("/dashboard/teacher");
+  },
+  teacherCoach() {
+    return apiClient<CoachCards>("/dashboard/teacher/coach", { method: "POST" });
   },
 };

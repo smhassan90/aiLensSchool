@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import { BrandMark } from "@/components/brand/brand-mark";
+import { AppShell } from "@/components/layout/app-shell";
 
 const navItems = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -40,7 +41,7 @@ export function SuperAdminSidebar() {
   const { user, logout } = useAuth();
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+    <aside className="flex h-full min-h-0 w-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
       <div className="border-b border-sidebar-border px-6 py-5">
         <BrandMark inverted subtitle="Super Admin" />
       </div>
@@ -85,9 +86,13 @@ export function SuperAdminSidebar() {
 
 export function SuperAdminShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="theme-super-admin flex min-h-screen bg-background">
-      <SuperAdminSidebar />
-      <main className="flex-1 overflow-auto">{children}</main>
-    </div>
+    <AppShell
+      inverted
+      className="theme-super-admin"
+      sidebar={<SuperAdminSidebar />}
+      header={<p className="truncate text-sm font-medium text-muted-foreground">Super Admin</p>}
+    >
+      {children}
+    </AppShell>
   );
 }

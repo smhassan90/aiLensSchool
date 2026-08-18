@@ -86,7 +86,7 @@ export default function IdCardsPage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="ID cards"
         description="Search a student by ID, name, or parent phone, then print their card"

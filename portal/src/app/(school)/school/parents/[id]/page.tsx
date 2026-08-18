@@ -37,12 +37,12 @@ export default function ParentWalkInPage() {
   if (query.isLoading) {
     return <PageLoader variant="page" />;
   }
-  if (!query.data) return <div className="p-8">Parent not found.</div>;
+  if (!query.data) return <div className="p-4 sm:p-6 lg:p-8">Parent not found.</div>;
 
   const { parent, children } = query.data;
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={`${parent.firstName} ${parent.lastName}`}
         description={`${parent.phone ?? parent.email} · ${children.length} child(ren)`}

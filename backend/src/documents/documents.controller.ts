@@ -97,7 +97,7 @@ export class DocumentsController {
     return this.documents.generateHomework(dto, user);
   }
 
-  @Roles(RoleName.SCHOOL_ADMIN)
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)
   @Post('report-cards/generate')
   generateReportCards(@Body() dto: GenerateReportCardDto, @CurrentUser() user: AuthUser) {
     return this.documents.generateReportCards(dto, user);

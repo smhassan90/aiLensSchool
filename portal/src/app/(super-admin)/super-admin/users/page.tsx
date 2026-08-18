@@ -24,7 +24,7 @@ export default function UsersPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader title="Users" description="Platform user accounts across all schools" />
 
       {isError && (

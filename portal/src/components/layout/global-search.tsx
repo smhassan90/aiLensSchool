@@ -41,7 +41,7 @@ export function GlobalSearch() {
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 180)}
-        placeholder="Search students, parents, phone, class..."
+        placeholder="Student ID, parent phone or name"
         className="pl-9"
       />
       {open && debounced.length >= 2 && (
@@ -78,7 +78,7 @@ export function GlobalSearch() {
           {results.data?.teachers.map((item) => (
             <Link
               key={item.id}
-              href="/school/teachers"
+              href={`/school/teachers/${item.id}`}
               className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
             >
               <span className="font-medium">{item.name}</span>

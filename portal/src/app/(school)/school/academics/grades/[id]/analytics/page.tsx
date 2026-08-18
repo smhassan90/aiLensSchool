@@ -34,11 +34,11 @@ export default function ClassAnalyticsPage() {
   if (query.isLoading) {
     return <PageLoader variant="page" />;
   }
-  if (!query.data) return <div className="p-8">Class not found.</div>;
+  if (!query.data) return <div className="p-4 sm:p-6 lg:p-8">Class not found.</div>;
   const data = query.data;
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={`${data.class.name} progress`}
         description="Attendance, quizzes, subjects and fees for this class in one view"
@@ -58,7 +58,7 @@ export default function ClassAnalyticsPage() {
         </Select>
       </div>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-4">
+      <div className="mb-6 grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card><CardHeader><CardTitle className="text-sm">Students</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data.enrollment.total}</CardContent></Card>
         <Card><CardHeader><CardTitle className="text-sm">Attendance</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data.attendance.rate}%</CardContent></Card>
         <Card><CardHeader><CardTitle className="text-sm">Quiz average</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data.quizzes.average}%</CardContent></Card>

@@ -80,7 +80,7 @@ export default function AcademicYearsPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Academic Years"
         description="Set the current year before assigning teachers and students to classes"

@@ -14,6 +14,7 @@ import { SchoolsService } from './schools.service';
 import { CreateSchoolDto } from './dto/create-school.dto';
 import { UpdateSchoolDto } from './dto/update-school.dto';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermission } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto } from '../common/dto/pagination.dto';
@@ -39,6 +40,27 @@ export class SchoolsController {
   @Get('dashboard/stats')
   dashboard() {
     return this.schoolsService.dashboardStats();
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_CLASSES')
+  @Post('setup')
+  setup(
+    @Body()
+    body: {
+      yearName: string;
+      startDate: string;
+      endDate: string;
+      grades: Array<{ name: string; level: number; section: string }>;
+      subjects: Array<{ name: string; code: string }>;
+      feeName?: string;
+      feeAmount?: number;
+      examPattern?: 'MID_FINAL' | 'THREE_TERMS';
+      minQuizzes?: number;
+    },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.schoolsService.runSetup(user, body);
   }
 
   @Roles(RoleName.SUPER_ADMIN)

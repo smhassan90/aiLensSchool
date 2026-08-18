@@ -13,7 +13,7 @@ import { BookOpen } from "lucide-react";
 export default function LessonsPage() {
   const lessons = useQuery({ queryKey: ["lessons"], queryFn: () => lessonsService.list({ limit: 50 }) });
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader title="Lessons" description="Confirmed and in-progress classroom lessons" />
       <div className="rounded-lg border bg-card">
         {lessons.isLoading ? (

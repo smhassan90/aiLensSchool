@@ -130,7 +130,7 @@ export default function NewStudentPage() {
   const loadingMeta = branches.isLoading || years.isLoading || grades.isLoading;
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Add Student"
         description="Mother and father mobile logins are generated automatically. Share the username and password with each parent."

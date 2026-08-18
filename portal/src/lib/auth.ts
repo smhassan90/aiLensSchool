@@ -1,4 +1,4 @@
-import type { AuthUser, LoginResponse, RoleName } from "./types";
+import type { AuthUser, LoginResponse, RoleName, StaffPermission } from "./types";
 
 const ACCESS_TOKEN_KEY = "accessToken";
 const REFRESH_TOKEN_KEY = "refreshToken";
@@ -45,11 +45,18 @@ export function hasAnyRole(user: AuthUser | null, roles: RoleName[]): boolean {
   return !!user && roles.some((r) => user.roles.includes(r));
 }
 
+export function hasPermission(user: AuthUser | null, permission: StaffPermission): boolean {
+  if (!user) return false;
+  if (user.roles.includes("SUPER_ADMIN") || user.roles.includes("SCHOOL_ADMIN")) return true;
+  return Boolean(user.permissions?.includes(permission));
+}
+
 export function getPrimaryRole(user: AuthUser | null): RoleName | null {
   if (!user) return null;
   const priority: RoleName[] = [
     "SUPER_ADMIN",
     "SCHOOL_ADMIN",
+    "PRINCIPAL",
     "TEACHER",
     "PARENT",
     "STUDENT",
@@ -63,6 +70,7 @@ export function getRoleRedirectPath(user: AuthUser | null): string {
     case "SUPER_ADMIN":
       return "/super-admin/dashboard";
     case "SCHOOL_ADMIN":
+    case "PRINCIPAL":
       return "/school/dashboard";
     case "TEACHER":
       return "/teacher/dashboard";

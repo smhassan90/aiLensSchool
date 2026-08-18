@@ -31,11 +31,13 @@ import { QueuesModule } from './queues/queues.module';
 import { areQueuesEnabled } from './queues/queues-enabled';
 import { CommonModule } from './common/common.module';
 import { FeesModule } from './fees/fees.module';
+import { ExpensesModule } from './expenses/expenses.module';
 import { DocumentsModule } from './documents/documents.module';
 import { InsightsModule } from './insights/insights.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { PermissionsGuard } from './common/guards/permissions.guard';
 import { HealthController } from './health.controller';
 import { loadRuntimeEnv } from './common/env';
 
@@ -121,6 +123,7 @@ const queuesEnabled = areQueuesEnabled();
     AuditModule,
     ShopModule,
     FeesModule,
+    ExpensesModule,
     DocumentsModule,
     InsightsModule,
     DashboardModule,
@@ -130,6 +133,7 @@ const queuesEnabled = areQueuesEnabled();
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
 })
 export class AppModule {}

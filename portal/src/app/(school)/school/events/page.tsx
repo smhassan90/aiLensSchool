@@ -53,7 +53,7 @@ export default function EventsPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader title="Events" description="School calendar" actions={<Button onClick={() => setOpen(true)}>New event</Button>} />
       <div className="rounded-lg border bg-card">
         {list.isLoading ? (

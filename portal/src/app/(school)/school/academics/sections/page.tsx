@@ -26,7 +26,7 @@ export default function SectionsPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Sections"
         description="Sections live inside a class. Add them from the class page — a school may have only one section per class."

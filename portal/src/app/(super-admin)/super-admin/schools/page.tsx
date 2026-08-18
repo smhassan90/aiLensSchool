@@ -38,7 +38,7 @@ export default function SchoolsPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Schools"
         description="Manage onboarded schools and their status"

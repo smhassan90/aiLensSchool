@@ -25,7 +25,7 @@ export default function BillingPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader title="Billing" description="Generated invoices across schools" />
 
       {isError && (

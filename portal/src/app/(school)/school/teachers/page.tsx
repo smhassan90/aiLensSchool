@@ -18,25 +18,29 @@ import {
 import { EmptyState } from "@/components/layout/empty-state";
 import { teachersService } from "@/services/teachers.service";
 import { UserSquare2, Plus } from "lucide-react";
+import { useAuth } from "@/providers/auth-provider";
 
 export default function TeachersPage() {
+  const { can } = useAuth();
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["teachers"],
     queryFn: () => teachersService.list({ limit: 50 }),
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Teachers"
-        description="Manage teaching staff and assignments"
+        description="Open a name to see lessons, attendance, quizzes and what to say."
         actions={
-          <Link href="/school/teachers/new">
-            <Button>
-              <Plus className="h-4 w-4" />
-              Add Teacher
-            </Button>
-          </Link>
+          can("MANAGE_TEACHERS") ? (
+            <Link href="/school/teachers/new">
+              <Button>
+                <Plus className="h-4 w-4" />
+                Add Teacher
+              </Button>
+            </Link>
+          ) : undefined
         }
       />
 
@@ -55,9 +59,11 @@ export default function TeachersPage() {
             title="No teachers yet"
             description="Add your first teacher to assign classes."
             action={
-              <Link href="/school/teachers/new">
-                <Button>Add Teacher</Button>
-              </Link>
+              can("MANAGE_TEACHERS") ? (
+                <Link href="/school/teachers/new">
+                  <Button>Add Teacher</Button>
+                </Link>
+              ) : undefined
             }
           />
         ) : (
@@ -75,7 +81,9 @@ export default function TeachersPage() {
               {data.items.map((teacher) => (
                 <TableRow key={teacher.id}>
                   <TableCell className="font-medium">
-                    {teacher.user.firstName} {teacher.user.lastName}
+                    <Link href={`/school/teachers/${teacher.id}`} className="hover:underline">
+                      {teacher.user.firstName} {teacher.user.lastName}
+                    </Link>
                   </TableCell>
                   <TableCell>{teacher.user.email}</TableCell>
                   <TableCell>{teacher.employeeCode}</TableCell>

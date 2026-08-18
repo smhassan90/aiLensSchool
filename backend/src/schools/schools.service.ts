@@ -289,4 +289,111 @@ export class SchoolsService {
       notificationsSent: notificationCount,
     };
   }
+
+  async runSetup(
+    user: AuthUser,
+    dto: {
+      yearName: string;
+      startDate: string;
+      endDate: string;
+      grades: Array<{ name: string; level: number; section: string }>;
+      subjects: Array<{ name: string; code: string }>;
+      feeName?: string;
+      feeAmount?: number;
+      examPattern?: 'MID_FINAL' | 'THREE_TERMS';
+      minQuizzes?: number;
+    },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      include: { branches: { take: 1 } },
+    });
+    const branchId = school?.branches[0]?.id;
+    if (!branchId) {
+      throw new BadRequestException({ code: 'NO_BRANCH', message: 'Create a branch first' });
+    }
+
+    const year = await this.prisma.academicYear.upsert({
+      where: { id: `setup-${schoolId}` },
+      create: {
+        id: `setup-${schoolId}`,
+        schoolId,
+        branchId,
+        name: dto.yearName,
+        startDate: new Date(dto.startDate),
+        endDate: new Date(dto.endDate),
+        isCurrent: true,
+      },
+      update: {
+        name: dto.yearName,
+        startDate: new Date(dto.startDate),
+        endDate: new Date(dto.endDate),
+        isCurrent: true,
+      },
+    });
+
+    const exams =
+      dto.examPattern === 'THREE_TERMS'
+        ? [
+            { name: 'First term', maxMarks: 100, sequence: 1 },
+            { name: 'Second term', maxMarks: 100, sequence: 2 },
+            { name: 'Third term', maxMarks: 100, sequence: 3 },
+          ]
+        : [
+            { name: 'Mid term', maxMarks: 50, sequence: 1 },
+            { name: 'Final term', maxMarks: 100, sequence: 2 },
+          ];
+
+    await this.prisma.examConfig.deleteMany({ where: { academicYearId: year.id } });
+    await this.prisma.examConfig.createMany({
+      data: exams.map((exam) => ({ schoolId, academicYearId: year.id, ...exam })),
+    });
+
+    for (const gradeInput of dto.grades) {
+      const grade = await this.prisma.grade.upsert({
+        where: { schoolId_name: { schoolId, name: gradeInput.name } },
+        create: { schoolId, name: gradeInput.name, level: gradeInput.level },
+        update: { level: gradeInput.level },
+      });
+      await this.prisma.section.upsert({
+        where: {
+          branchId_gradeId_name: { branchId, gradeId: grade.id, name: gradeInput.section || 'A' },
+        },
+        create: { schoolId, branchId, gradeId: grade.id, name: gradeInput.section || 'A' },
+        update: {},
+      });
+      for (const subject of dto.subjects) {
+        const code = `${subject.code}-${grade.level}`.slice(0, 20);
+        const created = await this.prisma.subject.upsert({
+          where: { schoolId_code: { schoolId, code } },
+          create: { schoolId, gradeId: grade.id, name: subject.name, code },
+          update: { name: subject.name, gradeId: grade.id },
+        });
+        if (dto.minQuizzes && dto.minQuizzes > 0) {
+          await this.prisma.quizTarget.upsert({
+            where: { gradeId_subjectId: { gradeId: grade.id, subjectId: created.id } },
+            create: { schoolId, gradeId: grade.id, subjectId: created.id, minQuizzes: dto.minQuizzes },
+            update: { minQuizzes: dto.minQuizzes },
+          });
+        }
+      }
+    }
+
+    if (dto.feeName && dto.feeAmount) {
+      await this.prisma.feeStructure.upsert({
+        where: { schoolId_name: { schoolId, name: dto.feeName } },
+        create: { schoolId, name: dto.feeName, amount: dto.feeAmount, frequency: 'MONTHLY' },
+        update: { amount: dto.feeAmount },
+      });
+    }
+
+    await this.prisma.schoolSettings.upsert({
+      where: { schoolId },
+      create: { schoolId, setupCompleted: true, examPattern: dto.examPattern ?? 'MID_FINAL' },
+      update: { setupCompleted: true, examPattern: dto.examPattern ?? 'MID_FINAL' },
+    });
+
+    return { ok: true, academicYearId: year.id };
+  }
 }

@@ -52,4 +52,20 @@ export const teachersService = {
   getById(id: string) {
     return apiClient<Teacher>(`/teachers/${id}`);
   },
+
+  performance(id: string) {
+    return apiClient<Record<string, unknown>>(`/teachers/${id}/performance`);
+  },
+
+  coach(id: string) {
+    return apiClient<{
+      performance: Record<string, unknown>;
+      coaching: {
+        headline: string;
+        verdict: string;
+        cards: Array<{ title: string; body: string; tone: string }>;
+        sayToTeacher: string;
+      };
+    }>(`/teachers/${id}/coach`, { method: "POST" });
+  },
 };

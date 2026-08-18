@@ -21,7 +21,7 @@ export default function TeacherResultsPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader title="Results" description="Quiz scores for your classes" />
       <div className="mb-4 max-w-md">
         <Input placeholder="Search student or quiz" value={search} onChange={(e) => setSearch(e.target.value)} />

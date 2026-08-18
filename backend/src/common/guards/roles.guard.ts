@@ -27,6 +27,11 @@ export class RolesGuard implements CanActivate {
 
     const user = request.user;
     if (!user?.roles?.length) return false;
-    return requiredRoles.some((role) => user.roles.includes(role));
+    if (requiredRoles.some((role) => user.roles.includes(role))) return true;
+    // Principal uses the school portal. Writes still need @RequirePermission.
+    if (requiredRoles.includes(RoleName.SCHOOL_ADMIN) && user.roles.includes(RoleName.PRINCIPAL)) {
+      return true;
+    }
+    return false;
   }
 }

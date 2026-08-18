@@ -12,6 +12,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LoginDto } from './dto/login.dto';
 import { AuthUser } from '../common/types/auth-user.type';
+import { parsePermissions } from '../common/permissions';
 
 @Injectable()
 export class AuthService {
@@ -70,6 +71,7 @@ export class AuthService {
       schoolId: user.schoolId,
       mustChangePassword: user.mustChangePassword,
       roles,
+      permissions: parsePermissions(user.permissions),
     };
 
     const tokens = await this.issueTokens(authUser, meta);
@@ -97,6 +99,7 @@ export class AuthService {
         schoolId: user.schoolId,
         mustChangePassword: user.mustChangePassword,
         roles,
+        permissions: parsePermissions(user.permissions),
       },
       ...tokens,
     };
@@ -138,6 +141,7 @@ export class AuthService {
       lastName: stored.user.lastName,
       schoolId: stored.user.schoolId,
       roles,
+      permissions: parsePermissions(stored.user.permissions),
     };
 
     const tokens = await this.issueTokens(authUser, meta);
@@ -200,6 +204,7 @@ export class AuthService {
       mustChangePassword: user.mustChangePassword,
       school: user.school,
       roles: user.roles.map((r) => r.role.name),
+      permissions: parsePermissions(user.permissions),
       teacherProfile: user.teacherProfile,
       parentProfile: user.parentProfile,
     };
@@ -273,6 +278,7 @@ export class AuthService {
       email: user.email,
       schoolId: user.schoolId,
       roles: user.roles,
+      permissions: user.permissions ?? [],
     };
 
     const accessToken = await this.jwt.signAsync(payload);

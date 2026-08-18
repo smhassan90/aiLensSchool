@@ -138,4 +138,59 @@ export const academicsService = {
       body: JSON.stringify(payload),
     });
   },
+
+  setClassTeacher(sectionId: string, classTeacherId: string | null) {
+    return apiClient(`/academics/sections/${sectionId}/class-teacher`, {
+      method: "POST",
+      body: JSON.stringify({ classTeacherId }),
+    });
+  },
+
+  saveExamPattern(payload: {
+    academicYearId: string;
+    pattern: string;
+    exams: Array<{ name: string; maxMarks: number; sequence: number }>;
+  }) {
+    return apiClient("/academics/exam-configs", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  listQuizTargets() {
+    return apiClient<Array<{
+      id: string;
+      gradeId: string;
+      subjectId: string;
+      minQuizzes: number;
+      grade?: { name: string };
+      subject?: { name: string };
+    }>>("/academics/quiz-targets");
+  },
+
+  saveQuizTarget(payload: { gradeId: string; subjectId: string; minQuizzes: number }) {
+    return apiClient("/academics/quiz-targets", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  addAssessment(payload: {
+    studentId: string;
+    subjectId: string;
+    sectionId: string;
+    academicYearId: string;
+    type: string;
+    title: string;
+    maxMarks: number;
+    marks: number;
+  }) {
+    return apiClient("/academics/assessments", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  listAssessments(params?: { sectionId?: string; subjectId?: string }) {
+    return apiClient<Array<{
+      id: string;
+      title: string;
+      type: string;
+      marks: number;
+      maxMarks: number;
+      student?: { firstName: string; lastName: string };
+      subject?: { name: string };
+    }>>(`/academics/assessments${buildQuery(params ?? {})}`);
+  },
 };

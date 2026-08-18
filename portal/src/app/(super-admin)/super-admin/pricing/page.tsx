@@ -24,7 +24,7 @@ export default function PricingPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader title="Pricing Plans" description="Platform pricing configuration" />
 
       {isError && (

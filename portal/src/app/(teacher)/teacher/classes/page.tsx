@@ -26,7 +26,7 @@ export default function TeacherClassesPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="My Classes"
         description="Sections and subjects assigned to you"

@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function FrontDeskPage() {
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="Front desk"
-        description="When a parent arrives, search their name or phone and open every child’s progress, attendance, quizzes and report cards in one window."
+        title="Find a child"
+        description="Type student ID, parent phone, or parent name. Open the child to see everything in one place."
       />
       <Card className="max-w-3xl">
         <CardHeader><CardTitle>Find parent or child</CardTitle></CardHeader>

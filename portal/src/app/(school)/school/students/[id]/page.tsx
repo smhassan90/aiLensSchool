@@ -46,14 +46,14 @@ export default function Student360Page() {
     return <PageLoader variant="page" />;
   }
   if (!query.data) {
-    return <div className="p-8">Student not found.</div>;
+    return <div className="p-4 sm:p-6 lg:p-8">Student not found.</div>;
   }
 
   const data = query.data;
   const student = data.student;
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={`${student.firstName} ${student.lastName}`}
         description={`${student.studentCode} · ${student.grade?.name ?? "Unassigned"} ${student.section?.name ?? ""} · ${student.academicYear?.name ?? ""}`}
@@ -64,7 +64,7 @@ export default function Student360Page() {
         }
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-4">
+      <div className="mb-6 grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card><CardHeader><CardTitle className="text-sm">Attendance</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data.attendance.rate}%</CardContent></Card>
         <Card><CardHeader><CardTitle className="text-sm">Quiz average</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data.quizzes.average}%</CardContent></Card>
         <Card><CardHeader><CardTitle className="text-sm">Fees due</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data.fees.due}</CardContent></Card>

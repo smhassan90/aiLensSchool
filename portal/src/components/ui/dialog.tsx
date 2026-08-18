@@ -26,7 +26,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
       <div
         className="fixed inset-0 bg-black/50"
         onClick={() => onOpenChange(false)}
@@ -49,7 +49,7 @@ export function DialogContent({
   onClose?: () => void;
 }) {
   return (
-    <div className={cn("relative my-auto w-full max-w-lg rounded-lg border bg-card p-6 shadow-lg", className)}>
+    <div className={cn("relative my-auto w-full max-w-lg rounded-t-lg border bg-card p-4 shadow-lg sm:rounded-lg sm:p-6", className)}>
       {onClose && (
         <Button
           variant="ghost"

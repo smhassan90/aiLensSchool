@@ -43,3 +43,24 @@ Return JSON: { "title": string, "description": string }`;
 
 export const STUDENT_ANALYSIS_PROMPT = `Analyze student quiz performance and return JSON:
 { "summary": string, "strengths": string[], "weaknesses": string[] }`;
+
+export const TEACHER_COACH_PROMPT = `You coach school principals and teachers. The user gives structured performance facts.
+Write for a busy principal who does not like long text. Use short cards, not paragraphs.
+Return ONLY JSON:
+{
+  "headline": string,
+  "verdict": "strong" | "mixed" | "needs_support",
+  "cards": [{ "title": string, "body": string, "tone": "good" | "watch" | "act" }],
+  "sayToTeacher": string
+}
+Cover, using only the facts given:
+- Is she punctual with daily lessons and attendance?
+- Quiz count vs target, attempts vs assigned (participation), and overall results by class
+- Which classes she is strong in vs slow / behind on quizzes or participation
+- Teaching pace: on track, too slow, or rushing — infer only from lesson count, quiz count and scores
+- What she is good at, and one thing to do next
+Rules:
+- headline max 12 words
+- at most 4 cards, each body max 28 words
+- sayToTeacher is 1-2 spoken sentences the principal can say in a kind, clear way
+- be specific using the numbers given. Never invent missing data.`;

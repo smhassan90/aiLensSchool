@@ -200,6 +200,22 @@ export default function ClassDetailPage() {
     },
   });
 
+  const setClassTeacher = useMutation({
+    mutationFn: ({ sectionId, classTeacherId }: { sectionId: string; classTeacherId: string | null }) =>
+      academicsService.setClassTeacher(sectionId, classTeacherId),
+    onSuccess: () => {
+      toast({ title: "Class teacher saved", variant: "success" });
+      invalidate();
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not assign class teacher",
+        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        variant: "error",
+      });
+    },
+  });
+
   const enrollStudent = useMutation({
     mutationFn: (values: EnrollValues) =>
       academicsService.createEnrollment({
@@ -252,7 +268,7 @@ export default function ClassDetailPage() {
 
   if (!grade) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <EmptyState
           title="Class not found"
           description="This class may have been removed."
@@ -267,7 +283,7 @@ export default function ClassDetailPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={grade.name}
         description={`Level ${grade.level}. Add sections, assign teachers (with optional assistants), then enroll students.`}
@@ -317,6 +333,7 @@ export default function ClassDetailPage() {
                     <TableHead>Capacity</TableHead>
                     <TableHead>Students</TableHead>
                     <TableHead>Subjects</TableHead>
+                    <TableHead>Class teacher</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -327,6 +344,25 @@ export default function ClassDetailPage() {
                       <TableCell>{section.capacity ?? "—"}</TableCell>
                       <TableCell>{section._count?.enrollments ?? 0}</TableCell>
                       <TableCell>{section._count?.classSubjects ?? section.classSubjects?.length ?? 0}</TableCell>
+                      <TableCell>
+                        <select
+                          className="h-9 max-w-[180px] rounded-md border bg-background px-2 text-sm"
+                          value={section.classTeacherId ?? ""}
+                          onChange={(e) =>
+                            setClassTeacher.mutate({
+                              sectionId: section.id,
+                              classTeacherId: e.target.value || null,
+                            })
+                          }
+                        >
+                          <option value="">Not assigned</option>
+                          {(teachers.data?.items ?? []).map((teacher) => (
+                            <option key={teacher.id} value={teacher.id}>
+                              {teacher.user.firstName} {teacher.user.lastName}
+                            </option>
+                          ))}
+                        </select>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

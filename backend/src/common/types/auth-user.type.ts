@@ -1,4 +1,5 @@
 import { RoleName } from '@prisma/client';
+import { StaffPermission } from '../permissions';
 
 export interface AuthUser {
   id: string;
@@ -9,4 +10,5 @@ export interface AuthUser {
   schoolId: string | null;
   mustChangePassword?: boolean;
   roles: RoleName[];
+  permissions?: StaffPermission[];
 }

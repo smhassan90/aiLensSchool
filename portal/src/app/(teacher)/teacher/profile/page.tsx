@@ -7,7 +7,7 @@ import { useAuth } from "@/providers/auth-provider";
 export default function TeacherProfilePage() {
   const { user } = useAuth();
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader title="Profile" description="Your teacher account" />
       <Card className="max-w-xl">
         <CardHeader><CardTitle>{user?.firstName} {user?.lastName}</CardTitle></CardHeader>

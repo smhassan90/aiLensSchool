@@ -35,7 +35,7 @@ export default function ParentsPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Parents"
         description="Parents are created with each student. Open a walk-in window when a parent visits."

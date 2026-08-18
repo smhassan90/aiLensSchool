@@ -189,8 +189,8 @@ async function main() {
 
   await prisma.schoolSettings.upsert({
     where: { schoolId: school.id },
-    create: { schoolId: school.id },
-    update: {},
+    create: { schoolId: school.id, setupCompleted: true, examPattern: 'MID_FINAL' },
+    update: { setupCompleted: true },
   });
 
   await prisma.schoolSubscription.upsert({
@@ -254,6 +254,35 @@ async function main() {
   if (!existingAdminRole) {
     await prisma.userRole.create({
       data: { userId: schoolAdmin.id, roleId: schoolAdminRole.id, schoolId: school.id },
+    });
+  }
+
+  const principalHash = await bcrypt.hash('Principal123!', 12);
+  const principal = await prisma.user.upsert({
+    where: { email: 'principal@abcschool.com' },
+    create: {
+      email: 'principal@abcschool.com',
+      username: 'principal',
+      passwordHash: principalHash,
+      firstName: 'School',
+      lastName: 'Principal',
+      schoolId: school.id,
+      status: UserStatus.ACTIVE,
+      permissions: ['VIEW_DASHBOARD', 'SEARCH_STUDENTS', 'VIEW_TEACHER_PROGRESS', 'VIEW_FINANCE'],
+    },
+    update: {
+      passwordHash: principalHash,
+      schoolId: school.id,
+      permissions: ['VIEW_DASHBOARD', 'SEARCH_STUDENTS', 'VIEW_TEACHER_PROGRESS', 'VIEW_FINANCE'],
+    },
+  });
+  const principalRole = await prisma.role.findUniqueOrThrow({ where: { name: RoleName.PRINCIPAL } });
+  const existingPrincipalRole = await prisma.userRole.findFirst({
+    where: { userId: principal.id, roleId: principalRole.id, schoolId: school.id },
+  });
+  if (!existingPrincipalRole) {
+    await prisma.userRole.create({
+      data: { userId: principal.id, roleId: principalRole.id, schoolId: school.id },
     });
   }
 
@@ -1005,6 +1034,7 @@ async function main() {
     students: studentRows.length,
     attendanceDays: ATTENDANCE_DAYS.length,
     admin: 'admin@abcschool.com / SchoolAdmin123!',
+    principal: 'principal@abcschool.com / Principal123!',
     sampleTeacher: 'teacher@abcschool.com / Teacher123!  (Math, Grades 1-5)',
     scienceJunior: 'sana.iqbal@thewisdomschool.com / Teacher123!  (Science, Grades 1-5)',
     scienceSenior: 'ahmed.sheikh@thewisdomschool.com / Teacher123!  (Science, Grades 6-10)',

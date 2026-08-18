@@ -12,6 +12,7 @@ import {
   LESSON_PROCESSING_PROMPT,
   QUIZ_GENERATION_PROMPT,
   STUDENT_ANALYSIS_PROMPT,
+  TEACHER_COACH_PROMPT,
 } from '../prompts';
 import { mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
 
@@ -173,6 +174,43 @@ export class OpenAiProvider implements AiProvider {
       outputTokens: content.outputTokens,
       estimatedCost: this.estimateCost(content.inputTokens, content.outputTokens),
     };
+  }
+
+  async coach(input: { facts: string }): Promise<
+    AiCompletionResult<{
+      headline: string;
+      verdict: 'strong' | 'mixed' | 'needs_support';
+      cards: Array<{ title: string; body: string; tone: 'good' | 'watch' | 'act' }>;
+      sayToTeacher: string;
+    }>
+  > {
+    const fallback = {
+      headline: 'Check lessons, attendance and quiz scores together',
+      verdict: 'mixed' as const,
+      cards: [
+        { title: 'What is going well', body: 'Use the numbers on this page as the source of truth.', tone: 'good' as const },
+        { title: 'What to watch', body: 'If lessons or attendance are missing, start there before talking about results.', tone: 'watch' as const },
+      ],
+      sayToTeacher:
+        'Thank you for the work you are doing. Let’s keep lessons and attendance updated every school day, then we can look at quiz scores together.',
+    };
+    if (!this.apiKey) {
+      return { data: fallback, provider: 'mock', model: 'deterministic-mock', inputTokens: 0, outputTokens: 0, estimatedCost: 0 };
+    }
+    try {
+      const content = await this.chat(TEACHER_COACH_PROMPT, input.facts);
+      const parsed = JSON.parse(this.extractJson(content.text)) as typeof fallback;
+      return {
+        data: parsed,
+        provider: 'openai',
+        model: content.model,
+        inputTokens: content.inputTokens,
+        outputTokens: content.outputTokens,
+        estimatedCost: this.estimateCost(content.inputTokens, content.outputTokens),
+      };
+    } catch {
+      return { data: fallback, provider: 'mock', model: 'deterministic-mock', inputTokens: 0, outputTokens: 0, estimatedCost: 0 };
+    }
   }
 
   private mockLesson(sourceText: string, imageCount = 0): AiCompletionResult<LessonOutput> {

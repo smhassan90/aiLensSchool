@@ -98,7 +98,7 @@ export default function SchoolQuizzesPage() {
   const catalogEmpty = !sections.isLoading && !subjects.isLoading && !classOptions.length && !sections.data?.items.length;
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Quizzes"
         description="Select homework topic titles. Drafts are never auto-published."

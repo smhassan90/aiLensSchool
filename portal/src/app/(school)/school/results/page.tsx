@@ -21,7 +21,7 @@ export default function ResultsPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader title="Quiz results" description="Scores across the school" />
       <div className="mb-4 max-w-md"><Input placeholder="Search student or quiz" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
       <div className="rounded-lg border bg-card">

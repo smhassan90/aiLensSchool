@@ -16,10 +16,11 @@ import {
   getRefreshToken,
   getStoredUser,
   hasAnyRole,
+  hasPermission,
   setAuthSession,
 } from "@/lib/auth";
 import { authService } from "@/services/auth.service";
-import type { LoginResponse } from "@/lib/types";
+import type { LoginResponse, StaffPermission } from "@/lib/types";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -29,6 +30,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   hasRole: (role: RoleName) => boolean;
   hasAnyRole: (roles: RoleName[]) => boolean;
+  can: (permission: StaffPermission) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -72,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       hasRole: (role) => hasAnyRole(user, [role]),
       hasAnyRole: (roles) => hasAnyRole(user, roles),
+      can: (permission) => hasPermission(user, permission),
     }),
     [user, isLoading, login, logout],
   );

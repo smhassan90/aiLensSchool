@@ -146,7 +146,7 @@ export default function TeacherQuizzesPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Quizzes"
         description="Select homework topics and generate a quiz from those titles"

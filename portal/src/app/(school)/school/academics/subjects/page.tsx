@@ -85,7 +85,7 @@ export default function SubjectsPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Subjects"
         description="Subjects are assigned to class sections along with a teacher"

@@ -81,7 +81,13 @@ export const documentsService = {
       body: JSON.stringify(payload),
     });
   },
-  generateReportCards(payload: { academicYearId: string; sectionId?: string; studentId?: string; termLabel?: string }) {
+  generateReportCards(payload: {
+    academicYearId: string;
+    sectionId?: string;
+    studentId?: string;
+    termLabel?: string;
+    subjectId?: string;
+  }) {
     return apiClient<{ generated: number; items: ReportCard[] }>("/documents/report-cards/generate", {
       method: "POST",
       body: JSON.stringify(payload),

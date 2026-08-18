@@ -404,6 +404,28 @@ export class DocumentsService {
 
   async generateReportCards(dto: GenerateReportCardDto, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
+    if (this.tenant.isTeacher(user)) {
+      if (!dto.sectionId) {
+        throw new BadRequestException({
+          code: 'SECTION_REQUIRED',
+          message: 'Choose your class to generate report cards',
+        });
+      }
+      const assigned = await this.prisma.classSubject.findFirst({
+        where: {
+          sectionId: dto.sectionId,
+          section: { schoolId },
+          ...(dto.subjectId ? { subjectId: dto.subjectId } : {}),
+          OR: [{ teacher: { userId: user.id } }, { assistantTeacher: { userId: user.id } }],
+        },
+      });
+      if (!assigned) {
+        throw new ForbiddenException({
+          code: 'NOT_YOUR_CLASS',
+          message: 'You can only generate report cards for your own class and subject',
+        });
+      }
+    }
     const termLabel = dto.termLabel ?? 'Term 1';
     const enrollments = await this.prisma.studentEnrollment.findMany({
       where: {
@@ -427,9 +449,21 @@ export class DocumentsService {
       const results = await this.prisma.quizResult.findMany({
         where: {
           studentId: enrollment.studentId,
-          quiz: { academicYearId: dto.academicYearId, schoolId },
+          quiz: {
+            academicYearId: dto.academicYearId,
+            schoolId,
+            ...(dto.subjectId ? { subjectId: dto.subjectId } : {}),
+          },
         },
         include: { quiz: { include: { subject: true } } },
+      });
+      const assessments = await this.prisma.assessmentMark.findMany({
+        where: {
+          studentId: enrollment.studentId,
+          academicYearId: dto.academicYearId,
+          ...(dto.subjectId ? { subjectId: dto.subjectId } : {}),
+        },
+        include: { subject: true },
       });
       const attendance = await this.prisma.attendance.findMany({
         where: { studentId: enrollment.studentId, academicYearId: dto.academicYearId },
@@ -444,6 +478,13 @@ export class DocumentsService {
         current.total += Number(result.percentage);
         current.count += 1;
         bySubject.set(subjectId, current);
+      }
+      for (const mark of assessments) {
+        const pct = Number(mark.maxMarks) ? (Number(mark.marks) / Number(mark.maxMarks)) * 100 : 0;
+        const current = bySubject.get(mark.subjectId) ?? { total: 0, count: 0, name: mark.subject.name };
+        current.total += pct;
+        current.count += 1;
+        bySubject.set(mark.subjectId, current);
       }
       const lines = [...bySubject.entries()].map(([subjectId, value]) => {
         const average = value.count ? value.total / value.count : 0;

@@ -1,9 +1,23 @@
 export type RoleName =
   | "SUPER_ADMIN"
   | "SCHOOL_ADMIN"
+  | "PRINCIPAL"
   | "TEACHER"
   | "PARENT"
   | "STUDENT";
+
+export type StaffPermission =
+  | "VIEW_DASHBOARD"
+  | "SEARCH_STUDENTS"
+  | "VIEW_TEACHER_PROGRESS"
+  | "VIEW_FINANCE"
+  | "MANAGE_TEACHERS"
+  | "MANAGE_CLASSES"
+  | "MANAGE_STAFF"
+  | "MANAGE_EXPENSES"
+  | "MANAGE_EXAMS"
+  | "GENERATE_REPORT_CARDS"
+  | "SET_QUIZ_TARGETS";
 
 export interface AuthUser {
   id: string;
@@ -14,6 +28,7 @@ export interface AuthUser {
   schoolId: string | null;
   mustChangePassword?: boolean;
   roles: RoleName[];
+  permissions?: StaffPermission[];
 }
 
 export interface LoginResponse {
@@ -165,6 +180,8 @@ export interface Section {
   gradeId: string;
   branchId: string;
   capacity?: number | null;
+  classTeacherId?: string | null;
+  classTeacher?: TeacherRef | null;
   grade?: Grade;
   branch?: Branch;
   _count?: { enrollments: number; classSubjects?: number };

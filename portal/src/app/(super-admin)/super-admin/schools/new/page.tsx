@@ -94,7 +94,7 @@ export default function NewSchoolPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Create School"
         description="Onboard a new school with an initial branch and admin account"

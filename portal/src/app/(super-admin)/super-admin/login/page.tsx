@@ -4,7 +4,7 @@ import Link from "next/link";
 
 export default function SuperAdminLoginPage() {
   return (
-    <div className="theme-super-admin flex min-h-screen flex-col items-center justify-center bg-slate-100 p-6">
+    <div className="theme-super-admin flex min-h-dvh flex-col items-center justify-center bg-slate-100 p-4 sm:p-6">
       <div className="mb-8">
         <BrandMark variant="full" subtitle="Super Admin access only" />
       </div>

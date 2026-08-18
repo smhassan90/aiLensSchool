@@ -64,7 +64,7 @@ export default function AttendancePage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader title="Attendance" description="Mark a section for a date" />
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <div>

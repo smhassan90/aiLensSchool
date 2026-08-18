@@ -30,9 +30,37 @@ enum UserStatus {
 enum RoleName {
   SUPER_ADMIN
   SCHOOL_ADMIN
+  PRINCIPAL
   TEACHER
   PARENT
   STUDENT
+}
+
+enum ExpenseCategory {
+  TEACHER_SALARY
+  ADMIN_SALARY
+  ELECTRICITY
+  GAS
+  WATER
+  RENT
+  REPAIR
+  SUPPLIES
+  TRANSPORT
+  MISC
+}
+
+enum ExpenseRecurrence {
+  ONE_TIME
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum AssessmentType {
+  CLASS_TEST
+  PHYSICAL_TEST
+  TERM_EXAM
+  OTHER
 }
 
 enum Gender {
@@ -242,6 +270,7 @@ model User {
   schoolId           String?    @map("school_id")
   mustChangePassword Boolean    @default(false) @map("must_change_password")
   lastLoginAt        DateTime?  @map("last_login_at")
+  permissions        Json?
   createdAt          DateTime   @default(now()) @map("created_at")
   updatedAt          DateTime   @updatedAt @map("updated_at")
 
@@ -265,6 +294,8 @@ model User {
   recordedFeePayments     FeePayment[]             @relation("FeeRecordedBy")
   generatedReportCards    ReportCard[]             @relation("ReportGeneratedBy")
   generatedIdCards        IdCard[]                 @relation("IdCardGeneratedBy")
+  recordedExpenses        Expense[]                @relation("ExpenseRecordedBy")
+  recordedAssessments     AssessmentMark[]         @relation("AssessmentRecordedBy")
 
   @@index([schoolId])
   @@index([status])
@@ -394,6 +425,10 @@ model School {
   reportCards             ReportCard[]
   idCards                 IdCard[]
   teacherGradeStyles      TeacherGradeStyle[]
+  expenses                Expense[]
+  quizTargets             QuizTarget[]
+  examConfigs             ExamConfig[]
+  assessmentMarks         AssessmentMark[]
   pricingPlanId           String?            @map("pricing_plan_id")
   pricingPlan             PricingPlan?       @relation(fields: [pricingPlanId], references: [id])
 
@@ -450,6 +485,8 @@ model SchoolSettings {
   locale                String   @default("en")
   maxQuizReminders      Int      @default(2) @map("max_quiz_reminders")
   academicYearStartMonth Int     @default(8) @map("academic_year_start_month")
+  setupCompleted        Boolean  @default(false) @map("setup_completed")
+  examPattern           String?  @map("exam_pattern")
   metadata              Json?
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
@@ -524,6 +561,7 @@ model Student {
   fees            StudentFee[]
   reportCards     ReportCard[]
   idCards         IdCard[]
+  assessmentMarks AssessmentMark[]
 
   @@unique([schoolId, studentCode])
   @@unique([schoolId, admissionNumber])
@@ -587,6 +625,7 @@ model TeacherProfile {
   lessons                DailyLesson[]
   idCards                IdCard[]
   gradeStyles            TeacherGradeStyle[]
+  classSections          Section[]         @relation("SectionClassTeacher")
 
   @@unique([schoolId, employeeCode])
   @@index([schoolId])
@@ -642,6 +681,8 @@ model AcademicYear {
   studentFees       StudentFee[]
   homeDiaries       HomeDiary[]
   reportCards       ReportCard[]
+  examConfigs       ExamConfig[]
+  assessmentMarks   AssessmentMark[]
 
   @@index([schoolId])
   @@index([branchId])
@@ -682,6 +723,7 @@ model Grade {
   events      Event[]
   reportCards ReportCard[]
   teacherStyles TeacherGradeStyle[]
+  quizTargets QuizTarget[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -689,18 +731,20 @@ model Grade {
 }
 
 model Section {
-  id        String   @id @default(uuid())
-  schoolId  String   @map("school_id")
-  branchId  String   @map("branch_id")
-  gradeId   String   @map("grade_id")
-  name      String
-  capacity  Int?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  schoolId       String   @map("school_id")
+  branchId       String   @map("branch_id")
+  gradeId        String   @map("grade_id")
+  name           String
+  capacity       Int?
+  classTeacherId String?  @map("class_teacher_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   school          School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   branch          Branch              @relation(fields: [branchId], references: [id])
   grade           Grade               @relation(fields: [gradeId], references: [id])
+  classTeacher    TeacherProfile?     @relation("SectionClassTeacher", fields: [classTeacherId], references: [id])
   enrollments     StudentEnrollment[]
   classSubjects   ClassSubject[]
   lessons         DailyLesson[]
@@ -712,11 +756,13 @@ model Section {
   studentFees     StudentFee[]
   homeDiaries     HomeDiary[]
   reportCards     ReportCard[]
+  assessmentMarks AssessmentMark[]
 
   @@unique([branchId, gradeId, name])
   @@index([schoolId])
   @@index([branchId])
   @@index([gradeId])
+  @@index([classTeacherId])
   @@map("sections")
 }
 
@@ -738,6 +784,8 @@ model Subject {
   homework        Homework[]
   quizzes         Quiz[]
   reportCardLines ReportCardLine[]
+  quizTargets     QuizTarget[]
+  assessmentMarks AssessmentMark[]
 
   @@unique([schoolId, code])
   @@index([schoolId])
@@ -1773,4 +1821,96 @@ model IdCard {
   @@index([studentId])
   @@index([teacherId])
   @@map("id_cards")
+}
+
+model Expense {
+  id           String             @id @default(uuid())
+  schoolId     String             @map("school_id")
+  title        String
+  category     ExpenseCategory
+  amount       Decimal            @db.Decimal(12, 2)
+  currency     String             @default("PKR")
+  recurrence   ExpenseRecurrence  @default(ONE_TIME)
+  expenseDate  DateTime           @map("expense_date") @db.Date
+  notes        String?            @db.Text
+  recordedById String             @map("recorded_by_id")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  school     School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  recordedBy User   @relation("ExpenseRecordedBy", fields: [recordedById], references: [id])
+
+  @@index([schoolId])
+  @@index([expenseDate])
+  @@index([category])
+  @@map("expenses")
+}
+
+model QuizTarget {
+  id         String @id @default(uuid())
+  schoolId   String @map("school_id")
+  gradeId    String @map("grade_id")
+  subjectId  String @map("subject_id")
+  minQuizzes Int    @map("min_quizzes")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  grade   Grade   @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([gradeId, subjectId])
+  @@index([schoolId])
+  @@map("quiz_targets")
+}
+
+model ExamConfig {
+  id             String    @id @default(uuid())
+  schoolId       String    @map("school_id")
+  academicYearId String    @map("academic_year_id")
+  name           String
+  sequence       Int       @default(1)
+  maxMarks       Int       @map("max_marks")
+  startDate      DateTime? @map("start_date") @db.Date
+  endDate        DateTime? @map("end_date") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  school       School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear     @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  marks        AssessmentMark[]
+
+  @@unique([academicYearId, name])
+  @@index([schoolId])
+  @@map("exam_configs")
+}
+
+model AssessmentMark {
+  id             String          @id @default(uuid())
+  schoolId       String          @map("school_id")
+  studentId      String          @map("student_id")
+  subjectId      String          @map("subject_id")
+  sectionId      String          @map("section_id")
+  academicYearId String          @map("academic_year_id")
+  examConfigId   String?         @map("exam_config_id")
+  type           AssessmentType  @default(CLASS_TEST)
+  title          String
+  maxMarks       Decimal         @map("max_marks") @db.Decimal(6, 2)
+  marks          Decimal         @db.Decimal(6, 2)
+  recordedById   String          @map("recorded_by_id")
+  assessedAt     DateTime        @default(now()) @map("assessed_at")
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  section      Section      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  examConfig   ExamConfig?  @relation(fields: [examConfigId], references: [id])
+  recordedBy   User         @relation("AssessmentRecordedBy", fields: [recordedById], references: [id])
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([sectionId])
+  @@map("assessment_marks")
 }

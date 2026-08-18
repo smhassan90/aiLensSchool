@@ -5,6 +5,7 @@ import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { TeachersService } from './teachers.service';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermission } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto } from '../common/dto/pagination.dto';
@@ -36,6 +37,7 @@ export class TeachersController {
   }
 
   @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_TEACHERS')
   @Post()
   create(@Body() dto: CreateTeacherDto, @CurrentUser() user: AuthUser) {
     return this.teachersService.create(dto, user);
@@ -45,6 +47,20 @@ export class TeachersController {
   @Get()
   findAll(@Query() query: TeacherQueryDto, @CurrentUser() user: AuthUser) {
     return this.teachersService.findAll(user, query);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('VIEW_TEACHER_PROGRESS')
+  @Get(':id/performance')
+  performance(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.teachersService.performance(id, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('VIEW_TEACHER_PROGRESS')
+  @Post(':id/coach')
+  coach(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.teachersService.coach(id, user);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN)

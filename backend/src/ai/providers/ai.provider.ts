@@ -46,6 +46,15 @@ export interface AiProvider {
   }): Promise<
     AiCompletionResult<{ summary: string; strengths: string[]; weaknesses: string[] }>
   >;
+
+  coach(input: { facts: string }): Promise<
+    AiCompletionResult<{
+      headline: string;
+      verdict: 'strong' | 'mixed' | 'needs_support';
+      cards: Array<{ title: string; body: string; tone: 'good' | 'watch' | 'act' }>;
+      sayToTeacher: string;
+    }>
+  >;
 }
 
 export const AI_PROVIDER = Symbol('AI_PROVIDER');

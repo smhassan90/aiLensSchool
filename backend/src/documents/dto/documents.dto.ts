@@ -80,6 +80,11 @@ export class GenerateReportCardDto {
   @IsOptional()
   @IsString()
   termLabel?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  subjectId?: string;
 }
 
 export class GenerateIdCardDto {

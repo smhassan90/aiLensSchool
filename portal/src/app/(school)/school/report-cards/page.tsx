@@ -46,13 +46,13 @@ export default function ReportCardsPage() {
   });
 
   return (
-    <div className="p-8 print:p-0">
+    <div className="p-4 sm:p-6 lg:p-8 print:p-0">
       <PageHeader
         title="Report cards"
         description="Compile quiz averages and attendance into a printable report"
         actions={<Button className="print:hidden" onClick={() => window.print()}>Print</Button>}
       />
-      <div className="mb-6 grid gap-3 sm:grid-cols-4 print:hidden">
+      <div className="mb-6 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 print:hidden">
         <div>
           <Label>Section</Label>
           <Select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>

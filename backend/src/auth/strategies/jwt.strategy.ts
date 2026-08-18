@@ -6,6 +6,7 @@ import { RoleName, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AuthUser } from '../../common/types/auth-user.type';
 import { requireEnv } from '../../common/env';
+import { parsePermissions } from '../../common/permissions';
 
 interface JwtPayload {
   sub: string;
@@ -47,6 +48,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         schoolId: true,
         mustChangePassword: true,
         status: true,
+        permissions: true,
       },
     });
 
@@ -67,6 +69,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       schoolId: user.schoolId,
       mustChangePassword: user.mustChangePassword,
       roles: payload.roles ?? [],
+      permissions: parsePermissions(user.permissions),
     };
     authCache.set(payload.sub, { user: authUser, expiresAt: Date.now() + AUTH_CACHE_TTL_MS });
     return authUser;

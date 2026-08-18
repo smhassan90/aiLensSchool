@@ -54,7 +54,7 @@ export default function SchoolHomeworkPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader title="Homework" description="Give each assignment a topic title so teachers can select it when generating a quiz" actions={<Button onClick={() => setOpen(true)}>Give homework</Button>} />
       <div className="rounded-lg border bg-card">
         {homework.isLoading ? (

@@ -66,7 +66,7 @@ export default function NewTeacherPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Add Teacher"
         description="Create a new teacher account"

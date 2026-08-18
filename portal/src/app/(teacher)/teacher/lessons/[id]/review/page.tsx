@@ -294,7 +294,7 @@ export default function ReviewLessonPage() {
 
   if (isError || !lesson) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {(error as Error)?.message ?? "Lesson not found"}
         </div>
@@ -303,7 +303,7 @@ export default function ReviewLessonPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Review extracted lesson"
         description="Photos were not saved. Check the page text, shape the key points, then generate homework and diary on this page."
