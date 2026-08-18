@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "npm install",
+  "installCommand": "npm install --include=dev",
   "buildCommand": "npm run build",
   "env": {
     "NEXT_PUBLIC_API_URL": "https://ai-school-lens-backend.vercel.app/api/v1"
