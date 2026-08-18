@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,16 @@ import { Wallet } from "lucide-react";
 export default function FeesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
   const [structureOpen, setStructureOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("focus") === "types") {
+      setStructureOpen(true);
+    }
+  }, [searchParams]);
   const [payId, setPayId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [feeName, setFeeName] = useState("Monthly Tuition");

@@ -88,7 +88,7 @@ export default function SettingsPage() {
                 Create the year, classes, subjects and exam pattern in one go.
               </p>
             </div>
-            <Link href="/school/setup">
+            <Link href="/school/setup/wizard">
               <Button variant="outline">Open wizard</Button>
             </Link>
           </CardContent>

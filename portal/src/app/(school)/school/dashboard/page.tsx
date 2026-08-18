@@ -61,7 +61,7 @@ export default function SchoolDashboardPage() {
         description="One screen for the principal: people, classes, money in, money out."
         actions={
           !data?.setupCompleted && can("MANAGE_CLASSES") ? (
-            <Link href="/school/setup">
+            <Link href="/school/setup/wizard">
               <Button>Finish school setup</Button>
             </Link>
           ) : undefined
