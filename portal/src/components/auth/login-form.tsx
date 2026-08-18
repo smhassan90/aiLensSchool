@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +40,7 @@ export function LoginForm({
   const { login } = useAuth();
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const inFlight = useRef(false);
 
   const {
     register,
@@ -50,6 +51,8 @@ export function LoginForm({
   });
 
   const onSubmit = async (values: FormValues) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setSubmitting(true);
     try {
       const data = await authService.login({
@@ -68,6 +71,7 @@ export function LoginForm({
         err instanceof ApiClientError ? err.message : "Login failed. Please try again.";
       toast({ title: "Login failed", description: message, variant: "error" });
     } finally {
+      inFlight.current = false;
       setSubmitting(false);
     }
   };

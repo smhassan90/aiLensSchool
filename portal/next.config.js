@@ -1,9 +1,10 @@
 const PRODUCTION_API_URL = "https://ai-school-lens-backend.vercel.app/api/v1";
 
 function publicApiUrl() {
-  const raw = (process.env.NEXT_PUBLIC_API_URL || "").trim();
-  if (process.env.VERCEL) return PRODUCTION_API_URL;
-  return raw || PRODUCTION_API_URL;
+  if (process.env.NEXT_PUBLIC_USE_LOCAL_API === "true") {
+    return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+  }
+  return PRODUCTION_API_URL;
 }
 
 /** @type {import('next').NextConfig} */

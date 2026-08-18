@@ -2,38 +2,13 @@ import type { ApiErrorBody, ApiResponse } from "./types";
 import { clearAuthSession } from "./auth";
 
 const PRODUCTION_API_URL = "https://ai-school-lens-backend.vercel.app/api/v1";
+const LOCAL_API_URL = "http://localhost:3001/api/v1";
 
-function isLocalhostUrl(url: string) {
-  return /localhost|127\.0\.0\.1/.test(url);
-}
-
-function isBrowserOnLocalhost() {
-  if (typeof window === "undefined") return false;
-  const host = window.location.hostname;
-  return host === "localhost" || host === "127.0.0.1";
-}
-
-function isUsableRemoteApi(url: string) {
-  if (!url || isLocalhostUrl(url) || !/^https?:\/\//i.test(url)) return false;
-  try {
-    const host = new URL(url).hostname;
-    if (host === "ai-lens-school.vercel.app") return false;
-    if (typeof window !== "undefined" && host === window.location.hostname) return false;
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Never call the Next.js portal as if it were the Nest API. */
+/** Remote API unless NEXT_PUBLIC_USE_LOCAL_API=true (local Nest on :3001). */
 export function getApiUrl(): string {
-  const fromEnv = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/$/, "");
-
-  if (isBrowserOnLocalhost()) {
-    return fromEnv || PRODUCTION_API_URL;
+  if (process.env.NEXT_PUBLIC_USE_LOCAL_API === "true") {
+    return (process.env.NEXT_PUBLIC_API_URL || LOCAL_API_URL).replace(/\/$/, "");
   }
-
-  if (isUsableRemoteApi(fromEnv)) return fromEnv;
   return PRODUCTION_API_URL;
 }
 
