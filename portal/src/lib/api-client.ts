@@ -13,20 +13,28 @@ function isBrowserOnLocalhost() {
   return host === "localhost" || host === "127.0.0.1";
 }
 
-/** Resolve at call time so a stale localhost bake-in cannot hijack the deployed portal. */
+function isUsableRemoteApi(url: string) {
+  if (!url || isLocalhostUrl(url) || !/^https?:\/\//i.test(url)) return false;
+  try {
+    const host = new URL(url).hostname;
+    if (host === "ai-lens-school.vercel.app") return false;
+    if (typeof window !== "undefined" && host === window.location.hostname) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Never call the Next.js portal as if it were the Nest API. */
 export function getApiUrl(): string {
   const fromEnv = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/$/, "");
 
-  if (typeof window !== "undefined" && !isBrowserOnLocalhost()) {
-    if (!fromEnv || isLocalhostUrl(fromEnv)) return PRODUCTION_API_URL;
-    return fromEnv;
+  if (isBrowserOnLocalhost()) {
+    return fromEnv || PRODUCTION_API_URL;
   }
 
-  if (process.env.VERCEL && (!fromEnv || isLocalhostUrl(fromEnv))) {
-    return PRODUCTION_API_URL;
-  }
-
-  return fromEnv || PRODUCTION_API_URL;
+  if (isUsableRemoteApi(fromEnv)) return fromEnv;
+  return PRODUCTION_API_URL;
 }
 
 export function getApiOrigin(): string {
