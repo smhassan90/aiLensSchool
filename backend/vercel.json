@@ -1,12 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
   "installCommand": "npm install --include=dev && npx prisma generate",
-  "buildCommand": "npx nest build",
+  "buildCommand": "npx prisma generate",
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }],
   "functions": {
     "api/index.ts": {
       "maxDuration": 30,
-      "includeFiles": "prisma/**"
+      "includeFiles": "prisma/**",
+      "excludeFiles": "{node_modules/@cursor/**,node_modules/sqlite3/**}"
     }
   }
 }
