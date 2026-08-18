@@ -37,6 +37,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { HealthController } from './health.controller';
+import { loadRuntimeEnv } from './common/env';
 
 const queuesEnabled = areQueuesEnabled();
 
@@ -45,8 +46,9 @@ const queuesEnabled = areQueuesEnabled();
     // Never load .env.example in production — it points Redis/MySQL at localhost and breaks Vercel.
     ConfigModule.forRoot({
       isGlobal: true,
-      ignoreEnvFile: process.env.VERCEL === '1' || process.env.NODE_ENV === 'production',
+      ignoreEnvFile: process.env['VERCEL'] === '1' || process.env['NODE_ENV'] === 'production',
       envFilePath: ['.env'],
+      load: [loadRuntimeEnv],
     }),
     LoggerModule.forRoot({
       pinoHttp:

@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { CommonModule } from '../common/common.module';
 import { AuditModule } from '../audit/audit.module';
+import { requireEnv } from '../common/env';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { AuditModule } from '../audit/audit.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.getOrThrow<string>('JWT_ACCESS_SECRET'),
+        secret: config.get<string>('JWT_ACCESS_SECRET') || requireEnv('JWT_ACCESS_SECRET'),
         signOptions: {
           expiresIn: (config.get<string>('JWT_ACCESS_EXPIRATION') ?? '15m') as `${number}m` | `${number}d` | `${number}h` | `${number}s`,
         },

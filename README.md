@@ -121,7 +121,27 @@ In the GitHub repo: **Settings → Secrets and variables → Actions**. Add:
 | `VERCEL_PORTAL_PROJECT_ID` | Portal project → Settings → General → Project ID |
 | `VERCEL_BACKEND_PROJECT_ID` | Backend project → Settings → General → Project ID |
 
-App env vars (`DATABASE_URL`, `JWT_*`, `NEXT_PUBLIC_API_URL`, `CORS_ORIGINS`, …) stay in each **Vercel project → Settings → Environment Variables**, not in GitHub.
+App env vars stay in each **Vercel project → Settings → Environment Variables**, not in GitHub.
+
+On the **backend** project (Production), set at least:
+
+| Variable | Notes |
+|----------|--------|
+| `DATABASE_URL` | Remote MySQL URL (not localhost). The host must allow Vercel. |
+| `JWT_ACCESS_SECRET` | Long random string; same value you use in local `backend/.env` is fine. |
+| `JWT_REFRESH_SECRET` | Long random string. |
+| `JWT_ACCESS_EXPIRATION` | e.g. `15m` |
+| `JWT_REFRESH_EXPIRATION` | e.g. `7d` |
+| `CORS_ORIGINS` | `https://ai-lens-school.vercel.app` |
+| `NODE_ENV` | `production` |
+
+Leave `REDIS_URL` empty on Vercel. After saving, **redeploy** the backend.
+
+On the **portal** project:
+
+| Variable | Value |
+|----------|--------|
+| `NEXT_PUBLIC_API_URL` | `https://ai-school-lens-backend.vercel.app/api/v1` |
 
 ### 2. Vercel project Root Directory
 

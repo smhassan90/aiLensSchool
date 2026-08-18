@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { RoleName, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AuthUser } from '../../common/types/auth-user.type';
+import { requireEnv } from '../../common/env';
 
 interface JwtPayload {
   sub: string;
@@ -25,7 +26,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.getOrThrow<string>('JWT_ACCESS_SECRET'),
+      secretOrKey: config.get<string>('JWT_ACCESS_SECRET') || requireEnv('JWT_ACCESS_SECRET'),
     });
   }
 
