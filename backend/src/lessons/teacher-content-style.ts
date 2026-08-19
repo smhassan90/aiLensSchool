@@ -3,6 +3,7 @@ export type ContentStyleHints = {
   hard: boolean;
   short: boolean;
   long: boolean;
+  bullets: boolean;
   raw: string;
 };
 
@@ -37,6 +38,7 @@ export function parseStyleHints(instruction?: string | null): ContentStyleHints 
     hard: /\bhard\b|\bdifficult\b|\badvanced\b|\bchallenging\b|\bcomplex\b|\bharder\b/.test(text),
     short: /\bshort\b|\bbrief\b|\bconcise\b|\bfew\b|\bshorter\b/.test(text),
     long: /\blong\b|\bdetailed\b|\belaborate\b|\blonger\b|\bmore detail/.test(text),
+    bullets: /\bbullet|\blist\b|\bdash(?:es)?\b|\bbullets\b/.test(text),
     raw,
   };
 }
@@ -45,9 +47,13 @@ export function simplifyWording(text: string) {
   return EASY_SWAPS.reduce((next, [from, to]) => next.replace(from, to), text);
 }
 
+export function stripListMarker(point: string) {
+  return point.replace(/^\s*(?:[-*•–]|\d+[.)])\s+/, '').trim();
+}
+
 export function applyKeyPointStyle(points: string[], instruction?: string | null) {
   const hints = parseStyleHints(instruction);
-  let next = points.map((point) => point.trim()).filter(Boolean);
+  let next = points.map((point) => stripListMarker(point)).filter(Boolean);
   if (!next.length) return next;
 
   if (hints.easy) {
@@ -60,6 +66,9 @@ export function applyKeyPointStyle(points: string[], instruction?: string | null
     });
   } else if (hints.long) {
     next = next.slice(0, 12);
+  }
+  if (hints.bullets) {
+    next = next.map((point) => `• ${point}`);
   }
   return next;
 }
@@ -84,7 +93,9 @@ export function generateStyledHomework(input: {
           .filter((line) => line.length > 12)
           .slice(0, 8),
     input.instruction,
-  ).slice(0, hints.short ? 3 : hints.long ? 8 : 5);
+  )
+    .map(stripListMarker)
+    .slice(0, hints.short ? 3 : hints.long ? 8 : 5);
 
   const numbered = points.map((point, index) => `${index + 1}. ${point}`).join('\n');
   const customNote = hints.raw && !hints.easy && !hints.hard && !hints.short && !hints.long

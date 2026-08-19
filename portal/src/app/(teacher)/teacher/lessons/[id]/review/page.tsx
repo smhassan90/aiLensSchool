@@ -30,7 +30,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-const KEY_POINT_HINTS = ["Easy words, keep it short", "Harder words, make it longer"];
+const KEY_POINT_HINTS = ["Easy words, keep it short", "Harder words, make it longer", "Make it in bullet points"];
 const HOMEWORK_HINTS = ["Easy words and keep it short", "Use harder words and make it longer"];
 const DIARY_HINTS = ["Easy words, keep it short", "More detail for parents"];
 

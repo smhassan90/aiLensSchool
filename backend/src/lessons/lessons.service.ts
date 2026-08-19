@@ -428,7 +428,9 @@ export class LessonsService {
         userId: user.id,
         sourceText: [
           'Write key points only. Do not write a lesson summary.',
-          instruction ? `Teacher instruction: ${instruction}` : '',
+          instruction
+            ? `Teacher instruction: ${instruction}. Follow that format exactly (for example bullet points if they asked for bullets).`
+            : '',
           '',
           extractedText,
         ]

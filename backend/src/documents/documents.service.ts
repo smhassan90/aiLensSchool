@@ -22,7 +22,7 @@ import {
 } from './dto/documents.dto';
 import { ParentsService } from '../parents/parents.service';
 import { TeacherGradeStyleService } from '../common/services/teacher-grade-style.service';
-import { applyDiaryStyle, generateStyledHomework } from '../lessons/teacher-content-style';
+import { applyDiaryStyle, generateStyledHomework, stripListMarker } from '../lessons/teacher-content-style';
 
 function letterGrade(avg: number) {
   if (avg >= 85) return 'A';
@@ -215,7 +215,7 @@ export class DocumentsService {
       lesson.topicName ||
       lesson.chapterName ||
       '';
-    const keyPoints = lesson.concepts.map((concept) => concept.name);
+    const keyPoints = lesson.concepts.map((concept) => stripListMarker(concept.name));
     const lessonContent = [
       extractedText,
       keyPoints.length ? `Key points:\n${keyPoints.map((point) => `- ${point}`).join('\n')}` : '',
