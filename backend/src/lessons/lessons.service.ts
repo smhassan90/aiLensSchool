@@ -240,12 +240,15 @@ export class LessonsService {
     const pageFrom = this.parseOptionalInt(dto.pageFrom);
     const pageTo = this.parseOptionalInt(dto.pageTo);
     const teacherNotes = dto.teacherNotes?.trim() || undefined;
-    const canVision = Boolean(this.config.get<string>('OPENAI_API_KEY')?.trim());
+    const canVision = Boolean(
+      this.config.get<string>('OPENAI_API_KEY')?.trim() ||
+        this.config.get<string>('CURSOR_API_KEY')?.trim(),
+    );
     if (isServerlessRuntime() && !canVision) {
       throw new BadRequestException({
         code: 'PHOTO_VISION_REQUIRED',
         message:
-          'Hosted photo extract cannot run page OCR (it times out). Add OPENAI_API_KEY on the backend Vercel project, then retry. Local extract still works without it.',
+          'Hosted photo extract needs an AI key (OPENAI_API_KEY or CURSOR_API_KEY) on the backend Vercel project.',
       });
     }
     const ocrText = await this.pageOcr.readPages(files);

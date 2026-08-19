@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { tmpdir } from 'os';
 import { AiCompletionResult, AiProvider, LessonImageInput } from './ai.provider';
 import { LessonOutput, LessonOutputSchema } from '../schemas/lesson-output.schema';
 import { QuizOutput, QuizOutputSchema } from '../schemas/quiz-output.schema';
@@ -29,17 +30,20 @@ export class CursorProvider implements AiProvider {
     gradeName?: string;
     images?: LessonImageInput[];
   }): Promise<AiCompletionResult<LessonOutput>> {
-    if (!this.apiKey || (input.images?.length ?? 0) > 0) {
+    if (!this.apiKey) {
       return this.textFallback(input);
     }
 
+    const userPrompt = input.images?.length
+      ? `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\n${input.sourceText}\n\nRead the attached textbook page photo(s) and extract the lesson.`
+      : `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\nClean and format this OCR lesson text:\n${input.sourceText}`;
+
     try {
       const content = await this.withTimeout(
-        this.complete(
-          LESSON_PROCESSING_PROMPT,
-          `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\nClean and format this OCR lesson text:\n${input.sourceText}`,
-        ),
-        25_000,
+        input.images?.length
+          ? this.completeWithImages(LESSON_PROCESSING_PROMPT, userPrompt, input.images)
+          : this.complete(LESSON_PROCESSING_PROMPT, userPrompt),
+        input.images?.length ? 50_000 : 25_000,
         'Lesson extraction',
       );
       const parsed = LessonOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
@@ -51,6 +55,9 @@ export class CursorProvider implements AiProvider {
       this.logger.warn(
         `Lesson AI cleanup failed, using formatted OCR: ${error instanceof Error ? error.message : String(error)}`,
       );
+      if (input.images?.length && input.sourceText.replace(/\s+/g, '').length < 40) {
+        throw error;
+      }
       return this.textFallback(input);
     }
   }
@@ -178,6 +185,49 @@ export class CursorProvider implements AiProvider {
       return { data: parsed, ...content.meta };
     } catch {
       return { data: fallback, provider: 'mock', model: 'deterministic-mock', inputTokens: 0, outputTokens: 0, estimatedCost: 0 };
+    }
+  }
+
+  private async completeWithImages(system: string, user: string, images: LessonImageInput[]) {
+    const { Agent } = await import('@cursor/sdk');
+    const agent = await Agent.create({
+      apiKey: this.apiKey,
+      model: { id: this.model },
+      local: { cwd: tmpdir() },
+    });
+    try {
+      const run = await agent.send({
+        text: `${system}\n\n${user}\n\nReturn ONLY valid JSON. Do not edit files or run tools.`,
+        images: images.slice(0, 5).map((image) => ({
+          data: image.buffer.toString('base64'),
+          mimeType: image.mimeType,
+        })),
+      });
+      const result = await run.wait();
+      if (result.status !== 'finished') {
+        throw new Error(`Cursor agent ${result.status || 'failed'} before reading the page photos`);
+      }
+      const text =
+        typeof result.result === 'string'
+          ? result.result
+          : result.result
+            ? JSON.stringify(result.result)
+            : '';
+      if (!text.trim()) {
+        throw new Error('Cursor agent returned an empty result for the page photos.');
+      }
+      return {
+        text,
+        meta: {
+          provider: 'cursor',
+          model: result.model?.id ?? this.model,
+          inputTokens: 0,
+          outputTokens: 0,
+          estimatedCost: 0,
+        },
+      };
+    } finally {
+      agent.close();
     }
   }
 
