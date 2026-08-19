@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { mkdir } from 'fs/promises';
+import { tmpdir } from 'os';
 import { join } from 'path';
 
 type OcrWorker = {
@@ -15,11 +16,15 @@ export class PageOcrService implements OnModuleDestroy {
 
   private async getWorker() {
     if (!this.workerPromise) {
-      const cachePath = join(process.cwd(), '.tesseract-cache');
+      // Vercel cwd is /var/task and cannot create folders. os.tmpdir() is /tmp there.
+      const cachePath = join(tmpdir(), 'ailens-tesseract-cache');
       this.workerPromise = (async () => {
         const tesseract = await import('tesseract.js');
         await mkdir(cachePath, { recursive: true });
-        const worker = (await tesseract.createWorker('eng', 1, { cachePath })) as OcrWorker;
+        const worker = (await tesseract.createWorker('eng', 1, {
+          cachePath,
+          cacheMethod: 'write',
+        })) as OcrWorker;
         await worker.setParameters({
           tessedit_pageseg_mode: String(tesseract.PSM.AUTO),
           preserve_interword_spaces: '1',
