@@ -145,7 +145,14 @@ On the **portal** project:
 
 ### 2. Vercel project Root Directory
 
-GitHub Actions `cd`s into `portal/` and `backend/` before `vercel build`, so the CLI sees `next` in `portal/package.json`. That job also clears a nested Root Directory so it does not look for `portal/portal`.
+This is a monorepo. Next.js lives in `portal/src/app`. GitHub Actions deploy from the **repo root** and pin:
+
+| Vercel project | Root Directory | Framework |
+|----------------|----------------|-----------|
+| Portal | `portal` | Next.js |
+| Backend | `backend` | Other (not Nest) |
+
+In each Vercel project: **Settings → General → Root Directory** must match the table. If Root Directory is empty, Next.js looks at the repo root, finds no `app/` folder, and fails with "Couldn't find any pages or app directory".
 
 If the GitHub repo is connected in the Vercel dashboard (Git deploys), set:
 
