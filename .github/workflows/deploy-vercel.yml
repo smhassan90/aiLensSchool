@@ -1,5 +1,7 @@
 name: Deploy to Vercel
 
+# Deploys portal (Root Directory: portal) and backend (Root Directory: backend).
+
 on:
   push:
     branches: [main]

@@ -306,18 +306,26 @@ export default function ReviewLessonPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Review extracted lesson"
-        description="Photos were not saved. Check the page text, shape the key points, then generate homework and diary on this page."
+        description="Photos were not saved. Check the extracted text and key points, then click Confirm lesson to set status to Confirmed."
         actions={
-          <Link href="/teacher/lessons">
-            <Button variant="outline">
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/teacher/lessons">
+              <Button variant="outline">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+            </Link>
+            {!confirmed && (
+              <Button onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending}>
+                <CheckCircle2 className="h-4 w-4" />
+                {confirmMutation.isPending ? "Confirming…" : "Confirm lesson"}
+              </Button>
+            )}
+          </div>
         }
       />
 
-      <div className="mx-auto max-w-4xl space-y-6">
+      <div className="space-y-6">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
@@ -640,11 +648,16 @@ export default function ReviewLessonPage() {
         </Card>
 
         {!confirmed && (
-          <div className="flex justify-end">
-            <Button onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending}>
-              <CheckCircle2 className="h-4 w-4" />
-              {confirmMutation.isPending ? "Confirming…" : "Confirm lesson"}
-            </Button>
+          <div className="sticky bottom-0 z-20 -mx-4 mt-2 border-t bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Review status stays until you confirm. That publishes the lesson for parents and quizzes.
+              </p>
+              <Button onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending}>
+                <CheckCircle2 className="h-4 w-4" />
+                {confirmMutation.isPending ? "Confirming…" : "Confirm lesson"}
+              </Button>
+            </div>
           </div>
         )}
       </div>
