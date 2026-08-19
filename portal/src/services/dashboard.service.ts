@@ -32,6 +32,15 @@ export interface TeacherDashboardSummary {
   quizTarget: number | null;
   missingLessonDays: number;
   missingAttendanceSlots: number;
+  expectedLessonSlots?: number;
+  doneLessonSlots?: number;
+  expectedAttendanceSlots?: number;
+  doneAttendanceSlots?: number;
+  windowDays?: string[];
+  lessonHeat?: number[];
+  attendanceHeat?: number[];
+  lessonByClass?: Array<{ label: string; done: number; expected: number; days?: boolean[] }>;
+  attendanceByClass?: Array<{ label: string; done: number; expected: number; days?: boolean[] }>;
   watchQuizzes: string[];
   nextActions: string[];
   classes: Array<{

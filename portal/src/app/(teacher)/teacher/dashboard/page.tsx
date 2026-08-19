@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { dashboardService } from "@/services/dashboard.service";
 import { PageLoader } from "@/components/layout/page-loader";
 import { AiWait } from "@/components/layout/ai-wait";
+import { TeacherPaceBoard } from "@/components/dashboard/teacher-pace";
 import { cn } from "@/lib/utils";
 
 export default function TeacherDashboardPage() {
@@ -26,48 +27,51 @@ export default function TeacherDashboardPage() {
   if (dashboard.isLoading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <PageHeader title="Your day" />
-        <PageLoader variant="page" phrases={["Checking lessons and attendance", "Looking at quiz scores", "Almost ready"]} />
+        <PageHeader title="Your pace" />
+        <PageLoader variant="page" phrases={["Checking lectures and attendance", "Looking at quizzes", "Almost ready"]} />
       </div>
     );
   }
 
+  const expectedLessons = data?.expectedLessonSlots ?? Math.max(data?.missingLessonDays ?? 0, 1);
+  const doneLessons = data?.doneLessonSlots ?? Math.max(0, expectedLessons - (data?.missingLessonDays ?? 0));
+  const expectedAttendance = data?.expectedAttendanceSlots ?? Math.max(data?.missingAttendanceSlots ?? 0, 1);
+  const doneAttendance =
+    data?.doneAttendanceSlots ?? Math.max(0, expectedAttendance - (data?.missingAttendanceSlots ?? 0));
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="What to do today"
-        description="Missing work is listed first. Tap a class to add a lesson or attendance."
+        title="Your pace"
         actions={
           <Button onClick={() => suggest.mutate()} disabled={suggest.isPending}>
-            {suggest.isPending ? "Thinking…" : "AI hint for me"}
+            {suggest.isPending ? "Thinking…" : "AI hint"}
           </Button>
         }
       />
 
-      <div className="mb-6 space-y-2">
-        {(data?.nextActions ?? []).map((action) => {
-          const href = action.toLowerCase().includes("lesson")
-            ? "/teacher/lessons/new"
-            : action.toLowerCase().includes("attendance")
-              ? "/teacher/attendance"
-              : action.toLowerCase().includes("quiz")
-                ? "/teacher/quizzes"
-                : "/teacher/marks";
-          return (
-            <Link key={action} href={href} className="block rounded-lg border bg-card px-4 py-3 text-sm font-medium hover:bg-muted">
-              {action}
-            </Link>
-          );
-        })}
-      </div>
+      <TeacherPaceBoard
+        expectedLessonSlots={expectedLessons}
+        doneLessonSlots={doneLessons}
+        expectedAttendanceSlots={expectedAttendance}
+        doneAttendanceSlots={doneAttendance}
+        lessonHeat={data?.lessonHeat ?? []}
+        attendanceHeat={data?.attendanceHeat ?? []}
+        lessonByClass={data?.lessonByClass ?? []}
+        attendanceByClass={data?.attendanceByClass ?? []}
+        quizCount={data?.quizCount ?? 0}
+        quizTarget={data?.quizTarget ?? null}
+      />
 
       {suggest.isPending ? (
-        <div className="mb-6">
+        <div className="mt-6">
           <AiWait kind="coach" />
         </div>
       ) : coach ? (
-        <Card className="mb-6">
-          <CardHeader><CardTitle>{coach.headline}</CardTitle></CardHeader>
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>{coach.headline}</CardTitle>
+          </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             {coach.cards.map((card) => (
               <div
@@ -87,23 +91,26 @@ export default function TeacherDashboardPage() {
         </Card>
       ) : null}
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Link href="/teacher/lessons/new"><Card><CardHeader><CardTitle className="text-sm">Missing lessons</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data?.missingLessonDays ?? 0}</CardContent></Card></Link>
-        <Link href="/teacher/attendance"><Card><CardHeader><CardTitle className="text-sm">Attendance gaps</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data?.missingAttendanceSlots ?? 0}</CardContent></Card></Link>
-        <Link href="/teacher/quizzes"><Card><CardHeader><CardTitle className="text-sm">Quizzes</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data?.quizCount ?? 0}{data?.quizTarget ? ` / ${data.quizTarget}` : ""}</CardContent></Card></Link>
-        <Link href="/teacher/homework"><Card><CardHeader><CardTitle className="text-sm">Homework</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data?.homeworkCount ?? 0}</CardContent></Card></Link>
-      </div>
-
       {(data?.watchQuizzes?.length ?? 0) > 0 && (
         <Card className="mt-6 border-amber-200">
-          <CardHeader><CardTitle>Keep an eye on these quizzes</CardTitle></CardHeader>
-          <CardContent className="text-sm">{data?.watchQuizzes.join(" · ")}</CardContent>
+          <CardHeader>
+            <CardTitle>Low quiz scores</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {data?.watchQuizzes.map((title) => (
+              <span key={title} className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900">
+                {title}
+              </span>
+            ))}
+          </CardContent>
         </Card>
       )}
 
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>My classes</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>My classes</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-2 text-sm">
             {(data?.classes ?? []).map((cls) => (
               <Link
@@ -117,12 +124,28 @@ export default function TeacherDashboardPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle>Latest scores</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardHeader>
+            <CardTitle>Latest scores</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
             {(data?.latestResults ?? []).map((row) => (
-              <p key={row.id}>
-                {row.student ? `${row.student.firstName} ${row.student.lastName}` : "Student"} · {row.quiz?.title} · {Number(row.percentage)}%
-              </p>
+              <div key={row.id} className="space-y-1">
+                <div className="flex justify-between gap-2 text-xs">
+                  <span className="truncate">
+                    {row.student ? `${row.student.firstName} ${row.student.lastName}` : "Student"}
+                  </span>
+                  <span className="tabular-nums font-medium">{Number(row.percentage)}%</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      "h-full rounded-full",
+                      Number(row.percentage) >= 70 ? "bg-emerald-500" : Number(row.percentage) >= 50 ? "bg-amber-400" : "bg-rose-500",
+                    )}
+                    style={{ width: `${Math.min(100, Number(row.percentage))}%` }}
+                  />
+                </div>
+              </div>
             ))}
           </CardContent>
         </Card>

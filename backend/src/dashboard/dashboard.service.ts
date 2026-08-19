@@ -192,7 +192,7 @@ export class DashboardService {
       }),
       this.prisma.dailyLesson.findMany({
         where: { schoolId, createdById: user.id, date: { gte: since } },
-        select: { date: true, sectionId: true },
+        select: { date: true, sectionId: true, subjectId: true },
       }),
       this.prisma.attendance.findMany({
         where: { schoolId, sectionId: { in: sectionIds.length ? sectionIds : ['none'] }, date: { gte: since } },
@@ -211,13 +211,65 @@ export class DashboardService {
     ]);
 
     const schoolDays = this.weekdaysSince(since);
-    const lessonDates = new Set(lessons.map((row) => row.date.toISOString().slice(0, 10)));
-    const missingLessonDays = schoolDays.filter((day) => !lessonDates.has(day)).length;
+    const lessonKeys = new Set(
+      lessons.map((row) => `${row.sectionId}:${row.subjectId}:${row.date.toISOString().slice(0, 10)}`),
+    );
+    const attendanceSet = new Set(
+      attendanceDays.map((row) => `${row.sectionId}:${row.date.toISOString().slice(0, 10)}`),
+    );
 
-    const attendanceSet = new Set(attendanceDays.map((row) => `${row.sectionId}:${row.date.toISOString().slice(0, 10)}`));
-    const missingAttendance = sectionIds.reduce((sum, sectionId) => {
-      return sum + schoolDays.filter((day) => !attendanceSet.has(`${sectionId}:${day}`)).length;
-    }, 0);
+    const lessonByClass = classSubjects.map((item) => {
+      const days = schoolDays.map((day) => lessonKeys.has(`${item.sectionId}:${item.subjectId}:${day}`));
+      const done = days.filter(Boolean).length;
+      return {
+        label: `${item.section.grade?.name ?? ''} ${item.section.name} · ${item.subject.name}`.trim(),
+        done,
+        expected: schoolDays.length,
+        days,
+      };
+    });
+
+    const uniqueSections = [
+      ...new Map(
+        classSubjects.map((item) => [
+          item.sectionId,
+          {
+            sectionId: item.sectionId,
+            label: `${item.section.grade?.name ?? ''} ${item.section.name}`.trim(),
+          },
+        ]),
+      ).values(),
+    ];
+    const attendanceByClass = uniqueSections.map((section) => {
+      const days = schoolDays.map((day) => attendanceSet.has(`${section.sectionId}:${day}`));
+      const done = days.filter(Boolean).length;
+      return {
+        label: section.label,
+        done,
+        expected: schoolDays.length,
+        days,
+      };
+    });
+
+    const lessonHeat = schoolDays.map(
+      (_, index) =>
+        classSubjects.length
+          ? lessonByClass.filter((row) => row.days[index]).length / classSubjects.length
+          : 1,
+    );
+    const attendanceHeat = schoolDays.map(
+      (_, index) =>
+        uniqueSections.length
+          ? attendanceByClass.filter((row) => row.days[index]).length / uniqueSections.length
+          : 1,
+    );
+
+    const expectedLessonSlots = lessonByClass.reduce((sum, row) => sum + row.expected, 0);
+    const doneLessonSlots = lessonByClass.reduce((sum, row) => sum + row.done, 0);
+    const expectedAttendanceSlots = attendanceByClass.reduce((sum, row) => sum + row.expected, 0);
+    const doneAttendanceSlots = attendanceByClass.reduce((sum, row) => sum + row.done, 0);
+    const missingLessonDays = Math.max(0, expectedLessonSlots - doneLessonSlots);
+    const missingAttendance = Math.max(0, expectedAttendanceSlots - doneAttendanceSlots);
 
     const quizTarget = targets.reduce((sum, row) => sum + row.minQuizzes, 0);
     const lowQuizzes = await this.prisma.quiz.findMany({
@@ -247,6 +299,15 @@ export class DashboardService {
       quizTarget: quizTarget || null,
       missingLessonDays,
       missingAttendanceSlots: missingAttendance,
+      expectedLessonSlots,
+      doneLessonSlots,
+      expectedAttendanceSlots,
+      doneAttendanceSlots,
+      windowDays: schoolDays,
+      lessonHeat,
+      attendanceHeat,
+      lessonByClass,
+      attendanceByClass,
       watchQuizzes: lowQuizzes.map((quiz) => quiz.title),
       classes,
       latestResults,
