@@ -22,8 +22,11 @@ function isGarbage(line: string) {
   if (GARBAGE.test(trimmed)) return true;
   if (/^Page\s+\d+$/i.test(trimmed)) return false;
   const letters = (trimmed.match(/[A-Za-z]/g) ?? []).length;
+  const digits = (trimmed.match(/\d/g) ?? []).length;
+  if (digits >= 1 && /[=+\-×÷*/]/.test(trimmed)) return false;
   if (
     letters / trimmed.length < 0.42 &&
+    digits < 2 &&
     !/^(Q\.|A\.|Aim|Activity|Hadith|\(?sahih bukhari)/i.test(trimmed)
   ) {
     return true;
@@ -99,7 +102,35 @@ function extractKeyPoints(formatted: string) {
     }
   }
 
-  return [...new Set(points.filter((point) => point.length > 8))].slice(0, 10);
+  return uniquePoints(points.filter((point) => point.length > 8)).slice(0, 10);
+}
+
+export function deriveKeyPointsFromLesson(formatted: string) {
+  const specific = extractKeyPoints(formatted);
+  if (specific.length) return specific;
+
+  const points: string[] = [];
+  for (const line of formatted.split(/\n/).map((item) => item.trim()).filter(Boolean)) {
+    if (/^(chapter|unit|lesson|exercise|example|aim)\b/i.test(line) && line.length < 120) {
+      points.push(line);
+    }
+    if (/^(\d+[\).]|[•\-])\s+\S/.test(line)) {
+      points.push(line.replace(/^(\d+[\).]|[•\-])\s+/, '').slice(0, 160));
+    }
+  }
+  if (points.length >= 3) return uniquePoints(points).slice(0, 8);
+
+  for (const sentence of formatted.replace(/\n+/g, ' ').split(/(?<=[.!?])\s+/)) {
+    const text = sentence.trim();
+    if (text.length >= 28 && text.length <= 180 && !/^Page\s+\d+/i.test(text)) {
+      points.push(text);
+    }
+  }
+  return uniquePoints(points).slice(0, 8);
+}
+
+function uniquePoints(points: string[]) {
+  return [...new Set(points.map((point) => point.replace(/\s+/g, ' ').trim()).filter(Boolean))];
 }
 
 export function formatOcrLesson(ocrText: string, subjectName: string) {
@@ -193,6 +224,6 @@ export function formatOcrLesson(ocrText: string, subjectName: string) {
     chapterName,
     topicName,
     summary,
-    concepts: extractKeyPoints(summary),
+    concepts: deriveKeyPointsFromLesson(summary),
   };
 }

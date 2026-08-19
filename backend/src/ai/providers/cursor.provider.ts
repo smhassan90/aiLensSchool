@@ -12,6 +12,8 @@ import {
   TEACHER_COACH_PROMPT,
 } from '../prompts';
 import { mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
+import { isFakeExtractText, looksLikeRealLessonText } from '../../common/extract-quality';
+import { readEnv } from '../../common/env';
 
 @Injectable()
 export class CursorProvider implements AiProvider {
@@ -20,7 +22,7 @@ export class CursorProvider implements AiProvider {
   private readonly model: string;
 
   constructor(private readonly config: ConfigService) {
-    this.apiKey = this.config.get<string>('CURSOR_API_KEY')?.trim() || undefined;
+    this.apiKey = readEnv('CURSOR_API_KEY') || this.config.get<string>('CURSOR_API_KEY')?.trim() || undefined;
     this.model = this.config.get<string>('CURSOR_MODEL') ?? 'composer-2.5';
   }
 
@@ -47,7 +49,10 @@ export class CursorProvider implements AiProvider {
         'Lesson extraction',
       );
       const parsed = LessonOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
-      if (/photos were not saved|photographed textbook page/i.test(parsed.summary)) {
+      if (isFakeExtractText(parsed.summary)) {
+        if (input.images?.length && isFakeExtractText(input.sourceText)) {
+          throw new Error('Cursor did not read the textbook photos');
+        }
         return this.textFallback(input);
       }
       return { data: parsed, ...content.meta };
@@ -55,7 +60,7 @@ export class CursorProvider implements AiProvider {
       this.logger.warn(
         `Lesson AI cleanup failed, using formatted OCR: ${error instanceof Error ? error.message : String(error)}`,
       );
-      if (input.images?.length && input.sourceText.replace(/\s+/g, '').length < 40) {
+      if (input.images?.length && isFakeExtractText(input.sourceText)) {
         throw error;
       }
       return this.textFallback(input);
@@ -291,7 +296,7 @@ export class CursorProvider implements AiProvider {
     images?: LessonImageInput[];
   }): AiCompletionResult<LessonOutput> {
     const text = input.sourceText.trim();
-    if (text.length > 40 && !/photos were not saved/i.test(text)) {
+    if (looksLikeRealLessonText(text)) {
       const firstLine = text.split(/\n/).map((line) => line.trim()).find((line) => line.length > 2 && !/^Page\s+\d+/i.test(line));
       return {
         data: LessonOutputSchema.parse({

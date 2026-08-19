@@ -20,7 +20,7 @@ import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto
 import { LessonProcessingService } from '../ai/services/lesson-processing.service';
 import { ParentsService } from '../parents/parents.service';
 import { PageOcrService } from './page-ocr.service';
-import { formatOcrLesson } from './lesson-text-formatter';
+import { deriveKeyPointsFromLesson, formatOcrLesson } from './lesson-text-formatter';
 import {
   CreateLessonDto,
   ExtractLessonDto,
@@ -32,7 +32,8 @@ import {
 import { TeacherGradeStyleService } from '../common/services/teacher-grade-style.service';
 import { applyKeyPointStyle } from './teacher-content-style';
 import { LessonImageInput } from '../ai/providers/ai.provider';
-import { isServerlessRuntime } from '../common/env';
+import { isFakeExtractText, looksLikeRealLessonText } from '../common/extract-quality';
+import { isServerlessRuntime, readEnv } from '../common/env';
 
 @Injectable()
 export class LessonsService {
@@ -241,21 +242,26 @@ export class LessonsService {
     const pageTo = this.parseOptionalInt(dto.pageTo);
     const teacherNotes = dto.teacherNotes?.trim() || undefined;
     const canVision = Boolean(
-      this.config.get<string>('OPENAI_API_KEY')?.trim() ||
+      readEnv('OPENAI_API_KEY') ||
+        readEnv('CURSOR_API_KEY') ||
+        this.config.get<string>('OPENAI_API_KEY')?.trim() ||
         this.config.get<string>('CURSOR_API_KEY')?.trim(),
     );
-    if (isServerlessRuntime() && !canVision) {
+    const uploadedText = dto.pageText?.trim() ?? '';
+    const ocrText = looksLikeRealLessonText(uploadedText)
+      ? uploadedText
+      : await this.pageOcr.readPages(files);
+    if (isServerlessRuntime() && isFakeExtractText(ocrText) && !canVision) {
       throw new BadRequestException({
         code: 'PHOTO_VISION_REQUIRED',
         message:
           'Hosted photo extract needs an AI key (OPENAI_API_KEY or CURSOR_API_KEY) on the backend Vercel project.',
       });
     }
-    const ocrText = await this.pageOcr.readPages(files);
     const images = this.toLessonImages(files);
-    const ocrThin = ocrText.replace(/\s+/g, '').length < 20;
+    const ocrThin = isFakeExtractText(ocrText);
     const local = this.structureFromPageText(
-      ocrText || 'Photographed textbook pages.',
+      looksLikeRealLessonText(ocrText) ? ocrText : `${subject.name} lesson`,
       subject.name,
       pageFrom,
       pageTo,
@@ -264,29 +270,32 @@ export class LessonsService {
     const polished = await this.lessonProcessing.process({
       schoolId,
       userId: user.id,
-      sourceText:
-        ocrText ||
-        `Transcribe every word visible on these ${subject.name} textbook photos for ${grade.name}. Return chapter, topic, full lesson text, and key points.`,
+      sourceText: looksLikeRealLessonText(ocrText)
+        ? ocrText
+        : `Read the attached ${subject.name} photos for ${grade.name}.`,
       subjectName: subject.name,
       gradeName: grade.name,
       images: ocrThin && canVision ? images : undefined,
     });
-    const polishedLooksReal =
-      polished.summary.trim().length > 40 &&
-      !/photos were not saved|photographed textbook page/i.test(polished.summary);
+    const polishedLooksReal = looksLikeRealLessonText(polished.summary);
     if (ocrThin && !polishedLooksReal) {
       throw new BadRequestException({
         code: 'PAGE_TEXT_UNREADABLE',
         message: 'Could not extract the lesson from this photo. Please try again.',
       });
     }
+    const summary = polishedLooksReal ? polished.summary : local.summary;
     const output = {
       ...local,
       chapterName: polishedLooksReal ? polished.chapterName || local.chapterName : local.chapterName,
       topicName: polishedLooksReal ? polished.topicName || local.topicName : local.topicName,
-      summary: polishedLooksReal ? polished.summary : local.summary,
+      summary,
       concepts:
-        polishedLooksReal && polished.concepts.length ? polished.concepts : local.concepts,
+        polishedLooksReal && polished.concepts.length
+          ? polished.concepts
+          : local.concepts.length
+            ? local.concepts
+            : deriveKeyPointsFromLesson(summary),
       teacherNotesSuggestion: polished.teacherNotesSuggestion ?? local.teacherNotesSuggestion,
     };
     const savedStyle = await this.gradeStyle.get(teacher.id, dto.gradeId);

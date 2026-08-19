@@ -81,6 +81,7 @@ export class LessonsController {
         teacherNotes: { type: 'string' },
         pageFrom: { type: 'string' },
         pageTo: { type: 'string' },
+        pageText: { type: 'string' },
         pages: { type: 'array', items: { type: 'string', format: 'binary' } },
       },
       required: ['academicYearId', 'gradeId', 'sectionId', 'subjectId', 'branchId', 'date', 'pages'],

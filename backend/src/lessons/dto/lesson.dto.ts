@@ -153,6 +153,11 @@ export class ExtractLessonDto {
   @IsString()
   pageTo?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  pageText?: string;
+
   // Multer may also place the file field on the body; ignore it so whitelist validation does not reject the request.
   @Allow()
   pages?: unknown;

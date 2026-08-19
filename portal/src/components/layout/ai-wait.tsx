@@ -16,7 +16,7 @@ const AI_WAIT: Record<
       "Picking key points for this class",
       "Preparing the review for you",
     ],
-    hint: "Photos are not saved. This usually takes a minute — stay on this page.",
+    hint: "The page is read in your browser first, then turned into a lesson. Stay on this page.",
   },
   "key-points": {
     phrases: [

@@ -19,6 +19,7 @@ import { lessonsService } from "@/services/lessons.service";
 import { teachersService } from "@/services/teachers.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
+import { readPagesInBrowser } from "@/lib/page-ocr";
 import { ArrowLeft, ImagePlus, X } from "lucide-react";
 
 const MAX_PHOTOS = 10;
@@ -66,9 +67,15 @@ export default function NewLessonPage() {
   );
 
   const mutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (!selectedClass?.gradeId) {
         throw new Error("Select a class");
+      }
+      let pageText = "";
+      try {
+        pageText = await readPagesInBrowser(photos);
+      } catch {
+        pageText = "";
       }
       return lessonsService.extract({
         academicYearId: selectedClass.academicYearId,
@@ -80,6 +87,7 @@ export default function NewLessonPage() {
         teacherNotes: teacherNotes.trim() || undefined,
         pageFrom: optionalPage(pageFrom),
         pageTo: optionalPage(pageTo),
+        pageText: pageText || undefined,
         pages: photos,
       });
     },

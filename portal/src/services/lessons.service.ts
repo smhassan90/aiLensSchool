@@ -25,6 +25,7 @@ export interface ExtractLessonPayload {
   teacherNotes?: string;
   pageFrom?: number;
   pageTo?: number;
+  pageText?: string;
   pages: File[];
 }
 
@@ -73,6 +74,7 @@ export const lessonsService = {
     if (payload.teacherNotes) body.append("teacherNotes", payload.teacherNotes);
     if (payload.pageFrom) body.append("pageFrom", String(payload.pageFrom));
     if (payload.pageTo) body.append("pageTo", String(payload.pageTo));
+    if (payload.pageText) body.append("pageText", payload.pageText);
     for (const page of payload.pages) {
       body.append("pages", page);
     }

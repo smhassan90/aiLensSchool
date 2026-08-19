@@ -69,13 +69,12 @@ export class LessonProcessingService {
       if (input.images?.length) {
         throw error;
       }
+      const source = input.sourceText.trim();
       return {
         chapterName: input.subjectName ? `${input.subjectName} chapter` : 'Chapter 1',
-        topicName: input.sourceText.slice(0, 60) || 'Today’s lesson',
-        summary:
-          input.sourceText.trim() ||
-          'Content taken from photographed textbook pages. Original photos were not saved.',
-        concepts: ['Main idea from the photographed pages', 'Key terms', 'Practice application'],
+        topicName: source.slice(0, 60) || 'Today’s lesson',
+        summary: source || 'Could not read this lesson yet.',
+        concepts: [],
         teacherNotesSuggestion: 'Review the extracted content before generating homework and diary.',
       };
     }
