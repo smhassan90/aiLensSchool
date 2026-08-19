@@ -4,6 +4,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { AI_PROVIDER, AiProvider, LessonImageInput } from '../providers/ai.provider';
 import { OpenAiProvider } from '../providers/openai.provider';
 import { LessonOutput } from '../schemas/lesson-output.schema';
+import { isFakeExtractText } from '../../common/extract-quality';
 
 @Injectable()
 export class LessonProcessingService {
@@ -66,7 +67,7 @@ export class LessonProcessingService {
           errorMessage: message,
         },
       });
-      if (input.images?.length) {
+      if (input.images?.length && isFakeExtractText(input.sourceText)) {
         throw error;
       }
       const source = input.sourceText.trim();

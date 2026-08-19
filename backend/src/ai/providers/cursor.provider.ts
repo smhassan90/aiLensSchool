@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { mkdirSync } from 'fs';
 import { tmpdir } from 'os';
+import { join } from 'path';
 import { AiCompletionResult, AiProvider, LessonImageInput } from './ai.provider';
 import { LessonOutput, LessonOutputSchema } from '../schemas/lesson-output.schema';
 import { QuizOutput, QuizOutputSchema } from '../schemas/quiz-output.schema';
@@ -13,7 +15,7 @@ import {
 } from '../prompts';
 import { mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
 import { isFakeExtractText, looksLikeRealLessonText } from '../../common/extract-quality';
-import { readEnv } from '../../common/env';
+import { isServerlessRuntime, readEnv } from '../../common/env';
 
 @Injectable()
 export class CursorProvider implements AiProvider {
@@ -193,12 +195,30 @@ export class CursorProvider implements AiProvider {
     }
   }
 
+  private prepareLocalRuntime() {
+    const cwd = join(tmpdir(), 'ailens-cursor-cwd');
+    const storeDir = join(tmpdir(), 'ailens-cursor-store');
+    mkdirSync(cwd, { recursive: true });
+    mkdirSync(storeDir, { recursive: true });
+    if (isServerlessRuntime()) {
+      const home = join(tmpdir(), 'ailens-cursor-home');
+      mkdirSync(join(home, '.cursor', 'projects'), { recursive: true });
+      process.env.HOME = home;
+      process.env.USERPROFILE = home;
+    }
+    return { cwd, storeDir };
+  }
+
   private async completeWithImages(system: string, user: string, images: LessonImageInput[]) {
-    const { Agent } = await import('@cursor/sdk');
+    const { Agent, JsonlLocalAgentStore } = await import('@cursor/sdk');
+    const runtime = this.prepareLocalRuntime();
     const agent = await Agent.create({
       apiKey: this.apiKey,
       model: { id: this.model },
-      local: { cwd: tmpdir() },
+      local: {
+        cwd: runtime.cwd,
+        store: new JsonlLocalAgentStore(runtime.storeDir),
+      },
     });
     try {
       const run = await agent.send({
@@ -237,13 +257,17 @@ export class CursorProvider implements AiProvider {
   }
 
   private async complete(system: string, user: string) {
-    const { Agent } = await import('@cursor/sdk');
+    const { Agent, JsonlLocalAgentStore } = await import('@cursor/sdk');
+    const runtime = this.prepareLocalRuntime();
     const result = await Agent.prompt(
       `${system}\n\n${user}\n\nReturn ONLY valid JSON. Do not edit files or run tools.`,
       {
         apiKey: this.apiKey,
         model: { id: this.model },
-        local: { cwd: process.cwd() },
+        local: {
+          cwd: runtime.cwd,
+          store: new JsonlLocalAgentStore(runtime.storeDir),
+        },
       },
     );
 

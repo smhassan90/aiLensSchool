@@ -267,16 +267,31 @@ export class LessonsService {
       pageTo,
       teacherNotes,
     );
-    const polished = await this.lessonProcessing.process({
-      schoolId,
-      userId: user.id,
-      sourceText: looksLikeRealLessonText(ocrText)
-        ? ocrText
-        : `Read the attached ${subject.name} photos for ${grade.name}.`,
-      subjectName: subject.name,
-      gradeName: grade.name,
-      images: ocrThin && canVision ? images : undefined,
-    });
+    let polished;
+    try {
+      polished = await this.lessonProcessing.process({
+        schoolId,
+        userId: user.id,
+        sourceText: looksLikeRealLessonText(ocrText)
+          ? ocrText
+          : `Read the attached ${subject.name} photos for ${grade.name}.`,
+        subjectName: subject.name,
+        gradeName: grade.name,
+        images: ocrThin && canVision ? images : undefined,
+      });
+    } catch (error) {
+      if (ocrThin) throw error;
+      this.logger.warn(
+        `Lesson AI polish failed, using page text: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      polished = {
+        chapterName: local.chapterName,
+        topicName: local.topicName,
+        summary: ocrText,
+        concepts: local.concepts,
+        teacherNotesSuggestion: local.teacherNotesSuggestion,
+      };
+    }
     const polishedLooksReal = looksLikeRealLessonText(polished.summary);
     if (ocrThin && !polishedLooksReal) {
       throw new BadRequestException({
