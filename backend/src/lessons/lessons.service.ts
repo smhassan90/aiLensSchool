@@ -242,6 +242,7 @@ export class LessonsService {
     const ocrText = await this.pageOcr.readPages(files);
     const images = this.toLessonImages(files);
     const ocrThin = ocrText.replace(/\s+/g, '').length < 20;
+    const canVision = Boolean(this.config.get<string>('OPENAI_API_KEY')?.trim());
     const local = this.structureFromPageText(
       ocrText || 'Photographed textbook pages.',
       subject.name,
@@ -255,7 +256,7 @@ export class LessonsService {
       sourceText: ocrText || local.summary,
       subjectName: subject.name,
       gradeName: grade.name,
-      images: ocrThin ? images : undefined,
+      images: ocrThin && canVision ? images : undefined,
     });
     const polishedLooksReal =
       polished.summary.trim().length > 40 &&
@@ -263,7 +264,7 @@ export class LessonsService {
     if (ocrThin && !polishedLooksReal) {
       throw new BadRequestException({
         code: 'PAGE_TEXT_UNREADABLE',
-        message: 'Could not read text from the photos. Please upload clearer pictures of the textbook pages.',
+        message: 'Could not extract the lesson from this photo. Please try again.',
       });
     }
     const output = {

@@ -33,12 +33,13 @@ export class LessonProcessingService {
     });
 
     try {
-      const provider = input.images?.length ? this.openai : this.ai;
+      const useVision = Boolean(input.images?.length) && this.openai.hasVision();
+      const provider = useVision ? this.openai : this.ai;
       const result = await provider.processLesson({
         sourceText: input.sourceText,
         subjectName: input.subjectName,
         gradeName: input.gradeName,
-        images: input.images,
+        images: useVision ? input.images : undefined,
       });
 
       await this.prisma.aIRequest.update({

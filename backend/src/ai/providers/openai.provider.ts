@@ -29,8 +29,12 @@ export class OpenAiProvider implements AiProvider {
   private readonly model: string;
 
   constructor(private readonly config: ConfigService) {
-    this.apiKey = this.config.get<string>('OPENAI_API_KEY') || undefined;
+    this.apiKey = this.config.get<string>('OPENAI_API_KEY')?.trim() || undefined;
     this.model = this.config.get<string>('OPENAI_MODEL') ?? 'gpt-4o-mini';
+  }
+
+  hasVision() {
+    return Boolean(this.apiKey);
   }
 
   async processLesson(input: {
