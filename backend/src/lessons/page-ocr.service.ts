@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { mkdir } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { isServerlessRuntime } from '../common/env';
 
 type OcrWorker = {
   setParameters: (params: Record<string, string>) => Promise<unknown>;
@@ -51,6 +52,11 @@ export class PageOcrService implements OnModuleDestroy {
   }
 
   async readPages(files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>) {
+    if (isServerlessRuntime()) {
+      this.logger.log('Skipping Tesseract on serverless; photos will be read by vision');
+      return '';
+    }
+
     const worker = await this.getWorker();
     const pages: string[] = [];
 

@@ -2,12 +2,14 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AIRequestStatus, AIRequestType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AI_PROVIDER, AiProvider, LessonImageInput } from '../providers/ai.provider';
+import { OpenAiProvider } from '../providers/openai.provider';
 import { LessonOutput } from '../schemas/lesson-output.schema';
 
 @Injectable()
 export class LessonProcessingService {
   constructor(
     @Inject(AI_PROVIDER) private readonly ai: AiProvider,
+    private readonly openai: OpenAiProvider,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -31,7 +33,8 @@ export class LessonProcessingService {
     });
 
     try {
-      const result = await this.ai.processLesson({
+      const provider = input.images?.length ? this.openai : this.ai;
+      const result = await provider.processLesson({
         sourceText: input.sourceText,
         subjectName: input.subjectName,
         gradeName: input.gradeName,

@@ -15,6 +15,10 @@ export function requireEnv(name: string): string {
   return value;
 }
 
+export function isServerlessRuntime(): boolean {
+  return readEnv('VERCEL') === '1' || Boolean(readEnv('AWS_LAMBDA_FUNCTION_NAME'));
+}
+
 export function loadRuntimeEnv(): Record<string, string> {
   const env = process['env'];
   const out: Record<string, string> = {};

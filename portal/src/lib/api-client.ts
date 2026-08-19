@@ -25,6 +25,14 @@ export function getApiOrigin(): string {
   return url.replace(/\/api\/v1\/?$/, "");
 }
 
+/** Long jobs (photo extract) call the Nest host directly so the portal rewrite cannot 504. */
+function getDirectApiUrl(): string {
+  if (process.env.NEXT_PUBLIC_USE_LOCAL_API === "true") {
+    return (process.env.NEXT_PUBLIC_API_URL || LOCAL_API_URL).replace(/\/$/, "");
+  }
+  return PRODUCTION_API_URL;
+}
+
 export function assetUrl(path?: string | null): string | null {
   if (!path) return null;
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
@@ -121,11 +129,11 @@ async function parsePayload<T>(response: Response): Promise<ApiResponse<T> | nul
   }
 }
 
-async function authorizedFetch<T>(path: string, init: RequestInit): Promise<T> {
+async function authorizedFetch<T>(path: string, init: RequestInit, baseUrl = getApiUrl()): Promise<T> {
   const headers = new Headers(init.headers);
   applyAuthHeader(headers);
 
-  let response = await fetch(`${getApiUrl()}${path}`, { ...init, headers });
+  let response = await fetch(`${baseUrl}${path}`, { ...init, headers });
   let payload = await parsePayload<T>(response);
 
   if (response.status === 401 && !isPublicAuthPath(path)) {
@@ -133,7 +141,7 @@ async function authorizedFetch<T>(path: string, init: RequestInit): Promise<T> {
     if (refreshed) {
       const retryHeaders = new Headers(init.headers);
       applyAuthHeader(retryHeaders);
-      response = await fetch(`${getApiUrl()}${path}`, { ...init, headers: retryHeaders });
+      response = await fetch(`${baseUrl}${path}`, { ...init, headers: retryHeaders });
       payload = await parsePayload<T>(response);
     } else {
       redirectToLogin();
@@ -181,7 +189,7 @@ export async function apiUpload<T>(path: string, file: File, fieldName = "file")
 }
 
 export async function apiForm<T>(path: string, body: FormData, method = "POST"): Promise<T> {
-  return authorizedFetch<T>(path, { method, body });
+  return authorizedFetch<T>(path, { method, body }, getDirectApiUrl());
 }
 
 export function buildQuery(params: Record<string, string | number | undefined | null>): string {

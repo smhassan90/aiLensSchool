@@ -31,6 +31,7 @@ import {
 } from './dto/lesson.dto';
 import { TeacherGradeStyleService } from '../common/services/teacher-grade-style.service';
 import { applyKeyPointStyle } from './teacher-content-style';
+import { LessonImageInput } from '../ai/providers/ai.provider';
 
 @Injectable()
 export class LessonsService {
@@ -85,6 +86,19 @@ export class LessonsService {
     if (!value || value.trim() === '') return undefined;
     const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  private toLessonImages(files: Express.Multer.File[]): LessonImageInput[] {
+    return files.slice(0, 5).map((file) => {
+      const name = file.originalname?.toLowerCase() ?? '';
+      let mime = file.mimetype?.toLowerCase() || '';
+      if (!mime.startsWith('image/')) {
+        if (name.endsWith('.png')) mime = 'image/png';
+        else if (name.endsWith('.webp')) mime = 'image/webp';
+        else mime = 'image/jpeg';
+      }
+      return { buffer: file.buffer, mimeType: mime, filename: file.originalname ?? 'page.jpg' };
+    });
   }
 
   private structureFromPageText(
@@ -226,24 +240,32 @@ export class LessonsService {
     const pageTo = this.parseOptionalInt(dto.pageTo);
     const teacherNotes = dto.teacherNotes?.trim() || undefined;
     const ocrText = await this.pageOcr.readPages(files);
-    if (ocrText.replace(/\s+/g, '').length < 20) {
+    const images = this.toLessonImages(files);
+    const ocrThin = ocrText.replace(/\s+/g, '').length < 20;
+    const local = this.structureFromPageText(
+      ocrText || 'Photographed textbook pages.',
+      subject.name,
+      pageFrom,
+      pageTo,
+      teacherNotes,
+    );
+    const polished = await this.lessonProcessing.process({
+      schoolId,
+      userId: user.id,
+      sourceText: ocrText || local.summary,
+      subjectName: subject.name,
+      gradeName: grade.name,
+      images: ocrThin ? images : undefined,
+    });
+    const polishedLooksReal =
+      polished.summary.trim().length > 40 &&
+      !/photos were not saved|photographed textbook page/i.test(polished.summary);
+    if (ocrThin && !polishedLooksReal) {
       throw new BadRequestException({
         code: 'PAGE_TEXT_UNREADABLE',
         message: 'Could not read text from the photos. Please upload clearer pictures of the textbook pages.',
       });
     }
-
-    const local = this.structureFromPageText(ocrText, subject.name, pageFrom, pageTo, teacherNotes);
-    const polished = await this.lessonProcessing.process({
-      schoolId,
-      userId: user.id,
-      sourceText: local.summary,
-      subjectName: subject.name,
-      gradeName: grade.name,
-    });
-    const polishedLooksReal =
-      polished.summary.trim().length > 40 &&
-      !/photos were not saved|photographed textbook page/i.test(polished.summary);
     const output = {
       ...local,
       chapterName: polishedLooksReal ? polished.chapterName || local.chapterName : local.chapterName,
