@@ -3,17 +3,26 @@ import { clearAuthSession } from "./auth";
 
 const PRODUCTION_API_URL = "https://ai-school-lens-backend.vercel.app/api/v1";
 const LOCAL_API_URL = "http://localhost:3001/api/v1";
+const PRODUCTION_ORIGIN = "https://ai-school-lens-backend.vercel.app";
 
-/** Remote API unless NEXT_PUBLIC_USE_LOCAL_API=true (local Nest on :3001). */
+/**
+ * In the browser, call same-origin /api/v1 so Next.js rewrites to the Nest API.
+ * That avoids a CORS OPTIONS preflight to the backend host.
+ */
 export function getApiUrl(): string {
   if (process.env.NEXT_PUBLIC_USE_LOCAL_API === "true") {
     return (process.env.NEXT_PUBLIC_API_URL || LOCAL_API_URL).replace(/\/$/, "");
+  }
+  if (typeof window !== "undefined") {
+    return "/api/v1";
   }
   return PRODUCTION_API_URL;
 }
 
 export function getApiOrigin(): string {
-  return getApiUrl().replace(/\/api\/v1\/?$/, "");
+  const url = getApiUrl();
+  if (url.startsWith("/")) return PRODUCTION_ORIGIN;
+  return url.replace(/\/api\/v1\/?$/, "");
 }
 
 export function assetUrl(path?: string | null): string | null {

@@ -13,12 +13,15 @@ function headerValue(value: string | string[] | undefined): string {
 
 function applyCors(req: IncomingMessage, res: ServerResponse): void {
   const origin = headerValue(req.headers.origin) || '*';
+  const requestedHeaders = headerValue(req.headers['access-control-request-headers']);
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
   res.setHeader('Vary', 'Origin');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'Authorization, Content-Type, Accept, Origin, X-Requested-With',
+    requestedHeaders ||
+      'Authorization, Content-Type, Accept, Origin, X-Requested-With',
   );
   res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
 }
