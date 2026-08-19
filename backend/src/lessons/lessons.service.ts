@@ -32,7 +32,7 @@ import {
 import { TeacherGradeStyleService } from '../common/services/teacher-grade-style.service';
 import { applyKeyPointStyle } from './teacher-content-style';
 import { LessonImageInput } from '../ai/providers/ai.provider';
-import { isFakeExtractText, looksLikeRealLessonText } from '../common/extract-quality';
+import { isFakeExtractText, longestRealLessonText, looksLikeRealLessonText } from '../common/extract-quality';
 import { isServerlessRuntime, readEnv } from '../common/env';
 
 @Injectable()
@@ -299,7 +299,11 @@ export class LessonsService {
         message: 'Could not extract the lesson from this photo. Please try again.',
       });
     }
-    const summary = polishedLooksReal ? polished.summary : local.summary;
+    const summary = longestRealLessonText(
+      ocrText,
+      local.summary,
+      polishedLooksReal ? polished.summary : undefined,
+    );
     const output = {
       ...local,
       chapterName: polishedLooksReal ? polished.chapterName || local.chapterName : local.chapterName,

@@ -12,7 +12,7 @@ const AI_WAIT: Record<
     phrases: [
       "Reading the textbook pages",
       "Finding the chapter and topic",
-      "Writing a lesson summary",
+      "Keeping every paragraph from the page",
       "Picking key points for this class",
       "Preparing the review for you",
     ],

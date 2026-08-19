@@ -50,7 +50,7 @@ export class OpenAiProvider implements AiProvider {
 
     const content = await this.chat(
       LESSON_PROCESSING_PROMPT,
-      `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\nSource:\n${input.sourceText}\n\nTranscribe the photographed textbook pages and extract the taught lesson.`,
+      `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\nSource:\n${input.sourceText}\n\nTranscribe the full page. Do not write a short retelling.`,
       input.images,
     );
     const parsed = LessonOutputSchema.parse(JSON.parse(this.extractJson(content.text)));

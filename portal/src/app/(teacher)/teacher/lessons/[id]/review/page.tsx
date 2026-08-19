@@ -315,8 +315,8 @@ export default function ReviewLessonPage() {
                 <Label htmlFor="extractedText">Content from the photos</Label>
                 <Textarea
                   id="extractedText"
-                  rows={12}
-                  className="whitespace-pre-wrap font-sans leading-relaxed"
+                  rows={20}
+                  className="min-h-[22rem] whitespace-pre-wrap font-sans leading-relaxed"
                   value={extractedText}
                   onChange={(e) => setExtractedText(e.target.value)}
                 />

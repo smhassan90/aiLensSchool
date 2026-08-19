@@ -39,8 +39,8 @@ export class CursorProvider implements AiProvider {
     }
 
     const userPrompt = input.images?.length
-      ? `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\n${input.sourceText}\n\nRead the attached textbook page photo(s) and extract the lesson.`
-      : `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\nClean and format this OCR lesson text:\n${input.sourceText}`;
+      ? `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\n${input.sourceText}\n\nTranscribe every word on the attached textbook page photo(s). The summary field must be the full page, not a short retelling.`
+      : `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\nKeep this entire OCR lesson text. Do not shorten it:\n${input.sourceText}`;
 
     try {
       const content = await this.withTimeout(
@@ -56,6 +56,13 @@ export class CursorProvider implements AiProvider {
           throw new Error('Cursor did not read the textbook photos');
         }
         return this.textFallback(input);
+      }
+      if (
+        looksLikeRealLessonText(input.sourceText) &&
+        input.sourceText.replace(/\s+/g, '').length >
+          parsed.summary.replace(/\s+/g, '').length * 1.2
+      ) {
+        parsed.summary = input.sourceText;
       }
       return { data: parsed, ...content.meta };
     } catch (error) {
