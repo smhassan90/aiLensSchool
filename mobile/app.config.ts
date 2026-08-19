@@ -11,21 +11,32 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   newArchEnabled: false,
   splash: {
     image: './assets/splash.png',
-    resizeMode: 'contain',
-    backgroundColor: '#0f766e',
+    resizeMode: 'cover',
+    backgroundColor: '#042f2e',
   },
   icon: './assets/icon.png',
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.sms.parent',
+    icon: './assets/icon.png',
+    splash: {
+      image: './assets/splash.png',
+      resizeMode: 'cover',
+      backgroundColor: '#042f2e',
+    },
   },
   android: {
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#ffffff',
+      backgroundColor: '#0f766e',
     },
     package: 'com.sms.parent',
     versionCode: 1,
+    splash: {
+      image: './assets/splash.png',
+      resizeMode: 'cover',
+      backgroundColor: '#042f2e',
+    },
   },
   web: {
     bundler: 'metro',

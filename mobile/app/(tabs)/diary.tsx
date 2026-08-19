@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChildHeader } from '@/components/ChildHeader';
 import { Badge, Card, EmptyState, ErrorState, LoadingState, SectionTitle } from '@/components/ui';
+import { AttendanceDots, ScoreRing } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
 import { colors, spacing } from '@/constants/theme';
 import { fetchAttendance, groupAttendanceByDate } from '@/services/attendance.service';
@@ -51,6 +52,15 @@ export default function DiaryScreen() {
 
   const grouped = groupAttendanceByDate(attendanceQuery.data?.items ?? []);
   const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+  const attendanceItems = attendanceQuery.data?.items ?? [];
+  const presentCount = attendanceItems.filter((row) => row.status === 'PRESENT' || row.status === 'LATE').length;
+  const attendanceRate = attendanceItems.length
+    ? Math.round((presentCount / attendanceItems.length) * 100)
+    : null;
+  const recentAttendance = [...attendanceItems]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-14)
+    .map((row) => ({ date: `${row.id}-${row.date}`, status: row.status }));
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -66,7 +76,15 @@ export default function DiaryScreen() {
         ) : dates.length === 0 ? (
           <EmptyState title="No attendance records" />
         ) : (
-          dates.slice(0, 10).map((date) => (
+          <>
+            <View style={styles.snapshot}>
+              <ScoreRing value={attendanceRate} label="Present" />
+              <View style={styles.snapshotDots}>
+                <Text style={styles.snapshotHint}>Last {recentAttendance.length} days</Text>
+                <AttendanceDots statuses={recentAttendance} />
+              </View>
+            </View>
+          {dates.slice(0, 10).map((date) => (
             <Card key={date}>
               <Text style={styles.dateHeading}>
                 {new Date(date).toLocaleDateString(undefined, {
@@ -86,6 +104,8 @@ export default function DiaryScreen() {
               ))}
             </Card>
           ))
+          }
+          </>
         )}
 
         <SectionTitle title="Recent lessons" />
@@ -145,6 +165,19 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.md, paddingBottom: spacing.xl },
   title: { fontSize: 28, fontWeight: '800', color: colors.slate900, marginBottom: spacing.md },
+  snapshot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    marginBottom: spacing.sm,
+  },
+  snapshotDots: { flex: 1 },
+  snapshotHint: { fontSize: 12, fontWeight: '700', color: colors.slate600, marginBottom: 8 },
   dateHeading: { fontWeight: '700', color: colors.slate800, marginBottom: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
   remarks: { color: colors.slate500, flex: 1, marginTop: 4 },

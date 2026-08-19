@@ -39,6 +39,10 @@ export default function QuizzesTabScreen() {
   const resultsByQuiz = new Map<string, QuizResult>(
     (resultsQuery.data?.items ?? []).map((result: QuizResult) => [result.quizId, result]),
   );
+  const scored = (resultsQuery.data?.items ?? []).map((row) => Number(row.percentage));
+  const average = scored.length
+    ? Math.round(scored.reduce((sum, n) => sum + n, 0) / scored.length)
+    : null;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -96,10 +100,13 @@ export default function QuizzesTabScreen() {
                 {item.section?.name ? ` · ${item.section.name}` : ''}
               </Text>
               {result ? (
-                <Badge
-                  label={`Score ${Number(result.percentage).toFixed(0)}%`}
-                  tone={Number(result.percentage) >= 50 ? 'success' : 'warning'}
-                />
+                <View style={styles.scoreBlock}>
+                  <ProgressBar value={Number(result.percentage)} height={8} />
+                  <Badge
+                    label={`${Number(result.percentage).toFixed(0)}%`}
+                    tone={Number(result.percentage) >= 50 ? 'success' : 'warning'}
+                  />
+                </View>
               ) : (
                 <Badge label="Not submitted" />
               )}
@@ -116,6 +123,20 @@ const styles = StyleSheet.create({
   content: { padding: spacing.md, paddingBottom: spacing.xl, flexGrow: 1 },
   title: { fontSize: 28, fontWeight: '800', color: colors.slate900, marginBottom: spacing.md },
   hint: { color: colors.slate500, marginBottom: spacing.md },
+  snapshot: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    marginBottom: spacing.md,
+  },
+  snapshotLabel: { fontSize: 12, fontWeight: '700', color: colors.slate500, marginBottom: 8 },
+  snapshotRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  snapshotValue: { fontSize: 28, fontWeight: '800', width: 72 },
+  snapshotBar: { flex: 1 },
+  scoreBlock: { gap: 8 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
   cardTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800, flex: 1 },
-  cardMeta: { fontSize: 13, color: c
+  cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4, marginBottom: spacing.sm },
+});

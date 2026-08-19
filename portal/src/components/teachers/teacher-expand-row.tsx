@@ -298,7 +298,7 @@ export function ExpandableTeacherRow({
 }) {
   const top = index === 0;
   const bottom = index === totalTeachers - 1 && totalTeachers > 1;
-  const panelRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLLIElement>(null);
 
   useEffect(() => {
     if (expanded) {

@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Badge, EmptyState, ErrorState, LoadingState } from '@/components/ui';
+import { ScoreRing, SplitBar } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
 import { colors, spacing } from '@/constants/theme';
 import { fetchQuizById } from '@/services/quizzes.service';
@@ -69,13 +70,27 @@ export default function QuizResultScreen() {
           {selectedChild?.firstName} {selectedChild?.lastName}
         </Text>
 
-        <Text style={styles.score}>{percentage.toFixed(1)}%</Text>
-        <Text style={styles.detail}>
-          {result.score} / {result.totalMarks} marks
-        </Text>
-        <Text style={styles.detail}>
-          Submitted {new Date(result.submittedAt).toLocaleString()}
-        </Text>
+        <View style={styles.scoreCard}>
+          <ScoreRing value={percentage} label="Score" />
+          <View style={styles.scoreFacts}>
+            <Text style={styles.detail}>
+              {result.score} / {result.totalMarks} marks
+            </Text>
+            <Text style={styles.detail}>
+              Submitted {new Date(result.submittedAt).toLocaleString()}
+            </Text>
+            {answers.length > 0 ? (
+              <View style={styles.splitWrap}>
+                <SplitBar
+                  left={answers.filter((answer: QuizAnswer) => answer.isCorrect).length}
+                  right={answers.filter((answer: QuizAnswer) => !answer.isCorrect).length}
+                  leftLabel="Correct"
+                  rightLabel="Review"
+                />
+              </View>
+            ) : null}
+          </View>
+        </View>
         {result.summary ? <Text style={styles.body}>{result.summary}</Text> : null}
 
         {answers.length > 0 ? (
@@ -110,12 +125,20 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, alignItems: 'center' },
   title: { fontSize: 22, fontWeight: '800', color: colors.slate900, textAlign: 'center' },
   student: { color: colors.slate500, marginTop: spacing.sm },
-  score: {
-    fontSize: 56,
-    fontWeight: '800',
-    color: colors.primary,
-    marginTop: spacing.xl,
+  scoreCard: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    marginTop: spacing.lg,
   },
+  scoreFacts: { flex: 1 },
+  splitWrap: { marginTop: spacing.sm },
   detail: { fontSize: 16, color: colors.slate700, marginTop: spacing.sm },
   body: { fontSize: 15, color: colors.slate600, marginTop: spacing.md, textAlign: 'center' },
   answers: { alignSelf: 'stretch', marginTop: spacing.xl },

@@ -36,7 +36,6 @@ const ringStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.white,
-    flexDirection: 'row',
   },
   value: { fontSize: 22, fontWeight: '800' },
   label: {
