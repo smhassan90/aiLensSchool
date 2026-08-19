@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { mkdir } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -15,12 +14,6 @@ type OcrWorker = {
 export class PageOcrService implements OnModuleDestroy {
   private readonly logger = new Logger(PageOcrService.name);
   private workerPromise: Promise<OcrWorker> | null = null;
-
-  constructor(private readonly config: ConfigService) {}
-
-  private canUseVision() {
-    return Boolean(this.config.get<string>('OPENAI_API_KEY')?.trim());
-  }
 
   private async getWorker() {
     if (!this.workerPromise) {
@@ -59,8 +52,8 @@ export class PageOcrService implements OnModuleDestroy {
   }
 
   async readPages(files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>) {
-    if (isServerlessRuntime() && this.canUseVision()) {
-      this.logger.log('Skipping Tesseract on serverless; photos will be read by vision');
+    if (isServerlessRuntime()) {
+      this.logger.log('Skipping Tesseract on serverless to avoid function timeouts');
       return '';
     }
 

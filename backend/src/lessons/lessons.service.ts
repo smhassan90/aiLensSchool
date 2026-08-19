@@ -32,6 +32,7 @@ import {
 import { TeacherGradeStyleService } from '../common/services/teacher-grade-style.service';
 import { applyKeyPointStyle } from './teacher-content-style';
 import { LessonImageInput } from '../ai/providers/ai.provider';
+import { isServerlessRuntime } from '../common/env';
 
 @Injectable()
 export class LessonsService {
@@ -239,10 +240,17 @@ export class LessonsService {
     const pageFrom = this.parseOptionalInt(dto.pageFrom);
     const pageTo = this.parseOptionalInt(dto.pageTo);
     const teacherNotes = dto.teacherNotes?.trim() || undefined;
+    const canVision = Boolean(this.config.get<string>('OPENAI_API_KEY')?.trim());
+    if (isServerlessRuntime() && !canVision) {
+      throw new BadRequestException({
+        code: 'PHOTO_VISION_REQUIRED',
+        message:
+          'Hosted photo extract cannot run page OCR (it times out). Add OPENAI_API_KEY on the backend Vercel project, then retry. Local extract still works without it.',
+      });
+    }
     const ocrText = await this.pageOcr.readPages(files);
     const images = this.toLessonImages(files);
     const ocrThin = ocrText.replace(/\s+/g, '').length < 20;
-    const canVision = Boolean(this.config.get<string>('OPENAI_API_KEY')?.trim());
     const local = this.structureFromPageText(
       ocrText || 'Photographed textbook pages.',
       subject.name,
@@ -253,7 +261,9 @@ export class LessonsService {
     const polished = await this.lessonProcessing.process({
       schoolId,
       userId: user.id,
-      sourceText: ocrText || local.summary,
+      sourceText:
+        ocrText ||
+        `Transcribe every word visible on these ${subject.name} textbook photos for ${grade.name}. Return chapter, topic, full lesson text, and key points.`,
       subjectName: subject.name,
       gradeName: grade.name,
       images: ocrThin && canVision ? images : undefined,

@@ -67,6 +67,9 @@ export class LessonProcessingService {
           errorMessage: message,
         },
       });
+      if (input.images?.length) {
+        throw error;
+      }
       return {
         chapterName: input.subjectName ? `${input.subjectName} chapter` : 'Chapter 1',
         topicName: input.sourceText.slice(0, 60) || 'Today’s lesson',

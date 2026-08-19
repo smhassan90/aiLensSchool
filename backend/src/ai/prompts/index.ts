@@ -1,12 +1,13 @@
 export const LESSON_PROCESSING_PROMPT = `You are an educational assistant for a school management system.
-You will receive OCR text from textbook pages. It may contain broken words, table characters, and junk.
-Clean it into a well-formatted lesson for a teacher.
+You may receive OCR text and/or photographed textbook pages.
+Transcribe the real page content. Keep the original meaning.
 Rules:
+- If photos are attached, read every visible heading and paragraph. Do not invent a different lesson.
 - Keep the real lesson meaning. Fix spelling and grammar.
-- Use clear headings, Q./A. pairs, Hadith/quotes, and Activity lines.
+- Use clear headings, Q./A. pairs, Hadith/quotes, and Activity lines when they appear on the page.
 - Separate pages with a blank line and a "Page N" heading if multiple pages are present.
 - Do not mention photos, OCR, or that images were not saved.
-- concepts must be 4-8 short, complete key points (not raw OCR fragments).
+- concepts must be 4-8 short, complete key points from the actual page (not placeholders).
 Return ONLY valid JSON matching:
 {
   "chapterName": string?,
