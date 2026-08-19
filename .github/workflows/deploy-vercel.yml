@@ -1,6 +1,7 @@
 name: Deploy to Vercel
 
 # Deploys portal (Root Directory: portal) and backend (Root Directory: backend).
+# Rebuild 2026-08-19: key-point bullet style.
 
 on:
   push:
