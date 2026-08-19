@@ -50,25 +50,18 @@ export function QuizEditorActions({
   const router = useRouter();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [draftOpen, setDraftOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
-  const [draftName, setDraftName] = useState(quiz.title);
   const [publishMode, setPublishMode] = useState<"immediate" | "schedule">("immediate");
   const [dueAt, setDueAt] = useState("");
 
   const includedCount = quiz.questions?.filter((q) => q.included).length ?? 0;
 
   const saveDraft = useMutation({
-    mutationFn: () => {
-      const title = draftName.trim();
-      if (!title) return Promise.reject(new Error("Enter a name for this draft"));
-      return quizzesService.updateQuestions(quizId, questionPayload(quiz), title);
-    },
-    onSuccess: (saved) => {
-      toast({ title: `Saved as draft: ${saved.title}`, variant: "success" });
+    mutationFn: () => quizzesService.updateQuestions(quizId, questionPayload(quiz)),
+    onSuccess: () => {
+      toast({ title: "Draft saved", description: "The system headline was kept.", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["quiz", quizId] });
       queryClient.invalidateQueries({ queryKey: listQueryKey });
-      setDraftOpen(false);
     },
     onError: (err) => {
       toast({
@@ -125,13 +118,10 @@ export function QuizEditorActions({
           type="button"
           variant="outline"
           disabled={busy}
-          onClick={() => {
-            setDraftName(quiz.title);
-            setDraftOpen(true);
-          }}
+          onClick={() => saveDraft.mutate()}
         >
           <FileText className="h-4 w-4" />
-          Save as draft
+          {saveDraft.isPending ? "Saving…" : "Save as draft"}
         </Button>
         <Button
           type="button"
@@ -146,44 +136,6 @@ export function QuizEditorActions({
           Publish
         </Button>
       </div>
-
-      <Dialog open={draftOpen} onOpenChange={setDraftOpen}>
-        <DialogContent onClose={() => setDraftOpen(false)}>
-          <DialogHeader>
-            <DialogTitle>Save as draft</DialogTitle>
-            <DialogDescription>
-              What name should this draft be saved as?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="draft-name">Draft name</Label>
-              <Input
-                id="draft-name"
-                value={draftName}
-                onChange={(e) => setDraftName(e.target.value)}
-                placeholder="e.g. Chapter 4 practice quiz"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveDraft.mutate();
-                }}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setDraftOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                disabled={saveDraft.isPending || !draftName.trim()}
-                onClick={() => saveDraft.mutate()}
-              >
-                {saveDraft.isPending ? "Saving…" : "Save draft"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
         <DialogContent onClose={() => setPublishOpen(false)}>

@@ -2,6 +2,7 @@
 
 import { PageLoader } from "@/components/layout/page-loader";
 import { AiWait } from "@/components/layout/ai-wait";
+import { LessonWizardSteps } from "@/components/lessons/lesson-wizard-steps";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -83,16 +84,11 @@ export default function NewLessonPage() {
       });
     },
     onSuccess: (lesson) => {
-      toast({
-        title: "Page content extracted",
-        description: "Photos were not saved. Review the extracted lesson next.",
-        variant: "success",
-      });
       router.push(`/teacher/lessons/${lesson.id}/review`);
     },
     onError: (err) => {
       toast({
-        title: "Could not extract lesson",
+        title: "Could not read the pages",
         description: err instanceof ApiClientError ? err.message : err instanceof Error ? err.message : "Unexpected error",
         variant: "error",
       });
@@ -141,14 +137,14 @@ export default function NewLessonPage() {
   };
 
   if (classes.isLoading) {
-    return <PageLoader variant="page" />;
+    return <PageLoader variant="page" task="lessons" />;
   }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="Today's Lesson"
-        description="Upload photos of the pages you taught. Photos are not saved — only the extracted content is kept."
+        title="Today's lesson"
+        description="Step 1: choose the class and upload the pages you taught. Photos are not saved."
         actions={
           <Link href="/teacher/lessons">
             <Button variant="outline">
@@ -159,17 +155,17 @@ export default function NewLessonPage() {
         }
       />
 
+      <LessonWizardSteps current="upload" />
+
       {mutation.isPending ? (
-        <div className="mx-auto max-w-2xl">
-          <AiWait kind="extract" variant="page" />
-        </div>
+        <AiWait kind="extract" variant="page" />
       ) : (
-      <form onSubmit={onSubmit} className="mx-auto max-w-2xl">
+      <form onSubmit={onSubmit}>
         <Card>
           <CardHeader>
-            <CardTitle>Class and pages</CardTitle>
+            <CardTitle>Upload page photos</CardTitle>
             <CardDescription>
-              Select the class, then photograph the textbook pages covered today.
+              Next we will show the extracted text and key points for you to check.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -180,7 +176,7 @@ export default function NewLessonPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="classPicker">Assigned Class</Label>
+              <Label htmlFor="classPicker">Class</Label>
               <Select
                 id="classPicker"
                 value={classKey}
@@ -272,7 +268,7 @@ export default function NewLessonPage() {
             <Button type="button" variant="outline">Cancel</Button>
           </Link>
           <Button type="submit">
-            Extract lesson from photos
+            Next
           </Button>
         </div>
       </form>

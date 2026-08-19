@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { teachersService } from "@/services/teachers.service";
 import { PageLoader } from "@/components/layout/page-loader";
+import { AiWait } from "@/components/layout/ai-wait";
 import { cn } from "@/lib/utils";
 
 export default function TeacherProgressPage() {
@@ -53,7 +54,11 @@ export default function TeacherProgressPage() {
         }
       />
 
-      {coach && (
+      {suggest.isPending ? (
+        <div className="mb-6">
+          <AiWait kind="coach" />
+        </div>
+      ) : coach ? (
         <Card className="mb-6 border-teal-200 bg-teal-50/60">
           <CardHeader>
             <p className="text-xs uppercase tracking-wide text-teal-800">{coach.coaching.verdict.replaceAll("_", " ")}</p>
@@ -80,7 +85,7 @@ export default function TeacherProgressPage() {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card><CardHeader><CardTitle className="text-sm">Lessons in 30 days</CardTitle></CardHeader><CardContent className="text-3xl font-semibold">{facts?.last30Days?.lessonsAdded ?? 0}</CardContent></Card>

@@ -11,7 +11,6 @@ import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +37,6 @@ const generateSchema = z
   .object({
     classKey: z.string().min(1, "Select a class"),
     homeworkIds: z.array(z.string()).min(1, "Select at least one topic"),
-    title: z.string().optional(),
     quickGenerate: z.boolean(),
     mcqCount: z.coerce.number().min(0).max(20),
     fillBlankCount: z.coerce.number().min(0).max(20),
@@ -118,7 +116,6 @@ export default function TeacherQuizzesPage() {
         subjectId: cls.subjectId,
         branchId: cls.branchId,
         homeworkIds: values.homeworkIds,
-        title: values.title,
         quickGenerate: values.quickGenerate,
         ...(values.quickGenerate
           ? { questionCount: 8 }
@@ -149,7 +146,7 @@ export default function TeacherQuizzesPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Quizzes"
-        description="Select homework topics and generate a quiz from those titles"
+        description="Select homework topics. The system suggests the quiz headline."
         actions={
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -166,7 +163,7 @@ export default function TeacherQuizzesPage() {
 
       <div className="rounded-lg border bg-card">
         {isLoading ? (
-          <PageLoader variant="panel" />
+          <PageLoader variant="panel" task="quizzes" />
         ) : !data?.items.length ? (
           <EmptyState
             icon={<FileQuestion className="h-10 w-10" />}
@@ -215,7 +212,7 @@ export default function TeacherQuizzesPage() {
           <DialogHeader>
             <DialogTitle>Generate Quiz</DialogTitle>
             <DialogDescription>
-              Choose homework topic titles. The quiz will be generated from those topics.
+              Choose homework topics. The system will suggest the quiz headline and write the questions.
             </DialogDescription>
           </DialogHeader>
           {generateMutation.isPending ? (
@@ -296,10 +293,9 @@ export default function TeacherQuizzesPage() {
               onShortAnswerChange={(value) => setValue("shortAnswerCount", value, { shouldValidate: true })}
             />
             {errors.mcqCount && <p className="text-sm text-destructive">{errors.mcqCount.message}</p>}
-            <div className="space-y-2">
-              <Label htmlFor="title">Quiz title (optional)</Label>
-              <Input id="title" {...register("title")} placeholder="Uses selected topics if empty" />
-            </div>
+            <p className="rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              The quiz headline is suggested by the system from these topics. You cannot type it here.
+            </p>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                 Cancel

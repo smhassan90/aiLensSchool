@@ -101,7 +101,7 @@ export default function SchoolQuizzesPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Quizzes"
-        description="Select homework topic titles. Drafts are never auto-published."
+        description="Select homework topics. The system suggests the quiz headline. Drafts are never auto-published."
         actions={
           <Button
             onClick={() => {
@@ -117,7 +117,7 @@ export default function SchoolQuizzesPage() {
       />
       <div className="rounded-lg border bg-card">
         {quizzes.isLoading ? (
-          <PageLoader variant="panel" />
+          <PageLoader variant="panel" task="quizzes" />
         ) : !quizzes.data?.items.length ? (
           <EmptyState icon={<FileQuestion className="h-10 w-10" />} title="No quizzes" description="Generate from homework topic titles." />
         ) : (
@@ -144,7 +144,12 @@ export default function SchoolQuizzesPage() {
       </div>
       <Dialog open={open} onOpenChange={(next) => !generate.isPending && setOpen(next)}>
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" onClose={() => !generate.isPending && setOpen(false)}>
-          <DialogHeader><DialogTitle>Generate quiz</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Generate quiz</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Choose topics. The quiz headline is written by the system.
+            </p>
+          </DialogHeader>
           {generate.isPending ? (
             <AiWait kind="quiz" />
           ) : (

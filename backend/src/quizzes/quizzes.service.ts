@@ -70,7 +70,6 @@ export class QuizzesService {
     }
 
     const topicSummaries: string[] = [];
-    let topicTitle: string | undefined;
     let rangeFrom = dto.lessonDateFrom ? new Date(dto.lessonDateFrom) : undefined;
     let rangeTo = dto.lessonDateTo ? new Date(dto.lessonDateTo) : undefined;
 
@@ -91,7 +90,6 @@ export class QuizzesService {
           message: 'No matching homework topics were found for this class',
         });
       }
-      topicTitle = homework.map((item) => item.title).join(', ');
       for (const item of homework) {
         const lessonBit = item.lesson?.aiSummary ?? item.lesson?.topicName ?? '';
         topicSummaries.push(
@@ -166,7 +164,7 @@ export class QuizzesService {
           academicYearId: dto.academicYearId,
           sectionId: dto.sectionId,
           subjectId: dto.subjectId,
-          title: dto.title ?? topicTitle ?? aiQuiz.title,
+          title: aiQuiz.title.trim() || `${subject?.name ?? 'Class'} quiz`,
           description: aiQuiz.description,
           status: QuizStatus.DRAFT,
           createdById: user.id,

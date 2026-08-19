@@ -3,34 +3,60 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-const DEFAULT_PHRASES = [
-  "Bringing your school into focus",
-  "Gathering the latest picture",
-  "Almost ready",
-];
+export type LoaderTask =
+  | "page"
+  | "list"
+  | "lessons"
+  | "lesson-review"
+  | "homework"
+  | "quizzes"
+  | "quiz"
+  | "teacher"
+  | "school"
+  | "admin";
+
+const TASK_PHRASES: Record<LoaderTask, string[]> = {
+  page: ["Opening this screen", "Getting it ready", "Almost there"],
+  list: ["Loading this list", "Fetching the latest records", "Almost ready"],
+  lessons: ["Loading today’s lessons", "Checking extracted pages", "Almost ready"],
+  "lesson-review": [
+    "Opening the extracted lesson",
+    "Loading key points and homework",
+    "Almost ready",
+  ],
+  homework: ["Loading homework", "Checking assignments for this class", "Almost ready"],
+  quizzes: ["Loading quizzes", "Checking drafts and published papers", "Almost ready"],
+  quiz: ["Opening this quiz", "Loading the questions", "Almost ready"],
+  teacher: ["Opening the teacher hub", "Checking your classes", "Almost there"],
+  school: ["Opening the school workspace", "Loading school records", "Almost there"],
+  admin: ["Opening admin tools", "Loading platform records", "Almost there"],
+};
 
 type LoaderVariant = "screen" | "page" | "panel";
 
 interface PageLoaderProps {
   variant?: LoaderVariant;
+  task?: LoaderTask;
   phrases?: string[];
   className?: string;
 }
 
 export function PageLoader({
   variant = "page",
-  phrases = DEFAULT_PHRASES,
+  task = "page",
+  phrases,
   className,
 }: PageLoaderProps) {
+  const lines = phrases?.length ? phrases : TASK_PHRASES[task];
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    if (phrases.length < 2) return;
+    if (lines.length < 2) return;
     const id = window.setInterval(() => {
-      setIndex((current) => (current + 1) % phrases.length);
+      setIndex((current) => (current + 1) % lines.length);
     }, 2400);
     return () => window.clearInterval(id);
-  }, [phrases.length]);
+  }, [lines.length]);
 
   return (
     <div
@@ -43,7 +69,7 @@ export function PageLoader({
       )}
       role="status"
       aria-live="polite"
-      aria-label={phrases[index] ?? "Loading"}
+      aria-label={lines[index] ?? "Loading"}
     >
       <img
         src="/brand/hawk.png"
@@ -63,7 +89,7 @@ export function PageLoader({
         key={index}
         className="loader-phrase mt-2 max-w-xs text-sm text-muted-foreground"
       >
-        {phrases[index]}
+        {lines[index]}
       </p>
     </div>
   );

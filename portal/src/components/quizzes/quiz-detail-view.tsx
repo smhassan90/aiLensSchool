@@ -39,7 +39,7 @@ export function QuizDetailView({ quizId, listHref, listQueryKey }: QuizDetailVie
   };
 
   if (isLoading) {
-    return <PageLoader variant="page" />;
+    return <PageLoader variant="page" task="quiz" />;
   }
 
   if (isError || !quiz) {
@@ -83,7 +83,7 @@ export function QuizDetailView({ quizId, listHref, listQueryKey }: QuizDetailVie
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={quiz.title}
-        description={`${quiz.subject?.name ?? ""} · Section ${quiz.section?.name ?? ""}`}
+        description={`${quiz.subject?.name ?? ""} · Section ${quiz.section?.name ?? ""} · Headline suggested by the system`}
         actions={
           <Link href={listHref}>
             <Button variant="outline">

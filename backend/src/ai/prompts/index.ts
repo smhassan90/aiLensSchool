@@ -21,6 +21,7 @@ Return ONLY valid JSON matching:
 export const QUIZ_GENERATION_PROMPT = `You are an educational quiz generator for school teachers.
 Given homework topic titles and lesson summaries, generate age-appropriate quiz questions.
 Follow the question-type instructions in the user message exactly.
+The quiz title must be a short student-facing headline (max 8 words) suggested by you from the topics. Do not concatenate homework titles with commas. The teacher does not name the quiz.
 Return ONLY valid JSON matching:
 {
   "title": string,

@@ -51,7 +51,7 @@ export function QuizAnalysis({ quizId }: { quizId: string }) {
   }, [data, search]);
 
   if (analysis.isLoading) {
-    return <PageLoader variant="panel" />;
+    return <PageLoader variant="panel" task="quiz" />;
   }
 
   if (analysis.isError || !data) {

@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageLoader } from "@/components/layout/page-loader";
+import { AiWait } from "@/components/layout/ai-wait";
 import { homeworkService } from "@/services/homework.service";
 import { documentsService } from "@/services/documents.service";
 import { teachersService } from "@/services/teachers.service";
@@ -56,7 +57,7 @@ export default function TeacherHomeworkPage() {
       <PageHeader title="Homework" description="Give each assignment a topic title so it can be selected when generating a quiz" actions={<Button onClick={() => setOpen(true)}>Give homework</Button>} />
       <div className="rounded-lg border bg-card">
         {homework.isLoading ? (
-          <PageLoader variant="panel" />
+          <PageLoader variant="panel" task="homework" />
         ) : !homework.data?.items.length ? (
           <EmptyState icon={<ClipboardList className="h-10 w-10" />} title="No homework" description="Generate from a lesson summary." />
         ) : (
@@ -75,9 +76,12 @@ export default function TeacherHomeworkPage() {
           </Table>
         )}
       </div>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent onClose={() => setOpen(false)}>
+      <Dialog open={open} onOpenChange={(next) => !generate.isPending && setOpen(next)}>
+        <DialogContent onClose={() => !generate.isPending && setOpen(false)}>
           <DialogHeader><DialogTitle>Give homework</DialogTitle></DialogHeader>
+          {generate.isPending ? (
+            <AiWait kind="homework" />
+          ) : (
           <div className="space-y-3">
             <Label>Class</Label>
             <Select value={classKey} onChange={(e) => setClassKey(e.target.value)}>
@@ -97,10 +101,11 @@ export default function TeacherHomeworkPage() {
             />
             <Label>Due date</Label>
             <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-            <Button disabled={generate.isPending || !classKey || !title.trim()} onClick={() => generate.mutate()}>
-              {generate.isPending ? "Saving…" : "Give homework"}
+            <Button disabled={!classKey || !title.trim()} onClick={() => generate.mutate()}>
+              Give homework
             </Button>
           </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

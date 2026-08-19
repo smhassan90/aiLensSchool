@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { dashboardService } from "@/services/dashboard.service";
 import { PageLoader } from "@/components/layout/page-loader";
+import { AiWait } from "@/components/layout/ai-wait";
 import { cn } from "@/lib/utils";
 
 export default function TeacherDashboardPage() {
@@ -26,7 +27,7 @@ export default function TeacherDashboardPage() {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <PageHeader title="Your day" />
-        <PageLoader variant="page" phrases={["Checking lessons and attendance"]} />
+        <PageLoader variant="page" phrases={["Checking lessons and attendance", "Looking at quiz scores", "Almost ready"]} />
       </div>
     );
   }
@@ -60,7 +61,11 @@ export default function TeacherDashboardPage() {
         })}
       </div>
 
-      {coach && (
+      {suggest.isPending ? (
+        <div className="mb-6">
+          <AiWait kind="coach" />
+        </div>
+      ) : coach ? (
         <Card className="mb-6">
           <CardHeader><CardTitle>{coach.headline}</CardTitle></CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
@@ -80,7 +85,7 @@ export default function TeacherDashboardPage() {
             ))}
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Link href="/teacher/lessons/new"><Card><CardHeader><CardTitle className="text-sm">Missing lessons</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data?.missingLessonDays ?? 0}</CardContent></Card></Link>

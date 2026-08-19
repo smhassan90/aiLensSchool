@@ -2,7 +2,7 @@
 
 import { PageLoader } from "@/components/layout/page-loader";
 
-export type AiWaitKind = "extract" | "key-points" | "homework" | "diary" | "quiz";
+export type AiWaitKind = "extract" | "key-points" | "homework" | "diary" | "quiz" | "coach";
 
 const AI_WAIT: Record<
   AiWaitKind,
@@ -10,11 +10,11 @@ const AI_WAIT: Record<
 > = {
   extract: {
     phrases: [
-      "Reading every line from the photos",
+      "Reading the textbook pages",
       "Finding the chapter and topic",
-      "Picking out what was actually taught",
-      "Shaping key points for this class",
-      "Almost ready for you to review",
+      "Writing a lesson summary",
+      "Picking key points for this class",
+      "Preparing the review for you",
     ],
     hint: "Photos are not saved. This usually takes a minute — stay on this page.",
   },
@@ -22,8 +22,8 @@ const AI_WAIT: Record<
     phrases: [
       "Reading the lesson with your instructions",
       "Keeping the ideas that matter most",
-      "Writing them the way this class needs",
-      "Matching the wording to your style",
+      "Rewriting them in the style you asked for",
+      "Checking that each point is complete",
       "Fresh key points are almost ready",
     ],
     hint: "We are rewriting the points, not the extracted page text.",
@@ -49,12 +49,23 @@ const AI_WAIT: Record<
   },
   quiz: {
     phrases: [
-      "Building questions from the homework topics",
+      "Reading the homework topics you selected",
+      "Writing a short quiz headline",
+      "Building questions from those topics",
       "Mixing recall and thinking questions",
       "Checking that answers stay fair",
       "Your quiz draft is almost ready",
     ],
-    hint: "This can take a little while. Stay on this page.",
+    hint: "The headline is written by the system. Stay on this page.",
+  },
+  coach: {
+    phrases: [
+      "Reading lessons, attendance, and quiz scores",
+      "Comparing this class with the usual pace",
+      "Writing a short hint you can use today",
+      "Almost ready",
+    ],
+    hint: "This is a suggestion from the numbers, not a judgement.",
   },
 };
 

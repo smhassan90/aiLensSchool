@@ -69,7 +69,7 @@ export default function TeacherLessonsPage() {
 
       <div className="rounded-lg border bg-card">
         {isLoading ? (
-          <PageLoader variant="panel" />
+          <PageLoader variant="panel" task="lessons" />
         ) : !data?.items.length ? (
           <EmptyState
             icon={<BookOpen className="h-10 w-10" />}
