@@ -34,12 +34,17 @@ export default function TeachersPage() {
         description="Add a teacher from this page. Open a name to see progress."
         actions={
           can("MANAGE_TEACHERS") ? (
-            <Link href="/school/teachers/new">
-              <Button>
-                <Plus className="h-4 w-4" />
-                Add Teacher
-              </Button>
-            </Link>
+            <div className="flex gap-2">
+              <Link href="/school/teachers/attendance">
+                <Button variant="outline">Teacher attendance</Button>
+              </Link>
+              <Link href="/school/teachers/new">
+                <Button>
+                  <Plus className="h-4 w-4" />
+                  Add Teacher
+                </Button>
+              </Link>
+            </div>
           ) : undefined
         }
       />

@@ -102,4 +102,21 @@ describe('FeesService', () => {
       service.recordPayment({ studentFeeId: 'missing', amount: 10 }, admin),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('marks a due fee as paid for the remaining balance', async () => {
+    prisma.studentFee.findFirst.mockResolvedValue({
+      id: 'fee-1',
+      amount: 5000,
+      paidAmount: 1500,
+      status: StudentFeeStatus.PARTIAL,
+    });
+    prisma.feePayment.create.mockResolvedValue({ id: 'p1', amount: 3500 });
+    prisma.studentFee.update.mockResolvedValue({});
+
+    const result = await service.markPaid({ studentFeeId: 'fee-1' }, admin);
+    expect(result.status).toBe(StudentFeeStatus.PAID);
+    expect(prisma.feePayment.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ amount: 3500 }) }),
+    );
+  });
 });

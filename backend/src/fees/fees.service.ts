@@ -13,6 +13,7 @@ import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto
 import {
   AssignFeesDto,
   CreateFeeStructureDto,
+  MarkPaidDto,
   RecordPaymentDto,
 } from './dto/fees.dto';
 import { ParentsService } from '../parents/parents.service';
@@ -285,5 +286,36 @@ export class FeesService {
     });
 
     return { ...payment, amount: money(payment.amount), status };
+  }
+
+  async markPaid(dto: MarkPaidDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const fee = await this.prisma.studentFee.findFirst({
+      where: { id: dto.studentFeeId, schoolId },
+    });
+    if (!fee) {
+      throw new NotFoundException({ code: 'STUDENT_FEE_NOT_FOUND', message: 'Fee record not found' });
+    }
+
+    const remaining = Number((money(fee.amount) - money(fee.paidAmount)).toFixed(2));
+    if (remaining <= 0) {
+      if (fee.status !== StudentFeeStatus.PAID) {
+        await this.prisma.studentFee.update({
+          where: { id: fee.id },
+          data: { status: StudentFeeStatus.PAID, paidAmount: fee.amount },
+        });
+      }
+      return { studentFeeId: fee.id, status: StudentFeeStatus.PAID, amount: 0 };
+    }
+
+    return this.recordPayment(
+      {
+        studentFeeId: fee.id,
+        amount: remaining,
+        method: dto.method ?? 'CASH',
+        notes: dto.notes ?? 'Marked paid by admin',
+      },
+      user,
+    );
   }
 }

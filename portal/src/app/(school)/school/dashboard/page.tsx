@@ -9,6 +9,7 @@ import { dashboardService } from "@/services/dashboard.service";
 import { PageLoader } from "@/components/layout/page-loader";
 import { CombinedFinanceChart } from "@/components/charts/simple-charts";
 import { useAuth } from "@/providers/auth-provider";
+import { TeacherProgressPanel } from "@/components/teachers/teacher-progress-panel";
 
 const EXPENSE_COLORS: Record<string, string> = {
   TEACHER_SALARY: "#0f766e",
@@ -74,6 +75,8 @@ export default function SchoolDashboardPage() {
         <Stat label="Collected this month" value={data?.feesCollectedThisMonth ?? "—"} hint="Fee payments received" />
         <Stat label="Still due this month" value={data?.feesRemainingThisMonth ?? "—"} hint="Not fully paid yet" />
       </div>
+
+      {can("VIEW_TEACHER_PROGRESS") ? <TeacherProgressPanel /> : null}
 
       {can("VIEW_FINANCE") && (
         <Card className="mt-8">

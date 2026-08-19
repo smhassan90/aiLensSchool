@@ -44,7 +44,7 @@ export default function TeacherDashboardPage() {
       <PageHeader
         title="Your pace"
         actions={
-          <Button onClick={() => suggest.mutate()} disabled={suggest.isPending}>
+          <Button type="button" onClick={() => suggest.mutate()} disabled={suggest.isPending}>
             {suggest.isPending ? "Thinking…" : "AI hint"}
           </Button>
         }
@@ -62,6 +62,12 @@ export default function TeacherDashboardPage() {
         quizCount={data?.quizCount ?? 0}
         quizTarget={data?.quizTarget ?? null}
       />
+
+      {suggest.isError ? (
+        <p className="mt-4 text-sm text-destructive">
+          {suggest.error instanceof Error ? suggest.error.message : "Could not get an AI hint. Try again."}
+        </p>
+      ) : null}
 
       {suggest.isPending ? (
         <div className="mt-6">

@@ -1,15 +1,19 @@
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChildHeader } from '@/components/ChildHeader';
 import { Badge, Card, EmptyState, ErrorState, LoadingState, SectionTitle } from '@/components/ui';
+import { AttendanceDots, LabeledBar, ScoreRing } from '@/components/visuals';
 import { useAuth } from '@/providers/AuthProvider';
 import { useChild } from '@/providers/ChildProvider';
-import { colors, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { fetchLessonsForStudent, isLessonToday } from '@/services/lessons.service';
 import { fetchHomework, isHomeworkPending } from '@/services/homework.service';
 import { fetchQuizzes, isQuizNew } from '@/services/quizzes.service';
+import { fetchQuizResults } from '@/services/results.service';
+import { fetchAttendance } from '@/services/attendance.service';
 import { fetchEvents, isUpcomingEvent } from '@/services/events.service';
 import { fetchNotifications } from '@/services/notifications.service';
 import { fetchAnnouncements } from '@/services/announcements.service';
@@ -39,6 +43,18 @@ export default function HomeScreen() {
     enabled: !!studentId,
   });
 
+  const resultsQuery = useQuery({
+    queryKey: ['home', 'results', studentId],
+    queryFn: () => fetchQuizResults(studentId, { limit: 50 }),
+    enabled: !!studentId,
+  });
+
+  const attendanceQuery = useQuery({
+    queryKey: ['home', 'attendance', studentId],
+    queryFn: () => fetchAttendance(studentId, { limit: 20 }),
+    enabled: !!studentId,
+  });
+
   const eventsQuery = useQuery({
     queryKey: ['home', 'events'],
     queryFn: () => fetchEvents({ limit: 5 }),
@@ -53,6 +69,51 @@ export default function HomeScreen() {
     queryKey: ['home', 'notifications'],
     queryFn: () => fetchNotifications({ limit: 5, unreadOnly: true }),
   });
+
+  const snapshot = useMemo(() => {
+    const attendance = attendanceQuery.data?.items ?? [];
+    const present = attendance.filter((row) => row.status === 'PRESENT' || row.status === 'LATE').length;
+    const attendanceRate = attendance.length ? Math.round((present / attendance.length) * 100) : null;
+    const results = resultsQuery.data?.items ?? [];
+    const quizAvg = results.length
+      ? Math.round(results.reduce((sum, row) => sum + Number(row.percentage), 0) / results.length)
+      : null;
+    const homeworkItems = homeworkQuery.data?.items ?? [];
+    const pendingHomework = homeworkItems.filter(isHomeworkPending);
+    const homeworkDoneRate = homeworkItems.length
+      ? Math.round(((homeworkItems.length - pendingHomework.length) / homeworkItems.length) * 100)
+      : null;
+    const quizzes = quizzesQuery.data?.items ?? [];
+    const resultByQuiz = new Map(results.map((row) => [row.quizId, row]));
+    const subjectBuckets = new Map<string, number[]>();
+    quizzes.forEach((quiz) => {
+      const result = resultByQuiz.get(quiz.id);
+      const name = quiz.subject?.name;
+      if (!result || !name) return;
+      const list = subjectBuckets.get(name) ?? [];
+      list.push(Number(result.percentage));
+      subjectBuckets.set(name, list);
+    });
+    const subjects = [...subjectBuckets.entries()]
+      .map(([name, scores]) => ({
+        name,
+        value: Math.round(scores.reduce((sum, n) => sum + n, 0) / scores.length),
+        hint: `${scores.length} quiz${scores.length === 1 ? '' : 'zes'}`,
+      }))
+      .sort((a, b) => a.value - b.value);
+    const recentAttendance = [...attendance]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-14)
+      .map((row) => ({ date: `${row.id}-${row.date}`, status: row.status }));
+    return {
+      attendanceRate,
+      quizAvg,
+      homeworkDoneRate,
+      pendingCount: pendingHomework.length,
+      subjects,
+      recentAttendance,
+    };
+  }, [attendanceQuery.data, resultsQuery.data, homeworkQuery.data, quizzesQuery.data]);
 
   if (childLoading) {
     return <LoadingState message="Loading children…" />;
@@ -79,7 +140,9 @@ export default function HomeScreen() {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.greeting}>Hello, {user?.firstName ?? 'Parent'}</Text>
-            <Text style={styles.date}>{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
+            <Text style={styles.date}>
+              {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+            </Text>
           </View>
           <Pressable onPress={() => router.push('/profile')}>
             <Text style={styles.profileLink}>Profile</Text>
@@ -87,6 +150,30 @@ export default function HomeScreen() {
         </View>
 
         <ChildHeader />
+
+        <View style={styles.snapshot}>
+          <Text style={styles.snapshotTitle}>At a glance</Text>
+          <View style={styles.rings}>
+            <ScoreRing value={snapshot.attendanceRate} label="Attendance" />
+            <ScoreRing value={snapshot.quizAvg} label="Quiz average" />
+            <ScoreRing value={snapshot.homeworkDoneRate} label="Homework done" />
+          </View>
+          {snapshot.recentAttendance.length ? (
+            <View style={styles.dotsWrap}>
+              <AttendanceDots statuses={snapshot.recentAttendance} />
+            </View>
+          ) : null}
+          {snapshot.subjects.length ? (
+            <View style={styles.subjects}>
+              <Text style={styles.subjectsTitle}>Quiz scores by subject</Text>
+              {snapshot.subjects.map((item) => (
+                <LabeledBar key={item.name} label={item.name} value={item.value} hint={item.hint} />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.snapshotHint}>Quiz subject bars appear after the first result.</Text>
+          )}
+        </View>
 
         <View style={styles.statsRow}>
           <StatPill label="Pending HW" value={pendingHomework.length} />
@@ -112,7 +199,11 @@ export default function HomeScreen() {
 
         <SectionTitle
           title="Pending homework"
-          action={<Text style={styles.link} onPress={() => router.push('/(tabs)/homework')}>See all</Text>}
+          action={
+            <Text style={styles.link} onPress={() => router.push('/(tabs)/homework')}>
+              See all
+            </Text>
+          }
         />
         {homeworkQuery.isLoading ? (
           <LoadingState message="Loading homework…" />
@@ -131,7 +222,11 @@ export default function HomeScreen() {
 
         <SectionTitle
           title="New quizzes"
-          action={<Text style={styles.link} onPress={() => router.push('/(tabs)/quizzes')}>See all</Text>}
+          action={
+            <Text style={styles.link} onPress={() => router.push('/(tabs)/quizzes')}>
+              See all
+            </Text>
+          }
         />
         {quizzesQuery.isLoading ? (
           <LoadingState message="Loading quizzes…" />
@@ -151,7 +246,11 @@ export default function HomeScreen() {
 
         <SectionTitle
           title="Announcements"
-          action={<Text style={styles.link} onPress={() => router.push('/announcements')}>See all</Text>}
+          action={
+            <Text style={styles.link} onPress={() => router.push('/announcements')}>
+              See all
+            </Text>
+          }
         />
         {announcementsQuery.isLoading ? (
           <LoadingState message="Loading announcements…" />
@@ -209,6 +308,20 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 24, fontWeight: '800', color: colors.slate900 },
   date: { color: colors.slate500, marginTop: 4 },
   profileLink: { color: colors.primary, fontWeight: '600' },
+  snapshot: {
+    backgroundColor: colors.white,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    marginBottom: spacing.md,
+  },
+  snapshotTitle: { fontSize: 16, fontWeight: '800', color: colors.slate800, marginBottom: spacing.md },
+  rings: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
+  dotsWrap: { marginTop: spacing.md },
+  subjects: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.slate100 },
+  subjectsTitle: { fontSize: 13, fontWeight: '700', color: colors.slate600, marginBottom: spacing.sm },
+  snapshotHint: { marginTop: spacing.md, fontSize: 12, color: colors.slate500 },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   statPill: {
     flex: 1,

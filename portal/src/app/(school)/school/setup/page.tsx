@@ -88,6 +88,13 @@ const setupSections: SetupSection[] = [
         icon: UserSquare2,
       },
       {
+        href: "/school/teachers/attendance",
+        title: "Teacher attendance",
+        description: "Admin marks present or absent — used in teacher ranking",
+        icon: ClipboardCheck,
+        permission: "MANAGE_TEACHERS",
+      },
+      {
         href: "/school/staff",
         title: "Staff access",
         description: "Principal and staff logins with permissions",

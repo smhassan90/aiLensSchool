@@ -1,9 +1,9 @@
 export const STAFF_PERMISSIONS = [
   { key: 'VIEW_DASHBOARD', label: 'School dashboard', hint: 'See students, fees and what is happening today' },
   { key: 'SEARCH_STUDENTS', label: 'Find a child', hint: 'Search by student ID, parent name or phone' },
-  { key: 'VIEW_TEACHER_PROGRESS', label: 'Teacher progress', hint: 'Punctuality, quizzes and AI coaching notes' },
+  { key: 'VIEW_TEACHER_PROGRESS', label: 'Teacher progress', hint: 'Ranked scores, AI coaching notes and class-level results' },
   { key: 'VIEW_FINANCE', label: 'Fees & money', hint: 'Collected vs remaining, and expense charts' },
-  { key: 'MANAGE_TEACHERS', label: 'Add teachers', hint: 'Create teacher logins' },
+  { key: 'MANAGE_TEACHERS', label: 'Add teachers', hint: 'Create teacher logins and mark teacher attendance' },
   { key: 'MANAGE_CLASSES', label: 'Classes & sections', hint: 'Create class, section, class teacher' },
   { key: 'MANAGE_STAFF', label: 'Staff accounts', hint: 'Create principal or staff with selected access' },
   { key: 'MANAGE_EXPENSES', label: 'Salaries & bills', hint: 'Teacher salary, electricity, repairs' },

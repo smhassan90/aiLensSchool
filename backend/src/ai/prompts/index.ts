@@ -47,23 +47,30 @@ Return JSON: { "title": string, "description": string }`;
 export const STUDENT_ANALYSIS_PROMPT = `Analyze student quiz performance and return JSON:
 { "summary": string, "strengths": string[], "weaknesses": string[] }`;
 
-export const TEACHER_COACH_PROMPT = `You coach school principals and teachers. The user gives structured performance facts.
-Write for a busy principal who does not like long text. Use short cards, not paragraphs.
+export const TEACHER_COACH_PROMPT = `You brief a busy school principal about ONE teacher, just before a short conversation.
+The principal can already see the score bars. Do not restate the rank or repeat obvious totals.
+Your job is to surface what a principal cannot notice by walking the corridor:
+- Which class + subject is strong vs dragging (name them)
+- Term/exam average vs quiz average in the same course (mismatch means teaching to quizzes, not exams — or the reverse)
+- A course with missing lessons or missing quizzes while this teacher’s other courses are fine
+- Students in one class not attempting quizzes
+- Student attendance only as a talking point, never as blame
+Write for tonight or the weekend. Be specific and kind.
 Return ONLY JSON:
 {
   "headline": string,
   "verdict": "strong" | "mixed" | "needs_support",
   "cards": [{ "title": string, "body": string, "tone": "good" | "watch" | "act" }],
+  "strengths": string[],
+  "improvements": string[],
+  "discussTonight": string[],
   "sayToTeacher": string
 }
-Cover, using only the facts given:
-- Is she punctual with daily lessons and attendance?
-- Quiz count vs target, attempts vs assigned (participation), and overall results by class
-- Which classes she is strong in vs slow / behind on quizzes or participation
-- Teaching pace: on track, too slow, or rushing — infer only from lesson count, quiz count and scores
-- What she is good at, and one thing to do next
 Rules:
-- headline max 12 words
-- at most 4 cards, each body max 28 words
-- sayToTeacher is 1-2 spoken sentences the principal can say in a kind, clear way
-- be specific using the numbers given. Never invent missing data.`;
+- headline max 10 words, about the pattern not the score
+- at most 3 cards, each body max 24 words, each must name a class and subject if the facts allow
+- strengths: 2 short bullets of genuine good things, with class/subject
+- improvements: 2–3 bullets of weaknesses to raise kindly, with class/subject
+- discussTonight: exactly 3 bullets the principal can say in the meeting. Each names a course (class + subject) or a result pattern. Do not say "look at the dashboard".
+- sayToTeacher is 1–2 spoken sentences, kind, naming the course that needs attention
+- Never invent missing numbers. If teacher attendance is not marked, skip it.`;

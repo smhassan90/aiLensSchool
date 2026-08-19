@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChildHeader } from '@/components/ChildHeader';
 import { Badge, Card, EmptyState, ErrorState, LoadingState } from '@/components/ui';
+import { ProgressBar, toneColor } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
 import { colors, spacing } from '@/constants/theme';
 import { fetchQuizzes, isQuizNew } from '@/services/quizzes.service';
@@ -50,6 +51,17 @@ export default function QuizzesTabScreen() {
             <Text style={styles.hint}>
               Showing published quizzes for {selectedChild?.firstName ?? 'this child'} only.
             </Text>
+            {average != null ? (
+              <View style={styles.snapshot}>
+                <Text style={styles.snapshotLabel}>Average score</Text>
+                <View style={styles.snapshotRow}>
+                  <Text style={[styles.snapshotValue, { color: toneColor(average) }]}>{average}%</Text>
+                  <View style={styles.snapshotBar}>
+                    <ProgressBar value={average} height={10} />
+                  </View>
+                </View>
+              </View>
+            ) : null}
           </>
         }
         data={query.data?.items ?? []}
@@ -106,5 +118,4 @@ const styles = StyleSheet.create({
   hint: { color: colors.slate500, marginBottom: spacing.md },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
   cardTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800, flex: 1 },
-  cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4, marginBottom: spacing.sm },
-});
+  cardMeta: { fontSize: 13, color: c

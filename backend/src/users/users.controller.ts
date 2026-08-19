@@ -47,6 +47,10 @@ class CreateStaffDto {
   title?: string;
 
   @IsOptional()
+  @IsEnum(RoleName)
+  role?: RoleName;
+
+  @IsOptional()
   @IsArray()
   @ArrayUnique()
   @IsString({ each: true })

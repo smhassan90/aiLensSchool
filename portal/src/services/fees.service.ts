@@ -30,4 +30,7 @@ export const feesService = {
   pay(payload: { studentFeeId: string; amount: number; method?: string; reference?: string }) {
     return apiClient("/fees/payments", { method: "POST", body: JSON.stringify(payload) });
   },
+  markPaid(studentFeeId: string) {
+    return apiClient("/fees/mark-paid", { method: "POST", body: JSON.stringify({ studentFeeId }) });
+  },
 };

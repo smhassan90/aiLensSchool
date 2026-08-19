@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, RoleName, TeacherStatus, UserStatus } from '@prisma/client';
+import { Prisma, RoleName, TeacherStatus, UserStatus, AttendanceStatus, LessonStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -13,6 +13,13 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { AI_PROVIDER, AiProvider } from '../ai/providers/ai.provider';
+import {
+  PERFORMANCE_CRITERIA,
+  clampScore,
+  weekdaysSince,
+  weightedTotal,
+  type ScoreKey,
+} from './teacher-score';
 
 @Injectable()
 export class TeachersService {
@@ -260,8 +267,128 @@ export class TeachersService {
 
   async performance(id: string, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
+    const scored = await this.scoreOne(id, schoolId);
+    if (!scored) throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
+    return scored;
+  }
+
+  async scoreboard(user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teachers = await this.prisma.teacherProfile.findMany({
+      where: { schoolId, status: TeacherStatus.ACTIVE },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const rows = (
+      await Promise.all(teachers.map((teacher) => this.scoreOne(teacher.id, schoolId)))
+    ).filter((row): row is NonNullable<typeof row> => Boolean(row));
+    rows.sort((a, b) => b.total - a.total);
+    return {
+      weights: PERFORMANCE_CRITERIA,
+      teachers: rows.map((row, index) => ({ ...row, rank: index + 1 })),
+    };
+  }
+
+  async listTeacherAttendance(user: AuthUser, date: string) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const day = new Date(date);
+    const teachers = await this.prisma.teacherProfile.findMany({
+      where: { schoolId, status: TeacherStatus.ACTIVE },
+      orderBy: { user: { firstName: 'asc' } },
+      select: {
+        id: true,
+        employeeCode: true,
+        user: { select: { firstName: true, lastName: true } },
+      },
+    });
+    const marks = await this.prisma.teacherAttendance.findMany({
+      where: { schoolId, date: day },
+      select: { teacherId: true, status: true },
+    });
+    const byTeacher = new Map(marks.map((row) => [row.teacherId, row.status]));
+    return teachers.map((teacher) => ({
+      teacherId: teacher.id,
+      name: `${teacher.user.firstName} ${teacher.user.lastName}`,
+      employeeCode: teacher.employeeCode,
+      status: byTeacher.get(teacher.id) ?? AttendanceStatus.PRESENT,
+    }));
+  }
+
+  async markTeacherAttendance(
+    user: AuthUser,
+    dto: { date: string; entries: Array<{ teacherId: string; status: 'PRESENT' | 'ABSENT' }> },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const day = new Date(dto.date);
+    await this.prisma.$transaction(
+      dto.entries.map((entry) =>
+        this.prisma.teacherAttendance.upsert({
+          where: { teacherId_date: { teacherId: entry.teacherId, date: day } },
+          create: {
+            schoolId,
+            teacherId: entry.teacherId,
+            date: day,
+            status: entry.status,
+            recordedById: user.id,
+          },
+          update: { status: entry.status, recordedById: user.id },
+        }),
+      ),
+    );
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'TEACHER_ATTENDANCE_MARKED',
+      entityType: 'TeacherAttendance',
+      metadata: { date: dto.date, count: dto.entries.length },
+    });
+    return { saved: dto.entries.length };
+  }
+
+  async coach(id: string, user: AuthUser) {
+    const board = await this.scoreboard(user);
+    const facts = board.teachers.find((row) => row.teacher.id === id);
+    if (!facts) throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
+    const text = [
+      `Teacher: ${facts.teacher.name}`,
+      `Rank: ${facts.rank ?? 'n/a'} · Weighted score: ${facts.total}/100`,
+      `Weights: ${PERFORMANCE_CRITERIA.map((c) => `${c.label} ${c.points}`).join(', ')}`,
+      `Lessons last 14 school days: ${facts.metrics.lessons.done}/${facts.metrics.lessons.expected} (score ${facts.scores.lessons ?? 'n/a'})`,
+      `Quizzes created: ${facts.metrics.quizzes.created} vs target ${facts.metrics.quizzes.target} (score ${facts.scores.quizzesCreated ?? 'n/a'})`,
+      `Quiz completion in this teacher's subjects: ${facts.metrics.quizzes.completion ?? 'n/a'}%`,
+      `Quiz marks ≥70% rate: ${facts.metrics.quizzes.goodMarks ?? 'n/a'}% · average ${facts.metrics.quizzes.average ?? 'n/a'}%`,
+      `Annual/term results in this teacher's subjects: ${facts.metrics.annual.average ?? 'n/a'}% (${facts.metrics.annual.source})`,
+      `Teacher attendance (admin-marked): ${facts.metrics.teacherAttendance.present}/${facts.metrics.teacherAttendance.marked} days`,
+      `Student attendance in this teacher's classes: ${facts.metrics.studentAttendance.rate ?? 'n/a'}% (discuss, do not blame)`,
+      `Class teacher of: ${facts.classTeacherOf?.join(', ') || 'none'}`,
+      ...facts.byClass.map(
+        (row) =>
+          `${row.className} ${row.subject}: lessons ${row.lessons}, quizzes ${row.quizzes}, ${row.attempts}/${row.enrolled} attempted, quiz avg ${row.quizAverage ?? 'n/a'}%, term avg ${row.termAverage ?? 'n/a'}%, student attendance ${row.studentAttendance ?? 'n/a'}%`,
+      ),
+    ].join('\n');
+    const result = await this.ai.coach({ facts: text });
+    const cards = result.data.cards ?? [];
+    const coaching = {
+      ...result.data,
+      cards,
+      strengths: result.data.strengths?.length
+        ? result.data.strengths
+        : cards.filter((card) => card.tone === 'good').map((card) => card.body),
+      improvements: result.data.improvements?.length
+        ? result.data.improvements
+        : cards.filter((card) => card.tone !== 'good').map((card) => card.body),
+      discussTonight: result.data.discussTonight?.length
+        ? result.data.discussTonight
+        : result.data.improvements?.length
+          ? result.data.improvements
+          : cards.filter((card) => card.tone !== 'good').map((card) => card.body),
+    };
+    return { performance: facts, coaching };
+  }
+
+  private async scoreOne(teacherId: string, schoolId: string) {
     const teacher = await this.prisma.teacherProfile.findFirst({
-      where: { id, schoolId },
+      where: { id: teacherId, schoolId },
       include: {
         user: { select: { firstName: true, lastName: true } },
         classSubjects: {
@@ -270,58 +397,177 @@ export class TeachersService {
             subject: true,
           },
         },
-        classSections: { include: { grade: true, _count: { select: { enrollments: true } } } },
+        classSections: { include: { grade: true } },
       },
     });
-    if (!teacher) throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
+    if (!teacher) return null;
 
     const since = new Date();
-    since.setDate(since.getDate() - 30);
-    const [lessons, attendanceDays, quizzes, results] = await Promise.all([
-      this.prisma.dailyLesson.count({ where: { createdById: teacher.userId, date: { gte: since } } }),
-      this.prisma.attendance.findMany({
-        where: { schoolId, date: { gte: since }, section: { classTeacherId: teacher.id } },
-        distinct: ['date', 'sectionId'],
-        select: { date: true, sectionId: true },
+    since.setDate(since.getDate() - 14);
+    const yearAgo = new Date();
+    yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+    const schoolDays = weekdaysSince(since);
+    const classes = teacher.classSubjects;
+    const sectionIds = [...new Set(classes.map((item) => item.sectionId))];
+    const subjectIds = [...new Set(classes.map((item) => item.subjectId))];
+
+    const [lessons, quizzes, enrollments, studentAttendance, teacherMarks, assessments, targets] = await Promise.all([
+      this.prisma.dailyLesson.findMany({
+        where: {
+          teacherId: teacher.id,
+          date: { gte: since },
+          status: { not: LessonStatus.CANCELLED },
+        },
+        select: { sectionId: true, subjectId: true, date: true },
       }),
-      this.prisma.quiz.findMany({
-        where: { createdById: teacher.userId },
+      classes.length
+        ? this.prisma.quiz.findMany({
+        where: {
+          createdById: teacher.userId,
+          OR: classes.map((cls) => ({ sectionId: cls.sectionId, subjectId: cls.subjectId })),
+        },
         select: {
           id: true,
-          title: true,
           sectionId: true,
           subjectId: true,
-          section: { select: { name: true, grade: { select: { name: true } } } },
-          _count: { select: { attempts: true, assignments: true } },
+          _count: { select: { attempts: true, assignments: true, results: true } },
+          results: { select: { percentage: true } },
         },
+      })
+        : Promise.resolve([]),
+      sectionIds.length
+        ? this.prisma.studentEnrollment.groupBy({
+            by: ['sectionId'],
+            where: { sectionId: { in: sectionIds }, status: 'ACTIVE' },
+            _count: { _all: true },
+          })
+        : Promise.resolve([]),
+      sectionIds.length
+        ? this.prisma.attendance.findMany({
+            where: { schoolId, sectionId: { in: sectionIds }, date: { gte: since } },
+            select: { sectionId: true, status: true },
+          })
+        : Promise.resolve([]),
+      this.prisma.teacherAttendance.findMany({
+        where: { teacherId: teacher.id, date: { gte: since } },
+        select: { status: true, date: true },
       }),
-      this.prisma.quizResult.groupBy({
-        by: ['quizId'],
-        where: { quiz: { createdById: teacher.userId } },
-        _avg: { percentage: true },
-        _count: { _all: true },
-      }),
+      subjectIds.length && sectionIds.length
+        ? this.prisma.assessmentMark.findMany({
+            where: {
+              schoolId,
+              subjectId: { in: subjectIds },
+              sectionId: { in: sectionIds },
+              assessedAt: { gte: yearAgo },
+              type: { in: ['TERM_EXAM', 'PHYSICAL_TEST', 'CLASS_TEST'] },
+            },
+            select: { sectionId: true, subjectId: true, marks: true, maxMarks: true, type: true },
+          })
+        : Promise.resolve([]),
+      this.prisma.quizTarget.findMany({ where: { schoolId } }),
     ]);
 
-    const resultMap = new Map(results.map((row) => [row.quizId, row]));
-    const byClass = teacher.classSubjects.map((cls) => {
-      const classQuizzes = quizzes.filter(
-        (quiz) => quiz.sectionId === cls.sectionId && quiz.subjectId === cls.subjectId,
+    const pairKey = (sectionId: string, subjectId: string) => `${sectionId}:${subjectId}`;
+    const taughtPairs = new Set(classes.map((cls) => pairKey(cls.sectionId, cls.subjectId)));
+    const scopedAssessments = assessments.filter((row) => taughtPairs.has(pairKey(row.sectionId, row.subjectId)));
+
+    const enrolledBySection = new Map(enrollments.map((row) => [row.sectionId, row._count._all]));
+    const expectedLessons = schoolDays.length * classes.length;
+    const lessonScore =
+      classes.length && expectedLessons
+        ? clampScore((lessons.length / expectedLessons) * 100)
+        : null;
+
+    const target = targets.reduce((sum, row) => {
+      const match = classes.some(
+        (cls) => cls.section.grade.id === row.gradeId && cls.subjectId === row.subjectId,
       );
-      const averages = classQuizzes
-        .map((quiz) => Number(resultMap.get(quiz.id)?._avg.percentage ?? 0))
-        .filter((n) => n > 0);
-      const avg = averages.length ? averages.reduce((a, b) => a + b, 0) / averages.length : null;
-      const attempts = classQuizzes.reduce((sum, quiz) => sum + quiz._count.attempts, 0);
-      const assigned = classQuizzes.reduce((sum, quiz) => sum + quiz._count.assignments, 0);
+      return match ? sum + row.minQuizzes : sum;
+    }, 0) || (classes.length ? Math.max(4, classes.length) : 0);
+    const quizCreateScore =
+      classes.length && target ? clampScore((quizzes.length / Math.max(target, 1)) * 100) : null;
+
+    const enrolledTotal = classes.reduce((sum, cls) => sum + (enrolledBySection.get(cls.sectionId) ?? 0), 0);
+    const attempts = quizzes.reduce((sum, quiz) => sum + quiz._count.attempts, 0);
+    const assigned = quizzes.reduce((sum, quiz) => sum + quiz._count.assignments, 0);
+    const completionBase = assigned || enrolledTotal;
+    const completion =
+      quizzes.length && completionBase ? Math.round((attempts / completionBase) * 100) : null;
+    const allResults = quizzes.flatMap((quiz) => quiz.results);
+    const quizAvg = allResults.length
+      ? allResults.reduce((sum, row) => sum + Number(row.percentage), 0) / allResults.length
+      : null;
+    const goodMarks = allResults.length
+      ? Math.round((allResults.filter((row) => Number(row.percentage) >= 70).length / allResults.length) * 100)
+      : null;
+
+    const termRows = scopedAssessments.filter((row) => row.type === 'TERM_EXAM');
+    const resultRows = termRows.length ? termRows : scopedAssessments;
+    const annualAvg = resultRows.length
+      ? resultRows.reduce((sum, row) => sum + (Number(row.maxMarks) ? (Number(row.marks) / Number(row.maxMarks)) * 100 : 0), 0) /
+        resultRows.length
+      : quizAvg;
+    const annualSource = termRows.length
+      ? 'term exams'
+      : scopedAssessments.length
+        ? 'class tests'
+        : quizAvg != null
+          ? 'quiz scores (no term exams yet)'
+          : 'none';
+
+    const presentStudents = studentAttendance.filter((row) => row.status === AttendanceStatus.PRESENT).length;
+    const studentAttRate = studentAttendance.length
+      ? Math.round((presentStudents / studentAttendance.length) * 100)
+      : null;
+
+    const teacherPresent = teacherMarks.filter((row) => row.status === AttendanceStatus.PRESENT).length;
+    const teacherAttScore = teacherMarks.length ? clampScore((teacherPresent / teacherMarks.length) * 100) : null;
+
+    const scores: Record<ScoreKey, number | null> = {
+      annualResults: annualAvg != null ? clampScore(annualAvg) : null,
+      lessons: lessonScore,
+      quizzesCreated: quizCreateScore,
+      teacherAttendance: teacherAttScore,
+      quizCompletion: completion,
+      quizMarks: goodMarks ?? (quizAvg != null ? clampScore(quizAvg) : null),
+      studentAttendance: studentAttRate,
+    };
+    const total = weightedTotal(scores);
+
+    const byClass = classes.map((cls) => {
+      const classLessons = lessons.filter((row) => row.sectionId === cls.sectionId && row.subjectId === cls.subjectId);
+      const classQuizzes = quizzes.filter((row) => row.sectionId === cls.sectionId && row.subjectId === cls.subjectId);
+      const classResults = classQuizzes.flatMap((quiz) => quiz.results);
+      const classAvg = classResults.length
+        ? Number((classResults.reduce((sum, row) => sum + Number(row.percentage), 0) / classResults.length).toFixed(1))
+        : null;
+      const classAttempts = classQuizzes.reduce((sum, quiz) => sum + quiz._count.attempts, 0);
+      const enrolled = enrolledBySection.get(cls.sectionId) ?? 0;
+      const classAssess = resultRows.filter((row) => row.sectionId === cls.sectionId && row.subjectId === cls.subjectId);
+      const termAverage = classAssess.length
+        ? Number(
+            (
+              classAssess.reduce(
+                (sum, row) => sum + (Number(row.maxMarks) ? (Number(row.marks) / Number(row.maxMarks)) * 100 : 0),
+                0,
+              ) / classAssess.length
+            ).toFixed(1),
+          )
+        : null;
+      const sectionAtt = studentAttendance.filter((row) => row.sectionId === cls.sectionId);
+      const sectionPresent = sectionAtt.filter((row) => row.status === AttendanceStatus.PRESENT).length;
       return {
         className: `${cls.section.grade.name} ${cls.section.name}`,
         subject: cls.subject.name,
+        sectionId: cls.sectionId,
+        subjectId: cls.subjectId,
+        lessons: classLessons.length,
         quizzes: classQuizzes.length,
-        attempts,
-        assigned,
-        participation: assigned ? Math.round((attempts / assigned) * 100) : null,
-        average: avg ? Number(avg.toFixed(1)) : null,
+        attempts: classAttempts,
+        enrolled,
+        quizAverage: classAvg,
+        termAverage,
+        studentAttendance: sectionAtt.length ? Math.round((sectionPresent / sectionAtt.length) * 100) : null,
       };
     });
 
@@ -330,35 +576,28 @@ export class TeachersService {
         id: teacher.id,
         name: `${teacher.user.firstName} ${teacher.user.lastName}`,
       },
+      total,
+      rank: undefined as number | undefined,
+      scores,
+      metrics: {
+        lessons: { done: lessons.length, expected: expectedLessons },
+        quizzes: {
+          created: quizzes.length,
+          target,
+          completion,
+          goodMarks,
+          average: quizAvg != null ? Number(quizAvg.toFixed(1)) : null,
+        },
+        annual: { average: annualAvg != null ? Number(annualAvg.toFixed(1)) : null, source: annualSource },
+        teacherAttendance: { present: teacherPresent, marked: teacherMarks.length },
+        studentAttendance: { rate: studentAttRate, records: studentAttendance.length },
+      },
+      byClass,
       last30Days: {
-        lessonsAdded: lessons,
-        attendanceDaysMarked: attendanceDays.length,
+        lessonsAdded: lessons.length,
+        attendanceDaysMarked: teacherMarks.length,
       },
       classTeacherOf: teacher.classSections.map((section) => `${section.grade.name} ${section.name}`),
-      byClass,
-      quizzes: quizzes.map((quiz) => ({
-        title: quiz.title,
-        className: quiz.section ? `${quiz.section.grade?.name ?? ''} ${quiz.section.name}` : '',
-        assigned: quiz._count.assignments,
-        attempted: quiz._count.attempts,
-        average: resultMap.get(quiz.id)?._avg.percentage ? Number(Number(resultMap.get(quiz.id)?._avg.percentage).toFixed(1)) : null,
-      })),
     };
-  }
-
-  async coach(id: string, user: AuthUser) {
-    const facts = await this.performance(id, user);
-    const text = [
-      `Teacher: ${facts.teacher.name}`,
-      `Lessons last 30 days: ${facts.last30Days.lessonsAdded}`,
-      `Attendance days marked: ${facts.last30Days.attendanceDaysMarked}`,
-      `Class teacher of: ${facts.classTeacherOf.join(', ') || 'none'}`,
-      ...facts.byClass.map(
-        (row) =>
-          `${row.className} ${row.subject}: ${row.quizzes} quizzes, ${row.attempts}/${row.assigned || 0} attempted (${row.participation ?? 'n/a'}% participation), avg ${row.average ?? 'n/a'}%`,
-      ),
-    ].join('\n');
-    const result = await this.ai.coach({ facts: text });
-    return { performance: facts, coaching: result.data };
   }
 }

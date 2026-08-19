@@ -22,6 +22,7 @@ export const staffService = {
     password: string;
     phone?: string;
     title?: string;
+    role?: "PRINCIPAL";
     permissions: StaffPermission[];
   }) {
     return apiClient("/users/staff", { method: "POST", body: JSON.stringify(payload) });

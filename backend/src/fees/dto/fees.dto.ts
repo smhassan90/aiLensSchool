@@ -94,3 +94,19 @@ export class RecordPaymentDto {
   @IsString()
   notes?: string;
 }
+
+export class MarkPaidDto {
+  @ApiProperty()
+  @IsString()
+  studentFeeId!: string;
+
+  @ApiPropertyOptional({ enum: PaymentMethod })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  method?: PaymentMethod;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}

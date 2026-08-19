@@ -77,6 +77,10 @@ export const dashboardService = {
     return apiClient<TeacherDashboardSummary>("/dashboard/teacher");
   },
   teacherCoach() {
-    return apiClient<CoachCards>("/dashboard/teacher/coach", { method: "POST" });
+    return apiClient<CoachCards>("/dashboard/teacher/coach", {
+      method: "POST",
+      body: JSON.stringify({}),
+      cache: "no-store",
+    });
   },
 };

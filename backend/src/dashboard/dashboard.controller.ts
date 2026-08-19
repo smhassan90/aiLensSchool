@@ -27,6 +27,12 @@ export class DashboardController {
   }
 
   @Roles(RoleName.TEACHER)
+  @Get('teacher/coach')
+  teacherCoachGet(@CurrentUser() user: AuthUser) {
+    return this.dashboardService.teacherCoach(user);
+  }
+
+  @Roles(RoleName.TEACHER)
   @Post('teacher/coach')
   teacherCoach(@CurrentUser() user: AuthUser) {
     return this.dashboardService.teacherCoach(user);

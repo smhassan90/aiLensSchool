@@ -30,7 +30,7 @@ export function AppShell({ sidebar, header, children, className, inverted }: App
   }, [open]);
 
   return (
-    <div className={cn("flex min-h-dvh bg-background", className)}>
+    <div className={cn("flex h-dvh overflow-hidden bg-background", className)}>
       {open ? (
         <button
           type="button"
@@ -42,8 +42,8 @@ export function AppShell({ sidebar, header, children, className, inverted }: App
 
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-72 max-w-[min(18rem,85vw)] flex-col print:hidden",
-          "transition-transform duration-200 ease-out lg:static lg:z-auto lg:w-64 lg:max-w-none lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex h-dvh w-72 max-w-[min(18rem,85vw)] flex-col overflow-hidden print:hidden",
+          "transition-transform duration-200 ease-out lg:static lg:z-auto lg:h-full lg:w-[17.5rem] lg:max-w-none lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -61,8 +61,8 @@ export function AppShell({ sidebar, header, children, className, inverted }: App
         {sidebar}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b bg-background/95 px-3 py-2.5 backdrop-blur print:hidden sm:px-6 sm:py-3">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="z-30 flex shrink-0 items-center gap-3 border-b bg-background/95 px-3 py-2.5 backdrop-blur print:hidden sm:px-6 sm:py-3">
           <Button
             variant="ghost"
             size="icon"

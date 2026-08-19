@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName, StudentFeeStatus } from '@prisma/client';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { FeesService } from './fees.service';
-import { AssignFeesDto, CreateFeeStructureDto, RecordPaymentDto } from './dto/fees.dto';
+import { AssignFeesDto, CreateFeeStructureDto, MarkPaidDto, RecordPaymentDto } from './dto/fees.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -57,9 +57,15 @@ export class FeesController {
     return this.feesService.listStudentFees(user, query);
   }
 
-  @Roles(RoleName.SCHOOL_ADMIN)
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
   @Post('payments')
   pay(@Body() dto: RecordPaymentDto, @CurrentUser() user: AuthUser) {
     return this.feesService.recordPayment(dto, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @Post('mark-paid')
+  markPaid(@Body() dto: MarkPaidDto, @CurrentUser() user: AuthUser) {
+    return this.feesService.markPaid(dto, user);
   }
 }

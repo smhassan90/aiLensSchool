@@ -52,6 +52,9 @@ export interface AiProvider {
       headline: string;
       verdict: 'strong' | 'mixed' | 'needs_support';
       cards: Array<{ title: string; body: string; tone: 'good' | 'watch' | 'act' }>;
+      strengths: string[];
+      improvements: string[];
+      discussTonight: string[];
       sayToTeacher: string;
     }>
   >;

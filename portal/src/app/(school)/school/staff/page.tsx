@@ -1,40 +1,65 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { staffService } from "@/services/school-ops.service";
 import type { StaffPermission } from "@/lib/types";
 import { useToast } from "@/providers/toast-provider";
+
+const STAFF_ROLES = [
+  {
+    title: "Principal",
+    permissions: ["VIEW_DASHBOARD", "SEARCH_STUDENTS", "VIEW_TEACHER_PROGRESS", "VIEW_FINANCE"] as StaffPermission[],
+  },
+  {
+    title: "Vice Principal",
+    permissions: ["VIEW_DASHBOARD", "SEARCH_STUDENTS", "VIEW_TEACHER_PROGRESS", "MANAGE_TEACHERS", "MANAGE_CLASSES"] as StaffPermission[],
+  },
+  {
+    title: "Accountant",
+    permissions: ["VIEW_FINANCE", "MANAGE_EXPENSES"] as StaffPermission[],
+  },
+  {
+    title: "Front desk",
+    permissions: ["VIEW_DASHBOARD", "SEARCH_STUDENTS"] as StaffPermission[],
+  },
+  {
+    title: "Coordinator",
+    permissions: ["VIEW_DASHBOARD", "VIEW_TEACHER_PROGRESS", "MANAGE_CLASSES", "SET_QUIZ_TARGETS"] as StaffPermission[],
+  },
+] as const;
 
 export default function StaffPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const catalog = useQuery({ queryKey: ["staff-permissions"], queryFn: () => staffService.permissions() });
   const staff = useQuery({ queryKey: ["staff"], queryFn: () => staffService.list({ limit: 50 }) });
-  const [permissions, setPermissions] = useState<StaffPermission[]>([
-    "VIEW_DASHBOARD",
-    "SEARCH_STUDENTS",
-    "VIEW_TEACHER_PROGRESS",
-    "VIEW_FINANCE",
-  ]);
+  const [title, setTitle] = useState<string>(STAFF_ROLES[0].title);
+  const selectedRole = useMemo(
+    () => STAFF_ROLES.find((role) => role.title === title) ?? STAFF_ROLES[0],
+    [title],
+  );
+  const [permissions, setPermissions] = useState<StaffPermission[]>([...STAFF_ROLES[0].permissions]);
 
   const create = useMutation({
-    mutationFn: (form: HTMLFormElement) => {
-      const data = new FormData(form);
-      return staffService.create({
-        firstName: String(data.get("firstName") ?? ""),
-        lastName: String(data.get("lastName") ?? ""),
-        email: String(data.get("email") ?? ""),
-        password: String(data.get("password") ?? ""),
-        title: String(data.get("title") ?? "Principal"),
+    mutationFn: (payload: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      password: string;
+    }) =>
+      staffService.create({
+        ...payload,
+        title: selectedRole.title,
+        role: "PRINCIPAL",
         permissions,
-      });
-    },
+      }),
     onSuccess: () => {
       toast({ title: "Account created", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["staff"] });
@@ -44,7 +69,17 @@ export default function StaffPage() {
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    create.mutate(e.currentTarget);
+    const form = e.currentTarget;
+    const data = new FormData(form);
+    create.mutate(
+      {
+        firstName: String(data.get("firstName") ?? ""),
+        lastName: String(data.get("lastName") ?? ""),
+        email: String(data.get("email") ?? ""),
+        password: String(data.get("password") ?? ""),
+      },
+      { onSuccess: () => form.reset() },
+    );
   };
 
   const toggle = (key: StaffPermission) => {
@@ -55,7 +90,7 @@ export default function StaffPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Staff access"
-        description="Create a principal or office account. Tick only what they need."
+        description="Pick a role, then tick only what they need."
       />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -68,7 +103,24 @@ export default function StaffPage() {
               </div>
               <div><Label>Email</Label><Input name="email" type="email" required /></div>
               <div><Label>Password</Label><Input name="password" type="password" minLength={6} required /></div>
-              <div><Label>Role label</Label><Input name="title" defaultValue="Principal" /></div>
+              <div>
+                <Label>Role</Label>
+                <Select
+                  name="title"
+                  value={title}
+                  onChange={(e) => {
+                    const next = STAFF_ROLES.find((role) => role.title === e.target.value) ?? STAFF_ROLES[0];
+                    setTitle(next.title);
+                    setPermissions([...next.permissions]);
+                  }}
+                >
+                  {STAFF_ROLES.map((role) => (
+                    <option key={role.title} value={role.title}>
+                      {role.title}
+                    </option>
+                  ))}
+                </Select>
+              </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium">What can they do?</p>
                 {(catalog.data ?? []).map((item) => (

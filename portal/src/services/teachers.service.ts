@@ -31,6 +31,84 @@ export interface CreateTeacherPayload {
   hireDate?: string;
 }
 
+export type ScoreKey =
+  | "annualResults"
+  | "lessons"
+  | "quizzesCreated"
+  | "teacherAttendance"
+  | "quizCompletion"
+  | "quizMarks"
+  | "studentAttendance";
+
+export interface PerformanceCriterion {
+  key: ScoreKey;
+  label: string;
+  points: number;
+  why: string;
+}
+
+export interface TeacherScoreRow {
+  teacher: { id: string; name: string };
+  total: number;
+  rank?: number;
+  scores: Record<ScoreKey, number | null>;
+  metrics: {
+    lessons: { done: number; expected: number };
+    quizzes: {
+      created: number;
+      target: number;
+      completion: number | null;
+      goodMarks: number | null;
+      average: number | null;
+    };
+    annual: { average: number | null; source: string };
+    teacherAttendance: { present: number; marked: number };
+    studentAttendance: { rate: number | null; records: number };
+  };
+  byClass: Array<{
+    className: string;
+    subject: string;
+    sectionId: string;
+    subjectId: string;
+    lessons: number;
+    quizzes: number;
+    attempts: number;
+    enrolled: number;
+    quizAverage: number | null;
+    termAverage: number | null;
+    studentAttendance: number | null;
+  }>;
+  last30Days?: { lessonsAdded: number; attendanceDaysMarked: number };
+  classTeacherOf?: string[];
+}
+
+export interface TeacherScoreboard {
+  weights: PerformanceCriterion[];
+  teachers: TeacherScoreRow[];
+}
+
+export interface TeacherCoaching {
+  headline: string;
+  verdict: string;
+  cards: Array<{ title: string; body: string; tone: string }>;
+  strengths: string[];
+  improvements: string[];
+  discussTonight: string[];
+  sayToTeacher: string;
+}
+
+export interface TeacherCoachResult {
+  performance: TeacherScoreRow;
+  coaching: TeacherCoaching;
+}
+
+export interface TeacherAttendanceRow {
+  teacherId: string;
+  name: string;
+  employeeCode: string;
+  status: "PRESENT" | "ABSENT";
+}
+
 export const teachersService = {
   myClasses() {
     return apiClient<TeacherClassAssignment[]>("/teachers/me/classes").then((items) =>
@@ -54,18 +132,32 @@ export const teachersService = {
   },
 
   performance(id: string) {
-    return apiClient<Record<string, unknown>>(`/teachers/${id}/performance`);
+    return apiClient<TeacherScoreRow>(`/teachers/${id}/performance`);
+  },
+
+  scoreboard() {
+    return apiClient<TeacherScoreboard>("/teachers/scoreboard", { cache: "no-store" });
+  },
+
+  listAttendance(date: string) {
+    return apiClient<TeacherAttendanceRow[]>(`/teachers/attendance${buildQuery({ date })}`);
+  },
+
+  markAttendance(payload: {
+    date: string;
+    entries: Array<{ teacherId: string; status: "PRESENT" | "ABSENT" }>;
+  }) {
+    return apiClient<{ saved: number }>("/teachers/attendance", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   coach(id: string) {
-    return apiClient<{
-      performance: Record<string, unknown>;
-      coaching: {
-        headline: string;
-        verdict: string;
-        cards: Array<{ title: string; body: string; tone: string }>;
-        sayToTeacher: string;
-      };
-    }>(`/teachers/${id}/coach`, { method: "POST" });
+    return apiClient<TeacherCoachResult>(`/teachers/${id}/coach`, {
+      method: "POST",
+      body: JSON.stringify({}),
+      cache: "no-store",
+    });
   },
 };

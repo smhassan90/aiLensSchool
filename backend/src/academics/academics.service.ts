@@ -660,7 +660,7 @@ export class AcademicsService {
     });
   }
 
-  addAssessment(
+  async addAssessment(
     user: AuthUser,
     dto: {
       studentId: string;
@@ -675,8 +675,62 @@ export class AcademicsService {
     },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
+    const enrollment = await this.prisma.studentEnrollment.findFirst({
+      where: {
+        student: { schoolId },
+        sectionId: dto.sectionId,
+        OR: [{ studentId: dto.studentId }, { id: dto.studentId }],
+      },
+      select: { studentId: true, sectionId: true, academicYearId: true },
+    });
+    if (!enrollment) {
+      throw new NotFoundException({
+        code: 'STUDENT_NOT_FOUND',
+        message: 'That student is not in this class. Pick a student from the list and try again.',
+      });
+    }
+
+    const [subject, section, year] = await Promise.all([
+      this.prisma.subject.findFirst({ where: { id: dto.subjectId, schoolId }, select: { id: true } }),
+      this.prisma.section.findFirst({ where: { id: dto.sectionId, schoolId }, select: { id: true } }),
+      this.prisma.academicYear.findFirst({
+        where: { id: enrollment.academicYearId || dto.academicYearId, schoolId },
+        select: { id: true },
+      }),
+    ]);
+    if (!subject) {
+      throw new NotFoundException({ code: 'SUBJECT_NOT_FOUND', message: 'Subject not found' });
+    }
+    if (!section) {
+      throw new NotFoundException({ code: 'SECTION_NOT_FOUND', message: 'Class not found' });
+    }
+    if (!year) {
+      throw new NotFoundException({ code: 'YEAR_NOT_FOUND', message: 'Academic year not found' });
+    }
+
+    let examConfigId = dto.examConfigId || undefined;
+    if (examConfigId) {
+      const exam = await this.prisma.examConfig.findFirst({
+        where: { id: examConfigId, schoolId },
+        select: { id: true },
+      });
+      if (!exam) examConfigId = undefined;
+    }
+
     return this.prisma.assessmentMark.create({
-      data: { schoolId, recordedById: user.id, ...dto },
+      data: {
+        schoolId,
+        studentId: enrollment.studentId,
+        subjectId: subject.id,
+        sectionId: section.id,
+        academicYearId: year.id,
+        examConfigId,
+        type: dto.type,
+        title: dto.title,
+        maxMarks: dto.maxMarks,
+        marks: dto.marks,
+        recordedById: user.id,
+      },
     });
   }
 

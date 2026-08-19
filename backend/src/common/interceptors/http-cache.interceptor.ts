@@ -30,7 +30,13 @@ export class HttpCacheInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    if (url.includes('/health') || url.includes('/docs') || url.includes('/uploads')) {
+    if (
+      url.includes('/health') ||
+      url.includes('/docs') ||
+      url.includes('/uploads') ||
+      url.includes('/coach') ||
+      url.includes('/scoreboard')
+    ) {
       return next.handle();
     }
 

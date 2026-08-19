@@ -178,6 +178,9 @@ export class CursorProvider implements AiProvider {
       headline: string;
       verdict: 'strong' | 'mixed' | 'needs_support';
       cards: Array<{ title: string; body: string; tone: 'good' | 'watch' | 'act' }>;
+      strengths: string[];
+      improvements: string[];
+      discussTonight: string[];
       sayToTeacher: string;
     }>
   > {
@@ -188,7 +191,14 @@ export class CursorProvider implements AiProvider {
         { title: 'What is going well', body: 'Use the numbers on this page as the source of truth.', tone: 'good' as const },
         { title: 'What to watch', body: 'If lessons or attendance are missing, start there before talking about results.', tone: 'watch' as const },
       ],
-      sayToTeacher: 'Thank you for the work you are doing. Let’s keep lessons and attendance updated every school day, then we can look at quiz scores together.',
+      strengths: ['Keep using the numbers on this page as the source of truth.'],
+      improvements: ['If lessons or quizzes are missing, start there in the next meeting.'],
+      discussTonight: [
+        'Ask which course feels hardest for students this term.',
+        'Compare quiz averages with term results in each class they teach.',
+        'Check whether every class has lessons and quizzes, not only the stronger one.',
+      ],
+      sayToTeacher: 'Thank you for the work you are doing. Let’s keep lessons and quizzes updated, then we can look at results together.',
     };
     if (!this.apiKey) {
       return { data: fallback, provider: 'mock', model: 'deterministic-mock', inputTokens: 0, outputTokens: 0, estimatedCost: 0 };

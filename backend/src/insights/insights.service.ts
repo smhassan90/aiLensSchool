@@ -196,7 +196,15 @@ export class InsightsService {
       }),
       this.prisma.studentFee.findMany({
         where: { studentId, schoolId },
-        include: { feeStructure: true, payments: true },
+        select: {
+          id: true,
+          amount: true,
+          paidAmount: true,
+          status: true,
+          periodLabel: true,
+          dueDate: true,
+          feeStructure: { select: { name: true } },
+        },
         orderBy: { dueDate: 'desc' },
       }),
       this.prisma.idCard.findMany({

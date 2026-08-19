@@ -296,6 +296,7 @@ model User {
   generatedIdCards        IdCard[]                 @relation("IdCardGeneratedBy")
   recordedExpenses        Expense[]                @relation("ExpenseRecordedBy")
   recordedAssessments     AssessmentMark[]         @relation("AssessmentRecordedBy")
+  recordedTeacherAttendance TeacherAttendance[]    @relation("TeacherAttendanceRecordedBy")
 
   @@index([schoolId])
   @@index([status])
@@ -419,6 +420,7 @@ model School {
   orders                  Order[]
   auditLogs               AuditLog[]
   attendances             Attendance[]
+  teacherAttendances      TeacherAttendance[]
   feeStructures           FeeStructure[]
   studentFees             StudentFee[]
   homeDiaries             HomeDiary[]
@@ -626,6 +628,7 @@ model TeacherProfile {
   idCards                IdCard[]
   gradeStyles            TeacherGradeStyle[]
   classSections          Section[]         @relation("SectionClassTeacher")
+  attendances            TeacherAttendance[]
 
   @@unique([schoolId, employeeCode])
   @@index([schoolId])
@@ -1246,6 +1249,27 @@ model Attendance {
   @@index([sectionId])
   @@index([date])
   @@map("attendances")
+}
+
+model TeacherAttendance {
+  id           String           @id @default(uuid())
+  schoolId     String           @map("school_id")
+  teacherId    String           @map("teacher_id")
+  date         DateTime         @db.Date
+  status       AttendanceStatus
+  notes        String?
+  recordedById String           @map("recorded_by_id")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  school     School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacher    TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  recordedBy User           @relation("TeacherAttendanceRecordedBy", fields: [recordedById], references: [id])
+
+  @@unique([teacherId, date])
+  @@index([schoolId])
+  @@index([date])
+  @@map("teacher_attendances")
 }
 
 // ===================== COMMUNICATION =====================

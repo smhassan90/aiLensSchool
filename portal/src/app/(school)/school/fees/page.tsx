@@ -77,6 +77,15 @@ export default function FeesPage() {
     onError: (err) => toast({ title: "Assign failed", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
   });
 
+  const markPaid = useMutation({
+    mutationFn: (studentFeeId: string) => feesService.markPaid(studentFeeId),
+    onSuccess: () => {
+      toast({ title: "Marked as paid", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["fees"] });
+    },
+    onError: (err) => toast({ title: "Could not mark paid", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
+  });
+
   const pay = useMutation({
     mutationFn: () => feesService.pay({ studentFeeId: payId!, amount: Number(amount), method: "CASH" }),
     onSuccess: () => {
@@ -92,7 +101,7 @@ export default function FeesPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Fees"
-        description="Assign tuition and collect payments"
+        description="Assign tuition and mark student fees as paid"
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setStructureOpen(true)}>New fee type</Button>
@@ -130,7 +139,25 @@ export default function FeesPage() {
                   <TableCell><Badge variant={row.status === "PAID" ? "success" : row.status === "DUE" ? "destructive" : "warning"}>{row.status}</Badge></TableCell>
                   <TableCell>
                     {row.status !== "PAID" && (
-                      <Button size="sm" variant="outline" onClick={() => { setPayId(row.id); setAmount(String(row.balance ?? row.amount - row.paidAmount)); }}>Pay</Button>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => markPaid.mutate(row.id)}
+                          disabled={markPaid.isPending}
+                        >
+                          Mark paid
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setPayId(row.id);
+                            setAmount(String(row.balance ?? Number(row.amount) - Number(row.paidAmount)));
+                          }}
+                        >
+                          Partial
+                        </Button>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>

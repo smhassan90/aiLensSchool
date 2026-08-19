@@ -4,16 +4,19 @@ import { PageLoader } from "@/components/layout/page-loader";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { insightsService } from "@/services/insights.service";
+import { feesService } from "@/services/fees.service";
 import { formatDate } from "@/lib/utils";
 import { BarChart } from "@/components/charts/simple-charts";
 import { ArrowLeft } from "lucide-react";
+import { useToast } from "@/providers/toast-provider";
+import { ApiClientError } from "@/lib/api-client";
 
 type Overview = {
   student: {
@@ -32,14 +35,26 @@ type Overview = {
   homework: Array<{ id: string; title: string; dueDate: string; subject?: { name: string } }>;
   diaries: Array<{ id: string; date: string; title: string; lessonSummary: string; homeworkNotes: string }>;
   reportCards: Array<{ id: string; termLabel: string; overallPercentage: number; attendanceRate: number; remarks?: string; lines?: Array<{ gradeLetter: string; average: number; subject: { name: string } }> }>;
-  fees: { billed: number; paid: number; due: number; items: Array<{ periodLabel: string; status: string; amount: number; paidAmount: number }> };
+  fees: { billed: number; paid: number; due: number; items: Array<{ id: string; periodLabel: string; status: string; amount: number; paidAmount: number }> };
 };
 
 export default function Student360Page() {
   const params = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const query = useQuery({
     queryKey: ["student-360", params.id],
     queryFn: () => insightsService.student(params.id) as Promise<Overview>,
+  });
+  const markPaid = useMutation({
+    mutationFn: (studentFeeId: string) => feesService.markPaid(studentFeeId),
+    onSuccess: () => {
+      toast({ title: "Marked as paid", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["student-360", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["fees"] });
+    },
+    onError: (err) =>
+      toast({ title: "Could not mark paid", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
   });
 
   if (query.isLoading) {
@@ -182,12 +197,25 @@ export default function Student360Page() {
         <TabsContent value="fees">
           <Card>
             <CardContent className="space-y-2 pt-6 text-sm">
-              {data.fees.items.map((item, i) => (
-                <div key={i} className="flex justify-between">
-                  <span>{item.periodLabel}</span>
-                  <span>{item.paidAmount}/{item.amount} · {item.status}</span>
-                </div>
-              ))}
+              {data.fees.items.length === 0 ? (
+                <p className="text-muted-foreground">No fee records yet.</p>
+              ) : (
+                data.fees.items.map((item) => (
+                  <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
+                    <span>{item.periodLabel}</span>
+                    <span className="text-muted-foreground">
+                      {Number(item.paidAmount)}/{Number(item.amount)} · {item.status}
+                    </span>
+                    {item.status !== "PAID" ? (
+                      <Button size="sm" onClick={() => markPaid.mutate(item.id)} disabled={markPaid.isPending}>
+                        Mark paid
+                      </Button>
+                    ) : (
+                      <Badge variant="success">Paid</Badge>
+                    )}
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </TabsContent>

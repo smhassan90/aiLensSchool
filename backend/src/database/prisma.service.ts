@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, RoleName } from '@prisma/client';
 
 function databaseUrl() {
   const url = process.env.DATABASE_URL ?? '';
@@ -26,8 +26,20 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleInit() {
     // On Vercel, connect on first query so a slow/blocked DB cannot kill the whole function at import.
-    if (process.env.VERCEL === '1') return;
-    await this.$connect();
+    if (process.env.VERCEL !== '1') {
+      await this.$connect();
+    }
+    await this.ensureRoles();
+  }
+
+  async ensureRoles() {
+    for (const name of Object.values(RoleName)) {
+      await this.role.upsert({
+        where: { name },
+        create: { name, description: `${name} role` },
+        update: {},
+      });
+    }
   }
 
   async onModuleDestroy() {

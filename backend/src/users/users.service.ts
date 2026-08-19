@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { Prisma, RoleName, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
@@ -103,6 +103,7 @@ export class UsersService {
       password: string;
       phone?: string;
       title?: string;
+      role?: RoleName;
       permissions?: StaffPermission[];
     },
   ) {
@@ -112,13 +113,12 @@ export class UsersService {
     if (existing) {
       throw new ConflictException({ code: 'EMAIL_EXISTS', message: 'Email already registered' });
     }
-    const role = await this.prisma.role.findUnique({ where: { name: RoleName.PRINCIPAL } });
-    if (!role) {
-      throw new BadRequestException({
-        code: 'ROLE_MISSING',
-        message: 'PRINCIPAL role missing. Restart after schema update / seed.',
-      });
-    }
+    const roleName = RoleName.PRINCIPAL;
+    const role = await this.prisma.role.upsert({
+      where: { name: roleName },
+      create: { name: roleName, description: `${roleName} role` },
+      update: {},
+    });
     const permissions = parsePermissions(dto.permissions?.length ? dto.permissions : PRINCIPAL_DEFAULT_PERMISSIONS);
     const created = await this.prisma.$transaction(async (tx) => {
       const staff = await tx.user.create({
@@ -143,9 +143,9 @@ export class UsersService {
       action: 'STAFF_CREATED',
       entityType: 'User',
       entityId: created.id,
-      metadata: { title: dto.title ?? 'Principal', permissions },
+      metadata: { title: dto.title ?? 'Principal', role: roleName, permissions },
     });
     const { passwordHash: _pw, ...safe } = created;
-    return { ...safe, roles: [RoleName.PRINCIPAL], permissions };
+    return { ...safe, roles: [roleName], permissions };
   }
 }

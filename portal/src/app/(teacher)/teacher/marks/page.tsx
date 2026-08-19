@@ -36,18 +36,24 @@ export default function TeacherMarksPage() {
   }, [selected]);
 
   const save = useMutation({
-    mutationFn: (form: HTMLFormElement) => {
+    mutationFn: (payload: {
+      studentId: string;
+      type: string;
+      title: string;
+      maxMarks: number;
+      marks: number;
+    }) => {
       if (!selected) throw new Error("Pick a class");
-      const data = new FormData(form);
+      if (!payload.studentId) throw new Error("Pick a student");
       return academicsService.addAssessment({
-        studentId: String(data.get("studentId")),
+        studentId: payload.studentId,
         subjectId: selected.subjectId,
         sectionId: selected.sectionId,
         academicYearId: selected.academicYearId,
-        type: String(data.get("type")),
-        title: String(data.get("title")),
-        maxMarks: Number(data.get("maxMarks") || 100),
-        marks: Number(data.get("marks") || 0),
+        type: payload.type,
+        title: payload.title,
+        maxMarks: payload.maxMarks,
+        marks: payload.marks,
       });
     },
     onSuccess: () => {
@@ -73,8 +79,18 @@ export default function TeacherMarksPage() {
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    save.mutate(e.currentTarget);
-    e.currentTarget.reset();
+    const form = e.currentTarget;
+    const data = new FormData(form);
+    save.mutate(
+      {
+        studentId: String(data.get("studentId") ?? ""),
+        type: String(data.get("type") || "CLASS_TEST"),
+        title: String(data.get("title") ?? ""),
+        maxMarks: Number(data.get("maxMarks") || 100),
+        marks: Number(data.get("marks") || 0),
+      },
+      { onSuccess: () => form.reset() },
+    );
   };
 
   return (
@@ -118,11 +134,15 @@ export default function TeacherMarksPage() {
               <form onSubmit={onSubmit} className="space-y-3">
                 <select name="studentId" required className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                   <option value="">Student</option>
-                  {(enrollments.data?.items ?? []).map((row) => (
-                    <option key={row.studentId} value={row.studentId}>
-                      {row.student ? `${row.student.firstName} ${row.student.lastName}` : row.studentId}
-                    </option>
-                  ))}
+                  {(enrollments.data?.items ?? []).map((row) => {
+                    const studentId = row.student?.id ?? row.studentId;
+                    if (!studentId) return null;
+                    return (
+                      <option key={studentId} value={studentId}>
+                        {row.student ? `${row.student.firstName} ${row.student.lastName}` : studentId}
+                      </option>
+                    );
+                  })}
                 </select>
                 <select name="type" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                   <option value="CLASS_TEST">Class test</option>
