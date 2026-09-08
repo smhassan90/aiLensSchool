@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -160,5 +161,11 @@ export class LessonsController {
   @Post(':id/confirm')
   confirm(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.lessonsService.confirm(id, user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Delete(':id')
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.lessonsService.removeDraft(id, user);
   }
 }

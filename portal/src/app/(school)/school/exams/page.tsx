@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -8,36 +8,52 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { academicsService } from "@/services/academics.service";
 import { useToast } from "@/providers/toast-provider";
 import { useAuth } from "@/providers/auth-provider";
+import { ExamPapersEditor } from "@/components/exams/exam-papers-editor";
+import { createDraftPaper, defaultExamDrafts, toExamPayload, type DraftExamPaper } from "@/lib/exam-patterns";
 
 export default function ExamsPage() {
   const { toast } = useToast();
   const { can } = useAuth();
   const queryClient = useQueryClient();
+  const [yearId, setYearId] = useState("");
+  const [papers, setPapers] = useState<DraftExamPaper[]>(defaultExamDrafts);
   const years = useQuery({ queryKey: ["years"], queryFn: () => academicsService.listYears({ limit: 20 }) });
   const grades = useQuery({ queryKey: ["grades"], queryFn: () => academicsService.listGrades({ limit: 50 }) });
   const subjects = useQuery({ queryKey: ["subjects"], queryFn: () => academicsService.listSubjects({ limit: 100 }) });
   const targets = useQuery({ queryKey: ["quiz-targets"], queryFn: () => academicsService.listQuizTargets() });
+  const configs = useQuery({
+    queryKey: ["exam-configs", yearId],
+    queryFn: () => academicsService.listExamConfigs(yearId),
+    enabled: Boolean(yearId),
+  });
+
+  const loadedYear = useRef("");
+
+  useEffect(() => {
+    const current = years.data?.items.find((year) => year.isCurrent) ?? years.data?.items[0];
+    if (current && !yearId) setYearId(current.id);
+  }, [years.data, yearId]);
+
+  useEffect(() => {
+    if (!yearId || configs.isFetching) return;
+    if (loadedYear.current === yearId) return;
+    loadedYear.current = yearId;
+    if (configs.data?.length) {
+                    setPapers(configs.data.map((exam) => createDraftPaper(exam.name, exam.maxMarks, exam)));
+      return;
+    }
+    setPapers(defaultExamDrafts());
+  }, [yearId, configs.data, configs.isFetching]);
 
   const save = useMutation({
-    mutationFn: (form: HTMLFormElement) => {
-      const data = new FormData(form);
-      const pattern = String(data.get("pattern"));
-      const academicYearId = String(data.get("academicYearId"));
-      const exams =
-        pattern === "THREE_TERMS"
-          ? [
-              { name: "First term", maxMarks: Number(data.get("marks") || 100), sequence: 1 },
-              { name: "Second term", maxMarks: Number(data.get("marks") || 100), sequence: 2 },
-              { name: "Third term", maxMarks: Number(data.get("marks") || 100), sequence: 3 },
-            ]
-          : [
-              { name: "Mid term", maxMarks: Number(data.get("mid") || 50), sequence: 1 },
-              { name: "Final term", maxMarks: Number(data.get("final") || 100), sequence: 2 },
-            ];
-      return academicsService.saveExamPattern({ academicYearId, pattern, exams });
+    mutationFn: () => {
+      const exams = toExamPayload(papers);
+      if (!yearId) throw new Error("Choose a year");
+      if (!exams.length) throw new Error("Add at least one exam paper");
+      return academicsService.saveExamPattern({ academicYearId: yearId, pattern: "CUSTOM", exams });
     },
     onSuccess: () => {
-      toast({ title: "Exam pattern saved", variant: "success" });
+      toast({ title: "Exam papers saved", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["exam-configs"] });
     },
     onError: (err: Error) => toast({ title: "Could not save", description: err.message, variant: "error" }),
@@ -61,34 +77,39 @@ export default function ExamsPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <PageHeader title="Exams & quiz targets" description="Pick mid + final or three terms. Set how many quizzes each subject needs." />
+      <PageHeader
+        title="Exams & quiz targets"
+        description="Each school sets its own papers, marks, and exam dates. Change this any time."
+      />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>Exam pattern</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Exam papers</CardTitle></CardHeader>
           <CardContent>
             <form
               onSubmit={(e: FormEvent<HTMLFormElement>) => {
                 e.preventDefault();
-                save.mutate(e.currentTarget);
+                save.mutate();
               }}
               className="space-y-4"
             >
-              <select name="academicYearId" required className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+              <select
+                required
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                value={yearId}
+                onChange={(e) => {
+                  loadedYear.current = "";
+                  setYearId(e.target.value);
+                }}
+              >
                 <option value="">Choose year</option>
                 {(years.data?.items ?? []).map((year) => (
                   <option key={year.id} value={year.id}>{year.name}</option>
                 ))}
               </select>
-              <select name="pattern" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                <option value="MID_FINAL">Mid term and Final</option>
-                <option value="THREE_TERMS">First, second, third term</option>
-              </select>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="text-sm">Mid marks<input name="mid" type="number" defaultValue={50} className="mt-1 h-10 w-full rounded-md border px-3" /></label>
-                <label className="text-sm">Final marks<input name="final" type="number" defaultValue={100} className="mt-1 h-10 w-full rounded-md border px-3" /></label>
-              </div>
-              <label className="text-sm">If three terms, each paper<input name="marks" type="number" defaultValue={100} className="mt-1 h-10 w-full rounded-md border px-3" /></label>
-              <Button type="submit">Save pattern</Button>
+              <ExamPapersEditor papers={papers} onChange={setPapers} />
+              <Button type="submit" disabled={save.isPending || !yearId}>
+                {save.isPending ? "Saving…" : "Save papers"}
+              </Button>
             </form>
           </CardContent>
         </Card>

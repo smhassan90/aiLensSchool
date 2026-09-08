@@ -21,7 +21,7 @@ import { homeworkService } from "@/services/homework.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
-import { ArrowLeft, CheckCircle2, RefreshCw } from "lucide-react";
+import { ArrowLeft, CheckCircle2, RefreshCw, Trash2 } from "lucide-react";
 
 const KEY_POINT_HINTS = ["Easy words, keep it short", "Harder words, make it longer", "Make it in bullet points"];
 const HOMEWORK_HINTS = ["Easy words and keep it short", "Use harder words and make it longer"];
@@ -65,13 +65,15 @@ export default function ReviewLessonPage() {
   const [topicName, setTopicName] = useState("");
   const [extractedText, setExtractedText] = useState("");
   const [conceptsText, setConceptsText] = useState("");
-  const [teacherNotes, setTeacherNotes] = useState("");
   const [pageFrom, setPageFrom] = useState("");
   const [pageTo, setPageTo] = useState("");
   const [keyPointInstruction, setKeyPointInstruction] = useState("");
   const [homeworkInstruction, setHomeworkInstruction] = useState("");
   const [homeworkDraft, setHomeworkDraft] = useState<HomeworkPreview | null>(null);
   const [homeworkSaved, setHomeworkSaved] = useState(false);
+  const isRtlLesson = /[\u0600-\u06FF]/.test(
+    `${extractedText}\n${conceptsText}\n${chapterName}\n${topicName}`,
+  );
 
   const { data: lesson, isLoading, isError, error } = useQuery({
     queryKey: ["lesson", params.id],
@@ -85,7 +87,6 @@ export default function ReviewLessonPage() {
     setTopicName(lesson.topicName ?? "");
     setExtractedText(lesson.extractedText ?? "");
     setConceptsText((lesson.concepts ?? []).map((item) => item.name).join("\n"));
-    setTeacherNotes(lesson.teacherNotes ?? "");
     setPageFrom(lesson.pageFrom ? String(lesson.pageFrom) : "");
     setPageTo(lesson.pageTo ? String(lesson.pageTo) : "");
     if (!styleHydrated.current) {
@@ -102,7 +103,6 @@ export default function ReviewLessonPage() {
     chapterName: chapterName.trim() || undefined,
     topicName: topicName.trim() || undefined,
     extractedText,
-    teacherNotes: teacherNotes.trim() || undefined,
     pageFrom: pageFrom && Number.isFinite(Number(pageFrom)) ? Number(pageFrom) : undefined,
     pageTo: pageTo && Number.isFinite(Number(pageTo)) ? Number(pageTo) : undefined,
     concepts: conceptsText
@@ -176,6 +176,7 @@ export default function ReviewLessonPage() {
           branchId: homeworkDraft.branchId,
           title: homeworkDraft.title.trim(),
           description: homeworkDraft.description.trim(),
+          answerKey: homeworkDraft.answerKey?.trim() || undefined,
           dueDate: homeworkDraft.dueDate,
           lessonId: homeworkDraft.lessonId,
         });
@@ -193,6 +194,22 @@ export default function ReviewLessonPage() {
     onError: (err) => {
       toast({
         title: "Confirmation failed",
+        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        variant: "error",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => lessonsService.delete(params.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["teacher-lessons"] });
+      toast({ title: "Draft deleted", variant: "success" });
+      router.push("/teacher/lessons");
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not delete lesson",
         description: err instanceof ApiClientError ? err.message : "Unexpected error",
         variant: "error",
       });
@@ -227,7 +244,23 @@ export default function ReviewLessonPage() {
     regenerateKeyPoints.isPending ||
     previewHomework.isPending ||
     saveContent.isPending ||
-    confirmMutation.isPending;
+    confirmMutation.isPending ||
+    deleteMutation.isPending;
+
+  const deleteDraftButton = (
+    <Button
+      variant="outline"
+      className="border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+      disabled={busy}
+      onClick={() => {
+        if (!window.confirm("Delete this draft lesson? This cannot be undone.")) return;
+        deleteMutation.mutate();
+      }}
+    >
+      <Trash2 className="h-4 w-4" />
+      {deleteMutation.isPending ? "Deleting…" : "Delete draft"}
+    </Button>
+  );
 
   const goToHomework = async () => {
     try {
@@ -258,7 +291,9 @@ export default function ReviewLessonPage() {
         <div className="space-y-4">
           <Card>
             <CardHeader><CardTitle>Content from the photos</CardTitle></CardHeader>
-            <CardContent className="whitespace-pre-wrap text-sm leading-relaxed">{extractedText || "—"}</CardContent>
+            <CardContent className="whitespace-pre-wrap text-sm leading-relaxed" dir={/[\u0600-\u06FF]/.test(extractedText) ? "rtl" : undefined}>
+              {extractedText || "—"}
+            </CardContent>
           </Card>
           <Card>
             <CardHeader><CardTitle>Key points</CardTitle></CardHeader>
@@ -285,12 +320,15 @@ export default function ReviewLessonPage() {
               : "Step 4: look over everything once, then confirm."
         }
         actions={
-          <Link href="/teacher/lessons">
-            <Button variant="outline">
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {deleteDraftButton}
+            <Link href="/teacher/lessons">
+              <Button variant="outline">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+            </Link>
+          </div>
         }
       />
 
@@ -316,6 +354,7 @@ export default function ReviewLessonPage() {
                 <Textarea
                   id="extractedText"
                   rows={20}
+                  dir={isRtlLesson ? "rtl" : "ltr"}
                   className="min-h-[22rem] whitespace-pre-wrap font-sans leading-relaxed"
                   value={extractedText}
                   onChange={(e) => setExtractedText(e.target.value)}
@@ -330,10 +369,6 @@ export default function ReviewLessonPage() {
                   <Label htmlFor="topicName">Topic</Label>
                   <Input id="topicName" value={topicName} onChange={(e) => setTopicName(e.target.value)} />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="teacherNotes">Teacher notes</Label>
-                <Textarea id="teacherNotes" rows={3} value={teacherNotes} onChange={(e) => setTeacherNotes(e.target.value)} />
               </div>
             </CardContent>
           </Card>
@@ -351,6 +386,7 @@ export default function ReviewLessonPage() {
                   <Textarea
                     id="concepts"
                     rows={8}
+                    dir={isRtlLesson ? "rtl" : "ltr"}
                     className="whitespace-pre-wrap leading-relaxed"
                     value={conceptsText}
                     onChange={(e) => setConceptsText(e.target.value)}
@@ -418,12 +454,24 @@ export default function ReviewLessonPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="hwDesc">Homework</Label>
+                      <Label htmlFor="hwDesc">Homework (for students)</Label>
                       <Textarea
                         id="hwDesc"
                         rows={8}
                         value={homeworkDraft.description}
                         onChange={(e) => setHomeworkDraft({ ...homeworkDraft, description: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="hwAnswers">Answer key (teachers only)</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Parents and students will not see this. Used later to check answers in the app.
+                      </p>
+                      <Textarea
+                        id="hwAnswers"
+                        rows={6}
+                        value={homeworkDraft.answerKey ?? ""}
+                        onChange={(e) => setHomeworkDraft({ ...homeworkDraft, answerKey: e.target.value })}
                       />
                     </div>
                   </CardContent>
@@ -482,11 +530,13 @@ export default function ReviewLessonPage() {
               </div>
               <div>
                 <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Content from the photos</p>
-                <p className="whitespace-pre-wrap leading-relaxed">{extractedText || "—"}</p>
+                <p className="whitespace-pre-wrap leading-relaxed" dir={isRtlLesson ? "rtl" : undefined}>
+                  {extractedText || "—"}
+                </p>
               </div>
               <div>
                 <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Key points</p>
-                <ul className="list-disc space-y-1 pl-5">
+                <ul className={`list-disc space-y-1 ${isRtlLesson ? "pr-5 text-right" : "pl-5"}`} dir={isRtlLesson ? "rtl" : undefined}>
                   {keyPoints.map((point) => <li key={point}>{point}</li>)}
                 </ul>
               </div>
@@ -495,6 +545,14 @@ export default function ReviewLessonPage() {
                 <p className="font-medium">{homeworkDraft?.title}</p>
                 <p className="mt-1 whitespace-pre-wrap leading-relaxed">{homeworkDraft?.description}</p>
               </div>
+              {homeworkDraft?.answerKey?.trim() ? (
+                <div>
+                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Answer key (teachers only)
+                  </p>
+                  <p className="whitespace-pre-wrap leading-relaxed">{homeworkDraft.answerKey}</p>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 

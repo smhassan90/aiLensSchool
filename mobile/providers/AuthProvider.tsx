@@ -1,8 +1,7 @@
-import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, PropsWithChildren, use, useCallback, useEffect, useMemo, useState } from 'react';
 import { getAccessToken } from '@/lib/storage';
 import { getCurrentUser, login as authLogin, logout as authLogout } from '@/lib/auth';
 import { AuthUser, MeResponse } from '@/types/api';
-import { registerPushNotifications } from '@/hooks/useNotifications';
 import { queryClient } from '@/providers/QueryProvider';
 
 interface AuthContextValue {
@@ -45,7 +44,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const login = useCallback(async (username: string, password: string) => {
     const response = await authLogin(username, password);
     setUser(response.user as MeResponse);
-    await registerPushNotifications();
     try {
       const me = await getCurrentUser();
       setUser(me);
@@ -72,11 +70,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     [user, isLoading, login, logout, refreshUser],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext value={value}>{children}</AuthContext>;
 }
 
 export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
+  const context = use(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within AuthProvider');
   }

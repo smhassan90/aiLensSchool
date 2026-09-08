@@ -12,11 +12,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { insightsService } from "@/services/insights.service";
 import { feesService } from "@/services/fees.service";
+import { studentsService } from "@/services/students.service";
 import { formatDate } from "@/lib/utils";
 import { BarChart } from "@/components/charts/simple-charts";
 import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
+import { ReportCardSheet } from "@/components/report-cards/report-card-sheet";
+import type { ReportCard } from "@/lib/types";
+import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 type Overview = {
   student: {
@@ -25,7 +30,8 @@ type Overview = {
     studentCode: string;
     admissionNumber: string;
     status: string;
-    grade?: { name: string };
+    scienceGroup?: string | null;
+    grade?: { name: string; level?: number };
     section?: { name: string };
     academicYear?: { name: string };
     parents?: Array<{ relationship: string; parent: { user: { firstName: string; lastName: string; email: string; username?: string; phone?: string } } }>;
@@ -34,7 +40,7 @@ type Overview = {
   quizzes: { average: number; results: Array<{ id: string; title: string; subject: string; percentage: number; submittedAt: string }> };
   homework: Array<{ id: string; title: string; dueDate: string; subject?: { name: string } }>;
   diaries: Array<{ id: string; date: string; title: string; lessonSummary: string; homeworkNotes: string }>;
-  reportCards: Array<{ id: string; termLabel: string; overallPercentage: number; attendanceRate: number; remarks?: string; lines?: Array<{ gradeLetter: string; average: number; subject: { name: string } }> }>;
+  reportCards: Array<ReportCard>;
   fees: { billed: number; paid: number; due: number; items: Array<{ id: string; periodLabel: string; status: string; amount: number; paidAmount: number }> };
 };
 
@@ -55,6 +61,15 @@ export default function Student360Page() {
     },
     onError: (err) =>
       toast({ title: "Could not mark paid", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
+  });
+  const saveStream = useMutation({
+    mutationFn: (scienceGroup: string) => studentsService.update(params.id, { scienceGroup: scienceGroup || null }),
+    onSuccess: () => {
+      toast({ title: "Science group saved", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["student-360", params.id] });
+    },
+    onError: (err) =>
+      toast({ title: "Could not save", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
   });
 
   if (query.isLoading) {
@@ -115,6 +130,21 @@ export default function Student360Page() {
                   {p.parent.user.phone ? ` · ${p.parent.user.phone}` : ""}
                 </p>
               ))}
+              {student.grade?.level === 9 || student.grade?.level === 10 || /\b(9|10|ix|x)\b/i.test(student.grade?.name ?? "") ? (
+                <div className="pt-2">
+                  <Label>Science group</Label>
+                  <Select
+                    className="mt-1"
+                    value={student.scienceGroup ?? ""}
+                    onChange={(e) => saveStream.mutate(e.target.value)}
+                    disabled={saveStream.isPending}
+                  >
+                    <option value="">Not set</option>
+                    <option value="COMPUTER">Comp. science</option>
+                    <option value="BIOLOGY">Bio. science</option>
+                  </Select>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </TabsContent>
@@ -158,15 +188,7 @@ export default function Student360Page() {
           <div className="space-y-4">
             {data.reportCards.length === 0 && <p className="text-sm text-muted-foreground">No report cards generated yet.</p>}
             {data.reportCards.map((card) => (
-              <Card key={card.id}>
-                <CardHeader>
-                  <CardTitle>{card.termLabel} · {card.overallPercentage}% · Attendance {card.attendanceRate}%</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {card.remarks && <p className="mb-3 text-sm">{card.remarks}</p>}
-                  <BarChart items={(card.lines ?? []).map((line) => ({ label: `${line.subject.name} (${line.gradeLetter})`, value: line.average }))} />
-                </CardContent>
-              </Card>
+              <ReportCardSheet key={card.id} card={card} />
             ))}
           </div>
         </TabsContent>
@@ -197,6 +219,9 @@ export default function Student360Page() {
         <TabsContent value="fees">
           <Card>
             <CardContent className="space-y-2 pt-6 text-sm">
+              <Link href={`/school/fees?studentId=${params.id}`}>
+                <Button size="sm" className="mb-3">Collect fees</Button>
+              </Link>
               {data.fees.items.length === 0 ? (
                 <p className="text-muted-foreground">No fee records yet.</p>
               ) : (

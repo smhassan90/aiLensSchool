@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { IsOptional, IsString } from 'class-validator';
@@ -8,8 +8,11 @@ import {
   CreateAcademicYearDto,
   CreateEnrollmentDto,
   CreateGradeDto,
+  CreateSchoolStageDto,
   CreateSectionDto,
   CreateSubjectDto,
+  UpdateGradeDto,
+  UpdateSchoolStageDto,
 } from './dto/academics.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RequirePermission } from '../common/decorators/permissions.decorator';
@@ -80,6 +83,30 @@ export class AcademicsController {
     return this.academicsService.listAcademicYears(user, query);
   }
 
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)
+  @Get('stages')
+  listStages(@CurrentUser() user: AuthUser) {
+    return this.academicsService.listStages(user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_CLASSES')
+  @Post('stages')
+  createStage(@Body() dto: CreateSchoolStageDto, @CurrentUser() user: AuthUser) {
+    return this.academicsService.createStage(dto, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_CLASSES')
+  @Patch('stages/:id')
+  updateStage(
+    @Param('id') id: string,
+    @Body() dto: UpdateSchoolStageDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.academicsService.updateStage(id, dto, user);
+  }
+
   @Roles(RoleName.SCHOOL_ADMIN)
   @RequirePermission('MANAGE_CLASSES')
   @Post('grades')
@@ -97,6 +124,13 @@ export class AcademicsController {
   @Get('grades/:id')
   getGrade(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.academicsService.getGrade(id, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_CLASSES')
+  @Patch('grades/:id')
+  updateGrade(@Param('id') id: string, @Body() dto: UpdateGradeDto, @CurrentUser() user: AuthUser) {
+    return this.academicsService.updateGrade(id, dto, user);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN)
@@ -175,7 +209,11 @@ export class AcademicsController {
   @RequirePermission('MANAGE_EXAMS')
   @Post('exam-configs')
   saveExamPattern(
-    @Body() body: { academicYearId: string; pattern: string; exams: Array<{ name: string; maxMarks: number; sequence: number }> },
+    @Body() body: {
+      academicYearId: string;
+      pattern: string;
+      exams?: Array<{ name: string; maxMarks: number; sequence: number; startDate?: string; endDate?: string }>;
+    },
     @CurrentUser() user: AuthUser,
   ) {
     return this.academicsService.saveExamPattern(user, body);
@@ -215,6 +253,12 @@ export class AcademicsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.academicsService.addAssessment(user, body);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)
+  @Get('timetable')
+  listTimetable(@Query('gradeId') gradeId: string | undefined, @CurrentUser() user: AuthUser) {
+    return this.academicsService.listTimetable(user, gradeId);
   }
 }
 

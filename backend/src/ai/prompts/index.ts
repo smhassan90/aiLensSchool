@@ -3,12 +3,14 @@ You may receive OCR text and/or photographed textbook pages.
 Return the FULL page as lesson content. Do not write a short synopsis.
 Rules:
 - If photos are attached, transcribe every visible heading, paragraph, question, example, and caption.
+- Keep the original language and script of the page. For Urdu/Arabic/Sindhi pages, transcribe in that script (Unicode Nastaliq/Arabic letters). Never replace Urdu/Arabic with Latin "special characters", English-looking junk words, or Roman transliteration unless the printed page itself is Roman Urdu.
+- If the page is Urdu, the summary must be readable Urdu paragraphs (right-to-left script), not mixed Latin fragments.
 - If OCR text is provided, keep every paragraph. Fix spelling and line breaks only. Do not condense, paraphrase, or omit.
 - The JSON field "summary" is the complete lesson text from the page, not an abstract. It must be as long as the source page.
 - Use clear headings, Q./A. pairs, Hadith/quotes, and Activity lines when they appear on the page.
 - Separate pages with a blank line and a "Page N" heading if multiple pages are present.
 - Do not mention photos, OCR, or that images were not saved.
-- concepts must be 4-8 short, complete key points from the actual page (not placeholders).
+- concepts must be 4-8 short, complete key points from the actual page (not placeholders). Keep key points in the same script as the page when the page is Urdu/Arabic.
 Return ONLY valid JSON matching:
 {
   "chapterName": string?,
@@ -21,9 +23,10 @@ Return ONLY valid JSON matching:
 }`;
 
 export const QUIZ_GENERATION_PROMPT = `You are an educational quiz generator for school teachers.
-Given homework topic titles and lesson summaries, generate age-appropriate quiz questions.
+Given homework topic titles and lesson key points (or short lesson excerpts), generate age-appropriate quiz questions grounded in those topics.
 Follow the question-type instructions in the user message exactly.
 The quiz title must be a short student-facing headline (max 8 words) suggested by you from the topics. Do not concatenate homework titles with commas. The teacher does not name the quiz.
+Prefer testing the listed key points; do not invent unrelated chapters.
 Return ONLY valid JSON matching:
 {
   "title": string,
@@ -42,7 +45,18 @@ Return ONLY valid JSON matching:
 export const HOMEWORK_GENERATION_PROMPT = `Generate homework from the lesson content.
 Follow the teacher's style instruction if one is provided. Adapt difficulty, length, and vocabulary to that instruction and the grade.
 Do not invent a separate lesson summary. Use the extracted lesson text and key points only.
-Return JSON: { "title": string, "description": string }`;
+
+Return JSON:
+{
+  "title": string,
+  "description": string,
+  "answerKey": string
+}
+
+Rules:
+- "description" is what students/parents see: clear numbered tasks/questions ONLY. Do NOT include answers, solutions, or hints that give away the answer.
+- "answerKey" is for teachers only: numbered answers that match the same numbers in description (e.g. "1. …\\n2. …"). Keep it concise and accurate from the lesson.
+- If a task is open-ended (e.g. "write your own example"), put a short model answer or grading note in answerKey for that number.`;
 
 export const STUDENT_ANALYSIS_PROMPT = `Analyze student quiz performance and return JSON:
 { "summary": string, "strengths": string[], "weaknesses": string[] }`;

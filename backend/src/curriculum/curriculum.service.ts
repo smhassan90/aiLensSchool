@@ -22,6 +22,7 @@ export class CurriculumService {
         select: {
           id: true,
           name: true,
+          publisher: true,
           schoolId: true,
           subjectId: true,
           gradeId: true,

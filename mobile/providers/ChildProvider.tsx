@@ -1,4 +1,4 @@
-import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, PropsWithChildren, use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getSelectedChildId, setSelectedChildId as persistSelectedChildId } from '@/lib/storage';
 import { fetchMyChildren } from '@/services/children.service';
@@ -76,11 +76,11 @@ export function ChildProvider({ children }: PropsWithChildren) {
     [query, selectedChild, selectedChildId, hydrated, selectChild, isAuthenticated],
   );
 
-  return <ChildContext.Provider value={value}>{children}</ChildContext.Provider>;
+  return <ChildContext value={value}>{children}</ChildContext>;
 }
 
 export function useChild(): ChildContextValue {
-  const context = useContext(ChildContext);
+  const context = use(ChildContext);
   if (!context) {
     throw new Error('useChild must be used within ChildProvider');
   }

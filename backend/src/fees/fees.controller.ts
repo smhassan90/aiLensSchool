@@ -1,13 +1,25 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName, StudentFeeStatus } from '@prisma/client';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { FeesService } from './fees.service';
-import { AssignFeesDto, CreateFeeStructureDto, MarkPaidDto, RecordPaymentDto } from './dto/fees.dto';
+import {
+  AssignFeesDto,
+  CollectFeeDto,
+  CreateFeeStructureDto,
+  MarkPaidDto,
+  RecordPaymentDto,
+} from './dto/fees.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto } from '../common/dto/pagination.dto';
+
+class StructureQueryDto extends PaginationDto {
+  @IsOptional()
+  @IsString()
+  gradeId?: string;
+}
 
 class FeeListQueryDto extends PaginationDto {
   @IsOptional()
@@ -41,8 +53,14 @@ export class FeesController {
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)
   @Get('structures')
-  listStructures(@Query() query: PaginationDto, @CurrentUser() user: AuthUser) {
+  listStructures(@Query() query: StructureQueryDto, @CurrentUser() user: AuthUser) {
     return this.feesService.listStructures(user, query);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @Get('brackets')
+  listBrackets(@CurrentUser() user: AuthUser) {
+    return this.feesService.listBrackets(user);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN)
@@ -67,5 +85,29 @@ export class FeesController {
   @Post('mark-paid')
   markPaid(@Body() dto: MarkPaidDto, @CurrentUser() user: AuthUser) {
     return this.feesService.markPaid(dto, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @Get('lookup')
+  lookup(@Query('q') q: string | undefined, @CurrentUser() user: AuthUser) {
+    return this.feesService.lookup(user, q ?? '');
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @Get('account/:studentId')
+  getAccount(@Param('studentId') studentId: string, @CurrentUser() user: AuthUser) {
+    return this.feesService.getAccount(studentId, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @Post('collect')
+  collect(@Body() dto: CollectFeeDto, @CurrentUser() user: AuthUser) {
+    return this.feesService.collect(dto, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL, RoleName.TEACHER)
+  @Get('receipts/:id')
+  getReceipt(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.feesService.getReceipt(id, user);
   }
 }

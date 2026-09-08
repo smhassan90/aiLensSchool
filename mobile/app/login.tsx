@@ -37,7 +37,7 @@ export default function LoginScreen() {
   } = useForm<LoginForm>({
     resolver: zodResolver(schema),
     defaultValues: {
-      username: __DEV__ ? 'abc.f.stu001' : '',
+      username: __DEV__ ? 'tps.032123234543' : '',
       password: __DEV__ ? 'Parent123!' : '',
     },
   });
@@ -90,7 +90,7 @@ export default function LoginScreen() {
               autoCapitalize="none"
               autoComplete="username"
               style={styles.input}
-              placeholder="abc.f.stu001"
+              placeholder="tps.032123234543"
               onBlur={onBlur}
               onChangeText={onChange}
               value={value}

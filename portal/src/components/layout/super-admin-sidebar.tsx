@@ -16,6 +16,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { SidebarFrame, SidebarNavItem } from "@/components/layout/sidebar-frame";
+import { personFullName } from "@/lib/person-name";
 
 const navItems = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -37,7 +38,7 @@ export function SuperAdminSidebar() {
   return (
     <SidebarFrame
       subtitle="Super Admin"
-      userName={`${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim()}
+      userName={personFullName(user?.firstName, user?.lastName)}
       onLogout={logout}
     >
       {navItems.map(({ href, label, icon }) => (

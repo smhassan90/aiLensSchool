@@ -62,6 +62,7 @@ export class HomeworkService {
         createdById: user.id,
         title: dto.title,
         description: dto.description,
+        answerKey: dto.answerKey?.trim() || undefined,
         dueDate: new Date(dto.dueDate),
         publishedAt: new Date(),
       },
@@ -77,6 +78,12 @@ export class HomeworkService {
     });
 
     return homework;
+  }
+
+  /** Parents/students never receive the teacher answer key. */
+  private forParentView<T extends { answerKey?: string | null }>(homework: T) {
+    const { answerKey: _answerKey, ...safe } = homework;
+    return safe;
   }
 
   async findAll(
@@ -183,6 +190,7 @@ export class HomeworkService {
         });
       }
       await this.parentsService.assertParentChildInSection(user.id, studentId, homework.sectionId);
+      return this.forParentView(homework);
     }
     return homework;
   }

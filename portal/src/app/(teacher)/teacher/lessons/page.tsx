@@ -3,7 +3,7 @@
 import { PageLoader } from "@/components/layout/page-loader";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,9 @@ import {
 import { EmptyState } from "@/components/layout/empty-state";
 import { lessonsService } from "@/services/lessons.service";
 import { formatDate } from "@/lib/utils";
-import { BookOpen, Plus } from "lucide-react";
+import { ApiClientError } from "@/lib/api-client";
+import { useToast } from "@/providers/toast-provider";
+import { BookOpen, Plus, Trash2 } from "lucide-react";
 
 function statusVariant(status: string) {
   switch (status) {
@@ -40,10 +42,31 @@ function canReview(status: string) {
   return status === "READY_FOR_REVIEW" || status === "PENDING_REVIEW" || status === "DRAFT" || status === "CONFIRMED";
 }
 
+function canDeleteDraft(status: string) {
+  return status !== "CONFIRMED";
+}
+
 export default function TeacherLessonsPage() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["teacher-lessons"],
     queryFn: () => lessonsService.list({ limit: 50 }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => lessonsService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["teacher-lessons"] });
+      toast({ title: "Draft deleted", variant: "success" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not delete lesson",
+        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        variant: "error",
+      });
+    },
   });
 
   return (
@@ -104,13 +127,36 @@ export default function TeacherLessonsPage() {
                     <Badge variant={statusVariant(lesson.status)}>{statusLabel(lesson.status)}</Badge>
                   </TableCell>
                   <TableCell>
-                    {canReview(lesson.status) && (
-                      <Link href={`/teacher/lessons/${lesson.id}/review`}>
-                        <Button size="sm" variant="outline">
-                          {lesson.status === "CONFIRMED" ? "Open" : "Review"}
+                    <div className="flex items-center justify-end gap-2">
+                      {canReview(lesson.status) && (
+                        <Link href={`/teacher/lessons/${lesson.id}/review`}>
+                          <Button size="sm" variant="outline">
+                            {lesson.status === "CONFIRMED" ? "Open" : "Review"}
+                          </Button>
+                        </Link>
+                      )}
+                      {canDeleteDraft(lesson.status) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          disabled={deleteMutation.isPending && deleteMutation.variables === lesson.id}
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                "Delete this draft lesson? This cannot be undone.",
+                              )
+                            ) {
+                              return;
+                            }
+                            deleteMutation.mutate(lesson.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Delete draft</span>
                         </Button>
-                      </Link>
-                    )}
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

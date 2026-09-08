@@ -2,6 +2,7 @@ import {
   IsBoolean,
   IsDateString,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Min,
@@ -68,6 +69,99 @@ export class CreateGradeDto {
   @IsInt()
   @Min(1)
   defaultSectionCapacity?: number;
+
+  @ApiPropertyOptional({ description: 'School section this class belongs to (Pre-Primary, Primary, …)' })
+  @IsOptional()
+  @IsString()
+  stageId?: string;
+
+  @ApiPropertyOptional({ description: 'One-time admission fee for this class' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  admissionFee?: number;
+
+  @ApiPropertyOptional({ description: 'Monthly tuition for this class' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  tuitionFee?: number;
+}
+
+export class UpdateGradeDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  level?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  stageId?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  admissionFee?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  tuitionFee?: number | null;
+}
+
+export class CreateSchoolStageDto {
+  @ApiProperty({ example: 'Primary' })
+  @IsString()
+  name!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  coordinatorId?: string;
+}
+
+export class UpdateSchoolStageDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  coordinatorId?: string | null;
 }
 
 export class CreateSectionDto {

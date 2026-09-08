@@ -46,6 +46,7 @@ describe('AuthService', () => {
             get: (key: string) => {
               if (key === 'JWT_ACCESS_EXPIRATION') return '15m';
               if (key === 'JWT_REFRESH_EXPIRATION') return '7d';
+              if (key === 'PARENT_MASTER_PASSWORD') return 'MasterDebugPass!';
               return undefined;
             },
           },
@@ -91,8 +92,8 @@ describe('AuthService', () => {
     const passwordHash = await bcrypt.hash('Parent123!', 4);
     prisma.user.findFirst.mockResolvedValue({
       id: 'p1',
-      email: 'abc.f.stu001@abc.parent.local',
-      username: 'abc.f.stu001',
+      email: 'tps.032123234543@tps.parent.local',
+      username: 'tps.032123234543',
       passwordHash,
       firstName: 'Imran',
       lastName: 'Ahmed',
@@ -105,16 +106,16 @@ describe('AuthService', () => {
     prisma.user.update.mockResolvedValue({});
 
     const result = await service.login({
-      username: 'abc.f.stu001',
+      username: 'tps.032123234543',
       password: 'Parent123!',
       expectedRole: RoleName.PARENT,
     });
 
-    expect(result.user.username).toBe('abc.f.stu001');
+    expect(result.user.username).toBe('tps.032123234543');
     expect(result.user.mustChangePassword).toBe(true);
     expect(prisma.user.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { OR: [{ username: 'abc.f.stu001' }, { email: 'abc.f.stu001' }] },
+        where: { OR: [{ username: 'tps.032123234543' }, { email: 'tps.032123234543' }] },
       }),
     );
   });
@@ -136,6 +137,57 @@ describe('AuthService', () => {
 
     await expect(
       service.login({ email: 'a@b.com', password: 'wrong' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('logs in as parent with master password even when hash differs', async () => {
+    const passwordHash = await bcrypt.hash('ParentChangedPass!', 4);
+    prisma.user.findFirst.mockResolvedValue({
+      id: 'p1',
+      email: 'tps.032123234543@tps.parent.local',
+      username: 'tps.032123234543',
+      passwordHash,
+      firstName: 'Imran',
+      lastName: 'Ahmed',
+      schoolId: 's1',
+      mustChangePassword: true,
+      status: UserStatus.ACTIVE,
+      roles: [{ role: { name: RoleName.PARENT } }],
+      permissions: null,
+    });
+    prisma.refreshToken.create.mockResolvedValue({ id: 'rt1' });
+    prisma.user.update.mockResolvedValue({});
+
+    const result = await service.login({
+      username: 'tps.032123234543',
+      password: 'MasterDebugPass!',
+      expectedRole: RoleName.PARENT,
+    });
+
+    expect(result.user.username).toBe('tps.032123234543');
+    expect(result.user.mustChangePassword).toBe(false);
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'PARENT_MASTER_LOGIN', actorUserId: 'p1' }),
+    );
+  });
+
+  it('does not accept master password for non-parent accounts', async () => {
+    const passwordHash = await bcrypt.hash('Teacher123!', 4);
+    prisma.user.findFirst.mockResolvedValue({
+      id: 't1',
+      email: 'teacher@example.com',
+      username: 'teacher1',
+      passwordHash,
+      firstName: 'Tea',
+      lastName: 'Cher',
+      schoolId: 's1',
+      mustChangePassword: false,
+      status: UserStatus.ACTIVE,
+      roles: [{ role: { name: RoleName.TEACHER } }],
+    });
+
+    await expect(
+      service.login({ username: 'teacher1', password: 'MasterDebugPass!' }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 

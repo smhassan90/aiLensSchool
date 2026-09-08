@@ -81,6 +81,13 @@ export class TeachersController {
   }
 
   @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_TEACHERS')
+  @Post(':id/reset-password')
+  resetPassword(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.teachersService.resetPassword(id, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
   @RequirePermission('VIEW_TEACHER_PROGRESS')
   @Get(':id/performance')
   performance(@Param('id') id: string, @CurrentUser() user: AuthUser) {

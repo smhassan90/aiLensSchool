@@ -24,6 +24,25 @@ export interface CreateClassPayload {
   branchId?: string;
   defaultSectionName?: string;
   defaultSectionCapacity?: number;
+  stageId?: string;
+  admissionFee?: number;
+  tuitionFee?: number;
+}
+
+export interface UpdateClassPayload {
+  name?: string;
+  level?: number;
+  stageId?: string | null;
+  admissionFee?: number | null;
+  tuitionFee?: number | null;
+}
+
+export interface SchoolStage {
+  id: string;
+  name: string;
+  sortOrder?: number;
+  grades?: Array<{ id: string; name: string; level: number; tuitionFee?: string | number | null }>;
+  _count?: { grades: number };
 }
 
 export interface CreateSectionPayload {
@@ -61,6 +80,24 @@ export const academicsService = {
     return apiClient<Paginated<AcademicYear>>(`/academics/years${buildQuery(params ?? {})}`);
   },
 
+  listStages() {
+    return apiClient<SchoolStage[]>("/academics/stages");
+  },
+
+  createStage(payload: { name: string; sortOrder?: number; coordinatorId?: string }) {
+    return apiClient<SchoolStage>("/academics/stages", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateStage(id: string, payload: { name?: string; sortOrder?: number; coordinatorId?: string | null }) {
+    return apiClient<SchoolStage>(`/academics/stages/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
   createYear(payload: CreateYearPayload) {
     return apiClient<AcademicYear>("/academics/years", {
       method: "POST",
@@ -83,6 +120,13 @@ export const academicsService = {
     });
   },
 
+  updateGrade(id: string, payload: UpdateClassPayload) {
+    return apiClient<Grade>(`/academics/grades/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
   listSections(params?: { page?: number; limit?: number; branchId?: string; gradeId?: string }) {
     return apiClient<Paginated<Section>>(`/academics/sections${buildQuery(params ?? {})}`);
   },
@@ -96,6 +140,16 @@ export const academicsService = {
 
   listSubjects(params?: { page?: number; limit?: number; gradeId?: string }) {
     return apiClient<Paginated<Subject>>(`/academics/subjects${buildQuery(params ?? {})}`);
+  },
+
+  listBooks(params?: { page?: number; limit?: number }) {
+    return apiClient<Paginated<{
+      id: string;
+      name: string;
+      publisher?: string | null;
+      subject?: { id: string; name: string };
+      grade?: { id: string; name: string };
+    }>>(`/curriculum${buildQuery(params ?? {})}`);
   },
 
   createSubject(payload: CreateSubjectPayload) {
@@ -149,9 +203,54 @@ export const academicsService = {
   saveExamPattern(payload: {
     academicYearId: string;
     pattern: string;
-    exams: Array<{ name: string; maxMarks: number; sequence: number }>;
+    exams?: Array<{ name: string; maxMarks: number; sequence: number; startDate?: string; endDate?: string }>;
   }) {
     return apiClient("/academics/exam-configs", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  listExamConfigs(academicYearId?: string) {
+    return apiClient<Array<{
+      id: string;
+      name: string;
+      sequence: number;
+      maxMarks: number;
+      academicYearId: string;
+      startDate?: string | null;
+      endDate?: string | null;
+    }>>(`/academics/exam-configs${buildQuery({ academicYearId })}`);
+  },
+
+  listTimetable(gradeId?: string) {
+    return apiClient<{
+      academicYear: { id: string; name: string } | null;
+      grades?: Array<{ id: string; name: string }>;
+      grade: {
+        id: string;
+        name: string;
+        hasPeriodTimetable?: boolean;
+        stage?: { id: string; name: string } | null;
+      } | null;
+      section: {
+        id: string;
+        name: string;
+        classTeacher?: { id: string; user: { firstName: string; lastName: string } } | null;
+      } | null;
+      pattern?: "WEEKLY" | "CLASS_TEACHER";
+      subjects?: Array<{
+        id: string;
+        name: string;
+        teacher?: { id: string; user: { firstName: string; lastName: string } } | null;
+      }>;
+      slots: Array<{
+        weekday: string;
+        periodNumber: number;
+        startTime?: string | null;
+        endTime?: string | null;
+        title: string;
+        subject?: { id: string; name: string } | null;
+        teacher?: { id: string; user: { firstName: string; lastName: string } } | null;
+      }>;
+    }>(`/academics/timetable${buildQuery({ gradeId })}`);
   },
 
   listQuizTargets() {
@@ -174,6 +273,7 @@ export const academicsService = {
     subjectId: string;
     sectionId: string;
     academicYearId: string;
+    examConfigId?: string;
     type: string;
     title: string;
     maxMarks: number;

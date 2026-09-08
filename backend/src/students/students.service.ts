@@ -20,6 +20,7 @@ import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateParentInlineDto, CreateStudentDto } from './dto/create-student.dto';
+import { UpdateStudentDto } from './dto/update-student.dto';
 import { FilesService } from '../files/files.service';
 import {
   buildParentUsername,
@@ -92,6 +93,7 @@ export class StudentsService {
           dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
           gender: dto.gender,
           address: dto.address?.trim() || null,
+          scienceGroup: dto.scienceGroup?.trim() || null,
           status: StudentStatus.ACTIVE,
         },
       });
@@ -228,11 +230,11 @@ export class StudentsService {
       };
     }
 
-    let username = buildParentUsername(args.schoolCode, args.relationship, args.studentCode);
+    let username = buildParentUsername(args.schoolCode, phone);
     let attempt = 0;
     while (await tx.user.findUnique({ where: { username } })) {
       attempt += 1;
-      username = buildParentUsername(args.schoolCode, args.relationship, args.studentCode, attempt);
+      username = buildParentUsername(args.schoolCode, phone, attempt);
     }
 
     const password = generateParentPassword();
@@ -327,6 +329,7 @@ export class StudentsService {
             status: true,
             photoUrl: true,
             address: true,
+            scienceGroup: true,
             createdAt: true,
             branch: { select: { id: true, name: true } },
             enrollments: {
@@ -366,6 +369,26 @@ export class StudentsService {
       },
     });
     return this.tenant.assertOwnedOrThrow(user, student, 'STUDENT_NOT_FOUND');
+  }
+
+  async update(id: string, dto: UpdateStudentDto, user: AuthUser) {
+    await this.findOne(id, user);
+    const scienceGroup = dto.scienceGroup?.trim();
+    if (scienceGroup && scienceGroup !== 'COMPUTER' && scienceGroup !== 'BIOLOGY') {
+      throw new BadRequestException({
+        code: 'INVALID_SCIENCE_GROUP',
+        message: 'Science group must be Computer or Biology',
+      });
+    }
+    return this.prisma.student.update({
+      where: { id },
+      data: { scienceGroup: scienceGroup || null },
+      include: {
+        branch: true,
+        enrollments: { include: { grade: true, section: true, academicYear: true } },
+        parents: { include: { parent: { include: { user: true } } } },
+      },
+    });
   }
 
   async updatePhoto(id: string, file: Express.Multer.File | undefined, user: AuthUser) {

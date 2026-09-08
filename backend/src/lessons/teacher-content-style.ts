@@ -106,6 +106,9 @@ export function generateStyledHomework(input: {
     return {
       title: `${topic} practice`,
       description: `${customNote}Do this short ${input.subjectName} homework for ${grade}. Use easy words.\n\n${numbered || '1. Read today’s lesson again.'}\n\nWrite 2 or 3 short answers in your notebook.`,
+      answerKey:
+        points.map((point, index) => `${index + 1}. ${point}`).join('\n') ||
+        '1. Student restates the main idea from today’s lesson.',
     };
   }
 
@@ -113,12 +116,18 @@ export function generateStyledHomework(input: {
     return {
       title: `${topic} extended practice`,
       description: `${customNote}Complete a thorough ${input.subjectName} homework for ${grade}. Use complete sentences.\n\n${numbered || '1. Review the full lesson and explain the main idea.'}\n\nAdd one example of your own and one question you still have.`,
+      answerKey:
+        points.map((point, index) => `${index + 1}. ${point}`).join('\n') ||
+        '1. Clear explanation of the main idea with supporting detail from the lesson.',
     };
   }
 
   return {
     title: `${topic} homework`,
     description: `${customNote}Based on today’s ${input.subjectName} lesson, complete the following:\n\n${numbered || '1. Review the lesson pages and write the main ideas.'}\n\nWrite your answers neatly.`,
+    answerKey:
+      points.map((point, index) => `${index + 1}. ${point}`).join('\n') ||
+      '1. Main ideas from today’s lesson pages.',
   };
 }
 

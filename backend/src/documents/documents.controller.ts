@@ -109,6 +109,15 @@ export class DocumentsController {
     return this.documents.listReportCards(user, query);
   }
 
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)
+  @Get('report-card-templates')
+  listReportCardTemplates(
+    @Query('gradeId') gradeId: string | undefined,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.documents.listReportCardTemplates(user, gradeId);
+  }
+
   @Roles(RoleName.SCHOOL_ADMIN)
   @Post('id-cards/generate')
   generateIdCards(@Body() dto: GenerateIdCardDto, @CurrentUser() user: AuthUser) {

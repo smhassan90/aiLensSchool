@@ -17,7 +17,7 @@ import { useToast } from "@/providers/toast-provider";
 import type { RoleName } from "@/lib/types";
 
 const schema = z.object({
-  email: z.string().email("Enter a valid email"),
+  username: z.string().trim().min(2, "Enter your username"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
@@ -56,7 +56,8 @@ export function LoginForm({
     setSubmitting(true);
     try {
       const data = await authService.login({
-        ...values,
+        username: values.username,
+        password: values.password,
         expectedRole,
       });
       login(data);
@@ -85,10 +86,16 @@ export function LoginForm({
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" autoComplete="email" {...register("email")} />
-            {errors.email && (
-              <p className="text-sm text-destructive">{errors.email.message}</p>
+            <Label htmlFor="username">Username</Label>
+            <Input
+              id="username"
+              type="text"
+              autoComplete="username"
+              placeholder="e.g. dtps.waleed"
+              {...register("username")}
+            />
+            {errors.username && (
+              <p className="text-sm text-destructive">{errors.username.message}</p>
             )}
           </div>
           <div className="space-y-2">

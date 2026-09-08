@@ -17,7 +17,6 @@ import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { QuizGenerationService } from '../ai/services/quiz-generation.service';
-import { NotificationService } from '../notifications/notifications.service';
 import { ParentsService } from '../parents/parents.service';
 import {
   GenerateQuizDto,
@@ -35,7 +34,6 @@ export class QuizzesService {
     private readonly audit: AuditService,
     private readonly tenant: TenantService,
     private readonly quizGeneration: QuizGenerationService,
-    private readonly notifications: NotificationService,
     private readonly parentsService: ParentsService,
   ) {}
 
@@ -81,7 +79,16 @@ export class QuizzesService {
           sectionId: dto.sectionId,
           subjectId: dto.subjectId,
         },
-        include: { lesson: true },
+        include: {
+          lesson: {
+            select: {
+              topicName: true,
+              chapterName: true,
+              aiSummary: true,
+              concepts: { select: { name: true }, take: 12 },
+            },
+          },
+        },
         orderBy: { dueDate: 'asc' },
       });
       if (!homework.length) {
@@ -91,7 +98,10 @@ export class QuizzesService {
         });
       }
       for (const item of homework) {
-        const lessonBit = item.lesson?.aiSummary ?? item.lesson?.topicName ?? '';
+        const concepts = item.lesson?.concepts?.map((c) => c.name).filter(Boolean) ?? [];
+        const lessonBit = concepts.length
+          ? `Key points: ${concepts.join('; ')}`
+          : this.slimTopicText(item.lesson?.aiSummary ?? item.lesson?.topicName ?? '');
         topicSummaries.push(
           [`Topic: ${item.title}`, item.description, lessonBit ? `Lesson: ${lessonBit}` : '']
             .filter(Boolean)
@@ -115,13 +125,23 @@ export class QuizzesService {
             lte: new Date(`${dto.lessonDateTo}T23:59:59.999`),
           },
         },
+        select: {
+          date: true,
+          topicName: true,
+          chapterName: true,
+          aiSummary: true,
+          concepts: { select: { name: true }, take: 12 },
+        },
         orderBy: { date: 'asc' },
       });
       topicSummaries.push(
-        ...lessons.map(
-          (l) =>
-            `${l.date.toISOString().slice(0, 10)}: ${l.aiSummary ?? l.topicName ?? l.chapterName ?? 'Lesson'}`,
-        ),
+        ...lessons.map((l) => {
+          const concepts = l.concepts.map((c) => c.name).filter(Boolean);
+          const body = concepts.length
+            ? `Key points: ${concepts.join('; ')}`
+            : this.slimTopicText(l.aiSummary ?? l.topicName ?? l.chapterName ?? 'Lesson');
+          return `${l.date.toISOString().slice(0, 10)}: ${l.topicName ?? l.chapterName ?? 'Lesson'}\n${body}`;
+        }),
       );
     }
 
@@ -340,19 +360,23 @@ export class QuizzesService {
           },
         },
       },
-      include: { parent: true },
+      select: { parent: { select: { userId: true } } },
     });
 
     const uniqueUserIds = [...new Set(parents.map((p) => p.parent.userId))];
-    for (const userId of uniqueUserIds) {
-      await this.notifications.createAndQueue({
-        schoolId: quiz.schoolId,
-        userId,
-        type: NotificationType.QUIZ_PUBLISHED,
-        title: `New quiz: ${quiz.title}`,
-        body: `A quiz has been published for your child's class.`,
-        data: { quizId: quiz.id } as Prisma.InputJsonValue,
-        deepLink: `/quizzes/${quiz.id}`,
+    if (uniqueUserIds.length) {
+      const now = new Date();
+      await this.prisma.notification.createMany({
+        data: uniqueUserIds.map((userId) => ({
+          schoolId: quiz.schoolId,
+          userId,
+          type: NotificationType.QUIZ_PUBLISHED,
+          title: `New quiz: ${quiz.title}`,
+          body: `A quiz has been published for your child's class.`,
+          data: { quizId: quiz.id } as Prisma.InputJsonValue,
+          deepLink: `/quizzes/${quiz.id}`,
+          sentAt: now,
+        })),
       });
     }
 
@@ -599,5 +623,13 @@ export class QuizzesService {
     });
 
     return result;
+  }
+
+  /** Prefer key points; otherwise keep a short slice of lesson text for the AI prompt. */
+  private slimTopicText(text: string, max = 900) {
+    const trimmed = text.trim();
+    if (!trimmed) return '';
+    if (trimmed.length <= max) return trimmed;
+    return `${trimmed.slice(0, max).trim()}…`;
   }
 }

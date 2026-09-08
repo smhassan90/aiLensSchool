@@ -50,6 +50,10 @@ export default function SubjectsPage() {
     queryKey: ["subjects"],
     queryFn: () => academicsService.listSubjects({ limit: 100 }),
   });
+  const books = useQuery({
+    queryKey: ["books"],
+    queryFn: () => academicsService.listBooks({ limit: 100 }),
+  });
   const classes = useQuery({
     queryKey: ["grades"],
     queryFn: () => academicsService.listGrades({ limit: 100 }),
@@ -88,7 +92,7 @@ export default function SubjectsPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Subjects"
-        description="Subjects are assigned to class sections along with a teacher"
+        description="Subjects and the textbooks used in each class"
         actions={
           <Button onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -127,6 +131,48 @@ export default function SubjectsPage() {
             </TableBody>
           </Table>
         )}
+      </div>
+
+      <div className="mt-8">
+        <h2 className="mb-3 text-sm font-semibold">Books</h2>
+        <div className="rounded-lg border bg-card">
+          {books.isLoading ? (
+            <PageLoader variant="panel" />
+          ) : !books.data?.items.length ? (
+            <EmptyState
+              icon={<BookOpen className="h-10 w-10" />}
+              title="No books yet"
+              description="Textbooks will appear here with publisher names."
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Class</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Book</TableHead>
+                  <TableHead>Publisher</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...books.data.items]
+                  .sort((a, b) => {
+                    const classCmp = (a.grade?.name ?? "").localeCompare(b.grade?.name ?? "", undefined, { numeric: true });
+                    if (classCmp) return classCmp;
+                    return a.name.localeCompare(b.name);
+                  })
+                  .map((book) => (
+                    <TableRow key={book.id}>
+                      <TableCell>{book.grade?.name ?? "—"}</TableCell>
+                      <TableCell>{book.subject?.name ?? "—"}</TableCell>
+                      <TableCell className="font-medium">{book.name}</TableCell>
+                      <TableCell>{book.publisher || "—"}</TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>

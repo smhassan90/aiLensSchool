@@ -13,13 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { lessonsService } from "@/services/lessons.service";
 import { teachersService } from "@/services/teachers.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
-import { readPagesInBrowser } from "@/lib/page-ocr";
+import { readPagesInBrowser, compressPhotosForUpload } from "@/lib/page-ocr";
+import { localDateISO } from "@/lib/utils";
 import { ArrowLeft, ImagePlus, X } from "lucide-react";
 
 const MAX_PHOTOS = 10;
@@ -40,10 +40,9 @@ export default function NewLessonPage() {
   const { toast } = useToast();
   const [photos, setPhotos] = useState<File[]>([]);
   const [classKey, setClassKey] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => localDateISO());
   const [pageFrom, setPageFrom] = useState("");
   const [pageTo, setPageTo] = useState("");
-  const [teacherNotes, setTeacherNotes] = useState("");
   const [formError, setFormError] = useState("");
 
   const previews = useMemo(
@@ -71,12 +70,16 @@ export default function NewLessonPage() {
       if (!selectedClass?.gradeId) {
         throw new Error("Select a class");
       }
+      if (!selectedClass.subjectId) {
+        throw new Error("This class has no subject yet. Ask the school admin to add subjects.");
+      }
       let pageText = "";
       try {
-        pageText = await readPagesInBrowser(photos);
+        pageText = await readPagesInBrowser(photos, selectedClass.subjectName);
       } catch {
         pageText = "";
       }
+      const pages = await compressPhotosForUpload(photos);
       return lessonsService.extract({
         academicYearId: selectedClass.academicYearId,
         gradeId: selectedClass.gradeId,
@@ -84,11 +87,10 @@ export default function NewLessonPage() {
         subjectId: selectedClass.subjectId,
         branchId: selectedClass.branchId,
         date,
-        teacherNotes: teacherNotes.trim() || undefined,
         pageFrom: optionalPage(pageFrom),
         pageTo: optionalPage(pageTo),
         pageText: pageText || undefined,
-        pages: photos,
+        pages,
       });
     },
     onSuccess: (lesson) => {
@@ -256,17 +258,6 @@ export default function NewLessonPage() {
                   ))}
                 </div>
               )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="teacherNotes">Teacher notes (optional)</Label>
-              <Textarea
-                id="teacherNotes"
-                rows={3}
-                placeholder="Anything extra that is not visible in the photos"
-                value={teacherNotes}
-                onChange={(e) => setTeacherNotes(e.target.value)}
-              />
             </div>
           </CardContent>
         </Card>

@@ -3,6 +3,7 @@ import { AttendanceStatus } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
+import { personFullName, teacherDisplayName } from '../common/utils/person-name';
 
 @Injectable()
 export class InsightsService {
@@ -114,22 +115,22 @@ export class InsightsService {
     return {
       students: students.map((s) => ({
         id: s.id,
-        name: `${s.firstName} ${s.lastName}`,
+        name: personFullName(s.firstName, s.lastName),
         studentCode: s.studentCode,
         className: s.enrollments[0]?.grade.name,
         sectionName: s.enrollments[0]?.section.name,
       })),
       parents: parents.map((p) => ({
         id: p.id,
-        name: `${p.user.firstName} ${p.user.lastName}`,
+        name: personFullName(p.user.firstName, p.user.lastName),
         email: p.user.email,
         username: p.user.username,
         phone: p.phone ?? p.user.phone,
-        children: p.students.map((sp) => `${sp.student.firstName} ${sp.student.lastName}`),
+        children: p.students.map((sp) => personFullName(sp.student.firstName, sp.student.lastName)),
       })),
       teachers: teachers.map((t) => ({
         id: t.id,
-        name: `${t.user.firstName} ${t.user.lastName}`,
+        name: teacherDisplayName(t.user.firstName, t.user.lastName, t.gender),
         email: t.user.email,
         employeeCode: t.employeeCode,
       })),
@@ -192,7 +193,14 @@ export class InsightsService {
       this.prisma.reportCard.findMany({
         where: { studentId, schoolId },
         orderBy: { generatedAt: 'desc' },
-        include: { lines: { include: { subject: true } }, academicYear: true },
+        include: {
+          student: true,
+          lines: { include: { subject: true }, orderBy: { sortOrder: 'asc' } },
+          academicYear: true,
+          grade: true,
+          section: true,
+          school: { select: { name: true, address: true, phone: true } },
+        },
       }),
       this.prisma.studentFee.findMany({
         where: { studentId, schoolId },

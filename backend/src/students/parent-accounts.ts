@@ -1,26 +1,27 @@
-import { randomBytes } from 'crypto';
-import { ParentRelationship } from '@prisma/client';
+/** Default parent password; must be changed on first login. */
+export const DEFAULT_PARENT_PASSWORD = 'Password123';
 
-const PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-
-export function generateParentPassword(length = 8): string {
-  const bytes = randomBytes(length);
-  return Array.from(bytes, (byte) => PASSWORD_CHARS[byte % PASSWORD_CHARS.length]).join('');
+export function generateParentPassword(): string {
+  return DEFAULT_PARENT_PASSWORD;
 }
 
 export function slugPart(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
-export function buildParentUsername(
-  schoolCode: string,
-  relationship: ParentRelationship,
-  studentCode: string,
-  attempt = 0,
-): string {
-  const role = relationship === ParentRelationship.MOTHER ? 'm' : 'f';
-  const base = `${slugPart(schoolCode)}.${role}.${slugPart(studentCode)}`;
-  return attempt ? `${base}${attempt}` : base;
+/** Digits only — keeps leading 0 (e.g. 032123234543). */
+export function parentPhoneDigits(phone?: string | null): string {
+  return (phone ?? '').replace(/\D/g, '');
+}
+
+/**
+ * Parent login: school initials + phone, e.g. tps.032123234543
+ */
+export function buildParentUsername(schoolCode: string, phone?: string | null, attempt = 0): string {
+  const school = slugPart(schoolCode) || 'school';
+  const digits = parentPhoneDigits(phone);
+  const base = digits ? `${school}.${digits}` : `${school}.parent`;
+  return attempt ? `${base}.${attempt}` : base;
 }
 
 export function parentLocalEmail(username: string, schoolCode: string): string {

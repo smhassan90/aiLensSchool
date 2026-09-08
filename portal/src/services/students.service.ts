@@ -21,6 +21,7 @@ export interface CreateStudentPayload {
   sectionId: string;
   academicYearId: string;
   address?: string;
+  scienceGroup?: string;
   father?: {
     firstName: string;
     lastName?: string;
@@ -54,6 +55,13 @@ export const studentsService = {
 
   getById(id: string) {
     return apiClient<Student>(`/students/${id}`);
+  },
+
+  update(id: string, payload: { scienceGroup?: string | null }) {
+    return apiClient<Student>(`/students/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
   },
 
   uploadPhoto(id: string, file: File) {

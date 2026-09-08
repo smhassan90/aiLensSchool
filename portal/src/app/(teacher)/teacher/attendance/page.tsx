@@ -12,7 +12,7 @@ import { academicsService } from "@/services/academics.service";
 import { teachersService } from "@/services/teachers.service";
 import { PageLoader } from "@/components/layout/page-loader";
 import { useToast } from "@/providers/toast-provider";
-import { ApiClientError } from "@/lib/api-client";
+import { localDateISO } from "@/lib/utils";
 import {
   AttendanceRoster,
   toPresentAbsent,
@@ -23,7 +23,7 @@ export default function TeacherAttendancePage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [sectionId, setSectionId] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => localDateISO());
   const [marks, setMarks] = useState<Record<string, AttendanceMark>>({});
   const classes = useQuery({ queryKey: ["teacher-classes"], queryFn: () => teachersService.myClasses() });
   const enrollments = useQuery({
@@ -70,21 +70,28 @@ export default function TeacherAttendancePage() {
   }, [enrollments.data, existing.data, marks]);
 
   const save = useMutation({
-    mutationFn: () =>
-      attendanceService.mark({
-        academicYearId: selected?.academicYearId ?? "",
+    mutationFn: () => {
+      if (!merged.length) throw new Error("No students in this class to mark");
+      if (!selected?.academicYearId || !selected.branchId) throw new Error("Class details incomplete");
+      return attendanceService.mark({
+        academicYearId: selected.academicYearId,
         sectionId,
-        branchId: selected?.branchId ?? "",
+        branchId: selected.branchId,
         date,
         entries: merged.map((row) => ({ studentId: row.studentId, status: row.status })),
-      }),
+      });
+    },
     onSuccess: () => {
       toast({ title: "Attendance saved", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
       queryClient.invalidateQueries({ queryKey: ["teacher-dashboard"] });
     },
     onError: (err) =>
-      toast({ title: "Save failed", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
+      toast({
+        title: "Save failed",
+        description: err instanceof Error ? err.message : "",
+        variant: "error",
+      }),
   });
 
   return (
@@ -120,7 +127,7 @@ export default function TeacherAttendancePage() {
           />
         </div>
         <div className="flex items-end">
-          <Button disabled={!sectionId || save.isPending} onClick={() => save.mutate()}>
+          <Button disabled={!sectionId || !merged.length || save.isPending} onClick={() => save.mutate()}>
             {save.isPending ? "Saving…" : "Save"}
           </Button>
         </div>
@@ -128,6 +135,10 @@ export default function TeacherAttendancePage() {
       {sectionId &&
         (enrollments.isLoading || existing.isLoading ? (
           <PageLoader variant="panel" />
+        ) : enrollments.isError ? (
+          <p className="text-sm text-destructive">Could not load students. Try again.</p>
+        ) : merged.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No students enrolled in this class yet.</p>
         ) : (
           <AttendanceRoster
             rows={merged}
@@ -137,3 +148,9 @@ export default function TeacherAttendancePage() {
     </div>
   );
 }
+
+
+
+
+
+

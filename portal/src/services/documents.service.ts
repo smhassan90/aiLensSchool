@@ -20,6 +20,8 @@ export interface HomeworkPreview {
   branchId: string;
   title: string;
   description: string;
+  /** Teacher-only; never shown on parent/student mobile. */
+  answerKey?: string;
   dueDate: string;
 }
 
@@ -95,6 +97,25 @@ export const documentsService = {
   },
   listReportCards(params?: { studentId?: string; sectionId?: string; academicYearId?: string; limit?: number }) {
     return apiClient<Paginated<ReportCard>>(`/documents/report-cards${buildQuery(params ?? {})}`);
+  },
+  listReportCardTemplates(gradeId?: string) {
+    return apiClient<{
+      school: { name: string; address?: string | null; phone?: string | null };
+      grading: Array<{ min: number; max: number; letter: string }>;
+      templates: Array<{
+        code: string;
+        examTitle: string;
+        classLabel: string;
+        totalMarks: number;
+        showRank: boolean;
+        lines: Array<{
+          label: string;
+          maxMarks: number | null;
+          matchSubject: string;
+          choiceGroup?: string | null;
+        }>;
+      }>;
+    }>(`/documents/report-card-templates${buildQuery({ gradeId })}`);
   },
   generateIdCards(payload: { studentId?: string; teacherId?: string; sectionId?: string }) {
     return apiClient<{ generated: number; items: IdCard[] }>("/documents/id-cards/generate", {

@@ -63,6 +63,14 @@ enum AssessmentType {
   OTHER
 }
 
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+}
+
 enum Gender {
   MALE
   FEMALE
@@ -225,6 +233,12 @@ enum FeeFrequency {
   QUARTERLY
   ANNUAL
   ONE_TIME
+}
+
+enum FeeKind {
+  ADMISSION
+  TUITION
+  OTHER
 }
 
 enum StudentFeeStatus {
@@ -402,6 +416,7 @@ model School {
   teachers                TeacherProfile[]
   academicYears           AcademicYear[]
   grades                  Grade[]
+  schoolStages            SchoolStage[]
   sections                Section[]
   subjects                Subject[]
   curricula               Curriculum[]
@@ -431,6 +446,8 @@ model School {
   quizTargets             QuizTarget[]
   examConfigs             ExamConfig[]
   assessmentMarks         AssessmentMark[]
+  timetableSlots          TimetableSlot[]
+  reportCardTemplates     ReportCardTemplate[]
   pricingPlanId           String?            @map("pricing_plan_id")
   pricingPlan             PricingPlan?       @relation(fields: [pricingPlanId], references: [id])
 
@@ -549,6 +566,7 @@ model Student {
   status          StudentStatus @default(ACTIVE)
   photoUrl        String?       @map("photo_url")
   address         String?       @db.VarChar(255)
+  scienceGroup    String?       @map("science_group")
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
@@ -614,6 +632,7 @@ model TeacherProfile {
   branchId     String        @map("branch_id")
   employeeCode String        @map("employee_code")
   hireDate     DateTime?     @map("hire_date") @db.Date
+  gender       Gender?
   status       TeacherStatus @default(ACTIVE)
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
@@ -628,7 +647,9 @@ model TeacherProfile {
   idCards                IdCard[]
   gradeStyles            TeacherGradeStyle[]
   classSections          Section[]         @relation("SectionClassTeacher")
+  coordinatedStages      SchoolStage[]     @relation("StageCoordinator")
   attendances            TeacherAttendance[]
+  timetableSlots         TimetableSlot[]
 
   @@unique([schoolId, employeeCode])
   @@index([schoolId])
@@ -686,6 +707,7 @@ model AcademicYear {
   reportCards       ReportCard[]
   examConfigs       ExamConfig[]
   assessmentMarks   AssessmentMark[]
+  timetableSlots    TimetableSlot[]
 
   @@index([schoolId])
   @@index([branchId])
@@ -708,15 +730,39 @@ model Term {
   @@map("terms")
 }
 
+model SchoolStage {
+  id            String   @id @default(uuid())
+  schoolId      String   @map("school_id")
+  name          String
+  sortOrder     Int      @default(0) @map("sort_order")
+  coordinatorId String?  @map("coordinator_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  school      School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  coordinator TeacherProfile? @relation("StageCoordinator", fields: [coordinatorId], references: [id], onDelete: SetNull)
+  grades      Grade[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@index([coordinatorId])
+  @@map("school_stages")
+}
+
 model Grade {
-  id        String   @id @default(uuid())
-  schoolId  String   @map("school_id")
-  name      String
-  level     Int
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  schoolId     String   @map("school_id")
+  stageId      String?  @map("stage_id")
+  name         String
+  level        Int
+  admissionFee         Decimal? @map("admission_fee") @db.Decimal(12, 2)
+  tuitionFee           Decimal? @map("tuition_fee") @db.Decimal(12, 2)
+  hasPeriodTimetable   Boolean  @default(true) @map("has_period_timetable")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
   school      School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  stage       SchoolStage?        @relation(fields: [stageId], references: [id], onDelete: SetNull)
   sections    Section[]
   enrollments StudentEnrollment[]
   subjects    Subject[]
@@ -727,9 +773,11 @@ model Grade {
   reportCards ReportCard[]
   teacherStyles TeacherGradeStyle[]
   quizTargets QuizTarget[]
+  feeStructures FeeStructure[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
+  @@index([stageId])
   @@map("grades")
 }
 
@@ -760,6 +808,7 @@ model Section {
   homeDiaries     HomeDiary[]
   reportCards     ReportCard[]
   assessmentMarks AssessmentMark[]
+  timetableSlots  TimetableSlot[]
 
   @@unique([branchId, gradeId, name])
   @@index([schoolId])
@@ -789,6 +838,7 @@ model Subject {
   reportCardLines ReportCardLine[]
   quizTargets     QuizTarget[]
   assessmentMarks AssessmentMark[]
+  timetableSlots  TimetableSlot[]
 
   @@unique([schoolId, code])
   @@index([schoolId])
@@ -820,6 +870,34 @@ model ClassSubject {
   @@index([academicYearId])
   @@index([branchId])
   @@map("class_subjects")
+}
+
+model TimetableSlot {
+  id             String   @id @default(uuid())
+  schoolId       String   @map("school_id")
+  academicYearId String   @map("academic_year_id")
+  sectionId      String   @map("section_id")
+  weekday        Weekday
+  periodNumber   Int      @map("period_number")
+  startTime      String?  @map("start_time") @db.VarChar(8)
+  endTime        String?  @map("end_time") @db.VarChar(8)
+  title          String
+  subjectId      String?  @map("subject_id")
+  teacherId      String?  @map("teacher_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  school       School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear    @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  section      Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject      Subject?        @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  teacher      TeacherProfile? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  @@unique([sectionId, academicYearId, weekday, periodNumber])
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@index([teacherId])
+  @@map("timetable_slots")
 }
 
 model TeacherSubject {
@@ -874,6 +952,7 @@ model Curriculum {
   subjectId String   @map("subject_id")
   gradeId   String   @map("grade_id")
   name      String
+  publisher String?  @db.VarChar(255)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1033,6 +1112,8 @@ model Homework {
   createdById    String    @map("created_by_id")
   title          String
   description    String?   @db.Text
+  /// Teacher-only correct answers for auto-matching later. Never sent to parents/students.
+  answerKey      String?   @map("answer_key") @db.Text
   dueDate        DateTime  @map("due_date")
   publishedAt    DateTime? @map("published_at")
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -1672,6 +1753,8 @@ model OrderItem {
 model FeeStructure {
   id          String       @id @default(uuid())
   schoolId    String       @map("school_id")
+  gradeId     String?      @map("grade_id")
+  kind        FeeKind      @default(OTHER)
   name        String
   amount      Decimal      @db.Decimal(12, 2)
   currency    String       @default("PKR")
@@ -1682,10 +1765,13 @@ model FeeStructure {
   updatedAt   DateTime     @updatedAt @map("updated_at")
 
   school      School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  grade       Grade?       @relation(fields: [gradeId], references: [id], onDelete: SetNull)
   studentFees StudentFee[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
+  @@index([gradeId])
+  @@index([schoolId, gradeId, kind])
   @@map("fee_structures")
 }
 
@@ -1700,6 +1786,7 @@ model StudentFee {
   periodLabel    String           @map("period_label")
   amount         Decimal          @db.Decimal(12, 2)
   paidAmount     Decimal          @default(0) @map("paid_amount") @db.Decimal(12, 2)
+  discountAmount Decimal          @default(0) @map("discount_amount") @db.Decimal(12, 2)
   dueDate        DateTime         @map("due_date") @db.Date
   status         StudentFeeStatus @default(DUE)
   createdAt      DateTime         @default(now()) @map("created_at")
@@ -1722,20 +1809,23 @@ model StudentFee {
 }
 
 model FeePayment {
-  id            String        @id @default(uuid())
-  studentFeeId  String        @map("student_fee_id")
-  amount        Decimal       @db.Decimal(12, 2)
-  method        PaymentMethod @default(CASH)
-  reference     String?
-  notes         String?
-  paidAt        DateTime      @default(now()) @map("paid_at")
-  recordedById  String        @map("recorded_by_id")
-  createdAt     DateTime      @default(now()) @map("created_at")
+  id             String        @id @default(uuid())
+  studentFeeId   String        @map("student_fee_id")
+  amount         Decimal       @db.Decimal(12, 2)
+  discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  receiptNumber  String?       @unique @map("receipt_number")
+  method         PaymentMethod @default(CASH)
+  reference      String?
+  notes          String?
+  paidAt         DateTime      @default(now()) @map("paid_at")
+  recordedById   String        @map("recorded_by_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
 
   studentFee StudentFee @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
   recordedBy User       @relation("FeeRecordedBy", fields: [recordedById], references: [id])
 
   @@index([studentFeeId])
+  @@index([receiptNumber])
   @@map("fee_payments")
 }
 
@@ -1781,6 +1871,14 @@ model ReportCard {
   gradeId          String           @map("grade_id")
   sectionId        String           @map("section_id")
   termLabel        String           @map("term_label")
+  examTitle        String?          @map("exam_title")
+  templateCode     String?          @map("template_code")
+  streamLabel      String?          @map("stream_label")
+  fatherName       String?          @map("father_name")
+  overallGrade     String?          @map("overall_grade")
+  rank             Int?
+  totalMax         Decimal?         @map("total_max") @db.Decimal(7, 2)
+  totalObtained    Decimal?         @map("total_obtained") @db.Decimal(7, 2)
   overallPercentage Decimal         @map("overall_percentage") @db.Decimal(5, 2)
   attendanceRate   Decimal          @map("attendance_rate") @db.Decimal(5, 2)
   remarks          String?          @db.Text
@@ -1806,18 +1904,64 @@ model ReportCard {
 }
 
 model ReportCardLine {
-  id          String  @id @default(uuid())
-  reportCardId String @map("report_card_id")
-  subjectId   String  @map("subject_id")
-  average     Decimal @db.Decimal(5, 2)
-  quizzesTaken Int    @map("quizzes_taken")
-  gradeLetter String  @map("grade_letter")
+  id             String   @id @default(uuid())
+  reportCardId   String   @map("report_card_id")
+  subjectId      String?  @map("subject_id")
+  title          String   @default("")
+  maxMarks       Decimal? @map("max_marks") @db.Decimal(6, 2)
+  obtainedMarks  Decimal? @map("obtained_marks") @db.Decimal(6, 2)
+  remarks        String?
+  includeInTotal Boolean  @default(true) @map("include_in_total")
+  sortOrder      Int      @default(0) @map("sort_order")
+  average        Decimal  @db.Decimal(5, 2)
+  quizzesTaken   Int      @map("quizzes_taken")
+  gradeLetter    String   @map("grade_letter")
 
   reportCard ReportCard @relation(fields: [reportCardId], references: [id], onDelete: Cascade)
-  subject    Subject    @relation(fields: [subjectId], references: [id])
+  subject    Subject?   @relation(fields: [subjectId], references: [id])
 
   @@index([reportCardId])
   @@map("report_card_lines")
+}
+
+model ReportCardTemplate {
+  id              String   @id @default(uuid())
+  schoolId        String   @map("school_id")
+  code            String
+  examTitle       String   @map("exam_title")
+  classLabel      String   @map("class_label")
+  totalMarks      Int      @map("total_marks")
+  showRank        Boolean  @default(true) @map("show_rank")
+  showStream      Boolean  @default(false) @map("show_stream")
+  showFatherName  Boolean  @default(false) @map("show_father_name")
+  showDate        Boolean  @default(true) @map("show_date")
+  showGradingKey  Boolean  @default(false) @map("show_grading_key")
+  showMonthYear   Boolean  @default(false) @map("show_month_year")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  school School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  lines  ReportCardTemplateLine[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+  @@map("report_card_templates")
+}
+
+model ReportCardTemplateLine {
+  id             String  @id @default(uuid())
+  templateId     String  @map("template_id")
+  sortOrder      Int     @map("sort_order")
+  label          String
+  maxMarks       Int?    @map("max_marks")
+  matchSubject   String  @map("match_subject")
+  choiceGroup    String? @map("choice_group")
+  includeInTotal Boolean @default(true) @map("include_in_total")
+
+  template ReportCardTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@map("report_card_template_lines")
 }
 
 // ===================== ID CARDS =====================

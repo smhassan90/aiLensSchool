@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import { RoleName, StudentStatus } from '@prisma/client';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
+import { UpdateStudentDto } from './dto/update-student.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -35,6 +36,12 @@ export class StudentsController {
   @Post()
   create(@Body() dto: CreateStudentDto, @CurrentUser() user: AuthUser) {
     return this.studentsService.create(dto, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateStudentDto, @CurrentUser() user: AuthUser) {
+    return this.studentsService.update(id, dto, user);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)

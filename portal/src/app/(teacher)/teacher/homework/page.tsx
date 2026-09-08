@@ -17,7 +17,7 @@ import { documentsService } from "@/services/documents.service";
 import { teachersService } from "@/services/teachers.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
-import { formatDate } from "@/lib/utils";
+import { formatDate, localDateISOPlusDays } from "@/lib/utils";
 import { ClipboardList } from "lucide-react";
 
 export default function TeacherHomeworkPage() {
@@ -26,7 +26,7 @@ export default function TeacherHomeworkPage() {
   const [open, setOpen] = useState(false);
   const [classKey, setClassKey] = useState("");
   const [title, setTitle] = useState("");
-  const [dueDate, setDueDate] = useState(new Date(Date.now() + 86400000).toISOString().slice(0, 10));
+  const [dueDate, setDueDate] = useState(() => localDateISOPlusDays(1));
   const homework = useQuery({ queryKey: ["homework"], queryFn: () => homeworkService.list({ limit: 50 }) });
   const classes = useQuery({ queryKey: ["teacher-classes"], queryFn: () => teachersService.myClasses() });
   const selected = classes.data?.find((c) => `${c.sectionId}:${c.subjectId}` === classKey);
@@ -34,6 +34,7 @@ export default function TeacherHomeworkPage() {
   const generate = useMutation({
     mutationFn: () => {
       if (!selected) throw new Error("Select a class");
+      if (!selected.subjectId) throw new Error("This class has no subject yet");
       return documentsService.generateHomework({
         academicYearId: selected.academicYearId,
         sectionId: selected.sectionId,
@@ -58,6 +59,8 @@ export default function TeacherHomeworkPage() {
       <div className="rounded-lg border bg-card">
         {homework.isLoading ? (
           <PageLoader variant="panel" task="homework" />
+        ) : homework.isError ? (
+          <EmptyState icon={<ClipboardList className="h-10 w-10" />} title="Could not load homework" description="Check your connection and try again." />
         ) : !homework.data?.items.length ? (
           <EmptyState icon={<ClipboardList className="h-10 w-10" />} title="No homework" description="Generate from a lesson summary." />
         ) : (

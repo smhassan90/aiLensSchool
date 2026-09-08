@@ -3,11 +3,11 @@ export const STAFF_PERMISSIONS = [
   { key: 'SEARCH_STUDENTS', label: 'Find a child', hint: 'Search by student ID, parent name or phone' },
   { key: 'VIEW_TEACHER_PROGRESS', label: 'Teacher progress', hint: 'Ranked scores, AI coaching notes and class-level results' },
   { key: 'VIEW_FINANCE', label: 'Fees & money', hint: 'Collected vs remaining, and expense charts' },
-  { key: 'MANAGE_TEACHERS', label: 'Add teachers', hint: 'Create teacher logins and mark teacher attendance' },
+  { key: 'MANAGE_TEACHERS', label: 'Add teachers', hint: 'Create teacher logins, reset passwords, and mark teacher attendance' },
   { key: 'MANAGE_CLASSES', label: 'Classes & sections', hint: 'Create class, section, class teacher' },
   { key: 'MANAGE_STAFF', label: 'Staff accounts', hint: 'Create principal or staff with selected access' },
   { key: 'MANAGE_EXPENSES', label: 'Salaries & bills', hint: 'Teacher salary, electricity, repairs' },
-  { key: 'MANAGE_EXAMS', label: 'Exam pattern', hint: 'Mid/final or term exams and max marks' },
+  { key: 'MANAGE_EXAMS', label: 'Exam pattern', hint: 'Add assessments, mid term and final in any order, with max marks' },
   { key: 'GENERATE_REPORT_CARDS', label: 'Report cards', hint: 'Generate student report cards' },
   { key: 'SET_QUIZ_TARGETS', label: 'Quiz minimums', hint: 'How many quizzes each class/subject needs' },
 ] as const;

@@ -21,8 +21,9 @@ describe('AcademicsService', () => {
   let prisma: {
     $transaction: jest.Mock;
     branch: { findFirst: jest.Mock };
-    grade: { create: jest.Mock; findFirst: jest.Mock; findUnique: jest.Mock };
+    grade: { create: jest.Mock; findFirst: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     section: { create: jest.Mock; findFirst: jest.Mock };
+    feeStructure: { findFirst: jest.Mock; upsert: jest.Mock; update: jest.Mock };
     academicYear: { findFirst: jest.Mock };
     student: { findFirst: jest.Mock };
     studentEnrollment: { findFirst: jest.Mock; create: jest.Mock; count: jest.Mock };
@@ -41,8 +42,9 @@ describe('AcademicsService', () => {
         return Promise.all(arg as Promise<unknown>[]);
       }),
       branch: { findFirst: jest.fn() },
-      grade: { create: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn() },
+      grade: { create: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       section: { create: jest.fn(), findFirst: jest.fn() },
+      feeStructure: { findFirst: jest.fn().mockResolvedValue(null), upsert: jest.fn(), update: jest.fn() },
       academicYear: { findFirst: jest.fn() },
       student: { findFirst: jest.fn() },
       studentEnrollment: { findFirst: jest.fn(), create: jest.fn(), count: jest.fn() },
@@ -93,6 +95,29 @@ describe('AcademicsService', () => {
       }),
     });
     expect(result).toEqual(expect.objectContaining({ id: 'grade-1' }));
+  });
+
+  it('creates monthly tuition when a class is set up with fees', async () => {
+    prisma.grade.create.mockResolvedValue({ id: 'grade-1', name: 'Class 5', level: 5 });
+    prisma.grade.findUnique.mockResolvedValue({ id: 'grade-1', name: 'Class 5' });
+    prisma.feeStructure.upsert.mockResolvedValue({ id: 'fs-1' });
+
+    await service.createGrade({ name: 'Class 5', level: 5, tuitionFee: 5500, admissionFee: 1000 }, admin);
+
+    expect(prisma.grade.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ name: 'Class 5', tuitionFee: 5500, admissionFee: 1000 }),
+    });
+    expect(prisma.feeStructure.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { schoolId_name: { schoolId: 'school-1', name: 'Class 5 monthly tuition' } },
+        create: expect.objectContaining({ amount: 5500, kind: 'TUITION', gradeId: 'grade-1' }),
+      }),
+    );
+    expect(prisma.feeStructure.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { schoolId_name: { schoolId: 'school-1', name: 'Class 5 admission' } },
+      }),
+    );
   });
 
   it('requires a branch when creating the default section', async () => {

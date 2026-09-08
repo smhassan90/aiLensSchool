@@ -57,13 +57,30 @@ export const setupService = {
     yearName: string;
     startDate: string;
     endDate: string;
-    grades: Array<{ name: string; level: number; section: string }>;
-    subjects: Array<{ name: string; code: string }>;
-    feeName?: string;
-    feeAmount?: number;
-    examPattern?: "MID_FINAL" | "THREE_TERMS";
+    teachers: Array<{ key: string; firstName: string; lastName?: string; phone: string }>;
+    stages: Array<{ key: string; name: string; coordinatorKey?: string }>;
+    classes: Array<{
+      name: string;
+      stageKey: string;
+      classTeacherKey?: string;
+      admissionFee?: number;
+      tuitionFee?: number;
+      subjects: Array<{ name: string; teacherKey?: string }>;
+    }>;
+    exams?: Array<{ name: string; maxMarks: number; sequence: number }>;
     minQuizzes?: number;
   }) {
-    return apiClient("/schools/setup", { method: "POST", body: JSON.stringify(payload) });
+    return apiClient<{
+      ok: boolean;
+      academicYearId: string;
+      teachers: Array<{
+        name: string;
+        phone: string;
+        email: string;
+        temporaryPassword: string | null;
+        employeeCode: string;
+        existingAccount: boolean;
+      }>;
+    }>("/schools/setup", { method: "POST", body: JSON.stringify(payload) });
   },
 };

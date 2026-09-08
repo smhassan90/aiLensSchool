@@ -21,9 +21,7 @@ export default function SettingsScreen() {
 
         <View style={styles.card}>
           <Text style={styles.label}>Push notifications</Text>
-          <Text style={styles.value}>
-            Device token registration runs on login (stub — requires physical device / Expo project).
-          </Text>
+          <Text style={styles.value}>Disabled</Text>
         </View>
 
         <Text style={styles.note}>

@@ -36,9 +36,13 @@ import { academicsService } from "@/services/academics.service";
 import { branchesService } from "@/services/branches.service";
 import { teachersService } from "@/services/teachers.service";
 import { studentsService } from "@/services/students.service";
+import { feesService } from "@/services/fees.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import type { ClassSubject, TeacherRef } from "@/lib/types";
+import { teacherDisplayNameFromUser } from "@/lib/person-name";
+import { formatPkr, optionalMoney } from "@/lib/money";
+import { ClassFeeFields } from "@/components/academics/class-fee-fields";
 import { ArrowLeft, Plus, Users } from "lucide-react";
 
 const sectionSchema = z.object({
@@ -72,7 +76,7 @@ type EnrollValues = z.infer<typeof enrollSchema>;
 
 function teacherName(teacher?: TeacherRef | null) {
   if (!teacher) return "—";
-  return `${teacher.user.firstName} ${teacher.user.lastName}`;
+  return teacherDisplayNameFromUser(teacher.user, teacher.gender);
 }
 
 export default function ClassDetailPage() {
@@ -83,6 +87,12 @@ export default function ClassDetailPage() {
   const [sectionOpen, setSectionOpen] = useState(false);
   const [teacherOpen, setTeacherOpen] = useState(false);
   const [enrollOpen, setEnrollOpen] = useState(false);
+  const [admissionFee, setAdmissionFee] = useState("");
+  const [tuitionFee, setTuitionFee] = useState("");
+  const [stageId, setStageId] = useState("");
+  const [extraName, setExtraName] = useState("");
+  const [extraAmount, setExtraAmount] = useState("");
+  const [extraFrequency, setExtraFrequency] = useState("MONTHLY");
 
   const gradeQuery = useQuery({
     queryKey: ["grade", classId],
@@ -108,6 +118,10 @@ export default function ClassDetailPage() {
     queryKey: ["branches"],
     queryFn: () => branchesService.list({ limit: 50 }),
   });
+  const stages = useQuery({
+    queryKey: ["school-stages"],
+    queryFn: () => academicsService.listStages(),
+  });
   const enrollments = useQuery({
     queryKey: ["enrollments", classId],
     queryFn: () => academicsService.listEnrollments({ gradeId: classId, limit: 100 }),
@@ -122,6 +136,11 @@ export default function ClassDetailPage() {
   const singleSection = sections.length === 1 ? sections[0] : null;
   const currentYear = years.data?.items.find((y) => y.isCurrent) ?? years.data?.items[0];
   const onlyBranch = branches.data?.items.length === 1 ? branches.data.items[0] : null;
+  const extraFees = (grade?.feeStructures ?? []).filter((item) => {
+    if (item.kind === "TUITION" || item.kind === "ADMISSION") return false;
+    const name = item.name.toLowerCase();
+    return !name.endsWith(" monthly tuition") && !name.endsWith(" admission");
+  });
 
   const sectionForm = useForm<SectionValues>({
     resolver: zodResolver(sectionSchema),
@@ -136,6 +155,13 @@ export default function ClassDetailPage() {
       setSectionValue("branchId", onlyBranch.id);
     }
   }, [onlyBranch, setSectionValue]);
+
+  useEffect(() => {
+    if (!grade) return;
+    setAdmissionFee(grade.admissionFee != null && Number(grade.admissionFee) > 0 ? String(Number(grade.admissionFee)) : "");
+    setTuitionFee(grade.tuitionFee != null && Number(grade.tuitionFee) > 0 ? String(Number(grade.tuitionFee)) : "");
+    setStageId(grade.stage?.id ?? "");
+  }, [grade]);
 
   const availableStudents = useMemo(() => {
     const enrolledIds = new Set((enrollments.data?.items ?? []).map((item) => item.studentId));
@@ -240,6 +266,52 @@ export default function ClassDetailPage() {
     },
   });
 
+  const saveFees = useMutation({
+    mutationFn: () =>
+      academicsService.updateGrade(classId, {
+        stageId: stageId || null,
+        admissionFee: optionalMoney(admissionFee) ?? null,
+        tuitionFee: optionalMoney(tuitionFee) ?? null,
+      }),
+    onSuccess: () => {
+      toast({ title: "Class fees saved", variant: "success" });
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["fee-structures"] });
+      queryClient.invalidateQueries({ queryKey: ["school-stages"] });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not save fees",
+        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        variant: "error",
+      });
+    },
+  });
+
+  const addExtraFee = useMutation({
+    mutationFn: () =>
+      feesService.createStructure({
+        name: extraName.trim(),
+        amount: Number(extraAmount),
+        frequency: extraFrequency,
+        gradeId: classId,
+      }),
+    onSuccess: () => {
+      toast({ title: "Fee added to this class", variant: "success" });
+      setExtraName("");
+      setExtraAmount("");
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["fee-structures"] });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not add fee",
+        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        variant: "error",
+      });
+    },
+  });
+
   const openTeacherDialog = () => {
     teacherForm.reset({
       academicYearId: currentYear?.id ?? "",
@@ -286,7 +358,7 @@ export default function ClassDetailPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={grade.name}
-        description={`Level ${grade.level}. Add sections, assign teachers (with optional assistants), then enroll students.`}
+        description={`Level ${grade.level}. Fees, sections, teachers, and students for this class.`}
         actions={
           <div className="flex gap-2">
             <Link href={`/school/academics/grades/${classId}/analytics`}>
@@ -304,10 +376,87 @@ export default function ClassDetailPage() {
 
       <Tabs defaultValue="sections">
         <TabsList>
+          <TabsTrigger value="fees">Fees</TabsTrigger>
           <TabsTrigger value="sections">Sections ({sections.length})</TabsTrigger>
           <TabsTrigger value="teachers">Teachers ({assignments.data?.items.length ?? 0})</TabsTrigger>
           <TabsTrigger value="students">Students ({enrollments.data?.items.length ?? 0})</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="fees">
+          <div className="space-y-6 rounded-lg border bg-card p-4">
+            <div className="space-y-4">
+              <div>
+                <h2 className="font-medium">This class’s fees</h2>
+                <p className="text-sm text-muted-foreground">
+                  Put the class in a school section, then set monthly tuition and admission.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="classStage">School section</Label>
+                <Select id="classStage" value={stageId} onChange={(e) => setStageId(e.target.value)}>
+                  <option value="">Not assigned</option>
+                  {(stages.data ?? []).map((stage) => (
+                    <option key={stage.id} value={stage.id}>{stage.name}</option>
+                  ))}
+                </Select>
+              </div>
+              <ClassFeeFields
+                admissionFee={admissionFee}
+                tuitionFee={tuitionFee}
+                onAdmissionFeeChange={setAdmissionFee}
+                onTuitionFeeChange={setTuitionFee}
+              />
+              <Button onClick={() => saveFees.mutate()} disabled={saveFees.isPending}>
+                {saveFees.isPending ? "Saving…" : "Save class fees"}
+              </Button>
+            </div>
+
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="font-medium">Extra charges for this class</h3>
+              {extraFees.length ? (
+                <ul className="space-y-2 text-sm">
+                  {extraFees.map((item) => (
+                    <li key={item.id} className="flex items-center justify-between rounded-md border px-3 py-2">
+                      <span>
+                        {item.description || item.name}
+                        <span className="ml-2 text-muted-foreground">{item.frequency.toLowerCase().replace("_", " ")}</span>
+                      </span>
+                      <span className="font-medium">{formatPkr(item.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">No extra charges yet. Add lab, transport, or any other class-only fee.</p>
+              )}
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="extraName">Charge name</Label>
+                  <Input id="extraName" value={extraName} onChange={(e) => setExtraName(e.target.value)} placeholder="Computer lab" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="extraAmount">Amount</Label>
+                  <Input id="extraAmount" type="number" min={0} value={extraAmount} onChange={(e) => setExtraAmount(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="extraFrequency">When</Label>
+                  <Select id="extraFrequency" value={extraFrequency} onChange={(e) => setExtraFrequency(e.target.value)}>
+                    <option value="MONTHLY">Monthly</option>
+                    <option value="QUARTERLY">Quarterly</option>
+                    <option value="ANNUAL">Annual</option>
+                    <option value="ONE_TIME">One time</option>
+                  </Select>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                disabled={addExtraFee.isPending || !extraName.trim() || !extraAmount}
+                onClick={() => addExtraFee.mutate()}
+              >
+                {addExtraFee.isPending ? "Adding…" : "Add charge"}
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
 
         <TabsContent value="sections">
           <div className="mb-4 flex justify-end">
@@ -358,7 +507,7 @@ export default function ClassDetailPage() {
                           <option value="">Not assigned</option>
                           {(teachers.data?.items ?? []).map((teacher) => (
                             <option key={teacher.id} value={teacher.id}>
-                              {teacher.user.firstName} {teacher.user.lastName}
+                              {teacherDisplayNameFromUser(teacher.user, teacher.gender)}
                             </option>
                           ))}
                         </select>
@@ -581,7 +730,7 @@ export default function ClassDetailPage() {
                 <option value="">Select teacher</option>
                 {teachers.data?.items.map((teacher) => (
                   <option key={teacher.id} value={teacher.id}>
-                    {teacher.user.firstName} {teacher.user.lastName}
+                    {teacherDisplayNameFromUser(teacher.user, teacher.gender)}
                   </option>
                 ))}
               </Select>
@@ -595,7 +744,7 @@ export default function ClassDetailPage() {
                 <option value="">None</option>
                 {teachers.data?.items.map((teacher) => (
                   <option key={teacher.id} value={teacher.id}>
-                    {teacher.user.firstName} {teacher.user.lastName}
+                    {teacherDisplayNameFromUser(teacher.user, teacher.gender)}
                   </option>
                 ))}
               </Select>

@@ -4,7 +4,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { AI_PROVIDER, AiProvider, LessonImageInput } from '../providers/ai.provider';
 import { OpenAiProvider } from '../providers/openai.provider';
 import { LessonOutput } from '../schemas/lesson-output.schema';
-import { isFakeExtractText } from '../../common/extract-quality';
+import { isFakeExtractText, looksLikeRealLessonText } from '../../common/extract-quality';
 
 @Injectable()
 export class LessonProcessingService {
@@ -67,14 +67,18 @@ export class LessonProcessingService {
           errorMessage: message,
         },
       });
-      if (input.images?.length && isFakeExtractText(input.sourceText)) {
+      // Never turn vision/OCR instructions into fake lesson content.
+      if (input.images?.length || isFakeExtractText(input.sourceText)) {
         throw error;
       }
       const source = input.sourceText.trim();
+      if (!looksLikeRealLessonText(source)) {
+        throw error;
+      }
       return {
         chapterName: input.subjectName ? `${input.subjectName} chapter` : 'Chapter 1',
         topicName: source.slice(0, 60) || 'Today’s lesson',
-        summary: source || 'Could not read this lesson yet.',
+        summary: source,
         concepts: [],
         teacherNotesSuggestion: 'Review the extracted content before generating homework and diary.',
       };

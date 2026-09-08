@@ -6,6 +6,7 @@ import {
   Receipt,
   Search,
   Settings2,
+  UserSquare2,
   Wallet,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -14,12 +15,13 @@ import { GlobalSearch } from "@/components/layout/global-search";
 import { AppShell } from "@/components/layout/app-shell";
 import { SidebarFrame, SidebarNavItem } from "@/components/layout/sidebar-frame";
 import type { StaffPermission } from "@/lib/types";
+import { personFullName } from "@/lib/person-name";
 
 const setupPathPrefixes = [
   "/school/setup",
-  "/school/teachers",
   "/school/staff",
   "/school/academics",
+  "/school/timetable",
   "/school/exams",
   "/school/settings",
   "/school/id-cards",
@@ -43,7 +45,8 @@ const mainNav: Array<{
   { href: "/school/dashboard", label: "Dashboard", icon: LayoutDashboard, permission: "VIEW_DASHBOARD" },
   { href: "/school/front-desk", label: "Find a child", icon: Search, permission: "SEARCH_STUDENTS" },
   { href: "/school/students", label: "Students", icon: GraduationCap },
-  { href: "/school/fees", label: "Fees", icon: Wallet, permission: "VIEW_FINANCE" },
+  { href: "/school/teachers", label: "Teachers", icon: UserSquare2 },
+  { href: "/school/fees", label: "Collect fees", icon: Wallet, permission: "VIEW_FINANCE" },
   { href: "/school/expenses", label: "Salaries & bills", icon: Receipt, permission: "MANAGE_EXPENSES" },
   { href: "/school/setup", label: "Setup", icon: Settings2, matchSetup: true },
 ];
@@ -62,12 +65,17 @@ export function SchoolSidebar() {
   const pathname = usePathname();
   const { user, logout, can } = useAuth();
   const subtitle = user?.roles.includes("PRINCIPAL") ? "Principal" : "Administration";
-  const items = mainNav.filter((item) => !item.permission || can(item.permission));
+  const items = mainNav.filter((item) => {
+    if (item.href === "/school/teachers") {
+      return can("MANAGE_TEACHERS") || can("VIEW_TEACHER_PROGRESS");
+    }
+    return !item.permission || can(item.permission);
+  });
 
   return (
     <SidebarFrame
       subtitle={subtitle}
-      userName={`${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim()}
+      userName={personFullName(user?.firstName, user?.lastName)}
       onLogout={logout}
     >
       {items.map(({ href, label, icon, matchSetup }) => (

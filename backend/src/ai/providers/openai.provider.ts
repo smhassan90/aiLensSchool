@@ -99,7 +99,7 @@ export class OpenAiProvider implements AiProvider {
     subjectName?: string;
     gradeName?: string;
     styleInstruction?: string;
-  }): Promise<AiCompletionResult<{ title: string; description: string }>> {
+  }): Promise<AiCompletionResult<{ title: string; description: string; answerKey?: string }>> {
     if (!this.apiKey) {
       // Mock path ONLY when OPENAI_API_KEY is missing.
       return {
@@ -108,6 +108,7 @@ export class OpenAiProvider implements AiProvider {
           description: input.styleInstruction
             ? `${input.styleInstruction}\n\nComplete exercises based on: ${input.lessonSummary.slice(0, 240)}`
             : `Complete exercises based on: ${input.lessonSummary.slice(0, 120)}`,
+          answerKey: '1. Answers should match the main ideas in today’s lesson.',
         },
         provider: 'mock',
         model: 'deterministic-mock',
@@ -132,6 +133,7 @@ export class OpenAiProvider implements AiProvider {
     const parsed = JSON.parse(this.extractJson(content.text)) as {
       title: string;
       description: string;
+      answerKey?: string;
     };
     return {
       data: parsed,

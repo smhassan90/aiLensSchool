@@ -2,6 +2,7 @@ import {
   IsArray,
   IsDateString,
   IsEmail,
+  IsEnum,
   IsOptional,
   IsString,
   MinLength,
@@ -9,6 +10,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Gender } from '@prisma/client';
 
 class ClassSubjectAssignmentDto {
   @ApiProperty()
@@ -42,6 +44,11 @@ export class CreateTeacherDto {
   @ApiProperty()
   @IsString()
   lastName!: string;
+
+  @ApiPropertyOptional({ enum: Gender })
+  @IsOptional()
+  @IsEnum(Gender)
+  gender?: Gender;
 
   @ApiProperty()
   @IsEmail()

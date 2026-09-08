@@ -8,22 +8,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   orientation: 'portrait',
   scheme: 'smsparent',
   userInterfaceStyle: 'light',
-  newArchEnabled: false,
-  splash: {
-    image: './assets/splash.png',
-    resizeMode: 'cover',
-    backgroundColor: '#042f2e',
-  },
   icon: './assets/icon.png',
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.sms.parent',
     icon: './assets/icon.png',
-    splash: {
-      image: './assets/splash.png',
-      resizeMode: 'cover',
-      backgroundColor: '#042f2e',
-    },
   },
   android: {
     adaptiveIcon: {
@@ -31,18 +20,25 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#0f766e',
     },
     package: 'com.sms.parent',
-    versionCode: 1,
-    splash: {
-      image: './assets/splash.png',
-      resizeMode: 'cover',
-      backgroundColor: '#042f2e',
-    },
+    versionCode: 2,
   },
   web: {
     bundler: 'metro',
     output: 'static',
   },
-  plugins: ['expo-router', 'expo-notifications'],
+  plugins: [
+    'expo-router',
+    'expo-secure-store',
+    [
+      'expo-splash-screen',
+      {
+        image: './assets/splash.png',
+        backgroundColor: '#042f2e',
+        resizeMode: 'cover',
+        enableFullScreenImage_legacy: true,
+      },
+    ],
+  ],
   experiments: {
     typedRoutes: true,
   },

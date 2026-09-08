@@ -9,6 +9,7 @@ import {
   RoleName,
   SchoolStatus,
   SubscriptionStatus,
+  TeacherStatus,
   UserStatus,
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
@@ -19,6 +20,10 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateSchoolDto } from './dto/create-school.dto';
 import { UpdateSchoolDto } from './dto/update-school.dto';
+import { examsForPattern, normalizeExamPapers } from '../academics/exam-patterns';
+import { SetupSchoolDto } from './dto/setup-school.dto';
+import { syncClassFeeStructures } from '../fees/class-fees';
+import { teacherDisplayName } from '../common/utils/person-name';
 
 @Injectable()
 export class SchoolsService {
@@ -290,110 +295,340 @@ export class SchoolsService {
     };
   }
 
-  async runSetup(
-    user: AuthUser,
-    dto: {
-      yearName: string;
-      startDate: string;
-      endDate: string;
-      grades: Array<{ name: string; level: number; section: string }>;
-      subjects: Array<{ name: string; code: string }>;
-      feeName?: string;
-      feeAmount?: number;
-      examPattern?: 'MID_FINAL' | 'THREE_TERMS';
-      minQuizzes?: number;
-    },
-  ) {
+  async runSetup(user: AuthUser, dto: SetupSchoolDto) {
     const schoolId = this.tenant.requireSchoolId(user);
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
       include: { branches: { take: 1 } },
     });
     const branchId = school?.branches[0]?.id;
-    if (!branchId) {
+    if (!school || !branchId) {
       throw new BadRequestException({ code: 'NO_BRANCH', message: 'Create a branch first' });
     }
 
-    const year = await this.prisma.academicYear.upsert({
-      where: { id: `setup-${schoolId}` },
-      create: {
-        id: `setup-${schoolId}`,
-        schoolId,
-        branchId,
-        name: dto.yearName,
-        startDate: new Date(dto.startDate),
-        endDate: new Date(dto.endDate),
-        isCurrent: true,
-      },
-      update: {
-        name: dto.yearName,
-        startDate: new Date(dto.startDate),
-        endDate: new Date(dto.endDate),
-        isCurrent: true,
-      },
-    });
-
-    const exams =
-      dto.examPattern === 'THREE_TERMS'
-        ? [
-            { name: 'First term', maxMarks: 100, sequence: 1 },
-            { name: 'Second term', maxMarks: 100, sequence: 2 },
-            { name: 'Third term', maxMarks: 100, sequence: 3 },
-          ]
-        : [
-            { name: 'Mid term', maxMarks: 50, sequence: 1 },
-            { name: 'Final term', maxMarks: 100, sequence: 2 },
-          ];
-
-    await this.prisma.examConfig.deleteMany({ where: { academicYearId: year.id } });
-    await this.prisma.examConfig.createMany({
-      data: exams.map((exam) => ({ schoolId, academicYearId: year.id, ...exam })),
-    });
-
-    for (const gradeInput of dto.grades) {
-      const grade = await this.prisma.grade.upsert({
-        where: { schoolId_name: { schoolId, name: gradeInput.name } },
-        create: { schoolId, name: gradeInput.name, level: gradeInput.level },
-        update: { level: gradeInput.level },
+    const exams = dto.exams?.length
+      ? normalizeExamPapers(dto.exams)
+      : examsForPattern('ASSESSMENTS_MID_FINAL');
+    if (!exams.length) {
+      throw new BadRequestException({
+        code: 'EXAMS_REQUIRED',
+        message: 'Add at least one exam paper',
       });
-      await this.prisma.section.upsert({
-        where: {
-          branchId_gradeId_name: { branchId, gradeId: grade.id, name: gradeInput.section || 'A' },
+    }
+
+    const teacherRole = await this.prisma.role.findUnique({ where: { name: RoleName.TEACHER } });
+    if (!teacherRole) {
+      throw new BadRequestException({ code: 'ROLE_MISSING', message: 'TEACHER role missing' });
+    }
+
+    const existingTeacherCount = await this.prisma.teacherProfile.count({ where: { schoolId } });
+    const schoolSlug = slugCode(school.code);
+    const minQuizzes = dto.minQuizzes && dto.minQuizzes > 0 ? dto.minQuizzes : 4;
+
+    const preparedTeachers = await Promise.all(
+      dto.teachers.map(async (input, index) => {
+        const firstName = input.firstName.trim();
+        const lastName = (input.lastName ?? '').trim();
+        const phone = input.phone.trim();
+        const employeeCode = `T-${String(existingTeacherCount + index + 1).padStart(3, '0')}`;
+        const password = teacherPassword(firstName, phone);
+        const email = teacherEmail(schoolSlug, phone, employeeCode);
+        return {
+          key: input.key,
+          firstName,
+          lastName,
+          gender: input.gender ?? null,
+          phone,
+          employeeCode,
+          email,
+          password,
+          passwordHash: await bcrypt.hash(password, 12),
+        };
+      }),
+    );
+
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+      const year = await tx.academicYear.upsert({
+        where: { id: `setup-${schoolId}` },
+        create: {
+          id: `setup-${schoolId}`,
+          schoolId,
+          branchId,
+          name: dto.yearName,
+          startDate: new Date(dto.startDate),
+          endDate: new Date(dto.endDate),
+          isCurrent: true,
         },
-        create: { schoolId, branchId, gradeId: grade.id, name: gradeInput.section || 'A' },
-        update: {},
+        update: {
+          name: dto.yearName,
+          startDate: new Date(dto.startDate),
+          endDate: new Date(dto.endDate),
+          isCurrent: true,
+        },
       });
-      for (const subject of dto.subjects) {
-        const code = `${subject.code}-${grade.level}`.slice(0, 20);
-        const created = await this.prisma.subject.upsert({
-          where: { schoolId_code: { schoolId, code } },
-          create: { schoolId, gradeId: grade.id, name: subject.name, code },
-          update: { name: subject.name, gradeId: grade.id },
+
+      await tx.examConfig.deleteMany({ where: { academicYearId: year.id } });
+      await tx.examConfig.createMany({
+        data: exams.map((exam) => ({
+          schoolId,
+          academicYearId: year.id,
+          name: exam.name,
+          maxMarks: exam.maxMarks,
+          sequence: exam.sequence,
+          startDate: exam.startDate ? new Date(exam.startDate) : null,
+          endDate: exam.endDate ? new Date(exam.endDate) : null,
+        })),
+      });
+
+      const reusedKeys = new Set<string>();
+      const teacherIds = new Map<string, string>();
+      for (const teacher of preparedTeachers) {
+        const existingUser =
+          (await tx.user.findFirst({
+            where: { schoolId, phone: teacher.phone, teacherProfile: { isNot: null } },
+            include: { teacherProfile: true },
+          })) ??
+          (await tx.user.findUnique({
+            where: { email: teacher.email },
+            include: { teacherProfile: true },
+          }));
+
+        if (existingUser?.teacherProfile) {
+          teacherIds.set(teacher.key, existingUser.teacherProfile.id);
+          reusedKeys.add(teacher.key);
+          continue;
+        }
+
+        const teacherUser = await tx.user.create({
+          data: {
+            email: teacher.email,
+            username: teacher.email.split('@')[0],
+            passwordHash: teacher.passwordHash,
+            firstName: teacher.firstName,
+            lastName: teacher.lastName,
+            phone: teacher.phone,
+            schoolId,
+            status: UserStatus.ACTIVE,
+            mustChangePassword: true,
+          },
         });
-        if (dto.minQuizzes && dto.minQuizzes > 0) {
-          await this.prisma.quizTarget.upsert({
-            where: { gradeId_subjectId: { gradeId: grade.id, subjectId: created.id } },
-            create: { schoolId, gradeId: grade.id, subjectId: created.id, minQuizzes: dto.minQuizzes },
-            update: { minQuizzes: dto.minQuizzes },
+        await tx.userRole.create({
+          data: { userId: teacherUser.id, roleId: teacherRole.id, schoolId },
+        });
+        const profile = await tx.teacherProfile.create({
+          data: {
+            userId: teacherUser.id,
+            schoolId,
+            branchId,
+            employeeCode: teacher.employeeCode,
+            gender: teacher.gender,
+            status: TeacherStatus.ACTIVE,
+          },
+        });
+        teacherIds.set(teacher.key, profile.id);
+      }
+
+      const stageIds = new Map<string, string>();
+      for (const [index, stageInput] of dto.stages.entries()) {
+        const name = stageInput.name.trim();
+        const coordinatorId = stageInput.coordinatorKey
+          ? teacherIds.get(stageInput.coordinatorKey) ?? null
+          : null;
+        const stage = await tx.schoolStage.upsert({
+          where: { schoolId_name: { schoolId, name } },
+          create: {
+            schoolId,
+            name,
+            sortOrder: index,
+            coordinatorId,
+          },
+          update: { sortOrder: index, coordinatorId },
+        });
+        stageIds.set(stageInput.key, stage.id);
+      }
+
+      const usedSubjectCodes = new Set<string>();
+      const existingCodes = await tx.subject.findMany({
+        where: { schoolId },
+        select: { code: true },
+      });
+      existingCodes.forEach((row) => usedSubjectCodes.add(row.code));
+
+      for (const [classIndex, classInput] of dto.classes.entries()) {
+        const stageId = stageIds.get(classInput.stageKey);
+        if (!stageId) {
+          throw new BadRequestException({
+            code: 'STAGE_MISSING',
+            message: `Class "${classInput.name}" is missing its school section`,
           });
         }
+        const classTeacherId = classInput.classTeacherKey
+          ? teacherIds.get(classInput.classTeacherKey) ?? null
+          : null;
+        const admissionFee =
+          classInput.admissionFee && classInput.admissionFee > 0 ? classInput.admissionFee : null;
+        const tuitionFee =
+          classInput.tuitionFee && classInput.tuitionFee > 0 ? classInput.tuitionFee : null;
+
+        const grade = await tx.grade.upsert({
+          where: { schoolId_name: { schoolId, name: classInput.name.trim() } },
+          create: {
+            schoolId,
+            stageId,
+            name: classInput.name.trim(),
+            level: classIndex + 1,
+            admissionFee: admissionFee ?? undefined,
+            tuitionFee: tuitionFee ?? undefined,
+          },
+          update: {
+            stageId,
+            level: classIndex + 1,
+            admissionFee: admissionFee ?? undefined,
+            tuitionFee: tuitionFee ?? undefined,
+          },
+        });
+
+        const section = await tx.section.upsert({
+          where: { branchId_gradeId_name: { branchId, gradeId: grade.id, name: 'A' } },
+          create: {
+            schoolId,
+            branchId,
+            gradeId: grade.id,
+            name: 'A',
+            classTeacherId,
+          },
+          update: { classTeacherId },
+        });
+
+        for (const subjectInput of classInput.subjects) {
+          const subjectName = subjectInput.name.trim();
+          const code = uniqueSubjectCode(subjectName, classIndex, usedSubjectCodes);
+          usedSubjectCodes.add(code);
+          const subject = await tx.subject.upsert({
+            where: { schoolId_code: { schoolId, code } },
+            create: { schoolId, gradeId: grade.id, name: subjectName, code },
+            update: { name: subjectName, gradeId: grade.id },
+          });
+
+          const subjectTeacherId = subjectInput.teacherKey
+            ? teacherIds.get(subjectInput.teacherKey) ?? null
+            : null;
+
+          await tx.classSubject.upsert({
+            where: {
+              sectionId_subjectId_academicYearId: {
+                sectionId: section.id,
+                subjectId: subject.id,
+                academicYearId: year.id,
+              },
+            },
+            create: {
+              sectionId: section.id,
+              subjectId: subject.id,
+              academicYearId: year.id,
+              branchId,
+              teacherId: subjectTeacherId,
+            },
+            update: { teacherId: subjectTeacherId },
+          });
+
+          if (subjectTeacherId) {
+            await tx.teacherSubject.upsert({
+              where: {
+                teacherId_subjectId_branchId_academicYearId: {
+                  teacherId: subjectTeacherId,
+                  subjectId: subject.id,
+                  branchId,
+                  academicYearId: year.id,
+                },
+              },
+              create: {
+                teacherId: subjectTeacherId,
+                subjectId: subject.id,
+                branchId,
+                academicYearId: year.id,
+              },
+              update: {},
+            });
+          }
+
+          await tx.quizTarget.upsert({
+            where: { gradeId_subjectId: { gradeId: grade.id, subjectId: subject.id } },
+            create: { schoolId, gradeId: grade.id, subjectId: subject.id, minQuizzes },
+            update: { minQuizzes },
+          });
+        }
+
+        await syncClassFeeStructures(tx, {
+          schoolId,
+          gradeId: grade.id,
+          gradeName: grade.name,
+          admissionFee,
+          tuitionFee,
+        });
       }
-    }
 
-    if (dto.feeName && dto.feeAmount) {
-      await this.prisma.feeStructure.upsert({
-        where: { schoolId_name: { schoolId, name: dto.feeName } },
-        create: { schoolId, name: dto.feeName, amount: dto.feeAmount, frequency: 'MONTHLY' },
-        update: { amount: dto.feeAmount },
+      await tx.schoolSettings.upsert({
+        where: { schoolId },
+        create: { schoolId, setupCompleted: true, examPattern: 'CUSTOM' },
+        update: { setupCompleted: true, examPattern: 'CUSTOM' },
       });
-    }
 
-    await this.prisma.schoolSettings.upsert({
-      where: { schoolId },
-      create: { schoolId, setupCompleted: true, examPattern: dto.examPattern ?? 'MID_FINAL' },
-      update: { setupCompleted: true, examPattern: dto.examPattern ?? 'MID_FINAL' },
+      return { yearId: year.id, reusedKeys: [...reusedKeys] };
+      },
+      { timeout: 60_000, maxWait: 15_000 },
+    );
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'SCHOOL_SETUP_COMPLETED',
+      entityType: 'School',
+      entityId: schoolId,
     });
 
-    return { ok: true, academicYearId: year.id };
+    const reused = new Set(result.reusedKeys);
+    return {
+      ok: true,
+      academicYearId: result.yearId,
+      teachers: preparedTeachers.map((teacher) => ({
+        name: teacherDisplayName(teacher.firstName, teacher.lastName, teacher.gender),
+        phone: teacher.phone,
+        email: teacher.email,
+        temporaryPassword: reused.has(teacher.key) ? null : teacher.password,
+        employeeCode: teacher.employeeCode,
+        existingAccount: reused.has(teacher.key),
+      })),
+    };
   }
 }
+
+function slugCode(value: string) {
+  const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 16);
+  return slug || 'school';
+}
+
+function teacherEmail(schoolSlug: string, phone: string, employeeCode: string) {
+  const digits = phone.replace(/\D/g, '');
+  const local = digits ? `t${digits}` : employeeCode.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return `${local}@${schoolSlug}.school`;
+}
+
+function teacherPassword(firstName: string, phone: string) {
+  const letters = firstName.replace(/[^A-Za-z]/g, '').slice(0, 4).padEnd(4, 'Teach');
+  const digits = phone.replace(/\D/g, '').slice(-4).padStart(4, '1234');
+  return `${letters[0].toUpperCase()}${letters.slice(1).toLowerCase()}${digits}!`;
+}
+
+function uniqueSubjectCode(name: string, classIndex: number, used: Set<string>) {
+  const base = name.replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase() || 'SUB';
+  let code = `${base}${classIndex + 1}`.slice(0, 20);
+  let n = 2;
+  while (used.has(code)) {
+    code = `${base}${classIndex + 1}${n}`.slice(0, 20);
+    n += 1;
+  }
+  return code;
+}
+

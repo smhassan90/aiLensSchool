@@ -13,6 +13,7 @@ import { RoleName, SchoolStatus } from '@prisma/client';
 import { SchoolsService } from './schools.service';
 import { CreateSchoolDto } from './dto/create-school.dto';
 import { UpdateSchoolDto } from './dto/update-school.dto';
+import { SetupSchoolDto } from './dto/setup-school.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RequirePermission } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -47,17 +48,7 @@ export class SchoolsController {
   @Post('setup')
   setup(
     @Body()
-    body: {
-      yearName: string;
-      startDate: string;
-      endDate: string;
-      grades: Array<{ name: string; level: number; section: string }>;
-      subjects: Array<{ name: string; code: string }>;
-      feeName?: string;
-      feeAmount?: number;
-      examPattern?: 'MID_FINAL' | 'THREE_TERMS';
-      minQuizzes?: number;
-    },
+    body: SetupSchoolDto,
     @CurrentUser() user: AuthUser,
   ) {
     return this.schoolsService.runSetup(user, body);

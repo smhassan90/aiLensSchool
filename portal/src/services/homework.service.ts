@@ -5,6 +5,7 @@ export interface HomeworkItem {
   id: string;
   title: string;
   description?: string;
+  answerKey?: string;
   dueDate: string;
   subject?: { name: string };
   section?: { name: string };
@@ -21,6 +22,7 @@ export const homeworkService = {
     branchId: string;
     title: string;
     description?: string;
+    answerKey?: string;
     dueDate: string;
     lessonId?: string;
   }) {

@@ -12,6 +12,7 @@ import { academicsService } from "@/services/academics.service";
 import { PageLoader } from "@/components/layout/page-loader";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
+import { localDateISO } from "@/lib/utils";
 import {
   AttendanceRoster,
   toPresentAbsent,
@@ -22,7 +23,7 @@ export default function AttendancePage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [sectionId, setSectionId] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => localDateISO());
   const [marks, setMarks] = useState<Record<string, AttendanceMark>>({});
   const sections = useQuery({ queryKey: ["sections"], queryFn: () => academicsService.listSections({ limit: 100 }) });
   const years = useQuery({ queryKey: ["academic-years"], queryFn: () => academicsService.listYears({ limit: 20 }) });
@@ -121,3 +122,9 @@ export default function AttendancePage() {
     </div>
   );
 }
+
+
+
+
+
+

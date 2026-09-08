@@ -92,6 +92,10 @@ export const lessonsService = {
     return apiClient<Lesson>(`/lessons/${id}/confirm`, { method: "POST" });
   },
 
+  delete(id: string) {
+    return apiClient<{ id: string; deleted: boolean }>(`/lessons/${id}`, { method: "DELETE" });
+  },
+
   regenerateKeyPoints(id: string, instruction?: string) {
     return apiClient<Lesson>(`/lessons/${id}/key-points/regenerate`, {
       method: "POST",

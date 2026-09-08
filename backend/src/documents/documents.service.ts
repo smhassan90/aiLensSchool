@@ -23,14 +23,15 @@ import {
 import { ParentsService } from '../parents/parents.service';
 import { TeacherGradeStyleService } from '../common/services/teacher-grade-style.service';
 import { applyDiaryStyle, generateStyledHomework, stripListMarker } from '../lessons/teacher-content-style';
-
-function letterGrade(avg: number) {
-  if (avg >= 85) return 'A';
-  if (avg >= 70) return 'B';
-  if (avg >= 55) return 'C';
-  if (avg >= 40) return 'D';
-  return 'F';
-}
+import {
+  fatherDisplayName,
+  letterGrade,
+  pickObtained,
+  pickSubject,
+  streamLabel,
+  templateCodeForGrade,
+  TPS_GRADING,
+} from './report-card-pattern';
 
 @Injectable()
 export class DocumentsService {
@@ -243,7 +244,7 @@ export class DocumentsService {
       gradeName: lesson.grade?.name,
     });
 
-    let generated = fallback;
+    let generated: { title: string; description: string; answerKey?: string } = fallback;
     try {
       generated = await this.homeworkAi.generate({
         schoolId,
@@ -255,6 +256,9 @@ export class DocumentsService {
       });
       if (!generated.description?.trim() || generated.description.trim().length < 20) {
         generated = fallback;
+      }
+      if (!generated.answerKey?.trim()) {
+        generated = { ...generated, answerKey: fallback.answerKey };
       }
     } catch {
       generated = fallback;
@@ -271,6 +275,7 @@ export class DocumentsService {
       branchId: lesson.branchId,
       title: generated.title,
       description: generated.description ?? lessonContent,
+      answerKey: generated.answerKey?.trim() || undefined,
       dueDate,
     };
   }
@@ -386,6 +391,7 @@ export class DocumentsService {
         createdById: user.id,
         title,
         description: generated.description ?? lessonSummary,
+        answerKey: generated.answerKey?.trim() || undefined,
         dueDate: new Date(dto.dueDate),
         publishedAt: new Date(),
       },
@@ -435,7 +441,15 @@ export class DocumentsService {
         ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
         ...(dto.studentId ? { studentId: dto.studentId } : {}),
       },
-      include: { student: true, section: true, grade: true },
+      include: {
+        student: {
+          include: {
+            parents: { include: { parent: { include: { user: true } } } },
+          },
+        },
+        section: true,
+        grade: true,
+      },
     });
     if (!enrollments.length) {
       throw new BadRequestException({
@@ -444,61 +458,157 @@ export class DocumentsService {
       });
     }
 
+    const templates = await this.prisma.reportCardTemplate.findMany({
+      where: { schoolId },
+      include: { lines: { orderBy: { sortOrder: 'asc' } } },
+    });
+    const templateByCode = new Map(templates.map((row) => [row.code, row]));
+    const gradeScale = templates.length ? 'TPS' : 'DEFAULT';
+    const subjectsByGrade = new Map<string, Array<{ id: string; name: string }>>();
+    for (const gradeId of [...new Set(enrollments.map((row) => row.gradeId))]) {
+      subjectsByGrade.set(
+        gradeId,
+        await this.prisma.subject.findMany({
+          where: { schoolId, gradeId },
+          select: { id: true, name: true },
+        }),
+      );
+    }
+
     const cards = [];
     for (const enrollment of enrollments) {
-      const results = await this.prisma.quizResult.findMany({
-        where: {
-          studentId: enrollment.studentId,
-          quiz: {
-            academicYearId: dto.academicYearId,
-            schoolId,
-            ...(dto.subjectId ? { subjectId: dto.subjectId } : {}),
-          },
-        },
-        include: { quiz: { include: { subject: true } } },
+      const templateCode = templateCodeForGrade(enrollment.grade.name, enrollment.grade.level);
+      const template = templateCode ? templateByCode.get(templateCode) : undefined;
+      const attendance = await this.prisma.attendance.findMany({
+        where: { studentId: enrollment.studentId, academicYearId: dto.academicYearId },
       });
+      const present = attendance.filter(
+        (a) => a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.LATE,
+      ).length;
+      const attendanceRate = attendance.length ? (present / attendance.length) * 100 : 0;
+
       const assessments = await this.prisma.assessmentMark.findMany({
         where: {
           studentId: enrollment.studentId,
           academicYearId: dto.academicYearId,
-          ...(dto.subjectId ? { subjectId: dto.subjectId } : {}),
+          ...(!template && dto.subjectId ? { subjectId: dto.subjectId } : {}),
         },
-        include: { subject: true },
+        include: { subject: true, examConfig: true },
       });
-      const attendance = await this.prisma.attendance.findMany({
-        where: { studentId: enrollment.studentId, academicYearId: dto.academicYearId },
-      });
-      const present = attendance.filter((a) => a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.LATE).length;
-      const attendanceRate = attendance.length ? (present / attendance.length) * 100 : 0;
 
-      const bySubject = new Map<string, { total: number; count: number; name: string }>();
-      for (const result of results) {
-        const subjectId = result.quiz.subjectId;
-        const current = bySubject.get(subjectId) ?? { total: 0, count: 0, name: result.quiz.subject.name };
-        current.total += Number(result.percentage);
-        current.count += 1;
-        bySubject.set(subjectId, current);
-      }
-      for (const mark of assessments) {
-        const pct = Number(mark.maxMarks) ? (Number(mark.marks) / Number(mark.maxMarks)) * 100 : 0;
-        const current = bySubject.get(mark.subjectId) ?? { total: 0, count: 0, name: mark.subject.name };
-        current.total += pct;
-        current.count += 1;
-        bySubject.set(mark.subjectId, current);
-      }
-      const lines = [...bySubject.entries()].map(([subjectId, value]) => {
-        const average = value.count ? value.total / value.count : 0;
-        return {
-          subjectId,
-          average: Number(average.toFixed(2)),
-          quizzesTaken: value.count,
-          gradeLetter: letterGrade(average),
-        };
-      });
-      const overall = lines.length
-        ? lines.reduce((sum, line) => sum + line.average, 0) / lines.length
-        : 0;
+      let lines: Array<{
+        subjectId?: string | null;
+        title: string;
+        maxMarks?: number | null;
+        obtainedMarks?: number | null;
+        remarks?: string | null;
+        includeInTotal: boolean;
+        sortOrder: number;
+        average: number;
+        quizzesTaken: number;
+        gradeLetter: string;
+      }>;
+      let overall = 0;
+      let totalMax: number | null = null;
+      let totalObtained: number | null = null;
+      let examTitle: string | null = null;
+      let stream: string | null = null;
+      let fatherName: string | null = null;
 
+      if (template) {
+        const subjects = subjectsByGrade.get(enrollment.gradeId) ?? [];
+        examTitle = template.examTitle;
+        stream = template.showStream ? streamLabel(enrollment.student.scienceGroup) || null : null;
+        fatherName = template.showFatherName ? fatherDisplayName(enrollment.student.parents) || null : null;
+        lines = template.lines.map((line) => {
+          const subject = pickSubject(
+            subjects,
+            line.matchSubject,
+            line.choiceGroup,
+            enrollment.student.scienceGroup,
+          );
+          const mark = pickObtained(
+            assessments,
+            subject?.id ?? null,
+            line.label,
+            line.maxMarks,
+            termLabel,
+          );
+          const maxMarks = line.maxMarks;
+          const obtained = mark ? Number(mark.marks) : null;
+          const average =
+            obtained != null && maxMarks
+              ? (obtained / maxMarks) * 100
+              : mark && Number(mark.maxMarks)
+                ? (Number(mark.marks) / Number(mark.maxMarks)) * 100
+                : 0;
+          return {
+            subjectId: subject?.id ?? null,
+            title: line.label,
+            maxMarks,
+            obtainedMarks: obtained,
+            remarks: null,
+            includeInTotal: line.includeInTotal,
+            sortOrder: line.sortOrder,
+            average: Number(average.toFixed(2)),
+            quizzesTaken: mark ? 1 : 0,
+            gradeLetter: mark || obtained != null ? letterGrade(average, gradeScale) : '',
+          };
+        });
+        const counted = lines.filter((line) => line.includeInTotal && line.obtainedMarks != null && line.maxMarks);
+        totalMax = template.totalMarks;
+        totalObtained = counted.reduce((sum, line) => sum + Number(line.obtainedMarks), 0);
+        overall = counted.length
+          ? (totalObtained / counted.reduce((sum, line) => sum + Number(line.maxMarks), 0)) * 100
+          : 0;
+      } else {
+        const results = await this.prisma.quizResult.findMany({
+          where: {
+            studentId: enrollment.studentId,
+            quiz: {
+              academicYearId: dto.academicYearId,
+              schoolId,
+              ...(dto.subjectId ? { subjectId: dto.subjectId } : {}),
+            },
+          },
+          include: { quiz: { include: { subject: true } } },
+        });
+        const bySubject = new Map<string, { total: number; count: number; name: string }>();
+        for (const result of results) {
+          const subjectId = result.quiz.subjectId;
+          const current = bySubject.get(subjectId) ?? { total: 0, count: 0, name: result.quiz.subject.name };
+          current.total += Number(result.percentage);
+          current.count += 1;
+          bySubject.set(subjectId, current);
+        }
+        for (const mark of assessments) {
+          const pct = Number(mark.maxMarks) ? (Number(mark.marks) / Number(mark.maxMarks)) * 100 : 0;
+          const current = bySubject.get(mark.subjectId) ?? { total: 0, count: 0, name: mark.subject.name };
+          current.total += pct;
+          current.count += 1;
+          bySubject.set(mark.subjectId, current);
+        }
+        lines = [...bySubject.entries()].map(([subjectId, value], index) => {
+          const average = value.count ? value.total / value.count : 0;
+          return {
+            subjectId,
+            title: value.name,
+            includeInTotal: true,
+            sortOrder: index,
+            average: Number(average.toFixed(2)),
+            quizzesTaken: value.count,
+            gradeLetter: letterGrade(average, gradeScale),
+          };
+        });
+        overall = lines.length ? lines.reduce((sum, line) => sum + line.average, 0) / lines.length : 0;
+      }
+
+      const overallGrade =
+        template && lines.some((line) => line.obtainedMarks != null)
+          ? letterGrade(overall, gradeScale)
+          : !template && lines.length
+            ? letterGrade(overall, gradeScale)
+            : '';
       const card = await this.prisma.reportCard.upsert({
         where: {
           studentId_academicYearId_termLabel: {
@@ -515,6 +625,13 @@ export class DocumentsService {
           gradeId: enrollment.gradeId,
           sectionId: enrollment.sectionId,
           termLabel,
+          examTitle,
+          templateCode: template?.code ?? null,
+          streamLabel: stream,
+          fatherName,
+          overallGrade,
+          totalMax,
+          totalObtained,
           overallPercentage: Number(overall.toFixed(2)),
           attendanceRate: Number(attendanceRate.toFixed(2)),
           remarks: overall >= 70 ? 'Good progress. Keep it up.' : 'Needs more practice and regular attendance.',
@@ -522,6 +639,13 @@ export class DocumentsService {
           lines: { create: lines },
         },
         update: {
+          examTitle,
+          templateCode: template?.code ?? null,
+          streamLabel: stream,
+          fatherName,
+          overallGrade,
+          totalMax,
+          totalObtained,
           overallPercentage: Number(overall.toFixed(2)),
           attendanceRate: Number(attendanceRate.toFixed(2)),
           generatedById: user.id,
@@ -535,10 +659,32 @@ export class DocumentsService {
           grade: true,
           section: true,
           academicYear: true,
-          lines: { include: { subject: true } },
+          school: { select: { name: true, address: true, phone: true } },
+          lines: { include: { subject: true }, orderBy: { sortOrder: 'asc' } },
         },
       });
       cards.push(card);
+    }
+
+    const rankedGroups = new Map<string, typeof cards>();
+    for (const card of cards) {
+      const template = card.templateCode ? templateByCode.get(card.templateCode) : undefined;
+      if (!template?.showRank) continue;
+      const key = `${card.sectionId}:${card.termLabel}`;
+      const group = rankedGroups.get(key) ?? [];
+      group.push(card);
+      rankedGroups.set(key, group);
+    }
+    for (const group of rankedGroups.values()) {
+      group.sort((a, b) => Number(b.totalObtained ?? 0) - Number(a.totalObtained ?? 0));
+      let rank = 1;
+      for (let i = 0; i < group.length; i += 1) {
+        if (i > 0 && Number(group[i].totalObtained ?? 0) < Number(group[i - 1].totalObtained ?? 0)) {
+          rank = i + 1;
+        }
+        await this.prisma.reportCard.update({ where: { id: group[i].id }, data: { rank } });
+        group[i].rank = rank;
+      }
     }
 
     await this.audit.log({
@@ -582,16 +728,39 @@ export class DocumentsService {
         select: {
           id: true,
           termLabel: true,
+          examTitle: true,
+          templateCode: true,
+          streamLabel: true,
+          fatherName: true,
+          overallGrade: true,
+          rank: true,
+          totalMax: true,
+          totalObtained: true,
           overallPercentage: true,
           attendanceRate: true,
           remarks: true,
           generatedAt: true,
-          student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
-          grade: { select: { id: true, name: true } },
+          student: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              studentCode: true,
+              scienceGroup: true,
+            },
+          },
+          grade: { select: { id: true, name: true, level: true } },
           section: { select: { id: true, name: true } },
           academicYear: { select: { id: true, name: true } },
+          school: { select: { name: true, address: true, phone: true } },
           lines: {
+            orderBy: { sortOrder: 'asc' },
             select: {
+              title: true,
+              maxMarks: true,
+              obtainedMarks: true,
+              remarks: true,
+              includeInTotal: true,
               average: true,
               gradeLetter: true,
               subject: { select: { name: true } },
@@ -602,6 +771,42 @@ export class DocumentsService {
       this.prisma.reportCard.count({ where }),
     );
     return paginate(items, total, page, limit);
+  }
+
+  async listReportCardTemplates(user: AuthUser, gradeId?: string) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      include: { settings: true },
+    });
+    const templates = await this.prisma.reportCardTemplate.findMany({
+      where: { schoolId },
+      include: { lines: { orderBy: { sortOrder: 'asc' } } },
+      orderBy: { code: 'asc' },
+    });
+    let matched = templates;
+    if (gradeId) {
+      const grade = await this.prisma.grade.findFirst({ where: { id: gradeId, schoolId } });
+      const code = grade ? templateCodeForGrade(grade.name, grade.level) : null;
+      matched = code ? templates.filter((row) => row.code === code) : [];
+    }
+    const metadata =
+      school?.settings?.metadata && typeof school.settings.metadata === 'object' && !Array.isArray(school.settings.metadata)
+        ? (school.settings.metadata as Record<string, unknown>)
+        : {};
+    const reportCard =
+      metadata.reportCard && typeof metadata.reportCard === 'object'
+        ? (metadata.reportCard as { grading?: typeof TPS_GRADING })
+        : {};
+    return {
+      school: {
+        name: school?.name ?? '',
+        address: school?.address ?? '',
+        phone: school?.phone ?? '',
+      },
+      grading: reportCard.grading ?? (templates.length ? TPS_GRADING : []),
+      templates: matched,
+    };
   }
 
   async generateIdCards(dto: GenerateIdCardDto, user: AuthUser) {

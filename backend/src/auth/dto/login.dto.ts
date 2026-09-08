@@ -3,7 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 
 export class LoginDto {
-  @ApiPropertyOptional({ example: 'abc.f.stu001', description: 'Generated parent username or staff email' })
+  @ApiPropertyOptional({ example: 'tps.032123234543', description: 'Parent login (schoolcode.phone) or staff email' })
   @IsOptional()
   @IsString()
   username?: string;

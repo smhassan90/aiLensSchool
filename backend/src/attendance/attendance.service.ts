@@ -1,8 +1,10 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
+import { MemoryCacheService } from '../common/services/memory-cache.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
@@ -15,36 +17,59 @@ export class AttendanceService {
     private readonly audit: AuditService,
     private readonly tenant: TenantService,
     private readonly parentsService: ParentsService,
+    private readonly cache: MemoryCacheService,
   ) {}
 
   async mark(dto: MarkAttendanceDto, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
     const date = new Date(dto.date);
 
-    const results = await this.prisma.$transaction(
-      dto.entries.map((entry) =>
-        this.prisma.attendance.upsert({
-          where: {
-            studentId_date: { studentId: entry.studentId, date },
-          },
-          create: {
-            schoolId,
-            branchId: dto.branchId,
-            academicYearId: dto.academicYearId,
-            sectionId: dto.sectionId,
-            studentId: entry.studentId,
-            date,
-            status: entry.status,
-            notes: entry.notes,
-          },
-          update: {
-            status: entry.status,
-            notes: entry.notes,
-            sectionId: dto.sectionId,
-          },
-        }),
-      ),
+    if (!dto.entries.length) {
+      return [];
+    }
+
+    // One round-trip upsert for the whole roster (remote MySQL latency dominates N upserts).
+    const rows = dto.entries.map((entry) =>
+      Prisma.sql`(
+        ${randomUUID()},
+        ${schoolId},
+        ${dto.branchId},
+        ${dto.academicYearId},
+        ${dto.sectionId},
+        ${entry.studentId},
+        ${date},
+        ${entry.status},
+        ${entry.notes ?? null},
+        NOW(3),
+        NOW(3)
+      )`,
     );
+
+    await this.prisma.$executeRaw`
+      INSERT INTO attendances (
+        id, school_id, branch_id, academic_year_id, section_id, student_id,
+        date, status, notes, created_at, updated_at
+      )
+      VALUES ${Prisma.join(rows)}
+      ON DUPLICATE KEY UPDATE
+        status = VALUES(status),
+        notes = VALUES(notes),
+        section_id = VALUES(section_id),
+        branch_id = VALUES(branch_id),
+        academic_year_id = VALUES(academic_year_id),
+        school_id = VALUES(school_id),
+        updated_at = NOW(3)
+    `;
+
+    const results = await this.prisma.attendance.findMany({
+      where: {
+        date,
+        studentId: { in: dto.entries.map((entry) => entry.studentId) },
+      },
+    });
+
+    this.cache.invalidatePrefix(`teacher:summary:`);
+    this.cache.invalidatePrefix(`teacher:coach:`);
 
     await this.audit.log({
       actorUserId: user.id,

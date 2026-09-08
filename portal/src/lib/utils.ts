@@ -5,6 +5,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Calendar date in the user's local timezone (YYYY-MM-DD). Avoids UTC off-by-one. */
+export function localDateISO(date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** Local calendar date plus N days (YYYY-MM-DD). */
+export function localDateISOPlusDays(days: number, from = new Date()): string {
+  const date = new Date(from.getFullYear(), from.getMonth(), from.getDate() + days);
+  return localDateISO(date);
+}
+
 export function formatDate(value?: string | Date | null): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;

@@ -111,8 +111,9 @@ export interface Student {
   status: string;
   photoUrl?: string | null;
   address?: string | null;
+  scienceGroup?: string | null;
   branch?: { id: string; name: string };
-  grade?: { id: string; name: string };
+  grade?: { id: string; name: string; level?: number };
   section?: { id: string; name: string };
   enrollments?: Enrollment[];
   parents?: StudentParentLink[];
@@ -122,11 +123,13 @@ export interface Teacher {
   id: string;
   employeeCode: string;
   status: string;
+  gender?: "MALE" | "FEMALE" | "OTHER" | null;
   user: {
     id: string;
     firstName: string;
     lastName: string;
     email: string;
+    username?: string | null;
     phone?: string;
   };
   branch?: { id: string; name: string };
@@ -138,7 +141,7 @@ export interface TeacherClassAssignment {
   subjectId: string;
   academicYearId: string;
   branchId: string;
-  role?: "TEACHER" | "ASSISTANT";
+  role?: "TEACHER" | "ASSISTANT" | "CLASS_TEACHER";
   section?: { id: string; name: string; grade?: { id: string; name: string } };
   subject?: { id: string; name: string };
   academicYear?: { id: string; name: string };
@@ -154,7 +157,7 @@ export interface TeacherClass {
   subjectName: string;
   academicYearId: string;
   branchId: string;
-  role?: "TEACHER" | "ASSISTANT";
+  role?: "TEACHER" | "ASSISTANT" | "CLASS_TEACHER";
 }
 
 export interface AcademicYear {
@@ -170,8 +173,13 @@ export interface Grade {
   id: string;
   name: string;
   level: number;
+  admissionFee?: string | number | null;
+  tuitionFee?: string | number | null;
+  hasPeriodTimetable?: boolean;
+  stage?: { id: string; name: string } | null;
   _count?: { sections: number; enrollments: number };
   sections?: Section[];
+  feeStructures?: FeeStructure[];
 }
 
 export interface Section {
@@ -204,6 +212,7 @@ export interface TeacherUserRef {
 
 export interface TeacherRef {
   id: string;
+  gender?: "MALE" | "FEMALE" | "OTHER" | null;
   user: TeacherUserRef;
 }
 
@@ -393,9 +402,13 @@ export interface AuditLog {
 export interface FeeStructure {
   id: string;
   name: string;
-  amount: number;
+  amount: number | string;
   frequency: string;
+  kind?: string;
   active: boolean;
+  description?: string | null;
+  gradeId?: string | null;
+  grade?: { id: string; name: string } | null;
 }
 
 export interface StudentFee {
@@ -403,12 +416,93 @@ export interface StudentFee {
   periodLabel: string;
   amount: number;
   paidAmount: number;
+  discountAmount?: number;
   balance?: number;
   dueDate: string;
   status: string;
+  name?: string;
   student?: { id: string; firstName: string; lastName: string; studentCode: string };
   feeStructure?: FeeStructure;
   section?: { id: string; name: string };
+}
+
+export interface FeeParent {
+  relationship: string;
+  name: string;
+  phone: string;
+}
+
+export interface FeeLookupItem {
+  id: string;
+  name: string;
+  studentCode: string;
+  admissionNumber: string;
+  className?: string | null;
+  sectionName?: string | null;
+  tuitionFee?: number | null;
+  parents: FeeParent[];
+  dueTotal: number;
+}
+
+export interface FeeAccount {
+  school: { name: string; address?: string | null; phone?: string | null; code?: string } | null;
+  student: { id: string; firstName: string; lastName: string; studentCode: string; admissionNumber: string };
+  className?: string | null;
+  sectionName?: string | null;
+  academicYear?: { id: string; name: string } | null;
+  parents: FeeParent[];
+  tuitionDefault: number;
+  admissionDefault: number;
+  suggested: {
+    studentFeeId: string | null;
+    feeStructureId: string | null;
+    periodLabel: string;
+    amount: number;
+    billedAmount: number;
+    label: string;
+  };
+  fees: Array<{
+    id: string;
+    periodLabel: string;
+    name: string;
+    amount: number;
+    paidAmount: number;
+    discountAmount: number;
+    balance: number;
+    status: string;
+    dueDate: string;
+  }>;
+}
+
+export interface FeeReceipt {
+  id: string;
+  receiptNumber: string | null;
+  paidAt: string;
+  method: string;
+  notes?: string | null;
+  school: { name: string; address?: string | null; phone?: string | null; code?: string } | null;
+  student: {
+    id: string;
+    name: string;
+    studentCode: string;
+    admissionNumber: string;
+    className?: string | null;
+    sectionName?: string | null;
+  };
+  parents: FeeParent[];
+  fee: {
+    id: string;
+    name: string;
+    periodLabel: string;
+    billed: number;
+    paidToDate: number;
+    discountedToDate: number;
+    status: string;
+  };
+  collected: number;
+  discount: number;
+  balance: number;
+  receivedBy: string;
 }
 
 export interface HomeDiary {
@@ -424,6 +518,14 @@ export interface HomeDiary {
 export interface ReportCard {
   id: string;
   termLabel: string;
+  examTitle?: string | null;
+  templateCode?: string | null;
+  streamLabel?: string | null;
+  fatherName?: string | null;
+  overallGrade?: string | null;
+  rank?: number | null;
+  totalMax?: number | string | null;
+  totalObtained?: number | string | null;
   overallPercentage: number;
   attendanceRate: number;
   remarks?: string;
@@ -432,11 +534,17 @@ export interface ReportCard {
   grade?: Grade;
   section?: Section;
   academicYear?: AcademicYear;
+  school?: { name: string; address?: string | null; phone?: string | null };
   lines?: Array<{
+    title?: string;
+    maxMarks?: number | string | null;
+    obtainedMarks?: number | string | null;
+    remarks?: string | null;
+    includeInTotal?: boolean;
     average: number;
-    quizzesTaken: number;
+    quizzesTaken?: number;
     gradeLetter: string;
-    subject: { name: string };
+    subject?: { name: string } | null;
   }>;
 }
 

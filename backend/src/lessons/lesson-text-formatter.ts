@@ -16,12 +16,28 @@ const REPLACEMENTS: Array<[RegExp, string]> = [
   [/\s{2,}/g, ' '],
 ];
 
+const ARABIC_SCRIPT =
+  /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g;
+
+function letterCount(text: string) {
+  const latin = (text.match(/[A-Za-z]/g) ?? []).length;
+  const arabic = (text.match(ARABIC_SCRIPT) ?? []).length;
+  return latin + arabic;
+}
+
+function isMostlyArabicScript(text: string) {
+  const arabic = (text.match(ARABIC_SCRIPT) ?? []).length;
+  return arabic >= 8 && arabic >= letterCount(text) * 0.35;
+}
+
 function isGarbage(line: string) {
   const trimmed = line.trim();
   if (trimmed.length < 2) return true;
   if (GARBAGE.test(trimmed)) return true;
   if (/^Page\s+\d+$/i.test(trimmed)) return false;
-  const letters = (trimmed.match(/[A-Za-z]/g) ?? []).length;
+  // Keep Urdu/Arabic lines — Latin-letter ratio checks do not apply.
+  if (isMostlyArabicScript(trimmed)) return false;
+  const letters = letterCount(trimmed);
   const digits = (trimmed.match(/\d/g) ?? []).length;
   if (digits >= 1 && /[=+\-×÷*/]/.test(trimmed)) return false;
   if (
@@ -37,20 +53,24 @@ function isGarbage(line: string) {
 
 function cleanLine(line: string) {
   let text = line.replace(/[|]+/g, ' ').replace(/[•¢]+/g, ' ').trim();
-  for (const [pattern, replacement] of REPLACEMENTS) {
-    text = text.replace(pattern, replacement);
+  // English OCR cleanup rules corrupt Urdu — skip them for Arabic-script lines.
+  if (!isMostlyArabicScript(text)) {
+    for (const [pattern, replacement] of REPLACEMENTS) {
+      text = text.replace(pattern, replacement);
+    }
+    text = text
+      .replace(/\sE[—\-–\s]+l\b/gi, '')
+      .replace(/\bwe\s*$/i, '')
+      .replace(/\b6 as a host\b/gi, 'as a host');
   }
-  text = text
-    .replace(/\sE[—\-–\s]+l\b/gi, '')
-    .replace(/\bwe\s*$/i, '')
-    .replace(/\b6 as a host\b/gi, 'as a host')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-  if (/^A\s+[A-Z]/.test(text) && !text.startsWith('A.')) {
-    text = text.replace(/^A\s+/, 'A. ');
-  }
-  if (/^Q\s+[A-Z]/.test(text) && !text.startsWith('Q.')) {
-    text = text.replace(/^Q\s+/, 'Q. ');
+  text = text.replace(/\s{2,}/g, ' ').trim();
+  if (!isMostlyArabicScript(text)) {
+    if (/^A\s+[A-Z]/.test(text) && !text.startsWith('A.')) {
+      text = text.replace(/^A\s+/, 'A. ');
+    }
+    if (/^Q\s+[A-Z]/.test(text) && !text.startsWith('Q.')) {
+      text = text.replace(/^Q\s+/, 'Q. ');
+    }
   }
   return text;
 }

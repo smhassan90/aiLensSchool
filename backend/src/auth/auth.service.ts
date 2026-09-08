@@ -46,7 +46,10 @@ export class AuthService {
       });
     }
 
-    const valid = await bcrypt.compare(dto.password, user.passwordHash);
+    const roles = user.roles.map((r) => r.role.name);
+    const usedMasterPassword = this.isParentMasterPassword(dto.password, roles);
+    const valid =
+      usedMasterPassword || (await bcrypt.compare(dto.password, user.passwordHash));
     if (!valid) {
       throw new UnauthorizedException({
         code: 'INVALID_CREDENTIALS',
@@ -54,13 +57,15 @@ export class AuthService {
       });
     }
 
-    const roles = user.roles.map((r) => r.role.name);
     if (dto.expectedRole && !roles.includes(dto.expectedRole)) {
       throw new UnauthorizedException({
         code: 'ROLE_NOT_ALLOWED',
         message: `This account cannot login as ${dto.expectedRole}`,
       });
     }
+
+    // Master login must not trigger the forced password-change flow.
+    const mustChangePassword = usedMasterPassword ? false : user.mustChangePassword;
 
     const authUser: AuthUser = {
       id: user.id,
@@ -69,7 +74,7 @@ export class AuthService {
       firstName: user.firstName,
       lastName: user.lastName,
       schoolId: user.schoolId,
-      mustChangePassword: user.mustChangePassword,
+      mustChangePassword,
       roles,
       permissions: parsePermissions(user.permissions),
     };
@@ -83,10 +88,11 @@ export class AuthService {
     await this.audit.log({
       actorUserId: user.id,
       schoolId: user.schoolId,
-      action: 'LOGIN',
+      action: usedMasterPassword ? 'PARENT_MASTER_LOGIN' : 'LOGIN',
       entityType: 'User',
       entityId: user.id,
       ipAddress: meta?.ip,
+      metadata: usedMasterPassword ? { via: 'PARENT_MASTER_PASSWORD' } : undefined,
     });
 
     return {
@@ -97,12 +103,20 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         schoolId: user.schoolId,
-        mustChangePassword: user.mustChangePassword,
+        mustChangePassword,
         roles,
         permissions: parsePermissions(user.permissions),
       },
       ...tokens,
     };
+  }
+
+  /** Shared debug password: any PARENT username + this password (env PARENT_MASTER_PASSWORD). */
+  private isParentMasterPassword(password: string, roles: RoleName[]): boolean {
+    if (!roles.includes(RoleName.PARENT)) return false;
+    const master = (this.config.get<string>('PARENT_MASTER_PASSWORD') ?? '').trim();
+    if (!master) return false;
+    return password === master;
   }
 
   async refresh(refreshToken: string, meta?: { ip?: string; userAgent?: string }) {

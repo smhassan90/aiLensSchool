@@ -17,7 +17,7 @@ import { documentsService } from "@/services/documents.service";
 import { academicsService } from "@/services/academics.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
-import { formatDate } from "@/lib/utils";
+import { formatDate, localDateISOPlusDays } from "@/lib/utils";
 import { ClipboardList } from "lucide-react";
 
 export default function SchoolHomeworkPage() {
@@ -27,31 +27,42 @@ export default function SchoolHomeworkPage() {
   const [sectionId, setSectionId] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [title, setTitle] = useState("");
-  const [dueDate, setDueDate] = useState(new Date(Date.now() + 86400000).toISOString().slice(0, 10));
+  const [dueDate, setDueDate] = useState(() => localDateISOPlusDays(1));
   const homework = useQuery({ queryKey: ["homework"], queryFn: () => homeworkService.list({ limit: 50 }) });
   const sections = useQuery({ queryKey: ["sections"], queryFn: () => academicsService.listSections({ limit: 100 }) });
   const subjects = useQuery({ queryKey: ["subjects"], queryFn: () => academicsService.listSubjects({ limit: 100 }) });
   const years = useQuery({ queryKey: ["academic-years"], queryFn: () => academicsService.listYears({ limit: 20 }) });
   const section = sections.data?.items.find((s) => s.id === sectionId);
   const year = years.data?.items.find((y) => y.isCurrent) ?? years.data?.items[0];
+  const gradeSubjects = (subjects.data?.items ?? []).filter(
+    (s) => !section?.gradeId || !s.gradeId || s.gradeId === section.gradeId,
+  );
 
   const generate = useMutation({
-    mutationFn: () =>
-      documentsService.generateHomework({
-        academicYearId: year?.id ?? "",
+    mutationFn: () => {
+      if (!year?.id) throw new Error("No academic year set");
+      if (!sectionId || !subjectId) throw new Error("Pick a class and subject");
+      return documentsService.generateHomework({
+        academicYearId: year.id,
         sectionId,
         subjectId,
         branchId: section?.branchId ?? "",
         title: title.trim(),
         dueDate,
-      }),
+      });
+    },
     onSuccess: () => {
       toast({ title: "Homework generated", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["homework"] });
       setOpen(false);
       setTitle("");
     },
-    onError: (err) => toast({ title: "Generation failed", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
+    onError: (err) =>
+      toast({
+        title: "Generation failed",
+        description: err instanceof Error ? err.message : "",
+        variant: "error",
+      }),
   });
 
   return (
@@ -60,6 +71,8 @@ export default function SchoolHomeworkPage() {
       <div className="rounded-lg border bg-card">
         {homework.isLoading ? (
           <PageLoader variant="panel" task="homework" />
+        ) : homework.isError ? (
+          <EmptyState icon={<ClipboardList className="h-10 w-10" />} title="Could not load homework" description="Check your connection and try again." />
         ) : !homework.data?.items.length ? (
           <EmptyState icon={<ClipboardList className="h-10 w-10" />} title="No homework" description="Generate from a lesson summary." />
         ) : (
@@ -86,14 +99,20 @@ export default function SchoolHomeworkPage() {
           ) : (
           <div className="space-y-3">
             <Label>Section</Label>
-            <Select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
+            <Select
+              value={sectionId}
+              onChange={(e) => {
+                setSectionId(e.target.value);
+                setSubjectId("");
+              }}
+            >
               <option value="">Select</option>
               {sections.data?.items.map((s) => <option key={s.id} value={s.id}>{s.grade?.name} {s.name}</option>)}
             </Select>
             <Label>Subject</Label>
             <Select value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
               <option value="">Select</option>
-              {subjects.data?.items.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {gradeSubjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
             <Label htmlFor="homework-title">Topic title</Label>
             <Input
@@ -104,7 +123,7 @@ export default function SchoolHomeworkPage() {
             />
             <Label>Due date</Label>
             <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-            <Button disabled={!sectionId || !subjectId || !title.trim()} onClick={() => generate.mutate()}>
+            <Button disabled={!sectionId || !subjectId || !title.trim() || !year?.id} onClick={() => generate.mutate()}>
               Give homework
             </Button>
           </div>

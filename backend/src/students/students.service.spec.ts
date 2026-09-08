@@ -6,6 +6,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
+import { FilesService } from '../files/files.service';
 import { buildParentUsername, generateParentPassword } from './parent-accounts';
 
 const admin: AuthUser = {
@@ -18,16 +19,17 @@ const admin: AuthUser = {
 };
 
 describe('parent account helpers', () => {
-  it('builds distinct mother and father usernames', () => {
-    expect(buildParentUsername('ABC', 'FATHER', 'STU-001')).toBe('abc.f.stu001');
-    expect(buildParentUsername('ABC', 'MOTHER', 'STU-001')).toBe('abc.m.stu001');
+  it('builds username from school code and phone', () => {
+    expect(buildParentUsername('TPS', '032123234543')).toBe('tps.032123234543');
+    expect(buildParentUsername('ABC', '0300-1234567')).toBe('abc.03001234567');
   });
 
-  it('generates an 8-character password without ambiguous characters', () => {
-    const password = generateParentPassword();
-    expect(password).toHaveLength(8);
-    expect(password).toMatch(/^[A-Za-z0-9]+$/);
-    expect(password).not.toMatch(/[IlO01]/);
+  it('adds a suffix when the username already exists', () => {
+    expect(buildParentUsername('TPS', '032123234543', 2)).toBe('tps.032123234543.2');
+  });
+
+  it('uses the shared default parent password', () => {
+    expect(generateParentPassword()).toBe('Password123');
   });
 });
 
@@ -40,6 +42,7 @@ describe('StudentsService', () => {
         StudentsService,
         { provide: PrismaService, useValue: {} },
         { provide: AuditService, useValue: { log: jest.fn() } },
+        { provide: FilesService, useValue: {} },
         TenantService,
       ],
     }).compile();

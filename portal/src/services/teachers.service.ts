@@ -6,7 +6,9 @@ import type {
   TeacherClassAssignment,
 } from "@/lib/types";
 
-function mapClassAssignment(item: TeacherClassAssignment & { role?: "TEACHER" | "ASSISTANT" }): TeacherClass {
+function mapClassAssignment(
+  item: TeacherClassAssignment & { role?: "TEACHER" | "ASSISTANT" | "CLASS_TEACHER" },
+): TeacherClass {
   return {
     sectionId: item.sectionId,
     sectionName: item.section?.name ?? "—",
@@ -158,6 +160,18 @@ export const teachersService = {
       method: "POST",
       body: JSON.stringify({}),
       cache: "no-store",
+    });
+  },
+
+  resetPassword(id: string) {
+    return apiClient<{
+      teacherId: string;
+      username: string | null;
+      temporaryPassword: string;
+      mustChangePassword: boolean;
+    }>(`/teachers/${id}/reset-password`, {
+      method: "POST",
+      body: JSON.stringify({}),
     });
   },
 };

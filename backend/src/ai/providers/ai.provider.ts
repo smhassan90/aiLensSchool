@@ -39,7 +39,7 @@ export interface AiProvider {
     subjectName?: string;
     gradeName?: string;
     styleInstruction?: string;
-  }): Promise<AiCompletionResult<{ title: string; description: string }>>;
+  }): Promise<AiCompletionResult<{ title: string; description: string; answerKey?: string }>>;
 
   analyzeStudent(input: {
     resultsSummary: string;

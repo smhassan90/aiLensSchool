@@ -55,9 +55,16 @@ const setupSections: SetupSection[] = [
         permission: "MANAGE_CLASSES",
       },
       {
+        href: "/school/academics/stages",
+        title: "School sections",
+        description: "Pre-Primary / Primary / Secondary — and which classes sit in each",
+        icon: BookOpen,
+        permission: "MANAGE_CLASSES",
+      },
+      {
         href: "/school/academics/grades",
         title: "Classes & sections",
-        description: "Create classes, sections and assign class teachers",
+        description: "Create each class, assign its school section, and set fees",
         icon: BookOpen,
         permission: "MANAGE_CLASSES",
       },
@@ -69,9 +76,16 @@ const setupSections: SetupSection[] = [
         permission: "MANAGE_CLASSES",
       },
       {
+        href: "/school/timetable",
+        title: "Timetable",
+        description: "Weekly periods and who teaches each class",
+        icon: Calendar,
+        permission: "MANAGE_CLASSES",
+      },
+      {
         href: "/school/exams",
         title: "Exams & quiz targets",
-        description: "Exam pattern and minimum quizzes per subject",
+        description: "Your school’s papers, marks, dates, and quiz minima — not a shared template",
         icon: Trophy,
         permission: "MANAGE_EXAMS",
       },
@@ -111,12 +125,12 @@ const setupSections: SetupSection[] = [
   },
   {
     title: "Fees",
-    hint: "Set admission and tuition amounts per class — collect payments from the main Fees page",
+    hint: "Set amounts on each class. Collect at the desk and send the receipt on WhatsApp.",
     items: [
       {
-        href: "/school/fees?focus=types",
-        title: "Fee types",
-        description: "Admission fee, monthly tuition and other charges",
+        href: "/school/fees",
+        title: "Collect fees",
+        description: "Search by student ID, parent name or phone, take payment and print a receipt",
         icon: Wallet,
         permission: "VIEW_FINANCE",
       },
@@ -183,7 +197,7 @@ const setupSections: SetupSection[] = [
       {
         href: "/school/report-cards",
         title: "Report cards",
-        description: "Generate term report cards",
+        description: "Print the school progress report",
         icon: CreditCard,
         permission: "GENERATE_REPORT_CARDS",
       },
@@ -254,7 +268,7 @@ export default function SetupHubPage() {
               <div>
                 <p className="font-medium">New school? Start here</p>
                 <p className="text-sm text-muted-foreground">
-                  Create your year, classes, subjects and exam pattern in one step.
+                  Add teachers, school sections (Pre-Primary, Primary, Secondary), then each class with its own name, subjects and fees.
                 </p>
               </div>
             </div>

@@ -15,6 +15,7 @@ import {
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
+import { MemoryCacheService } from '../common/services/memory-cache.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { LessonProcessingService } from '../ai/services/lesson-processing.service';
@@ -32,8 +33,22 @@ import {
 import { TeacherGradeStyleService } from '../common/services/teacher-grade-style.service';
 import { applyKeyPointStyle } from './teacher-content-style';
 import { LessonImageInput } from '../ai/providers/ai.provider';
-import { isFakeExtractText, longestRealLessonText, looksLikeRealLessonText } from '../common/extract-quality';
+import {
+  compactTextLength,
+  countArabicScriptChars,
+  countLatinLetters,
+  englishOnlyFromMixedOcr,
+  isFakeExtractText,
+  isGarbledRtlOcr,
+  isUsableLessonOcr,
+  longestRealLessonText,
+  looksLikeMangledRtlOcr,
+  looksLikeRealLessonText,
+} from '../common/extract-quality';
+import { ocrLanguagesForSubject } from './page-ocr.service';
 import { isServerlessRuntime, readEnv } from '../common/env';
+
+const ARABIC_SCRIPT_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
 @Injectable()
 export class LessonsService {
@@ -48,6 +63,7 @@ export class LessonsService {
     private readonly parentsService: ParentsService,
     private readonly pageOcr: PageOcrService,
     private readonly gradeStyle: TeacherGradeStyleService,
+    private readonly cache: MemoryCacheService,
   ) {}
 
   private async requireTeacherProfile(userId: string) {
@@ -69,19 +85,25 @@ export class LessonsService {
   }) {
     const assignment = await this.prisma.classSubject.findFirst({
       where: {
-        teacherId: input.teacherId,
         sectionId: input.sectionId,
         subjectId: input.subjectId,
         academicYearId: input.academicYearId,
+        OR: [{ teacherId: input.teacherId }, { assistantTeacherId: input.teacherId }],
       },
     });
-    if (!assignment) {
-      throw new ForbiddenException({
-        code: 'CLASS_SUBJECT_NOT_ASSIGNED',
-        message: 'Teacher is not assigned to this class/subject',
-      });
-    }
-    return assignment;
+    if (assignment) return assignment;
+
+    // Class teachers can extract for any subject in their section.
+    const section = await this.prisma.section.findFirst({
+      where: { id: input.sectionId, classTeacherId: input.teacherId },
+      select: { id: true },
+    });
+    if (section) return section;
+
+    throw new ForbiddenException({
+      code: 'CLASS_SUBJECT_NOT_ASSIGNED',
+      message: 'You are not assigned to this class/subject. Pick a class from My classes.',
+    });
   }
 
   private parseOptionalInt(value?: string) {
@@ -248,10 +270,41 @@ export class LessonsService {
         this.config.get<string>('CURSOR_API_KEY')?.trim(),
     );
     const uploadedText = dto.pageText?.trim() ?? '';
-    const ocrText = looksLikeRealLessonText(uploadedText)
+    const expectsArabicScript = ocrLanguagesForSubject(subject.name) !== 'eng';
+    const uploadedLooksUsable = isUsableLessonOcr(uploadedText, {
+      expectArabicScript: expectsArabicScript,
+    });
+    const uploadedMangledRtl = isGarbledRtlOcr(uploadedText);
+    // Skip local Tesseract when Urdu/Arabic is expected or browser OCR mangled RTL script.
+    const preferVisionOcr = (expectsArabicScript || uploadedMangledRtl) && canVision;
+    const ocrText = uploadedLooksUsable
       ? uploadedText
-      : await this.pageOcr.readPages(files);
-    if (isServerlessRuntime() && isFakeExtractText(ocrText) && !canVision) {
+      : preferVisionOcr
+        ? ''
+        : await this.pageOcr.readPages(files, { subjectName: subject.name });
+    // English OCR often mangles Urdu quotes. If vision is available, skip the slow
+    // Urdu Tesseract retry and go straight to photo reading.
+    let resolvedOcr = ocrText;
+    if (
+      !preferVisionOcr &&
+      files.length &&
+      (isGarbledRtlOcr(resolvedOcr) ||
+        (/Qur['’]?an|Hadith|ترجمہ|سورۃ/i.test(resolvedOcr) &&
+          countArabicScriptChars(resolvedOcr) < 20))
+    ) {
+      if (canVision) {
+        this.logger.warn(`Skipping Urdu OCR retry — using vision for ${subject.name}`);
+      } else {
+        this.logger.warn(`Retrying OCR with Urdu/Arabic packs for ${subject.name}`);
+        const urduPass = await this.pageOcr.readPages(files, { subjectName: 'Urdu' });
+        if (isUsableLessonOcr(urduPass, { expectArabicScript: true }) && !isGarbledRtlOcr(urduPass)) {
+          resolvedOcr = urduPass;
+        } else {
+          this.logger.warn('Urdu OCR still garbled — vision key required for Urdu quotes');
+        }
+      }
+    }
+    if (isServerlessRuntime() && isFakeExtractText(resolvedOcr) && !canVision) {
       throw new BadRequestException({
         code: 'PHOTO_VISION_REQUIRED',
         message:
@@ -259,63 +312,165 @@ export class LessonsService {
       });
     }
     const images = this.toLessonImages(files);
-    const ocrThin = isFakeExtractText(ocrText);
+    const ocrGarbled = isGarbledRtlOcr(resolvedOcr);
+    const ocrMissingScript =
+      expectsArabicScript &&
+      looksLikeRealLessonText(resolvedOcr) &&
+      !ARABIC_SCRIPT_RE.test(resolvedOcr);
+    const needsRtlVision = expectsArabicScript || uploadedMangledRtl || ocrGarbled;
+    const ocrThin =
+      isFakeExtractText(resolvedOcr) || ocrMissingScript || ocrGarbled || (needsRtlVision && canVision);
+    if (ocrGarbled || (needsRtlVision && canVision && !uploadedLooksUsable)) {
+      this.logger.warn(
+        `Using vision transcription for ${subject.name} (garbled=${ocrGarbled}, arabicSubject=${expectsArabicScript})`,
+      );
+    }
+    if (needsRtlVision && !canVision && (ocrGarbled || ocrMissingScript || isFakeExtractText(resolvedOcr))) {
+      throw new BadRequestException({
+        code: 'URDU_VISION_REQUIRED',
+        message:
+          'Pages with Urdu/Arabic need AI photo reading. Set CURSOR_API_KEY or OPENAI_API_KEY on the backend, then try again.',
+      });
+    }
+    const usableOcr = isUsableLessonOcr(resolvedOcr, {
+      expectArabicScript: expectsArabicScript || countArabicScriptChars(resolvedOcr) >= 40,
+    });
     const local = this.structureFromPageText(
-      looksLikeRealLessonText(ocrText) ? ocrText : `${subject.name} lesson`,
+      usableOcr ? resolvedOcr : `${subject.name} lesson`,
       subject.name,
       pageFrom,
       pageTo,
       teacherNotes,
     );
+    // English (or already-usable) OCR: trust the page text and skip a full AI polish round-trip.
+    // Still run AI when vision is required (Urdu/Arabic/mixed) or OCR is thin/garbled.
     let polished;
-    try {
-      polished = await this.lessonProcessing.process({
-        schoolId,
-        userId: user.id,
-        sourceText: looksLikeRealLessonText(ocrText)
-          ? ocrText
-          : `Read the attached ${subject.name} photos for ${grade.name}.`,
-        subjectName: subject.name,
-        gradeName: grade.name,
-        images: ocrThin && canVision ? images : undefined,
-      });
-    } catch (error) {
-      if (ocrThin) throw error;
-      this.logger.warn(
-        `Lesson AI polish failed, using page text: ${error instanceof Error ? error.message : String(error)}`,
-      );
+    let usedEnglishFallback = false;
+    const canTrustLocalOcr = usableOcr && !ocrThin && !needsRtlVision;
+    if (canTrustLocalOcr) {
       polished = {
         chapterName: local.chapterName,
         topicName: local.topicName,
-        summary: ocrText,
-        concepts: local.concepts,
+        summary: resolvedOcr,
+        concepts: local.concepts.length ? local.concepts : deriveKeyPointsFromLesson(resolvedOcr),
         teacherNotesSuggestion: local.teacherNotesSuggestion,
       };
+    } else {
+      try {
+        polished = await this.lessonProcessing.process({
+          schoolId,
+          userId: user.id,
+          sourceText: usableOcr
+            ? resolvedOcr
+            : `Transcribe the attached ${subject.name} textbook page photo(s) for ${grade.name}. Keep English as English. Keep every Urdu/Arabic line in original Unicode script (not Latin letters). Preserve Quran/Hadith quotations and citations. Keep every paragraph.`,
+          subjectName: subject.name,
+          gradeName: grade.name,
+          images: ocrThin && canVision ? images : undefined,
+        });
+      } catch (error) {
+        const englishFallback = englishOnlyFromMixedOcr(resolvedOcr);
+        if (compactTextLength(englishFallback) > 160) {
+          this.logger.warn(
+            `Vision failed (${error instanceof Error ? error.message : String(error)}); using English OCR fallback`,
+          );
+          usedEnglishFallback = true;
+          polished = {
+            chapterName: local.chapterName,
+            topicName: local.topicName,
+            summary: englishFallback,
+            concepts: deriveKeyPointsFromLesson(englishFallback),
+            teacherNotesSuggestion: undefined,
+          };
+        } else if (ocrThin) {
+          throw error;
+        } else {
+          this.logger.warn(
+            `Lesson AI polish failed, using page text: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          polished = {
+            chapterName: local.chapterName,
+            topicName: local.topicName,
+            summary: ocrGarbled || ocrMissingScript ? local.summary : resolvedOcr,
+            concepts: local.concepts,
+            teacherNotesSuggestion: local.teacherNotesSuggestion,
+          };
+        }
+      }
     }
-    const polishedLooksReal = looksLikeRealLessonText(polished.summary);
+    // Vision sometimes "succeeds" with Latin junk for Urdu quotes — strip to English.
+    if (
+      !usedEnglishFallback &&
+      (isGarbledRtlOcr(polished.summary) || looksLikeMangledRtlOcr(polished.summary))
+    ) {
+      const englishFallback = englishOnlyFromMixedOcr(
+        longestRealLessonText(resolvedOcr, polished.summary),
+      );
+      if (compactTextLength(englishFallback) > 160) {
+        usedEnglishFallback = true;
+        polished = {
+          ...polished,
+          summary: englishFallback,
+          concepts: deriveKeyPointsFromLesson(englishFallback),
+          teacherNotesSuggestion: undefined,
+        };
+      }
+    }
+    const polishedLooksReal =
+      usedEnglishFallback ||
+      isUsableLessonOcr(polished.summary, { expectArabicScript: expectsArabicScript }) ||
+      (looksLikeRealLessonText(polished.summary) &&
+        needsRtlVision &&
+        ARABIC_SCRIPT_RE.test(polished.summary) &&
+        !isGarbledRtlOcr(polished.summary)) ||
+      (needsRtlVision &&
+        looksLikeRealLessonText(polished.summary) &&
+        !isGarbledRtlOcr(polished.summary));
     if (ocrThin && !polishedLooksReal) {
       throw new BadRequestException({
         code: 'PAGE_TEXT_UNREADABLE',
-        message: 'Could not extract the lesson from this photo. Please try again.',
+        message:
+          'Could not read this page clearly. Try a sharper photo with the full page flat and well lit.',
       });
     }
-    const summary = longestRealLessonText(
-      ocrText,
-      local.summary,
-      polishedLooksReal ? polished.summary : undefined,
+    if (isFakeExtractText(polished.summary)) {
+      throw new BadRequestException({
+        code: 'PAGE_TEXT_UNREADABLE',
+        message:
+          'AI returned instructions instead of page text. Try again — photo reading can take up to a few minutes.',
+      });
+    }
+    const summary = usedEnglishFallback
+      ? polished.summary
+      : longestRealLessonText(
+          isUsableLessonOcr(resolvedOcr, { expectArabicScript: expectsArabicScript })
+            ? resolvedOcr
+            : undefined,
+          isUsableLessonOcr(local.summary, { expectArabicScript: expectsArabicScript })
+            ? local.summary
+            : undefined,
+          polishedLooksReal ? polished.summary : undefined,
+        );
+    const conceptsRaw =
+      polishedLooksReal && polished.concepts.length
+        ? polished.concepts
+        : local.concepts.length
+          ? local.concepts
+          : deriveKeyPointsFromLesson(summary);
+    const concepts = conceptsRaw.filter(
+      (c) =>
+        !looksLikeMangledRtlOcr(c) &&
+        countLatinLetters(c) >= 20 &&
+        !/[)(@£€«»#].*[)(@£€«»#]/.test(c),
     );
     const output = {
       ...local,
       chapterName: polishedLooksReal ? polished.chapterName || local.chapterName : local.chapterName,
       topicName: polishedLooksReal ? polished.topicName || local.topicName : local.topicName,
       summary,
-      concepts:
-        polishedLooksReal && polished.concepts.length
-          ? polished.concepts
-          : local.concepts.length
-            ? local.concepts
-            : deriveKeyPointsFromLesson(summary),
-      teacherNotesSuggestion: polished.teacherNotesSuggestion ?? local.teacherNotesSuggestion,
+      concepts: concepts.length
+        ? concepts
+        : deriveKeyPointsFromLesson(summary).filter((c) => countLatinLetters(c) >= 20),
+      teacherNotesSuggestion: undefined,
     };
     const savedStyle = await this.gradeStyle.get(teacher.id, dto.gradeId);
     if (savedStyle?.keyPointStyle) {
@@ -336,7 +491,7 @@ export class LessonsService {
         date: lessonDate,
         chapterName: output.chapterName,
         topicName: output.topicName,
-        teacherNotes: output.teacherNotesSuggestion ?? teacherNotes,
+        teacherNotes: teacherNotes,
         aiSummary: output.summary,
         pageFrom: output.pageFrom ?? pageFrom,
         pageTo: output.pageTo ?? pageTo,
@@ -363,6 +518,9 @@ export class LessonsService {
       entityType: 'DailyLesson',
       entityId: lesson.id,
     });
+
+    this.cache.invalidatePrefix(`teacher:summary:${user.id}`);
+    this.cache.invalidatePrefix(`teacher:coach:${user.id}`);
 
     return this.loadPresented(lesson.id);
   }
@@ -486,7 +644,14 @@ export class LessonsService {
       : this.structureFromPageText(extractedText, lesson.subject.name).concepts;
     let concepts = applyKeyPointStyle(localConcepts, instruction);
 
-    if (extractedText.trim().length > 20) {
+    // Skip a full lesson AI pass when local key points are already solid and the teacher
+    // did not ask for a custom format — keeps regenerate snappy without inventing content.
+    const needsAi =
+      extractedText.trim().length > 20 &&
+      (Boolean(instruction?.trim()) || localConcepts.length < 4);
+    if (needsAi) {
+      const clipped =
+        extractedText.length > 3500 ? `${extractedText.slice(0, 3500)}\n…` : extractedText;
       const polished = await this.lessonProcessing.process({
         schoolId: lesson.schoolId,
         userId: user.id,
@@ -496,7 +661,7 @@ export class LessonsService {
             ? `Teacher instruction: ${instruction}. Follow that format exactly (for example bullet points if they asked for bullets).`
             : '',
           '',
-          extractedText,
+          clipped,
         ]
           .filter((line) => line !== '')
           .join('\n'),
@@ -681,7 +846,7 @@ export class LessonsService {
             aiSummary: output.summary,
             pageFrom: output.pageFrom ?? lesson.pageFrom,
             pageTo: output.pageTo ?? lesson.pageTo,
-            teacherNotes: output.teacherNotesSuggestion ?? lesson.teacherNotes,
+            teacherNotes: lesson.teacherNotes,
             status: LessonStatus.READY_FOR_REVIEW,
           },
         });
@@ -766,6 +931,49 @@ export class LessonsService {
     });
 
     return this.loadPresented(id);
+  }
+
+  async removeDraft(id: string, user: AuthUser) {
+    const teacher = await this.requireTeacherProfile(user.id);
+    const lesson = await this.prisma.dailyLesson.findUnique({ where: { id } });
+    if (!lesson) {
+      throw new NotFoundException({ code: 'LESSON_NOT_FOUND', message: 'Lesson not found' });
+    }
+    this.tenant.assertSchoolAccess(user, lesson.schoolId);
+
+    if (lesson.teacherId !== teacher.id) {
+      throw new ForbiddenException({
+        code: 'LESSON_OWNER_REQUIRED',
+        message: 'Only the assigned lesson teacher can delete this lesson',
+      });
+    }
+
+    if (lesson.status === LessonStatus.CONFIRMED) {
+      throw new BadRequestException({
+        code: 'LESSON_ALREADY_CONFIRMED',
+        message: 'Confirmed lessons cannot be deleted',
+      });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.homework.updateMany({ where: { lessonId: id }, data: { lessonId: null } });
+      await tx.aIJob.updateMany({ where: { lessonId: id }, data: { lessonId: null } });
+      await tx.dailyLesson.delete({ where: { id } });
+    });
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId: lesson.schoolId,
+      branchId: lesson.branchId,
+      action: 'LESSON_DRAFT_DELETED',
+      entityType: 'DailyLesson',
+      entityId: id,
+    });
+
+    this.cache.invalidatePrefix(`teacher:summary:${user.id}`);
+    this.cache.invalidatePrefix(`teacher:coach:${user.id}`);
+
+    return { id, deleted: true };
   }
 
   async findAll(user: AuthUser, query: PaginationDto & LessonQueryDto) {

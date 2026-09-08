@@ -9,10 +9,12 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
+import { MemoryCacheService } from '../common/services/memory-cache.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { AI_PROVIDER, AiProvider } from '../ai/providers/ai.provider';
+import { teacherDisplayName } from '../common/utils/person-name';
 import {
   PERFORMANCE_CRITERIA,
   clampScore,
@@ -27,6 +29,7 @@ export class TeachersService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly tenant: TenantService,
+    private readonly cache: MemoryCacheService,
     @Inject(AI_PROVIDER) private readonly ai: AiProvider,
   ) {}
 
@@ -73,7 +76,7 @@ export class TeachersService {
           username: email.split('@')[0],
           passwordHash,
           firstName: dto.firstName,
-          lastName: dto.lastName,
+          lastName: (dto.lastName ?? '').trim(),
           phone: dto.phone,
           schoolId,
           status: UserStatus.ACTIVE,
@@ -91,6 +94,7 @@ export class TeachersService {
           branchId: dto.branchId,
           employeeCode: dto.employeeCode,
           hireDate: dto.hireDate ? new Date(dto.hireDate) : null,
+          gender: dto.gender ?? null,
           status: TeacherStatus.ACTIVE,
         },
       });
@@ -169,6 +173,7 @@ export class TeachersService {
               { user: { firstName: { contains: query.search } } },
               { user: { lastName: { contains: query.search } } },
               { user: { email: { contains: query.search } } },
+              { user: { username: { contains: query.search } } },
             ],
           }
         : {}),
@@ -185,10 +190,12 @@ export class TeachersService {
             id: true,
             employeeCode: true,
             status: true,
+            gender: true,
             user: {
               select: {
                 id: true,
                 email: true,
+                username: true,
                 firstName: true,
                 lastName: true,
                 phone: true,
@@ -214,6 +221,7 @@ export class TeachersService {
           select: {
             id: true,
             email: true,
+            username: true,
             firstName: true,
             lastName: true,
             phone: true,
@@ -233,7 +241,62 @@ export class TeachersService {
     return this.tenant.assertOwnedOrThrow(user, teacher, 'TEACHER_NOT_FOUND');
   }
 
+  async resetPassword(id: string, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.prisma.teacherProfile.findFirst({
+      where: { id, schoolId },
+      select: {
+        id: true,
+        userId: true,
+        user: { select: { id: true, username: true, firstName: true, phone: true } },
+      },
+    });
+    if (!teacher) {
+      throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
+    }
+
+    const temporaryPassword = buildTeacherTemporaryPassword(
+      teacher.user.firstName,
+      teacher.user.phone,
+    );
+    const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: teacher.userId },
+        data: {
+          passwordHash,
+          mustChangePassword: true,
+        },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId: teacher.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'TEACHER_PASSWORD_RESET',
+      entityType: 'TeacherProfile',
+      entityId: teacher.id,
+    });
+
+    return {
+      teacherId: teacher.id,
+      username: teacher.user.username,
+      temporaryPassword,
+      mustChangePassword: true,
+    };
+  }
+
   async myClasses(user: AuthUser) {
+    return this.cache.getOrSet(`teacher:myClasses:${user.id}`, 30_000, () => this.loadMyClasses(user));
+  }
+
+  private async loadMyClasses(user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
     const classSelect = {
       sectionId: true,
       subjectId: true,
@@ -242,23 +305,145 @@ export class TeachersService {
       section: { select: { id: true, name: true, grade: { select: { id: true, name: true } } } },
       subject: { select: { id: true, name: true } },
     } as const;
-    const profile = await this.prisma.teacherProfile.findUnique({
-      where: { userId: user.id },
-      select: {
-        classSubjects: { select: classSelect },
-        assistantClassSubjects: { select: classSelect },
-      },
-    });
+    const [profile, year] = await Promise.all([
+      this.prisma.teacherProfile.findUnique({
+        where: { userId: user.id },
+        select: {
+          id: true,
+          schoolId: true,
+          classSubjects: { select: classSelect },
+          assistantClassSubjects: { select: classSelect },
+          classSections: {
+            select: {
+              id: true,
+              name: true,
+              branchId: true,
+              grade: {
+                select: {
+                  id: true,
+                  name: true,
+                  subjects: { select: { id: true, name: true }, orderBy: { name: 'asc' } },
+                },
+              },
+              classSubjects: {
+                select: {
+                  subjectId: true,
+                  academicYearId: true,
+                  subject: { select: { id: true, name: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.academicYear.findFirst({
+        where: { schoolId, isCurrent: true },
+        orderBy: { startDate: 'desc' },
+      }),
+    ]);
     if (!profile) {
       throw new NotFoundException({
         code: 'TEACHER_PROFILE_NOT_FOUND',
         message: 'Teacher profile not found',
       });
     }
-    return [
+    const assigned = [
       ...profile.classSubjects.map((item) => ({ ...item, role: 'TEACHER' as const })),
       ...profile.assistantClassSubjects.map((item) => ({ ...item, role: 'ASSISTANT' as const })),
     ];
+    // If the teacher already teaches any subject in a section, do not invent extra
+    // subjects for that section (class teacher of Class 1 who teaches Urdu should
+    // not also see Arts / PT / Social Studies in My classes).
+    const coveredSections = new Set(assigned.map((item) => item.sectionId));
+
+    const uncovered = profile.classSections.filter((section) => !coveredSections.has(section.id));
+    const homerooms = (
+      await Promise.all(
+        uncovered.map(async (section) => {
+          const sectionMeta = {
+            id: section.id,
+            name: section.name,
+            grade: { id: section.grade.id, name: section.grade.name },
+          };
+
+          const yearSubjects = section.classSubjects.filter(
+            (row) => !year || row.academicYearId === year.id,
+          );
+          let subject =
+            yearSubjects[0]?.subject ?? section.grade.subjects[0] ?? null;
+
+          if (!subject && year) {
+            const general = await this.ensureGeneralSubject(
+              profile.schoolId,
+              section.grade.id,
+              section.grade.name,
+            );
+            await this.prisma.classSubject.upsert({
+              where: {
+                sectionId_subjectId_academicYearId: {
+                  sectionId: section.id,
+                  subjectId: general.id,
+                  academicYearId: year.id,
+                },
+              },
+              create: {
+                sectionId: section.id,
+                subjectId: general.id,
+                teacherId: profile.id,
+                academicYearId: year.id,
+                branchId: section.branchId,
+              },
+              update: { teacherId: profile.id },
+            });
+            subject = general;
+          }
+
+          if (!subject) return null;
+
+          return {
+            sectionId: section.id,
+            subjectId: subject.id,
+            academicYearId: yearSubjects[0]?.academicYearId || year?.id || '',
+            branchId: section.branchId,
+            section: sectionMeta,
+            subject: { id: subject.id, name: subject.name },
+            role: 'CLASS_TEACHER' as const,
+          };
+        }),
+      )
+    ).filter((row): row is NonNullable<typeof row> => Boolean(row));
+
+    return [...assigned, ...homerooms];
+  }
+
+  /** Default subject so class teachers can enter marks when the grade has none yet. */
+  private async ensureGeneralSubject(schoolId: string, gradeId: string, gradeName: string) {
+    const existing = await this.prisma.subject.findFirst({
+      where: {
+        schoolId,
+        gradeId,
+        OR: [{ name: 'General' }, { code: { startsWith: 'GEN-' } }],
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (existing) return existing;
+
+    const slug = gradeName
+      .replace(/[^a-zA-Z0-9]+/g, '')
+      .slice(0, 12)
+      .toUpperCase() || 'CLASS';
+    let code = `GEN-${slug}`;
+    const taken = await this.prisma.subject.findFirst({ where: { schoolId, code } });
+    if (taken) code = `GEN-${slug}-${gradeId.slice(0, 6)}`;
+
+    return this.prisma.subject.create({
+      data: {
+        schoolId,
+        gradeId,
+        name: 'General',
+        code,
+      },
+    });
   }
 
   async getProfileByUserId(userId: string) {
@@ -298,6 +483,7 @@ export class TeachersService {
       select: {
         id: true,
         employeeCode: true,
+        gender: true,
         user: { select: { firstName: true, lastName: true } },
       },
     });
@@ -308,7 +494,7 @@ export class TeachersService {
     const byTeacher = new Map(marks.map((row) => [row.teacherId, row.status]));
     return teachers.map((teacher) => ({
       teacherId: teacher.id,
-      name: `${teacher.user.firstName} ${teacher.user.lastName}`,
+      name: teacherDisplayName(teacher.user.firstName, teacher.user.lastName, teacher.gender),
       employeeCode: teacher.employeeCode,
       status: byTeacher.get(teacher.id) ?? AttendanceStatus.PRESENT,
     }));
@@ -574,7 +760,7 @@ export class TeachersService {
     return {
       teacher: {
         id: teacher.id,
-        name: `${teacher.user.firstName} ${teacher.user.lastName}`,
+        name: teacherDisplayName(teacher.user.firstName, teacher.user.lastName, teacher.gender),
       },
       total,
       rank: undefined as number | undefined,
@@ -600,4 +786,11 @@ export class TeachersService {
       classTeacherOf: teacher.classSections.map((section) => `${section.grade.name} ${section.name}`),
     };
   }
+}
+
+/** Same pattern as school setup: First4Letters + last4phone + ! */
+function buildTeacherTemporaryPassword(firstName: string, phone: string | null | undefined) {
+  const letters = firstName.replace(/[^A-Za-z]/g, '').slice(0, 4).padEnd(4, 'Teach');
+  const digits = (phone ?? '').replace(/\D/g, '').slice(-4).padStart(4, '1234');
+  return `${letters[0].toUpperCase()}${letters.slice(1).toLowerCase()}${digits}!`;
 }

@@ -79,6 +79,11 @@
 
 @media print {
   @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  @page id-card {
     size: 86mm 58mm;
     margin: 0;
   }
@@ -88,16 +93,29 @@
     background: white !important;
   }
 
-  body * {
+  .report-card-sheet {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .report-card-sheet:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+}
+
+@media print {
+  body:has(#printable-id-card) * {
     visibility: hidden;
   }
 
-  #printable-id-card,
-  #printable-id-card * {
+  body:has(#printable-id-card) #printable-id-card,
+  body:has(#printable-id-card) #printable-id-card * {
     visibility: visible;
   }
 
   #printable-id-card {
+    page: id-card;
     position: absolute;
     inset: 0;
     width: 86mm;

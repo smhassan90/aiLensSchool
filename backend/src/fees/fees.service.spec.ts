@@ -5,6 +5,7 @@ import { FeesService } from './fees.service';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
+import { ParentsService } from '../parents/parents.service';
 import { AuthUser } from '../common/types/auth-user.type';
 
 const admin: AuthUser = {
@@ -27,10 +28,13 @@ describe('FeesService', () => {
         if (typeof arg === 'function') return arg(prisma);
         return arg;
       }),
-      feeStructure: { create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn() },
+      feeStructure: { create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn(), upsert: jest.fn() },
       academicYear: { findFirst: jest.fn() },
+      schoolStage: { findFirst: jest.fn() },
+      grade: { findMany: jest.fn(), update: jest.fn() },
       studentEnrollment: { findMany: jest.fn() },
-      student: { findMany: jest.fn() },
+      student: { findMany: jest.fn(), findFirst: jest.fn() },
+      school: { findUnique: jest.fn() },
       studentFee: {
         upsert: jest.fn(),
         findFirst: jest.fn(),
@@ -38,7 +42,7 @@ describe('FeesService', () => {
         count: jest.fn(),
         update: jest.fn(),
       },
-      feePayment: { create: jest.fn() },
+      feePayment: { create: jest.fn(), findFirst: jest.fn() },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -46,6 +50,7 @@ describe('FeesService', () => {
         FeesService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: { log: jest.fn() } },
+        { provide: ParentsService, useValue: { assertParentOwnsStudent: jest.fn() } },
         TenantService,
       ],
     }).compile();
@@ -83,6 +88,7 @@ describe('FeesService', () => {
   it('requires students when assigning fees', async () => {
     prisma.feeStructure.findFirst.mockResolvedValue({ id: 'fs-1', amount: 1000 });
     prisma.academicYear.findFirst.mockResolvedValue({ id: 'year-1' });
+    prisma.studentEnrollment = { findMany: jest.fn().mockResolvedValue([]) };
     await expect(
       service.assign(
         {
@@ -90,6 +96,7 @@ describe('FeesService', () => {
           academicYearId: 'year-1',
           periodLabel: 'August 2026',
           dueDate: '2026-08-10',
+          sectionId: 'sec-1',
         },
         admin,
       ),
@@ -118,5 +125,112 @@ describe('FeesService', () => {
     expect(prisma.feePayment.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ amount: 3500 }) }),
     );
+  });
+
+  it('collects cash, keeps a balance, and writes a receipt', async () => {
+    prisma.student.findFirst.mockResolvedValue({
+      id: 'st-1',
+      schoolId: 'school-1',
+      branchId: 'b1',
+      firstName: 'Ali',
+      lastName: 'Khan',
+      studentCode: 'S1',
+      admissionNumber: 'A1',
+      enrollments: [
+        {
+          sectionId: 'sec-1',
+          academicYear: { id: 'year-1', name: '2026-27' },
+          grade: { name: 'Class 1', tuitionFee: 8000 },
+          section: { name: 'A' },
+        },
+      ],
+      parents: [
+        {
+          relationship: 'FATHER',
+          parent: { phone: '03001234567', user: { firstName: 'Ahmed', lastName: 'Khan', phone: null } },
+        },
+      ],
+    });
+    prisma.studentFee.findFirst.mockResolvedValue({
+      id: 'fee-1',
+      amount: 8000,
+      paidAmount: 0,
+      discountAmount: 0,
+      periodLabel: 'September 2026',
+      feeStructure: { name: 'Class 1 monthly tuition' },
+    });
+    prisma.school.findUnique.mockResolvedValue({
+      name: 'The Piercing Stars',
+      address: 'Karachi',
+      phone: '0315',
+      code: 'TPS',
+    });
+    prisma.feePayment.findFirst.mockResolvedValue(null);
+    prisma.feePayment.create.mockResolvedValue({
+      id: 'p1',
+      amount: 5000,
+      discountAmount: 1000,
+      receiptNumber: 'TPS-202609-0001',
+      method: 'CASH',
+      notes: null,
+      paidAt: new Date('2026-09-06'),
+      recordedBy: { firstName: 'School', lastName: 'Admin' },
+    });
+    prisma.studentFee.update.mockResolvedValue({});
+
+    const receipt = await service.collect(
+      { studentId: 'st-1', studentFeeId: 'fee-1', collectedAmount: 5000, discountAmount: 1000 },
+      admin,
+    );
+
+    expect(receipt.collected).toBe(5000);
+    expect(receipt.discount).toBe(1000);
+    expect(receipt.balance).toBe(2000);
+    expect(receipt.receiptNumber).toBe('TPS-202609-0001');
+    expect(prisma.studentFee.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paidAmount: 5000,
+          discountAmount: 1000,
+          status: StudentFeeStatus.PARTIAL,
+        }),
+      }),
+    );
+  });
+
+  it('rejects collect when cash plus discount is more than due', async () => {
+    prisma.student.findFirst.mockResolvedValue({
+      id: 'st-1',
+      schoolId: 'school-1',
+      branchId: 'b1',
+      firstName: 'Ali',
+      lastName: 'Khan',
+      studentCode: 'S1',
+      admissionNumber: 'A1',
+      enrollments: [
+        {
+          sectionId: 'sec-1',
+          academicYear: { id: 'year-1', name: '2026-27' },
+          grade: { name: 'Class 1', tuitionFee: 8000 },
+          section: { name: 'A' },
+        },
+      ],
+      parents: [],
+    });
+    prisma.studentFee.findFirst.mockResolvedValue({
+      id: 'fee-1',
+      amount: 8000,
+      paidAmount: 0,
+      discountAmount: 0,
+      periodLabel: 'September 2026',
+      feeStructure: { name: 'Tuition' },
+    });
+
+    await expect(
+      service.collect(
+        { studentId: 'st-1', studentFeeId: 'fee-1', collectedAmount: 7000, discountAmount: 2000 },
+        admin,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

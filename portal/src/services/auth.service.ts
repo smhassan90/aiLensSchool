@@ -2,7 +2,7 @@ import { apiClient } from "@/lib/api-client";
 import type { AuthUser, LoginResponse, RoleName } from "@/lib/types";
 
 export interface LoginPayload {
-  email: string;
+  username: string;
   password: string;
   expectedRole?: RoleName;
 }

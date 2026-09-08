@@ -34,16 +34,21 @@ import { academicsService } from "@/services/academics.service";
 import { branchesService } from "@/services/branches.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
+import { formatPkr, optionalMoney } from "@/lib/money";
+import { ClassFeeFields } from "@/components/academics/class-fee-fields";
 import { BookOpen, Plus } from "lucide-react";
 
 const schema = z
   .object({
     name: z.string().min(1, "Required"),
     level: z.coerce.number().int().min(1, "Level must be 1 or higher"),
+    stageId: z.string().optional(),
     createDefaultSection: z.boolean(),
     branchId: z.string().optional(),
     defaultSectionName: z.string().optional(),
     defaultSectionCapacity: z.string().optional(),
+    admissionFee: z.string().optional(),
+    tuitionFee: z.string().optional(),
   })
   .refine((v) => !v.createDefaultSection || Boolean(v.branchId), {
     message: "Select a branch for the default section",
@@ -65,6 +70,10 @@ export default function ClassesPage() {
     queryKey: ["branches"],
     queryFn: () => branchesService.list({ limit: 50 }),
   });
+  const stages = useQuery({
+    queryKey: ["school-stages"],
+    queryFn: () => academicsService.listStages(),
+  });
 
   const {
     register,
@@ -78,6 +87,8 @@ export default function ClassesPage() {
     defaultValues: {
       createDefaultSection: true,
       defaultSectionName: "A",
+      admissionFee: "",
+      tuitionFee: "",
     },
   });
 
@@ -95,18 +106,30 @@ export default function ClassesPage() {
       academicsService.createGrade({
         name: values.name,
         level: values.level,
+        stageId: values.stageId || undefined,
         createDefaultSection: values.createDefaultSection,
         branchId: values.branchId || onlyBranch?.id,
         defaultSectionName: values.defaultSectionName || "A",
         defaultSectionCapacity: values.defaultSectionCapacity
           ? Number(values.defaultSectionCapacity)
           : undefined,
+        admissionFee: optionalMoney(values.admissionFee),
+        tuitionFee: optionalMoney(values.tuitionFee),
       }),
     onSuccess: () => {
       toast({ title: "Class created", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["grades"] });
       queryClient.invalidateQueries({ queryKey: ["sections"] });
-      reset({ createDefaultSection: true, defaultSectionName: "A", name: "", level: 1 });
+      queryClient.invalidateQueries({ queryKey: ["school-stages"] });
+      reset({
+        createDefaultSection: true,
+        defaultSectionName: "A",
+        name: "",
+        level: 1,
+        stageId: "",
+        admissionFee: "",
+        tuitionFee: "",
+      });
       setOpen(false);
     },
     onError: (err) => {
@@ -122,7 +145,7 @@ export default function ClassesPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Classes"
-        description="Create classes, add sections, then assign teachers and students"
+        description="Each class has its own fee amounts. Set monthly tuition when you add the class."
         actions={
           <Button onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -152,8 +175,9 @@ export default function ClassesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Class</TableHead>
-                <TableHead>Level</TableHead>
-                <TableHead>Sections</TableHead>
+                <TableHead>School section</TableHead>
+                <TableHead>Classroom</TableHead>
+                <TableHead>Monthly tuition</TableHead>
                 <TableHead>Students</TableHead>
               </TableRow>
             </TableHeader>
@@ -165,7 +189,7 @@ export default function ClassesPage() {
                       {item.name}
                     </Link>
                   </TableCell>
-                  <TableCell>{item.level}</TableCell>
+                  <TableCell>{item.stage?.name ?? "—"}</TableCell>
                   <TableCell>
                     {item.sections?.length ? (
                       <div className="flex flex-wrap gap-1">
@@ -177,6 +201,13 @@ export default function ClassesPage() {
                       </div>
                     ) : (
                       <span className="text-muted-foreground">None</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {item.tuitionFee != null && Number(item.tuitionFee) > 0 ? (
+                      formatPkr(item.tuitionFee)
+                    ) : (
+                      <span className="text-muted-foreground">Not set</span>
                     )}
                   </TableCell>
                   <TableCell>{item._count?.enrollments ?? 0}</TableCell>
@@ -192,7 +223,7 @@ export default function ClassesPage() {
           <DialogHeader>
             <DialogTitle>Add class</DialogTitle>
             <DialogDescription>
-              A class can have one section or many. Tick the box if this class has only one section.
+              Name the class, then set its fees. Tuition can differ by class — for example Class 1–8 vs Class 9–10.
             </DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleSubmit((v) => mutation.mutate(v))}>
@@ -206,6 +237,26 @@ export default function ClassesPage() {
               <Input id="level" type="number" min={1} {...register("level")} />
               {errors.level && <p className="text-sm text-destructive">{errors.level.message}</p>}
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="stageId">School section</Label>
+              <Select id="stageId" {...register("stageId")}>
+                <option value="">Not assigned</option>
+                {(stages.data ?? []).map((stage) => (
+                  <option key={stage.id} value={stage.id}>
+                    {stage.name}
+                  </option>
+                ))}
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Example: Level 1–2 under Pre-Primary, Class 1–5 under Primary, Class 6–10 under Secondary.
+              </p>
+            </div>
+            <ClassFeeFields
+              admissionFee={watch("admissionFee") ?? ""}
+              tuitionFee={watch("tuitionFee") ?? ""}
+              onAdmissionFeeChange={(value) => setValue("admissionFee", value)}
+              onTuitionFeeChange={(value) => setValue("tuitionFee", value)}
+            />
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" className="mt-1" {...register("createDefaultSection")} />
               <span>

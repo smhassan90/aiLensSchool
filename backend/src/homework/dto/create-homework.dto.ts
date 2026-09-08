@@ -27,6 +27,13 @@ export class CreateHomeworkDto {
   @IsString()
   description?: string;
 
+  @ApiPropertyOptional({
+    description: 'Teacher-only answer key. Never shown to parents or students.',
+  })
+  @IsOptional()
+  @IsString()
+  answerKey?: string;
+
   @ApiProperty()
   @IsDateString()
   dueDate!: string;

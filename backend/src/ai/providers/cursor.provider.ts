@@ -14,7 +14,7 @@ import {
   TEACHER_COACH_PROMPT,
 } from '../prompts';
 import { mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
-import { isFakeExtractText, looksLikeRealLessonText } from '../../common/extract-quality';
+import { isFakeExtractText, isGarbledRtlOcr, looksLikeRealLessonText } from '../../common/extract-quality';
 import { isServerlessRuntime, readEnv } from '../../common/env';
 
 @Injectable()
@@ -22,10 +22,14 @@ export class CursorProvider implements AiProvider {
   private readonly logger = new Logger(CursorProvider.name);
   private readonly apiKey: string | undefined;
   private readonly model: string;
+  private readonly visionModel: string;
 
   constructor(private readonly config: ConfigService) {
     this.apiKey = readEnv('CURSOR_API_KEY') || this.config.get<string>('CURSOR_API_KEY')?.trim() || undefined;
-    this.model = this.config.get<string>('CURSOR_MODEL') ?? 'composer-2.5';
+    this.model = this.config.get<string>('CURSOR_MODEL') ?? 'auto';
+    this.visionModel =
+      this.config.get<string>('CURSOR_VISION_MODEL')?.trim() ||
+      (this.model === 'auto' ? 'composer-2.5' : this.model);
   }
 
   async processLesson(input: {
@@ -39,26 +43,29 @@ export class CursorProvider implements AiProvider {
     }
 
     const userPrompt = input.images?.length
-      ? `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\n${input.sourceText}\n\nTranscribe every word on the attached textbook page photo(s). The summary field must be the full page, not a short retelling.`
+      ? `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\n${input.sourceText}\n\nTranscribe every word on the attached textbook page photo(s). Keep English in English. Keep Urdu/Arabic (including Quran/Hadith lines) in Unicode Arabic script — never Latin gibberish like "SNUB" or "@2 A nid)". The summary field must be the full page, not a short retelling.`
       : `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\nKeep this entire OCR lesson text. Do not shorten it:\n${input.sourceText}`;
 
     try {
-      const content = await this.withTimeout(
-        input.images?.length
-          ? this.completeWithImages(LESSON_PROCESSING_PROMPT, userPrompt, input.images)
-          : this.complete(LESSON_PROCESSING_PROMPT, userPrompt),
-        input.images?.length ? 50_000 : 25_000,
-        'Lesson extraction',
-      );
+      const content = input.images?.length
+        ? await this.completeWithImages(LESSON_PROCESSING_PROMPT, userPrompt, input.images)
+        : await this.withTimeout(
+            this.complete(LESSON_PROCESSING_PROMPT, userPrompt),
+            25_000,
+            'Lesson extraction',
+          );
       const parsed = LessonOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
-      if (isFakeExtractText(parsed.summary)) {
-        if (input.images?.length && isFakeExtractText(input.sourceText)) {
-          throw new Error('Cursor did not read the textbook photos');
+      if (isFakeExtractText(parsed.summary) || isGarbledRtlOcr(parsed.summary)) {
+        if (input.images?.length) {
+          throw new Error('Cursor did not read the textbook photos as readable text');
         }
         return this.textFallback(input);
       }
+      // Prefer longer OCR only when it is clean and we did not send photos.
       if (
+        !input.images?.length &&
         looksLikeRealLessonText(input.sourceText) &&
+        !isGarbledRtlOcr(input.sourceText) &&
         input.sourceText.replace(/\s+/g, '').length >
           parsed.summary.replace(/\s+/g, '').length * 1.2
       ) {
@@ -67,9 +74,9 @@ export class CursorProvider implements AiProvider {
       return { data: parsed, ...content.meta };
     } catch (error) {
       this.logger.warn(
-        `Lesson AI cleanup failed, using formatted OCR: ${error instanceof Error ? error.message : String(error)}`,
+        `Lesson AI cleanup failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      if (input.images?.length && isFakeExtractText(input.sourceText)) {
+      if (input.images?.length) {
         throw error;
       }
       return this.textFallback(input);
@@ -108,7 +115,7 @@ export class CursorProvider implements AiProvider {
     subjectName?: string;
     gradeName?: string;
     styleInstruction?: string;
-  }): Promise<AiCompletionResult<{ title: string; description: string }>> {
+  }): Promise<AiCompletionResult<{ title: string; description: string; answerKey?: string }>> {
     if (!this.apiKey) {
       return {
         data: {
@@ -116,6 +123,7 @@ export class CursorProvider implements AiProvider {
           description: input.styleInstruction
             ? `${input.styleInstruction}\n\nComplete exercises based on: ${input.lessonSummary.slice(0, 240)}`
             : `Complete exercises based on: ${input.lessonSummary.slice(0, 120)}`,
+          answerKey: '1. Answers should match the main ideas in today’s lesson.',
         },
         provider: 'mock',
         model: 'deterministic-mock',
@@ -140,6 +148,7 @@ export class CursorProvider implements AiProvider {
     const parsed = JSON.parse(this.extractJson(content.text)) as {
       title: string;
       description: string;
+      answerKey?: string;
     };
     return { data: parsed, ...content.meta };
   }
@@ -227,11 +236,81 @@ export class CursorProvider implements AiProvider {
   }
 
   private async completeWithImages(system: string, user: string, images: LessonImageInput[]) {
+    const pages = images.slice(0, 3);
+    const summaries: string[] = [];
+    let chapterName: string | undefined;
+    let topicName: string | undefined;
+    const concepts: string[] = [];
+
+    for (let index = 0; index < pages.length; index++) {
+      const page = await this.shrinkLessonImage(pages[index]);
+      this.logger.log(
+        `Cursor vision page ${index + 1}/${pages.length} (${Math.round(page.buffer.length / 1024)}KB)`,
+      );
+      const pageText = await this.withTimeout(
+        this.transcribeSinglePage(system, user, page, index + 1, pages.length),
+        75_000,
+        `Lesson page ${index + 1}`,
+      );
+      try {
+        const parsed = LessonOutputSchema.parse(JSON.parse(this.extractJson(pageText)));
+        if (!chapterName && parsed.chapterName) chapterName = parsed.chapterName;
+        if (!topicName && parsed.topicName) topicName = parsed.topicName;
+        if (parsed.summary?.trim()) {
+          summaries.push(
+            pages.length > 1 ? `Page ${index + 1}\n${parsed.summary.trim()}` : parsed.summary.trim(),
+          );
+        }
+        for (const concept of parsed.concepts ?? []) {
+          if (concept && !concepts.includes(concept)) concepts.push(concept);
+        }
+      } catch {
+        const raw = pageText.trim();
+        if (raw) {
+          summaries.push(pages.length > 1 ? `Page ${index + 1}\n${raw}` : raw);
+        }
+      }
+    }
+
+    const summary = summaries.join('\n\n').trim();
+    if (!summary) {
+      throw new Error('Cursor agent returned an empty result for the page photos.');
+    }
+    const merged = JSON.stringify({
+      chapterName,
+      topicName,
+      summary,
+      concepts: concepts.slice(0, 8),
+      teacherNotesSuggestion: 'Review the transcribed page and adjust key points if needed.',
+    });
+    return {
+      text: merged,
+      meta: {
+        provider: 'cursor',
+        model: this.visionModel,
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCost: 0,
+      },
+    };
+  }
+
+  private async transcribeSinglePage(
+    system: string,
+    user: string,
+    image: LessonImageInput,
+    pageNum: number,
+    pageCount: number,
+  ) {
+    const { writeFile, unlink } = await import('fs/promises');
     const { Agent, JsonlLocalAgentStore } = await import('@cursor/sdk');
     const runtime = this.prepareLocalRuntime();
+    const fileName = `page-${pageNum}.jpg`;
+    const filePath = join(runtime.cwd, fileName);
+    await writeFile(filePath, image.buffer);
     const agent = await Agent.create({
       apiKey: this.apiKey,
-      model: { id: this.model },
+      model: { id: this.visionModel },
       local: {
         cwd: runtime.cwd,
         store: new JsonlLocalAgentStore(runtime.storeDir),
@@ -239,15 +318,17 @@ export class CursorProvider implements AiProvider {
     });
     try {
       const run = await agent.send({
-        text: `${system}\n\n${user}\n\nReturn ONLY valid JSON. Do not edit files or run tools.`,
-        images: images.slice(0, 5).map((image) => ({
-          data: image.buffer.toString('base64'),
-          mimeType: image.mimeType,
-        })),
+        text: `${system}\n\n${user}\n\nTranscribe the attached textbook photo (page ${pageNum} of ${pageCount}) into the JSON schema. Keep English as English and Urdu/Arabic as Unicode script. Return ONLY valid JSON. Do not use tools. Do not read or write files.`,
+        images: [
+          {
+            data: image.buffer.toString('base64'),
+            mimeType: image.mimeType,
+          },
+        ],
       });
       const result = await run.wait();
       if (result.status !== 'finished') {
-        throw new Error(`Cursor agent ${result.status || 'failed'} before reading the page photos`);
+        throw new Error(`Cursor agent ${result.status || 'failed'} before reading page ${pageNum}`);
       }
       const text =
         typeof result.result === 'string'
@@ -256,20 +337,42 @@ export class CursorProvider implements AiProvider {
             ? JSON.stringify(result.result)
             : '';
       if (!text.trim()) {
-        throw new Error('Cursor agent returned an empty result for the page photos.');
+        throw new Error(`Cursor agent returned an empty result for page ${pageNum}.`);
       }
-      return {
-        text,
-        meta: {
-          provider: 'cursor',
-          model: result.model?.id ?? this.model,
-          inputTokens: 0,
-          outputTokens: 0,
-          estimatedCost: 0,
-        },
-      };
+      return text;
     } finally {
       agent.close();
+      try {
+        await unlink(filePath);
+      } catch {
+        // temp image cleanup is best-effort
+      }
+    }
+  }
+
+  private async shrinkLessonImage(image: LessonImageInput): Promise<LessonImageInput> {
+    try {
+      const sharpModule = await import('sharp');
+      // Nest/CJS interop: sharp may be the function itself or under .default
+      const sharpFn = (sharpModule as unknown as { default?: (i: Buffer) => import('sharp').Sharp })
+        .default
+        ? (sharpModule as unknown as { default: (i: Buffer) => import('sharp').Sharp }).default
+        : (sharpModule as unknown as (i: Buffer) => import('sharp').Sharp);
+      const buffer = await sharpFn(image.buffer)
+        .rotate()
+        .resize({ width: 1100, height: 1100, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 62, mozjpeg: true })
+        .toBuffer();
+      return {
+        buffer,
+        mimeType: 'image/jpeg',
+        filename: (image.filename ?? 'page').replace(/\.\w+$/, '') + '.jpg',
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Image shrink skipped: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return image;
     }
   }
 
@@ -337,7 +440,7 @@ export class CursorProvider implements AiProvider {
     images?: LessonImageInput[];
   }): AiCompletionResult<LessonOutput> {
     const text = input.sourceText.trim();
-    if (looksLikeRealLessonText(text)) {
+    if (looksLikeRealLessonText(text) && !isGarbledRtlOcr(text)) {
       const firstLine = text.split(/\n/).map((line) => line.trim()).find((line) => line.length > 2 && !/^Page\s+\d+/i.test(line));
       return {
         data: LessonOutputSchema.parse({

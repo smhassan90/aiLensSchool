@@ -35,6 +35,7 @@ const schema = z
     sectionId: z.string().min(1, "Select a section"),
     academicYearId: z.string().min(1, "Select an academic year"),
     address: z.string().optional(),
+    scienceGroup: z.string().optional(),
     fatherFirstName: z.string().optional(),
     fatherLastName: z.string().optional(),
     fatherPhone: z.string().optional(),
@@ -97,6 +98,7 @@ export default function NewStudentPage() {
         sectionId: values.sectionId,
         academicYearId: values.academicYearId,
         address: values.address?.trim() || undefined,
+        scienceGroup: values.scienceGroup || undefined,
         father: values.fatherFirstName?.trim()
           ? {
               firstName: values.fatherFirstName.trim(),
@@ -133,7 +135,7 @@ export default function NewStudentPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Add Student"
-        description="Mother and father mobile logins are generated automatically. Share the username and password with each parent."
+        description="Parent app login is school code + phone (e.g. tps.032123234543). Default password is Password123; parents must change it on first login."
         actions={
           <Link href="/school/students">
             <Button variant="outline">
@@ -234,13 +236,31 @@ export default function NewStudentPage() {
                 </Select>
                 {errors.sectionId && <p className="text-sm text-destructive">{errors.sectionId.message}</p>}
               </div>
+              {(() => {
+                const grade = grades.data?.items.find((g) => g.id === gradeId);
+                const name = grade?.name?.toLowerCase() ?? "";
+                const needsStream = grade?.level === 9 || grade?.level === 10 || /\b(9|10|ix|x)\b/.test(name);
+                if (!needsStream) return null;
+                return (
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="scienceGroup">Science group (Class 9–10)</Label>
+                    <Select id="scienceGroup" {...register("scienceGroup")}>
+                      <option value="">Not set yet</option>
+                      <option value="COMPUTER">Comp. science</option>
+                      <option value="BIOLOGY">Bio. science</option>
+                    </Select>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
               <CardTitle>Father</CardTitle>
-              <CardDescription>A username and password will be generated for the parent app. Last name defaults to the student&apos;s.</CardDescription>
+              <CardDescription>
+                Login is school code + phone (e.g. tps.032123234543). Default password: Password123 (change on first login). Last name defaults to the student&apos;s.
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">

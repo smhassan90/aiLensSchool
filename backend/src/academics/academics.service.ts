@@ -15,9 +15,14 @@ import {
   CreateAcademicYearDto,
   CreateEnrollmentDto,
   CreateGradeDto,
+  CreateSchoolStageDto,
   CreateSectionDto,
   CreateSubjectDto,
+  UpdateGradeDto,
+  UpdateSchoolStageDto,
 } from './dto/academics.dto';
+import { examsForPattern, normalizeExamPapers } from './exam-patterns';
+import { positiveAmount, syncClassFeeStructures } from '../fees/class-fees';
 
 @Injectable()
 export class AcademicsService {
@@ -86,9 +91,109 @@ export class AcademicsService {
     return paginate(items, total, page, limit);
   }
 
+  async listStages(user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    return this.prisma.schoolStage.findMany({
+      where: { schoolId },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      include: {
+        grades: {
+          orderBy: { level: 'asc' },
+          select: { id: true, name: true, level: true, tuitionFee: true },
+        },
+        coordinator: {
+          select: { id: true, user: { select: { firstName: true, lastName: true } } },
+        },
+        _count: { select: { grades: true } },
+      },
+    });
+  }
+
+  async createStage(dto: CreateSchoolStageDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const name = dto.name.trim();
+    if (!name) {
+      throw new BadRequestException({ code: 'NAME_REQUIRED', message: 'Section name is required' });
+    }
+    if (dto.coordinatorId) {
+      const teacher = await this.prisma.teacherProfile.findFirst({
+        where: { id: dto.coordinatorId, schoolId },
+      });
+      if (!teacher) {
+        throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Coordinator not found' });
+      }
+    }
+    try {
+      const stage = await this.prisma.schoolStage.create({
+        data: {
+          schoolId,
+          name,
+          sortOrder: dto.sortOrder ?? 0,
+          coordinatorId: dto.coordinatorId,
+        },
+        include: {
+          grades: { select: { id: true, name: true, level: true } },
+          _count: { select: { grades: true } },
+        },
+      });
+      await this.audit.log({
+        actorUserId: user.id,
+        schoolId,
+        action: 'SCHOOL_STAGE_CREATED',
+        entityType: 'SchoolStage',
+        entityId: stage.id,
+      });
+      return stage;
+    } catch {
+      throw new ConflictException({
+        code: 'STAGE_EXISTS',
+        message: 'A school section with this name already exists',
+      });
+    }
+  }
+
+  async updateStage(id: string, dto: UpdateSchoolStageDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const existing = await this.prisma.schoolStage.findFirst({ where: { id, schoolId } });
+    if (!existing) {
+      throw new NotFoundException({ code: 'STAGE_NOT_FOUND', message: 'School section not found' });
+    }
+    if (dto.coordinatorId) {
+      const teacher = await this.prisma.teacherProfile.findFirst({
+        where: { id: dto.coordinatorId, schoolId },
+      });
+      if (!teacher) {
+        throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Coordinator not found' });
+      }
+    }
+    try {
+      return await this.prisma.schoolStage.update({
+        where: { id },
+        data: {
+          ...(dto.name != null ? { name: dto.name.trim() } : {}),
+          ...(dto.sortOrder != null ? { sortOrder: dto.sortOrder } : {}),
+          ...(dto.coordinatorId !== undefined ? { coordinatorId: dto.coordinatorId } : {}),
+        },
+        include: {
+          grades: { orderBy: { level: 'asc' }, select: { id: true, name: true, level: true } },
+          _count: { select: { grades: true } },
+        },
+      });
+    } catch {
+      throw new ConflictException({
+        code: 'STAGE_EXISTS',
+        message: 'A school section with this name already exists',
+      });
+    }
+  }
+
   private classSubjectInclude() {
     const teacherSelect = {
-      select: { id: true, user: { select: { firstName: true, lastName: true, email: true } } },
+      select: {
+        id: true,
+        gender: true,
+        user: { select: { firstName: true, lastName: true, email: true } },
+      },
     };
     return {
       subject: { select: { id: true, name: true, code: true } },
@@ -101,6 +206,14 @@ export class AcademicsService {
 
   async createGrade(dto: CreateGradeDto, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
+    if (dto.stageId) {
+      const stage = await this.prisma.schoolStage.findFirst({
+        where: { id: dto.stageId, schoolId },
+      });
+      if (!stage) {
+        throw new NotFoundException({ code: 'STAGE_NOT_FOUND', message: 'School section not found' });
+      }
+    }
     if (dto.createDefaultSection) {
       if (!dto.branchId) {
         throw new BadRequestException({
@@ -117,9 +230,18 @@ export class AcademicsService {
     }
 
     try {
+      const admissionFee = positiveAmount(dto.admissionFee);
+      const tuitionFee = positiveAmount(dto.tuitionFee);
       const grade = await this.prisma.$transaction(async (tx) => {
         const created = await tx.grade.create({
-          data: { schoolId, name: dto.name, level: dto.level },
+          data: {
+            schoolId,
+            stageId: dto.stageId,
+            name: dto.name,
+            level: dto.level,
+            admissionFee: admissionFee ?? undefined,
+            tuitionFee: tuitionFee ?? undefined,
+          },
         });
 
         if (dto.createDefaultSection && dto.branchId) {
@@ -133,6 +255,14 @@ export class AcademicsService {
             },
           });
         }
+
+        await syncClassFeeStructures(tx, {
+          schoolId,
+          gradeId: created.id,
+          gradeName: created.name,
+          admissionFee,
+          tuitionFee,
+        });
 
         return created;
       });
@@ -180,6 +310,10 @@ export class AcademicsService {
             id: true,
             name: true,
             level: true,
+            admissionFee: true,
+            tuitionFee: true,
+            hasPeriodTimetable: true,
+            stage: { select: { id: true, name: true } },
             _count: { select: { sections: true, enrollments: true } },
             sections: { orderBy: { name: 'asc' }, select: { id: true, name: true } },
           },
@@ -196,7 +330,20 @@ export class AcademicsService {
     const grade = await this.prisma.grade.findFirst({
       where: { id, schoolId },
       include: {
+        stage: { select: { id: true, name: true } },
         _count: { select: { sections: true, enrollments: true } },
+        feeStructures: {
+          where: { active: true },
+          orderBy: [{ kind: 'asc' }, { name: 'asc' }],
+          select: {
+            id: true,
+            name: true,
+            amount: true,
+            frequency: true,
+            kind: true,
+            description: true,
+          },
+        },
         sections: {
           orderBy: { name: 'asc' },
           select: {
@@ -207,7 +354,7 @@ export class AcademicsService {
             capacity: true,
             classTeacherId: true,
             branch: { select: { id: true, name: true } },
-            classTeacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
+            classTeacher: { select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } } },
             _count: { select: { enrollments: true, classSubjects: true } },
           },
         },
@@ -217,6 +364,71 @@ export class AcademicsService {
       throw new NotFoundException({ code: 'GRADE_NOT_FOUND', message: 'Class not found' });
     }
     return grade;
+  }
+
+  async updateGrade(id: string, dto: UpdateGradeDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const existing = await this.prisma.grade.findFirst({ where: { id, schoolId } });
+    if (!existing) {
+      throw new NotFoundException({ code: 'GRADE_NOT_FOUND', message: 'Class not found' });
+    }
+
+    const name = dto.name?.trim();
+    if (name === '') {
+      throw new BadRequestException({ code: 'NAME_REQUIRED', message: 'Class name is required' });
+    }
+
+    const admissionFee = dto.admissionFee === undefined ? existing.admissionFee : positiveAmount(dto.admissionFee);
+    const tuitionFee = dto.tuitionFee === undefined ? existing.tuitionFee : positiveAmount(dto.tuitionFee);
+
+    if (dto.stageId) {
+      const stage = await this.prisma.schoolStage.findFirst({
+        where: { id: dto.stageId, schoolId },
+      });
+      if (!stage) {
+        throw new NotFoundException({ code: 'STAGE_NOT_FOUND', message: 'School section not found' });
+      }
+    }
+
+    try {
+      const grade = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.grade.update({
+          where: { id },
+          data: {
+            ...(name ? { name } : {}),
+            ...(dto.level != null ? { level: dto.level } : {}),
+            ...(dto.stageId !== undefined ? { stageId: dto.stageId } : {}),
+            ...(dto.admissionFee !== undefined ? { admissionFee } : {}),
+            ...(dto.tuitionFee !== undefined ? { tuitionFee } : {}),
+          },
+        });
+        await syncClassFeeStructures(tx, {
+          schoolId,
+          gradeId: updated.id,
+          gradeName: updated.name,
+          admissionFee: admissionFee == null ? null : Number(admissionFee),
+          tuitionFee: tuitionFee == null ? null : Number(tuitionFee),
+        });
+        return updated;
+      });
+
+      await this.audit.log({
+        actorUserId: user.id,
+        schoolId,
+        action: 'GRADE_UPDATED',
+        entityType: 'Grade',
+        entityId: grade.id,
+      });
+      return this.getGrade(id, user);
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new ConflictException({
+        code: 'GRADE_EXISTS',
+        message: 'Grade name already exists',
+      });
+    }
   }
 
   async createSection(dto: CreateSectionDto, user: AuthUser) {
@@ -290,7 +502,7 @@ export class AcademicsService {
             classTeacherId: true,
             grade: { select: { id: true, name: true, level: true } },
             branch: { select: { id: true, name: true } },
-            classTeacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
+            classTeacher: { select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } } },
             _count: { select: { enrollments: true, classSubjects: true } },
             classSubjects: {
               select: {
@@ -631,25 +843,48 @@ export class AcademicsService {
 
   async saveExamPattern(
     user: AuthUser,
-    dto: { academicYearId: string; pattern: string; exams: Array<{ name: string; maxMarks: number; sequence: number }> },
+    dto: {
+      academicYearId: string;
+      pattern: string;
+      exams?: Array<{
+        name: string;
+        maxMarks: number;
+        sequence: number;
+        startDate?: string;
+        endDate?: string;
+      }>;
+    },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
+    const exams = dto.exams?.length ? normalizeExamPapers(dto.exams) : examsForPattern(dto.pattern);
+    if (!exams.length) {
+      throw new BadRequestException({
+        code: 'EXAMS_REQUIRED',
+        message: 'Add at least one exam paper',
+      });
+    }
+    const examPattern = dto.exams?.length ? 'CUSTOM' : dto.pattern;
     await this.prisma.schoolSettings.upsert({
       where: { schoolId },
-      create: { schoolId, examPattern: dto.pattern },
-      update: { examPattern: dto.pattern },
+      create: { schoolId, examPattern },
+      update: { examPattern },
     });
     await this.prisma.examConfig.deleteMany({ where: { schoolId, academicYearId: dto.academicYearId } });
     await this.prisma.examConfig.createMany({
-      data: dto.exams.map((exam) => ({
+      data: exams.map((exam) => ({
         schoolId,
         academicYearId: dto.academicYearId,
         name: exam.name,
         maxMarks: exam.maxMarks,
         sequence: exam.sequence,
+        startDate: exam.startDate ? new Date(exam.startDate) : null,
+        endDate: exam.endDate ? new Date(exam.endDate) : null,
       })),
     });
-    return this.prisma.examConfig.findMany({ where: { schoolId, academicYearId: dto.academicYearId }, orderBy: { sequence: 'asc' } });
+    return this.prisma.examConfig.findMany({
+      where: { schoolId, academicYearId: dto.academicYearId },
+      orderBy: { sequence: 'asc' },
+    });
   }
 
   listExamConfigs(user: AuthUser, academicYearId?: string) {
@@ -749,5 +984,102 @@ export class AcademicsService {
         subject: { select: { name: true } },
       },
     });
+  }
+
+  async listTimetable(user: AuthUser, gradeId?: string) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const year = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      orderBy: { startDate: 'desc' },
+    });
+    if (!year) {
+      return { academicYear: null, grade: null, section: null, slots: [] };
+    }
+
+    if (!gradeId) {
+      const grades = await this.prisma.grade.findMany({
+        where: { schoolId, sections: { some: { timetableSlots: { some: { academicYearId: year.id } } } } },
+        orderBy: { level: 'asc' },
+        select: { id: true, name: true },
+      });
+      return { academicYear: { id: year.id, name: year.name }, grades, slots: [] };
+    }
+
+    const grade = await this.prisma.grade.findFirst({
+      where: { id: gradeId, schoolId },
+      include: {
+        stage: { select: { id: true, name: true } },
+        sections: {
+          orderBy: { name: 'asc' },
+          take: 1,
+          include: {
+            classTeacher: { select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } } },
+            classSubjects: {
+              include: {
+                subject: { select: { id: true, name: true } },
+                teacher: {
+                  select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } },
+                },
+              },
+              orderBy: { subject: { name: 'asc' } },
+            },
+          },
+        },
+      },
+    });
+    if (!grade) {
+      throw new NotFoundException({ code: 'GRADE_NOT_FOUND', message: 'Class not found' });
+    }
+    const section = grade.sections[0];
+    if (!section) {
+      return {
+        academicYear: { id: year.id, name: year.name },
+        grade: {
+          id: grade.id,
+          name: grade.name,
+          hasPeriodTimetable: grade.hasPeriodTimetable,
+          stage: grade.stage,
+        },
+        section: null,
+        pattern: grade.hasPeriodTimetable ? 'WEEKLY' : 'CLASS_TEACHER',
+        subjects: [],
+        slots: [],
+      };
+    }
+
+    const slots = grade.hasPeriodTimetable
+      ? await this.prisma.timetableSlot.findMany({
+          where: { sectionId: section.id, academicYearId: year.id },
+          orderBy: [{ periodNumber: 'asc' }, { weekday: 'asc' }],
+          include: {
+            subject: { select: { id: true, name: true } },
+            teacher: {
+              select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } },
+            },
+          },
+        })
+      : [];
+
+    return {
+      academicYear: { id: year.id, name: year.name },
+      grade: {
+        id: grade.id,
+        name: grade.name,
+        hasPeriodTimetable: grade.hasPeriodTimetable,
+        stage: grade.stage,
+      },
+      section: {
+        id: section.id,
+        name: section.name,
+        classTeacher: section.classTeacher,
+      },
+      pattern: grade.hasPeriodTimetable ? 'WEEKLY' : 'CLASS_TEACHER',
+      subjects: section.classSubjects.map((row) => ({
+        id: row.subject.id,
+        name: row.subject.name,
+        teacher: row.teacher,
+      })),
+      slots,
+    };
   }
 }

@@ -11,6 +11,7 @@ import { PageLoader } from "@/components/layout/page-loader";
 import { useAuth } from "@/providers/auth-provider";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
+import { localDateISO } from "@/lib/utils";
 import {
   AttendanceRoster,
   toPresentAbsent,
@@ -21,7 +22,7 @@ export default function TeacherAttendancePage() {
   const { can } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => localDateISO());
   const [marks, setMarks] = useState<Record<string, AttendanceMark>>({});
 
   const roster = useQuery({

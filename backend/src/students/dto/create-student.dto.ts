@@ -79,6 +79,11 @@ export class CreateStudentDto {
   @IsString()
   address?: string;
 
+  @ApiPropertyOptional({ enum: ['COMPUTER', 'BIOLOGY'] })
+  @IsOptional()
+  @IsString()
+  scienceGroup?: string;
+
   @ApiPropertyOptional({ type: CreateParentInlineDto })
   @IsOptional()
   @ValidateNested()

@@ -2,8 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AttendanceStatus, EnrollmentStatus, ExpenseCategory, StudentFeeStatus, StudentStatus } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { TenantService } from '../common/services/tenant.service';
+import { MemoryCacheService } from '../common/services/memory-cache.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { AI_PROVIDER, AiProvider } from '../ai/providers/ai.provider';
+import { teacherDisplayName } from '../common/utils/person-name';
 
 function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -28,6 +30,7 @@ export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantService,
+    private readonly cache: MemoryCacheService,
     @Inject(AI_PROVIDER) private readonly ai: AiProvider,
   ) {}
 
@@ -77,13 +80,17 @@ export class DashboardService {
           id: true,
           name: true,
           grade: { select: { id: true, name: true, level: true } },
-          classTeacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
+          classTeacher: {
+            select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } },
+          },
           _count: { select: { enrollments: true } },
           classSubjects: {
             take: 8,
             select: {
               subject: { select: { name: true } },
-              teacher: { select: { user: { select: { firstName: true, lastName: true } } } },
+              teacher: {
+                select: { gender: true, user: { select: { firstName: true, lastName: true } } },
+              },
             },
           },
         },
@@ -141,17 +148,27 @@ export class DashboardService {
         className: `${section.grade.name} ${section.name}`,
         students: section._count.enrollments,
         classTeacher: section.classTeacher
-          ? `${section.classTeacher.user.firstName} ${section.classTeacher.user.lastName}`
+          ? teacherDisplayName(
+              section.classTeacher.user.firstName,
+              section.classTeacher.user.lastName,
+              section.classTeacher.gender,
+            )
           : null,
         subjects: section.classSubjects.map((item) => ({
           subject: item.subject.name,
-          teacher: item.teacher ? `${item.teacher.user.firstName} ${item.teacher.user.lastName}` : 'Unassigned',
+          teacher: item.teacher
+            ? teacherDisplayName(item.teacher.user.firstName, item.teacher.user.lastName, item.teacher.gender)
+            : 'Unassigned',
         })),
       })),
     };
   }
 
   async teacherSummary(user: AuthUser) {
+    return this.cache.getOrSet(`teacher:summary:${user.id}`, 20_000, () => this.loadTeacherSummary(user));
+  }
+
+  private async loadTeacherSummary(user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
     const since = new Date();
     since.setDate(since.getDate() - 14);
@@ -176,7 +193,8 @@ export class DashboardService {
     const subjectIds = [...new Set(classSubjects.map((item) => item.subjectId))];
     const sectionIds = [...new Set(classSubjects.map((item) => item.sectionId))];
 
-    const [quizCount, homeworkCount, latestResults, lessons, attendanceDays, targets, weakResults] = await Promise.all([
+    const [quizCount, homeworkCount, latestResults, lessons, attendanceDays, targets, lowQuizzes] =
+      await Promise.all([
       this.prisma.quiz.count({ where: { schoolId, createdById: user.id } }),
       this.prisma.homework.count({ where: { schoolId, createdById: user.id } }),
       this.prisma.quizResult.findMany({
@@ -202,12 +220,16 @@ export class DashboardService {
       this.prisma.quizTarget.findMany({
         where: { schoolId, gradeId: { in: gradeIds.length ? gradeIds : ['none'] }, subjectId: { in: subjectIds.length ? subjectIds : ['none'] } },
       }),
-      this.prisma.quizResult.groupBy({
-        by: ['quizId'],
-        where: { quiz: { schoolId, createdById: user.id } },
-        _avg: { percentage: true },
-        _count: { _all: true },
-      }),
+      this.prisma.$queryRaw<Array<{ title: string }>>`
+        SELECT q.title AS title
+        FROM quizzes q
+        INNER JOIN quiz_results r ON r.quiz_id = q.id
+        WHERE q.school_id = ${schoolId} AND q.created_by_id = ${user.id}
+        GROUP BY q.id, q.title
+        HAVING AVG(r.percentage) < 50
+        ORDER BY AVG(r.percentage) ASC
+        LIMIT 5
+      `,
     ]);
 
     const schoolDays = this.weekdaysSince(since);
@@ -272,13 +294,6 @@ export class DashboardService {
     const missingAttendance = Math.max(0, expectedAttendanceSlots - doneAttendanceSlots);
 
     const quizTarget = targets.reduce((sum, row) => sum + row.minQuizzes, 0);
-    const lowQuizzes = await this.prisma.quiz.findMany({
-      where: {
-        id: { in: weakResults.filter((row) => Number(row._avg.percentage ?? 100) < 50).map((row) => row.quizId) },
-      },
-      select: { id: true, title: true },
-      take: 5,
-    });
 
     const classes = classSubjects.map((item) => ({
       sectionId: item.sectionId,
@@ -320,19 +335,21 @@ export class DashboardService {
   }
 
   async teacherCoach(user: AuthUser) {
-    const summary = await this.teacherSummary(user);
-    const facts = [
-      `Teacher: ${user.firstName} ${user.lastName}`,
-      `Classes: ${summary.classCount}`,
-      `Missing lessons last 14 school days: ${summary.missingLessonDays}`,
-      `Missing attendance slots: ${summary.missingAttendanceSlots}`,
-      `Quizzes created: ${summary.quizCount}${summary.quizTarget ? ` vs target ${summary.quizTarget}` : ''}`,
-      `Homework: ${summary.homeworkCount}`,
-      `Low-scoring quizzes: ${summary.watchQuizzes.join(', ') || 'none'}`,
-      `Classes: ${summary.classes.map((cls) => `${cls.gradeName} ${cls.sectionName} ${cls.subjectName}`).join('; ')}`,
-    ].join('\n');
-    const result = await this.ai.coach({ facts });
-    return result.data;
+    return this.cache.getOrSet(`teacher:coach:${user.id}`, 60_000, async () => {
+      const summary = await this.teacherSummary(user);
+      const facts = [
+        `Teacher: ${user.firstName} ${user.lastName}`,
+        `Classes: ${summary.classCount}`,
+        `Missing lessons last 14 school days: ${summary.missingLessonDays}`,
+        `Missing attendance slots: ${summary.missingAttendanceSlots}`,
+        `Quizzes created: ${summary.quizCount}${summary.quizTarget ? ` vs target ${summary.quizTarget}` : ''}`,
+        `Homework: ${summary.homeworkCount}`,
+        `Low-scoring quizzes: ${summary.watchQuizzes.join(', ') || 'none'}`,
+        `Classes: ${summary.classes.map((cls) => `${cls.gradeName} ${cls.sectionName} ${cls.subjectName}`).join('; ')}`,
+      ].join('\n');
+      const result = await this.ai.coach({ facts });
+      return result.data;
+    });
   }
 
   private weekdaysSince(from: Date) {
