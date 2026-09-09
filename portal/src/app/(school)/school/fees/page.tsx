@@ -426,7 +426,7 @@ export default function FeesPage() {
                         Print
                       </Button>
                       {whatsappLink ? (
-                        <Button variant="outline" asChild={false} onClick={() => window.open(whatsappLink, "_blank")}>
+                        <Button variant="outline" onClick={() => window.open(whatsappLink, "_blank")}>
                           <MessageCircle className="h-4 w-4" />
                           Send on WhatsApp
                         </Button>
