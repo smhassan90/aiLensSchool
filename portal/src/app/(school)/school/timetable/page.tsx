@@ -52,7 +52,9 @@ export default function TimetablePage() {
   });
 
   const periods = useMemo(() => {
-    const numbers = [...new Set((table.data?.slots ?? []).map((slot) => slot.periodNumber))].sort((a, b) => a - b);
+    const numbers = Array.from(new Set((table.data?.slots ?? []).map((slot) => slot.periodNumber))).sort(
+      (a, b) => a - b,
+    );
     return numbers.map((number) => {
       const sample = table.data?.slots.find((slot) => slot.periodNumber === number);
       return { number, startTime: sample?.startTime, endTime: sample?.endTime };
