@@ -62,8 +62,9 @@ export default function TimetablePage() {
   }, [table.data]);
 
   const grid = useMemo(() => {
-    const map = new Map<string, (typeof table.data.slots)[number]>();
-    for (const slot of table.data?.slots ?? []) {
+    const slots = table.data?.slots ?? [];
+    const map = new Map<string, (typeof slots)[number]>();
+    for (const slot of slots) {
       map.set(`${slot.periodNumber}-${slot.weekday}`, slot);
     }
     return map;
