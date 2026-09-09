@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { BookOpen, CalendarCheck, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -171,16 +172,24 @@ export function TeacherPaceBoard({
       visual: lessonHeat.length ? <HeatGrid values={lessonHeat} /> : <ClassBars items={lessonByClass} />,
       extra: <ClassBars items={lessonByClass} />,
     },
-    {
-      href: "/teacher/attendance",
-      title: "Attendance",
-      icon: CalendarCheck,
-      tone: attendanceTone,
-      done: doneAttendanceSlots,
-      expected: expectedAttendanceSlots,
-      visual: attendanceHeat.length ? <HeatGrid values={attendanceHeat} /> : <ClassBars items={attendanceByClass} />,
-      extra: <ClassBars items={attendanceByClass} />,
-    },
+    ...(expectedAttendanceSlots > 0
+      ? [
+          {
+            href: "/teacher/attendance",
+            title: "Attendance",
+            icon: CalendarCheck,
+            tone: attendanceTone,
+            done: doneAttendanceSlots,
+            expected: expectedAttendanceSlots,
+            visual: attendanceHeat.length ? (
+              <HeatGrid values={attendanceHeat} />
+            ) : (
+              <ClassBars items={attendanceByClass} />
+            ),
+            extra: <ClassBars items={attendanceByClass} />,
+          },
+        ]
+      : []),
     {
       href: "/teacher/quizzes",
       title: "Quizzes",
@@ -191,7 +200,16 @@ export function TeacherPaceBoard({
       visual: <QuizSlots done={quizCount} expected={quizExpected} />,
       extra: null,
     },
-  ] as const;
+  ] as Array<{
+    href: string;
+    title: string;
+    icon: typeof BookOpen;
+    tone: PaceTone;
+    done: number;
+    expected: number;
+    visual: ReactNode;
+    extra: ReactNode;
+  }>;
 
   return (
     <div className="space-y-4">

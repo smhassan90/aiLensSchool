@@ -1,13 +1,14 @@
 "use client";
 
 import { PageLoader } from "@/components/layout/page-loader";
-
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -17,19 +18,52 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { academicsService } from "@/services/academics.service";
+import { teachersService } from "@/services/teachers.service";
+import { useToast } from "@/providers/toast-provider";
+import { ApiClientError } from "@/lib/api-client";
+import { teacherDisplayNameFromUser } from "@/lib/person-name";
 import { Users } from "lucide-react";
 
 export default function SectionsPage() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
   const sections = useQuery({
     queryKey: ["sections"],
-    queryFn: () => academicsService.listSections({ limit: 100 }),
+    queryFn: () => academicsService.listSections({ limit: 200 }),
+  });
+  const teachers = useQuery({
+    queryKey: ["teachers"],
+    queryFn: () => teachersService.list({ limit: 100 }),
+  });
+
+  const setClassTeacher = useMutation({
+    mutationFn: ({
+      sectionId,
+      classTeacherId,
+    }: {
+      sectionId: string;
+      classTeacherId: string | null;
+    }) => academicsService.setClassTeacher(sectionId, classTeacherId),
+    onSuccess: () => {
+      toast({ title: "Class teacher saved", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["sections"] });
+      queryClient.invalidateQueries({ queryKey: ["grades"] });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not assign class teacher",
+        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        variant: "error",
+      });
+    },
   });
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Sections"
-        description="Sections live inside a class. Add them from the class page — a school may have only one section per class."
+        description="Assign a class teacher for each section. Subject teachers are managed on the class page."
         actions={
           <Link href="/school/academics/grades">
             <Button>Manage classes</Button>
@@ -59,7 +93,8 @@ export default function SectionsPage() {
                 <TableHead>Section</TableHead>
                 <TableHead>Branch</TableHead>
                 <TableHead>Students</TableHead>
-                <TableHead>Teachers</TableHead>
+                <TableHead>Subject teachers</TableHead>
+                <TableHead>Class teacher</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -67,7 +102,10 @@ export default function SectionsPage() {
                 <TableRow key={section.id}>
                   <TableCell className="font-medium">
                     {section.grade ? (
-                      <Link href={`/school/academics/grades/${section.gradeId}`} className="hover:underline">
+                      <Link
+                        href={`/school/academics/grades/${section.gradeId}`}
+                        className="hover:underline"
+                      >
                         {section.grade.name}
                       </Link>
                     ) : (
@@ -79,7 +117,33 @@ export default function SectionsPage() {
                   </TableCell>
                   <TableCell>{section.branch?.name ?? "—"}</TableCell>
                   <TableCell>{section._count?.enrollments ?? 0}</TableCell>
-                  <TableCell>{section._count?.classSubjects ?? section.classSubjects?.length ?? 0}</TableCell>
+                  <TableCell>
+                    {section._count?.classSubjects ?? section.classSubjects?.length ?? 0}
+                  </TableCell>
+                  <TableCell>
+                    <Label className="sr-only" htmlFor={`class-teacher-${section.id}`}>
+                      Class teacher for {section.grade?.name} {section.name}
+                    </Label>
+                    <Select
+                      id={`class-teacher-${section.id}`}
+                      className="max-w-[220px]"
+                      value={section.classTeacherId ?? ""}
+                      disabled={setClassTeacher.isPending}
+                      onChange={(e) =>
+                        setClassTeacher.mutate({
+                          sectionId: section.id,
+                          classTeacherId: e.target.value || null,
+                        })
+                      }
+                    >
+                      <option value="">Not assigned</option>
+                      {(teachers.data?.items ?? []).map((teacher) => (
+                        <option key={teacher.id} value={teacher.id}>
+                          {teacherDisplayNameFromUser(teacher.user, teacher.gender)}
+                        </option>
+                      ))}
+                    </Select>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

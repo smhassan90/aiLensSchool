@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, RoleName } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -27,6 +27,8 @@ export class AttendanceService {
     if (!dto.entries.length) {
       return [];
     }
+
+    await this.assertCanMarkSection(user, schoolId, dto.sectionId);
 
     // One round-trip upsert for the whole roster (remote MySQL latency dominates N upserts).
     const rows = dto.entries.map((entry) =>
@@ -128,5 +130,38 @@ export class AttendanceService {
       limit,
     );
     return paginate(items, total, page, limit);
+  }
+
+  /** Only school admins or the section's class teacher may mark student attendance. */
+  private async assertCanMarkSection(user: AuthUser, schoolId: string, sectionId: string) {
+    if (user.roles.includes(RoleName.SCHOOL_ADMIN) || user.roles.includes(RoleName.SUPER_ADMIN)) {
+      return;
+    }
+    if (!this.tenant.isTeacher(user)) {
+      throw new ForbiddenException({
+        code: 'ATTENDANCE_FORBIDDEN',
+        message: 'Only class teachers can mark attendance',
+      });
+    }
+    const section = await this.prisma.section.findFirst({
+      where: { id: sectionId, schoolId },
+      select: {
+        id: true,
+        classTeacherId: true,
+        classTeacher: { select: { userId: true } },
+      },
+    });
+    if (!section) {
+      throw new ForbiddenException({
+        code: 'SECTION_NOT_FOUND',
+        message: 'Class section not found',
+      });
+    }
+    if (!section.classTeacherId || section.classTeacher?.userId !== user.id) {
+      throw new ForbiddenException({
+        code: 'NOT_CLASS_TEACHER',
+        message: 'Only the class teacher of this section can mark attendance',
+      });
+    }
   }
 }

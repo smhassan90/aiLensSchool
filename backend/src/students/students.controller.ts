@@ -22,6 +22,19 @@ class StudentQueryDto extends PaginationDto {
   branchId?: string;
 
   @IsOptional()
+  @IsString()
+  sectionId?: string;
+
+  @IsOptional()
+  @IsString()
+  gradeId?: string;
+
+  /** Teacher profile id — students in sections this teacher teaches. */
+  @IsOptional()
+  @IsString()
+  teacherId?: string;
+
+  @IsOptional()
   @IsEnum(StudentStatus)
   status?: StudentStatus;
 }

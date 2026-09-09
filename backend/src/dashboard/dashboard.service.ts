@@ -177,6 +177,7 @@ export class DashboardService {
     // One parallel batch against the remote DB — avoid waiting on classes before other queries.
     const [
       classSubjects,
+      classTeacherSections,
       quizCount,
       homeworkCount,
       latestResults,
@@ -200,6 +201,14 @@ export class DashboardService {
           assistantTeacher: { select: { userId: true } },
         },
       }),
+      this.prisma.section.findMany({
+        where: { schoolId, classTeacher: { userId: user.id } },
+        select: {
+          id: true,
+          name: true,
+          grade: { select: { id: true, name: true } },
+        },
+      }),
       this.prisma.quiz.count({ where: { schoolId, createdById: user.id } }),
       this.prisma.homework.count({ where: { schoolId, createdById: user.id } }),
       this.prisma.quizResult.findMany({
@@ -220,12 +229,11 @@ export class DashboardService {
       this.prisma.$queryRaw<Array<{ date: Date; sectionId: string }>>`
         SELECT DISTINCT a.date AS date, a.section_id AS sectionId
         FROM attendances a
-        INNER JOIN class_subjects cs ON cs.section_id = a.section_id
-        LEFT JOIN teacher_profiles tp ON tp.id = cs.teacher_id
-        LEFT JOIN teacher_profiles atp ON atp.id = cs.assistant_teacher_id
+        INNER JOIN sections s ON s.id = a.section_id
+        INNER JOIN teacher_profiles tp ON tp.id = s.class_teacher_id
         WHERE a.school_id = ${schoolId}
           AND a.date >= ${sinceDate}
-          AND (tp.user_id = ${user.id} OR atp.user_id = ${user.id})
+          AND tp.user_id = ${user.id}
       `,
       this.prisma.$queryRaw<Array<{ minQuizzes: number }>>`
         SELECT qt.min_quizzes AS minQuizzes
@@ -278,17 +286,10 @@ export class DashboardService {
       };
     });
 
-    const uniqueSections = [
-      ...new Map(
-        classSubjects.map((item) => [
-          item.sectionId,
-          {
-            sectionId: item.sectionId,
-            label: `${item.section.grade?.name ?? ''} ${item.section.name}`.trim(),
-          },
-        ]),
-      ).values(),
-    ];
+    const uniqueSections = classTeacherSections.map((section) => ({
+      sectionId: section.id,
+      label: `${section.grade?.name ?? ''} ${section.name}`.trim(),
+    }));
     const attendanceByClass = uniqueSections.map((section) => {
       const days = schoolDays.map((day) => attendanceSet.has(`${section.sectionId}:${day}`));
       const done = days.filter(Boolean).length;
@@ -334,6 +335,8 @@ export class DashboardService {
       role: item.teacher?.userId === user.id ? ('TEACHER' as const) : ('ASSISTANT' as const),
     }));
 
+    const isClassTeacher = uniqueSections.length > 0;
+
     return {
       classCount: classes.length,
       quizCount,
@@ -345,6 +348,7 @@ export class DashboardService {
       doneLessonSlots,
       expectedAttendanceSlots,
       doneAttendanceSlots,
+      isClassTeacher,
       windowDays: schoolDays,
       lessonHeat,
       attendanceHeat,
@@ -357,9 +361,11 @@ export class DashboardService {
         missingLessonDays > 0
           ? `Add ${missingLessonDays} missing lesson${missingLessonDays === 1 ? '' : 's'} from the last 2 weeks`
           : 'Lessons look up to date',
-        missingAttendance > 0
-          ? `Mark attendance for ${missingAttendance} class day${missingAttendance === 1 ? '' : 's'}`
-          : 'Attendance is marked',
+        !isClassTeacher
+          ? 'Attendance is only for class teachers'
+          : missingAttendance > 0
+            ? `Mark attendance for ${missingAttendance} class day${missingAttendance === 1 ? '' : 's'}`
+            : 'Attendance is marked',
         quizTarget && quizCount < quizTarget
           ? `Quizzes ${quizCount}/${quizTarget} of your minimum`
           : 'Quiz count is on track',

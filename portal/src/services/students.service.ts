@@ -42,7 +42,16 @@ export interface CreateStudentResult {
 }
 
 export const studentsService = {
-  list(params?: { page?: number; limit?: number; search?: string; branchId?: string }) {
+  list(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    branchId?: string;
+    sectionId?: string;
+    gradeId?: string;
+    teacherId?: string;
+    status?: string;
+  }) {
     return apiClient<Paginated<Student>>(`/students${buildQuery(params ?? {})}`);
   },
 

@@ -82,7 +82,7 @@ export default function FeesPage() {
 
   const bracketAmounts = useMemo(() => {
     const set = new Set<number>([...(brackets.data?.amounts ?? []), ...localBrackets]);
-    return [...set].sort((a, b) => a - b);
+    return Array.from(set).sort((a, b) => a - b);
   }, [brackets.data, localBrackets]);
 
   useEffect(() => {

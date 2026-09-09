@@ -11,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/providers/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
@@ -19,12 +20,13 @@ import {
   TeacherBackgroundPrefetch,
   prefetchMenuHref,
 } from "@/components/layout/background-prefetch";
+import { teachersService } from "@/services/teachers.service";
 import { personFullName } from "@/lib/person-name";
 
-const navItems = [
+const baseNavItems = [
   { href: "/teacher/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/teacher/classes", label: "My classes", icon: Users },
-  { href: "/teacher/attendance", label: "Attendance", icon: ClipboardCheck },
+  { href: "/teacher/attendance", label: "Attendance", icon: ClipboardCheck, classTeacherOnly: true },
   { href: "/teacher/lessons", label: "Lessons", icon: BookOpen },
   { href: "/teacher/homework", label: "Homework", icon: ClipboardList },
   { href: "/teacher/quizzes", label: "Quizzes", icon: FileQuestion },
@@ -36,6 +38,12 @@ export function TeacherSidebar() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const { user, logout } = useAuth();
+  const classes = useQuery({
+    queryKey: ["teacher-classes"],
+    queryFn: () => teachersService.myClasses(),
+  });
+  const isClassTeacher = (classes.data ?? []).some((row) => row.isClassTeacher);
+  const navItems = baseNavItems.filter((item) => !item.classTeacherOnly || isClassTeacher);
 
   return (
     <SidebarFrame

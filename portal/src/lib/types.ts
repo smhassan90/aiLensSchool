@@ -142,6 +142,7 @@ export interface TeacherClassAssignment {
   academicYearId: string;
   branchId: string;
   role?: "TEACHER" | "ASSISTANT" | "CLASS_TEACHER";
+  isClassTeacher?: boolean;
   section?: { id: string; name: string; grade?: { id: string; name: string } };
   subject?: { id: string; name: string };
   academicYear?: { id: string; name: string };
@@ -158,6 +159,7 @@ export interface TeacherClass {
   academicYearId: string;
   branchId: string;
   role?: "TEACHER" | "ASSISTANT" | "CLASS_TEACHER";
+  isClassTeacher?: boolean;
 }
 
 export interface AcademicYear {

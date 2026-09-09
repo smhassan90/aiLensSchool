@@ -348,9 +348,21 @@ export class TeachersService {
       });
     }
     const assigned = [
-      ...profile.classSubjects.map((item) => ({ ...item, role: 'TEACHER' as const })),
-      ...profile.assistantClassSubjects.map((item) => ({ ...item, role: 'ASSISTANT' as const })),
+      ...profile.classSubjects.map((item) => ({
+        ...item,
+        role: 'TEACHER' as const,
+        isClassTeacher: false as boolean,
+      })),
+      ...profile.assistantClassSubjects.map((item) => ({
+        ...item,
+        role: 'ASSISTANT' as const,
+        isClassTeacher: false as boolean,
+      })),
     ];
+    const classTeacherSectionIds = new Set(profile.classSections.map((section) => section.id));
+    for (const row of assigned) {
+      row.isClassTeacher = classTeacherSectionIds.has(row.sectionId);
+    }
     // If the teacher already teaches any subject in a section, do not invent extra
     // subjects for that section (class teacher of Class 1 who teaches Urdu should
     // not also see Arts / PT / Social Studies in My classes).
@@ -408,6 +420,7 @@ export class TeachersService {
             section: sectionMeta,
             subject: { id: subject.id, name: subject.name },
             role: 'CLASS_TEACHER' as const,
+            isClassTeacher: true as const,
           };
         }),
       )

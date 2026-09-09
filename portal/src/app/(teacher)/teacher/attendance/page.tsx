@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { EmptyState } from "@/components/layout/empty-state";
 import { attendanceService } from "@/services/attendance.service";
 import { academicsService } from "@/services/academics.service";
 import { teachersService } from "@/services/teachers.service";
@@ -18,6 +19,7 @@ import {
   toPresentAbsent,
   type AttendanceMark,
 } from "@/components/attendance/attendance-toggle";
+import { ClipboardCheck } from "lucide-react";
 
 export default function TeacherAttendancePage() {
   const { toast } = useToast();
@@ -40,6 +42,7 @@ export default function TeacherAttendancePage() {
   const sections = useMemo(() => {
     const seen = new Map<string, { id: string; label: string; branchId: string; academicYearId: string }>();
     for (const cls of classes.data ?? []) {
+      if (!cls.isClassTeacher) continue;
       if (!seen.has(cls.sectionId)) {
         seen.set(cls.sectionId, {
           id: cls.sectionId,
@@ -51,6 +54,13 @@ export default function TeacherAttendancePage() {
     }
     return Array.from(seen.values());
   }, [classes.data]);
+
+  useEffect(() => {
+    if (sectionId && !sections.some((s) => s.id === sectionId)) {
+      setSectionId("");
+      setMarks({});
+    }
+  }, [sectionId, sections]);
 
   const selected = sections.find((s) => s.id === sectionId);
 
@@ -94,9 +104,32 @@ export default function TeacherAttendancePage() {
       }),
   });
 
+  if (classes.isLoading) {
+    return <PageLoader variant="page" />;
+  }
+
+  if (!sections.length) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <PageHeader
+          title="Today’s attendance"
+          description="Attendance is marked by the class teacher of each section."
+        />
+        <EmptyState
+          icon={<ClipboardCheck className="h-10 w-10" />}
+          title="No class teacher role"
+          description="You are not assigned as class teacher for any section, so there is no attendance register for you to mark."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <PageHeader title="Today’s attendance" description="Everyone is present until you tap Absent. Save once." />
+      <PageHeader
+        title="Today’s attendance"
+        description="Mark the register for sections where you are the class teacher. Everyone starts present until you tap Absent."
+      />
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <div>
           <Label>Class</Label>
@@ -148,9 +181,3 @@ export default function TeacherAttendancePage() {
     </div>
   );
 }
-
-
-
-
-
-

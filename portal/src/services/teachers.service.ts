@@ -7,7 +7,10 @@ import type {
 } from "@/lib/types";
 
 function mapClassAssignment(
-  item: TeacherClassAssignment & { role?: "TEACHER" | "ASSISTANT" | "CLASS_TEACHER" },
+  item: TeacherClassAssignment & {
+    role?: "TEACHER" | "ASSISTANT" | "CLASS_TEACHER";
+    isClassTeacher?: boolean;
+  },
 ): TeacherClass {
   return {
     sectionId: item.sectionId,
@@ -19,6 +22,7 @@ function mapClassAssignment(
     academicYearId: item.academicYearId,
     branchId: item.branchId,
     role: item.role,
+    isClassTeacher: Boolean(item.isClassTeacher || item.role === "CLASS_TEACHER"),
   };
 }
 

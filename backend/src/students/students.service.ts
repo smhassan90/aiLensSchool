@@ -277,15 +277,78 @@ export class StudentsService {
 
   async findAll(
     user: AuthUser,
-    query: PaginationDto & { search?: string; branchId?: string; status?: StudentStatus },
+    query: PaginationDto & {
+      search?: string;
+      branchId?: string;
+      status?: StudentStatus;
+      sectionId?: string;
+      gradeId?: string;
+      teacherId?: string;
+    },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+
+    let teacherSectionIds: string[] | undefined;
+    if (query.teacherId) {
+      const teacher = await this.prisma.teacherProfile.findFirst({
+        where: { id: query.teacherId, schoolId },
+        select: { id: true },
+      });
+      if (!teacher) {
+        return paginate([], 0, page, limit);
+      }
+      const [assignments, homerooms] = await Promise.all([
+        this.prisma.classSubject.findMany({
+          where: {
+            OR: [{ teacherId: teacher.id }, { assistantTeacherId: teacher.id }],
+            section: { schoolId },
+          },
+          select: { sectionId: true },
+        }),
+        this.prisma.section.findMany({
+          where: { schoolId, classTeacherId: teacher.id },
+          select: { id: true },
+        }),
+      ]);
+      teacherSectionIds = [
+        ...new Set([
+          ...assignments.map((row) => row.sectionId),
+          ...homerooms.map((row) => row.id),
+        ]),
+      ];
+      if (!teacherSectionIds.length) {
+        return paginate([], 0, page, limit);
+      }
+      if (query.sectionId && !teacherSectionIds.includes(query.sectionId)) {
+        return paginate([], 0, page, limit);
+      }
+    }
+
+    const sectionFilter = query.sectionId
+      ? query.sectionId
+      : teacherSectionIds
+        ? { in: teacherSectionIds }
+        : undefined;
+
+    const needsEnrollmentFilter = Boolean(sectionFilter || query.gradeId);
+
     const where: Prisma.StudentWhereInput = {
       schoolId,
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...(needsEnrollmentFilter
+        ? {
+            enrollments: {
+              some: {
+                status: EnrollmentStatus.ACTIVE,
+                ...(sectionFilter ? { sectionId: sectionFilter } : {}),
+                ...(query.gradeId ? { gradeId: query.gradeId } : {}),
+              },
+            },
+          }
+        : {}),
       ...(query.search
         ? {
             OR: [
@@ -317,7 +380,7 @@ export class StudentsService {
       (skip, take) =>
         this.prisma.student.findMany({
           where,
-          orderBy: { createdAt: 'desc' },
+          orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
           skip,
           take,
           select: {
