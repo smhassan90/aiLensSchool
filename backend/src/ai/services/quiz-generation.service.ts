@@ -20,6 +20,7 @@ export class QuizGenerationService {
     quickGenerate?: boolean;
     mcqCount?: number;
     fillBlankCount?: number;
+    trueFalseCount?: number;
     shortAnswerCount?: number;
   }): Promise<QuizOutput> {
     const request = await this.prisma.aIRequest.create({
@@ -41,7 +42,7 @@ export class QuizGenerationService {
         quickGenerate: input.quickGenerate,
         mcqCount: input.mcqCount,
         fillBlankCount: input.fillBlankCount,
-        shortAnswerCount: input.shortAnswerCount,
+        trueFalseCount: input.trueFalseCount ?? input.shortAnswerCount,
       });
 
       await this.prisma.aIRequest.update({

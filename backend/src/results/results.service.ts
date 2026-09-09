@@ -217,7 +217,6 @@ export class ResultsService {
                           questionText: true,
                           type: true,
                           marks: true,
-                          correctAnswer: true,
                         },
                       },
                     },

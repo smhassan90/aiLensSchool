@@ -14,6 +14,7 @@ export interface GenerateQuizPayload {
   mcqCount?: number;
   fillBlankCount?: number;
   shortAnswerCount?: number;
+  trueFalseCount?: number;
   title?: string;
 }
 

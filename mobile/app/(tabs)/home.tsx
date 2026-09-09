@@ -10,7 +10,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useChild } from '@/providers/ChildProvider';
 import { colors, radii, spacing } from '@/constants/theme';
 import { fetchLessonsForStudent, isLessonToday } from '@/services/lessons.service';
-import { fetchHomework, isHomeworkPending } from '@/services/homework.service';
+import { fetchHomework, needsHomeworkSubmission } from '@/services/homework.service';
 import { fetchQuizzes, isQuizNew } from '@/services/quizzes.service';
 import { fetchQuizResults } from '@/services/results.service';
 import { fetchAttendance } from '@/services/attendance.service';
@@ -79,9 +79,9 @@ export default function HomeScreen() {
       ? Math.round(results.reduce((sum, row) => sum + Number(row.percentage), 0) / results.length)
       : null;
     const homeworkItems = homeworkQuery.data?.items ?? [];
-    const pendingHomework = homeworkItems.filter(isHomeworkPending);
+    const openHomework = homeworkItems.filter(needsHomeworkSubmission);
     const homeworkDoneRate = homeworkItems.length
-      ? Math.round(((homeworkItems.length - pendingHomework.length) / homeworkItems.length) * 100)
+      ? Math.round(((homeworkItems.length - openHomework.length) / homeworkItems.length) * 100)
       : null;
     const quizzes = quizzesQuery.data?.items ?? [];
     const resultByQuiz = new Map(results.map((row) => [row.quizId, row]));
@@ -109,7 +109,7 @@ export default function HomeScreen() {
       attendanceRate,
       quizAvg,
       homeworkDoneRate,
-      pendingCount: pendingHomework.length,
+      pendingCount: openHomework.length,
       subjects,
       recentAttendance,
     };
@@ -128,8 +128,11 @@ export default function HomeScreen() {
   }
 
   const todayLessons = (lessonsQuery.data ?? []).filter(isLessonToday);
-  const pendingHomework = (homeworkQuery.data?.items ?? []).filter(isHomeworkPending);
-  const newQuizzes = (quizzesQuery.data?.items ?? []).filter(isQuizNew);
+  const openHomework = (homeworkQuery.data?.items ?? []).filter(needsHomeworkSubmission);
+  const resultByQuiz = new Map((resultsQuery.data?.items ?? []).map((row) => [row.quizId, row]));
+  const newQuizzes = (quizzesQuery.data?.items ?? []).filter((quiz) =>
+    isQuizNew(quiz, { hasResult: resultByQuiz.has(quiz.id) }),
+  );
   const upcomingEvents = (eventsQuery.data?.items ?? []).filter(isUpcomingEvent).slice(0, 3);
   const unreadCount = notificationsQuery.data?.total ?? 0;
   const latestAnnouncements = announcementsQuery.data?.items ?? [];
@@ -150,6 +153,20 @@ export default function HomeScreen() {
         </View>
 
         <ChildHeader />
+
+        <Text style={styles.helpHint}>
+          You are helping {selectedChild.firstName}. Homework and quizzes you submit are recorded for
+          this child.
+        </Text>
+
+        <View style={styles.quickRow}>
+          <Pressable style={styles.quickLink} onPress={() => router.push('/fees')}>
+            <Text style={styles.quickLinkText}>Fees</Text>
+          </Pressable>
+          <Pressable style={styles.quickLink} onPress={() => router.push('/report-cards')}>
+            <Text style={styles.quickLinkText}>Report cards</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.snapshot}>
           <Text style={styles.snapshotTitle}>At a glance</Text>
@@ -176,7 +193,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.statsRow}>
-          <StatPill label="Pending HW" value={pendingHomework.length} />
+          <StatPill label="To-do HW" value={openHomework.length} />
           <StatPill label="New quizzes" value={newQuizzes.length} />
           <StatPill label="Unread" value={unreadCount} />
         </View>
@@ -198,7 +215,7 @@ export default function HomeScreen() {
         )}
 
         <SectionTitle
-          title="Pending homework"
+          title="Homework to do"
           action={
             <Text style={styles.link} onPress={() => router.push('/(tabs)/homework')}>
               See all
@@ -207,10 +224,12 @@ export default function HomeScreen() {
         />
         {homeworkQuery.isLoading ? (
           <LoadingState message="Loading homework…" />
-        ) : pendingHomework.length === 0 ? (
-          <EmptyState title="All caught up" subtitle="No pending homework right now." />
+        ) : homeworkQuery.isError ? (
+          <ErrorState message="Could not load homework" onRetry={() => homeworkQuery.refetch()} />
+        ) : openHomework.length === 0 ? (
+          <EmptyState title="All caught up" subtitle="No unsubmitted homework right now." />
         ) : (
-          pendingHomework.slice(0, 3).map((item: Homework) => (
+          openHomework.slice(0, 3).map((item: Homework) => (
             <Card key={item.id} onPress={() => router.push(`/homework/${item.id}`)}>
               <Text style={styles.cardTitle}>{item.title}</Text>
               <Text style={styles.cardMeta}>
@@ -230,6 +249,8 @@ export default function HomeScreen() {
         />
         {quizzesQuery.isLoading ? (
           <LoadingState message="Loading quizzes…" />
+        ) : quizzesQuery.isError ? (
+          <ErrorState message="Could not load quizzes" onRetry={() => quizzesQuery.refetch()} />
         ) : newQuizzes.length === 0 ? (
           <EmptyState title="No new quizzes" />
         ) : (
@@ -308,6 +329,23 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 24, fontWeight: '800', color: colors.slate900 },
   date: { color: colors.slate500, marginTop: 4 },
   profileLink: { color: colors.primary, fontWeight: '600' },
+  helpHint: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.slate600,
+    marginBottom: spacing.sm,
+  },
+  quickRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  quickLink: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  quickLinkText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
   snapshot: {
     backgroundColor: colors.white,
     borderRadius: radii.lg,

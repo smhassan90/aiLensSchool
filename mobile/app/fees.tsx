@@ -6,6 +6,7 @@ import { Badge, Card, EmptyState, ErrorState, LoadingState } from '@/components/
 import { ProgressBar } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
 import { colors, spacing } from '@/constants/theme';
+import { formatAmount } from '@/lib/format';
 import { fetchStudentFees } from '@/services/parent-records.service';
 
 export default function FeesScreen() {
@@ -45,12 +46,16 @@ export default function FeesScreen() {
         ListHeaderComponent={
           <>
             <ChildHeader />
+            <Text style={styles.note}>
+              Fees are view-only in the app. Pay at the school office unless your school says
+              otherwise.
+            </Text>
             {totals ? (
               <View style={styles.snapshot}>
                 <Text style={styles.snapshotTitle}>Collected vs still due</Text>
                 <ProgressBar value={totals.paid} max={Math.max(1, totals.amount)} height={10} />
                 <Text style={styles.snapshotMeta}>
-                  Paid {totals.paid} of {totals.amount}
+                  Paid {formatAmount(totals.paid)} of {formatAmount(totals.amount)}
                 </Text>
               </View>
             ) : null}
@@ -73,17 +78,20 @@ export default function FeesScreen() {
           const amount = Number(item.amount) || 0;
           const paid = Number(item.paidAmount) || 0;
           return (
-          <Card>
-            <Text style={styles.cardTitle}>{item.feeStructure?.name ?? item.periodLabel ?? 'Fee'}</Text>
-            <Text style={styles.cardMeta}>
-              Due {new Date(item.dueDate).toLocaleDateString()} · Balance {item.balance}
-            </Text>
-            <ProgressBar value={paid} max={Math.max(1, amount)} height={8} />
-            <Badge
-              label={item.status}
-              tone={item.status === 'PAID' ? 'success' : 'warning'}
-            />
-          </Card>
+            <Card>
+              <Text style={styles.cardTitle}>
+                {item.feeStructure?.name ?? item.periodLabel ?? 'Fee'}
+              </Text>
+              <Text style={styles.cardMeta}>
+                Due {new Date(item.dueDate).toLocaleDateString()} · Balance{' '}
+                {formatAmount(item.balance)}
+              </Text>
+              <ProgressBar value={paid} max={Math.max(1, amount)} height={8} />
+              <Badge
+                label={item.status}
+                tone={item.status === 'PAID' ? 'success' : 'warning'}
+              />
+            </Card>
           );
         }}
       />
@@ -94,6 +102,12 @@ export default function FeesScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.md, flexGrow: 1 },
+  note: {
+    color: colors.slate600,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: spacing.sm,
+  },
   cardTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800 },
   cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4, marginBottom: spacing.sm },
   snapshot: {
@@ -102,7 +116,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.slate200,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     marginBottom: spacing.sm,
   },
   snapshotTitle: { fontSize: 14, fontWeight: '700', color: colors.slate700, marginBottom: 8 },

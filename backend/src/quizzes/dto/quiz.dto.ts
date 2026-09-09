@@ -76,7 +76,16 @@ export class GenerateQuizDto {
   @Max(20)
   fillBlankCount?: number;
 
-  @ApiPropertyOptional({ description: 'Simple text / short-answer count' })
+  @ApiPropertyOptional({ description: 'True/False count (auto-gradable)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  trueFalseCount?: number;
+
+  /** @deprecated Prefer trueFalseCount — short answers are no longer generated. */
+  @ApiPropertyOptional({ description: 'Deprecated: mapped to trueFalseCount' })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

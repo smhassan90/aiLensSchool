@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -10,7 +11,16 @@ import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
+import { SubmitHomeworkDto } from './dto/submit-homework.dto';
 import { ParentsService } from '../parents/parents.service';
+import {
+  answerKeyFromQuestions,
+  buildHomeworkQuestions,
+  descriptionFromQuestions,
+  HomeworkQuestionItem,
+  scoreHomeworkAnswers,
+  stripAnswersFromQuestions,
+} from './homework-questions';
 
 @Injectable()
 export class HomeworkService {
@@ -51,6 +61,7 @@ export class HomeworkService {
       }
     }
 
+    const questions = this.resolveQuestions(dto);
     const homework = await this.prisma.homework.create({
       data: {
         schoolId,
@@ -61,8 +72,11 @@ export class HomeworkService {
         lessonId: dto.lessonId,
         createdById: user.id,
         title: dto.title,
-        description: dto.description,
-        answerKey: dto.answerKey?.trim() || undefined,
+        description: dto.description?.trim() || descriptionFromQuestions(questions) || undefined,
+        answerKey: dto.answerKey?.trim() || answerKeyFromQuestions(questions) || undefined,
+        questionsJson: questions.length
+          ? (questions as unknown as Prisma.InputJsonValue)
+          : undefined,
         dueDate: new Date(dto.dueDate),
         publishedAt: new Date(),
       },
@@ -80,10 +94,47 @@ export class HomeworkService {
     return homework;
   }
 
+  private resolveQuestions(dto: CreateHomeworkDto): HomeworkQuestionItem[] {
+    if (Array.isArray(dto.questionsJson) && dto.questionsJson.length) {
+      return buildHomeworkQuestions(dto.questionsJson as never, []);
+    }
+    return [];
+  }
+
   /** Parents/students never receive the teacher answer key. */
-  private forParentView<T extends { answerKey?: string | null }>(homework: T) {
-    const { answerKey: _answerKey, ...safe } = homework;
-    return safe;
+  private forParentView(
+    homework: {
+      answerKey?: string | null;
+      questionsJson?: Prisma.JsonValue | null;
+      [key: string]: unknown;
+    },
+    result?: {
+      id: string;
+      score: Prisma.Decimal | number;
+      totalMarks: Prisma.Decimal | number;
+      percentage: Prisma.Decimal | number;
+      submittedAt: Date;
+      answersJson?: Prisma.JsonValue;
+    } | null,
+  ) {
+    const { answerKey: _answerKey, questionsJson, ...safe } = homework;
+    const questions = Array.isArray(questionsJson)
+      ? stripAnswersFromQuestions(questionsJson as unknown as HomeworkQuestionItem[])
+      : [];
+    return {
+      ...safe,
+      questions,
+      result: result
+        ? {
+            id: result.id,
+            score: Number(result.score),
+            totalMarks: Number(result.totalMarks),
+            percentage: Number(result.percentage),
+            submittedAt: result.submittedAt,
+            answers: result.answersJson,
+          }
+        : null,
+    };
   }
 
   async findAll(
@@ -128,13 +179,43 @@ export class HomeworkService {
               createdAt: true,
               subject: { select: { id: true, name: true } },
               section: { select: { id: true, name: true } },
+              results: {
+                where: { studentId: query.studentId },
+                select: {
+                  id: true,
+                  score: true,
+                  totalMarks: true,
+                  percentage: true,
+                  submittedAt: true,
+                },
+                take: 1,
+              },
             },
           }),
         () => this.prisma.homework.count({ where }),
         page,
         limit,
       );
-      return paginate(items, total, page, limit);
+      return paginate(
+        items.map((item) => {
+          const { results, ...rest } = item;
+          return {
+            ...rest,
+            result: results[0]
+              ? {
+                  id: results[0].id,
+                  score: Number(results[0].score),
+                  totalMarks: Number(results[0].totalMarks),
+                  percentage: Number(results[0].percentage),
+                  submittedAt: results[0].submittedAt,
+                }
+              : null,
+          };
+        }),
+        total,
+        page,
+        limit,
+      );
     }
 
     const schoolId = this.tenant.requireSchoolId(user);
@@ -190,8 +271,74 @@ export class HomeworkService {
         });
       }
       await this.parentsService.assertParentChildInSection(user.id, studentId, homework.sectionId);
-      return this.forParentView(homework);
+      const result = await this.prisma.homeworkResult.findUnique({
+        where: { homeworkId_studentId: { homeworkId: id, studentId } },
+      });
+      return this.forParentView(homework, result);
     }
     return homework;
+  }
+
+  async submit(id: string, dto: SubmitHomeworkDto, user: AuthUser) {
+    const homework = await this.prisma.homework.findUnique({ where: { id } });
+    if (!homework) {
+      throw new NotFoundException({ code: 'HOMEWORK_NOT_FOUND', message: 'Homework not found' });
+    }
+    this.tenant.assertSchoolAccess(user, homework.schoolId);
+    await this.parentsService.assertParentChildInSection(user.id, dto.studentId, homework.sectionId);
+
+    const questions = Array.isArray(homework.questionsJson)
+      ? (homework.questionsJson as unknown as HomeworkQuestionItem[])
+      : [];
+    if (!questions.length) {
+      throw new BadRequestException({
+        code: 'HOMEWORK_NOT_AUTO_GRADABLE',
+        message: 'This homework has no auto-gradable questions yet',
+      });
+    }
+
+    const existing = await this.prisma.homeworkResult.findUnique({
+      where: { homeworkId_studentId: { homeworkId: id, studentId: dto.studentId } },
+    });
+    if (existing) {
+      throw new BadRequestException({
+        code: 'HOMEWORK_ALREADY_SUBMITTED',
+        message: 'This child already submitted this homework',
+      });
+    }
+
+    const scored = scoreHomeworkAnswers(questions, dto.answers ?? []);
+    const result = await this.prisma.homeworkResult.create({
+      data: {
+        homeworkId: id,
+        studentId: dto.studentId,
+        score: scored.score,
+        totalMarks: scored.totalMarks,
+        percentage: scored.percentage,
+        answersJson: scored.answerRows as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId: homework.schoolId,
+      branchId: homework.branchId,
+      action: 'HOMEWORK_SUBMITTED',
+      entityType: 'HomeworkResult',
+      entityId: result.id,
+      metadata: { homeworkId: id, studentId: dto.studentId, score: scored.score },
+    });
+
+    return {
+      id: result.id,
+      homeworkId: id,
+      studentId: dto.studentId,
+      score: scored.score,
+      totalMarks: scored.totalMarks,
+      percentage: scored.percentage,
+      submittedAt: result.submittedAt,
+      answers: scored.answerRows,
+      title: homework.title,
+    };
   }
 }

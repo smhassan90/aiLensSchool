@@ -83,7 +83,6 @@ export function generateStyledHomework(input: {
 }) {
   const hints = parseStyleHints(input.instruction);
   const topic = input.topicName?.trim() || input.subjectName;
-  const grade = input.gradeName?.trim() || 'this class';
   const points = applyKeyPointStyle(
     input.keyPoints.length
       ? input.keyPoints
@@ -97,37 +96,56 @@ export function generateStyledHomework(input: {
     .map(stripListMarker)
     .slice(0, hints.short ? 3 : hints.long ? 8 : 5);
 
-  const numbered = points.map((point, index) => `${index + 1}. ${point}`).join('\n');
-  const customNote = hints.raw && !hints.easy && !hints.hard && !hints.short && !hints.long
-    ? `Follow this request: ${hints.raw}\n\n`
-    : '';
+  type StyledHwQuestion =
+    | {
+        type: 'FILL_IN_THE_BLANK';
+        questionText: string;
+        marks: number;
+        correctAnswer: string;
+      }
+    | {
+        type: 'TRUE_FALSE';
+        questionText: string;
+        marks: number;
+        correctAnswer: string;
+        options: Array<{ optionText: string; isCorrect: boolean }>;
+      };
 
-  if (hints.easy || hints.short) {
-    return {
-      title: `${topic} practice`,
-      description: `${customNote}Do this short ${input.subjectName} homework for ${grade}. Use easy words.\n\n${numbered || '1. Read today’s lesson again.'}\n\nWrite 2 or 3 short answers in your notebook.`,
-      answerKey:
-        points.map((point, index) => `${index + 1}. ${point}`).join('\n') ||
-        '1. Student restates the main idea from today’s lesson.',
-    };
-  }
+  const questions: StyledHwQuestion[] = (points.length ? points : ["Today's lesson main idea"]).flatMap(
+    (point, index): StyledHwQuestion[] => {
+      if (index % 2 === 1) {
+        return [
+          {
+            type: 'TRUE_FALSE',
+            questionText: `${point.replace(/\.$/, '')}.`,
+            marks: 1,
+            correctAnswer: 'TRUE',
+            options: [
+              { optionText: 'TRUE', isCorrect: true },
+              { optionText: 'FALSE', isCorrect: false },
+            ],
+          },
+        ];
+      }
+      return [
+        {
+          type: 'FILL_IN_THE_BLANK',
+          questionText: `${point.replace(/\.$/, '')} is _____.`,
+          marks: 1,
+          correctAnswer: point.split(/\s+/).slice(0, 3).join(' ') || 'idea',
+        },
+      ];
+    },
+  );
 
-  if (hints.hard || hints.long) {
-    return {
-      title: `${topic} extended practice`,
-      description: `${customNote}Complete a thorough ${input.subjectName} homework for ${grade}. Use complete sentences.\n\n${numbered || '1. Review the full lesson and explain the main idea.'}\n\nAdd one example of your own and one question you still have.`,
-      answerKey:
-        points.map((point, index) => `${index + 1}. ${point}`).join('\n') ||
-        '1. Clear explanation of the main idea with supporting detail from the lesson.',
-    };
-  }
+  const description = questions.map((q, i) => `${i + 1}. ${q.questionText}`).join('\n');
+  const answerKey = questions.map((q, i) => `${i + 1}. ${q.correctAnswer}`).join('\n');
 
   return {
     title: `${topic} homework`,
-    description: `${customNote}Based on today’s ${input.subjectName} lesson, complete the following:\n\n${numbered || '1. Review the lesson pages and write the main ideas.'}\n\nWrite your answers neatly.`,
-    answerKey:
-      points.map((point, index) => `${index + 1}. ${point}`).join('\n') ||
-      '1. Main ideas from today’s lesson pages.',
+    description,
+    answerKey,
+    questions,
   };
 }
 

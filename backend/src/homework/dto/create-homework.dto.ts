@@ -1,4 +1,4 @@
-import { IsDateString, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsDateString, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateHomeworkDto {
@@ -33,6 +33,13 @@ export class CreateHomeworkDto {
   @IsOptional()
   @IsString()
   answerKey?: string;
+
+  @ApiPropertyOptional({
+    description: 'Auto-gradable homework questions JSON (teacher create/preview).',
+  })
+  @IsOptional()
+  @IsArray()
+  questionsJson?: unknown[];
 
   @ApiProperty()
   @IsDateString()

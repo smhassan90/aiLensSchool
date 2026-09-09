@@ -31,6 +31,7 @@ export interface AiProvider {
     quickGenerate?: boolean;
     mcqCount?: number;
     fillBlankCount?: number;
+    trueFalseCount?: number;
     shortAnswerCount?: number;
   }): Promise<AiCompletionResult<QuizOutput>>;
 
@@ -39,7 +40,20 @@ export interface AiProvider {
     subjectName?: string;
     gradeName?: string;
     styleInstruction?: string;
-  }): Promise<AiCompletionResult<{ title: string; description: string; answerKey?: string }>>;
+  }): Promise<
+    AiCompletionResult<{
+      title: string;
+      description: string;
+      answerKey?: string;
+      questions?: Array<{
+        type: string;
+        questionText: string;
+        marks: number;
+        correctAnswer?: string;
+        options?: Array<{ optionText: string; isCorrect: boolean }>;
+      }>;
+    }>
+  >;
 
   analyzeStudent(input: {
     resultsSummary: string;

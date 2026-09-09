@@ -10,10 +10,15 @@ import {
   Wallet,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/providers/auth-provider";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { AppShell } from "@/components/layout/app-shell";
 import { SidebarFrame, SidebarNavItem } from "@/components/layout/sidebar-frame";
+import {
+  SchoolBackgroundPrefetch,
+  prefetchMenuHref,
+} from "@/components/layout/background-prefetch";
 import type { StaffPermission } from "@/lib/types";
 import { personFullName } from "@/lib/person-name";
 
@@ -63,6 +68,7 @@ function isActivePath(pathname: string, href: string, matchSetup?: boolean) {
 
 export function SchoolSidebar() {
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   const { user, logout, can } = useAuth();
   const subtitle = user?.roles.includes("PRINCIPAL") ? "Principal" : "Administration";
   const items = mainNav.filter((item) => {
@@ -85,6 +91,7 @@ export function SchoolSidebar() {
           label={label}
           icon={icon}
           active={isActivePath(pathname, href, matchSetup)}
+          onPrefetch={(path) => prefetchMenuHref(queryClient, path)}
         />
       ))}
     </SidebarFrame>
@@ -94,6 +101,7 @@ export function SchoolSidebar() {
 export function SchoolShell({ children }: { children: React.ReactNode }) {
   return (
     <AppShell inverted sidebar={<SchoolSidebar />} header={<GlobalSearch />}>
+      <SchoolBackgroundPrefetch />
       {children}
     </AppShell>
   );

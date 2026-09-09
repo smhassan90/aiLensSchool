@@ -22,6 +22,7 @@ export interface HomeworkPreview {
   description: string;
   /** Teacher-only; never shown on parent/student mobile. */
   answerKey?: string;
+  questionsJson?: unknown;
   dueDate: string;
 }
 

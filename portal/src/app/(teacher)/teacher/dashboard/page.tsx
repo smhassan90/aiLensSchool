@@ -17,6 +17,8 @@ export default function TeacherDashboardPage() {
   const dashboard = useQuery({
     queryKey: ["teacher-dashboard"],
     queryFn: () => dashboardService.teacher(),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
   const suggest = useMutation({
     mutationFn: () => dashboardService.teacherCoach(),

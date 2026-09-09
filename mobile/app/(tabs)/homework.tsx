@@ -6,7 +6,12 @@ import { ChildHeader } from '@/components/ChildHeader';
 import { Badge, Card, EmptyState, ErrorState, LoadingState } from '@/components/ui';
 import { useChild } from '@/providers/ChildProvider';
 import { colors, spacing } from '@/constants/theme';
-import { fetchHomework, isHomeworkPending } from '@/services/homework.service';
+import {
+  fetchHomework,
+  getHomeworkListStatus,
+  homeworkStatusLabel,
+  homeworkStatusTone,
+} from '@/services/homework.service';
 
 export default function HomeworkTabScreen() {
   const { selectedChildId, isLoading: childLoading } = useChild();
@@ -50,19 +55,21 @@ export default function HomeworkTabScreen() {
             <EmptyState title="No homework assigned" />
           )
         }
-        renderItem={({ item }) => (
-          <Card onPress={() => router.push(`/homework/${item.id}`)}>
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardMeta}>
-              Due {new Date(item.dueDate).toLocaleDateString()} · {item.subject?.name}
-            </Text>
-            {isHomeworkPending(item) ? (
-              <Badge label="Pending" tone="warning" />
-            ) : (
-              <Badge label="Past due" />
-            )}
-          </Card>
-        )}
+        renderItem={({ item }) => {
+          const status = getHomeworkListStatus(item);
+          return (
+            <Card onPress={() => router.push(`/homework/${item.id}`)}>
+              <Text style={styles.cardTitle}>{item.title}</Text>
+              <Text style={styles.cardMeta}>
+                Due {new Date(item.dueDate).toLocaleDateString()} · {item.subject?.name}
+                {item.result
+                  ? ` · ${Number(item.result.percentage).toFixed(0)}%`
+                  : ''}
+              </Text>
+              <Badge label={homeworkStatusLabel(status)} tone={homeworkStatusTone(status)} />
+            </Card>
+          );
+        }}
       />
     </SafeAreaView>
   );

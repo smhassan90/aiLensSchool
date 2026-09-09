@@ -10,24 +10,29 @@ export default function SettingsScreen() {
         <Text style={styles.title}>Settings</Text>
 
         <View style={styles.card}>
-          <Text style={styles.label}>API URL</Text>
-          <Text style={styles.value}>{API_BASE_URL}</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.label}>Deep link scheme</Text>
-          <Text style={styles.value}>smsparent://</Text>
-        </View>
-
-        <View style={styles.card}>
           <Text style={styles.label}>Push notifications</Text>
-          <Text style={styles.value}>Disabled</Text>
+          <Text style={styles.value}>
+            Not enabled yet. You will still see school alerts in the Alerts tab.
+          </Text>
         </View>
 
-        <Text style={styles.note}>
-          Child-scoped API calls always include studentId from secure storage. The backend verifies
-          parent ownership — never trust client-only selection.
-        </Text>
+        <View style={styles.card}>
+          <Text style={styles.label}>App</Text>
+          <Text style={styles.value}>HawkNexa Parent</Text>
+        </View>
+
+        {__DEV__ ? (
+          <>
+            <View style={styles.card}>
+              <Text style={styles.label}>API URL (dev)</Text>
+              <Text style={styles.value}>{API_BASE_URL}</Text>
+            </View>
+            <View style={styles.card}>
+              <Text style={styles.label}>Deep link scheme (dev)</Text>
+              <Text style={styles.value}>smsparent://</Text>
+            </View>
+          </>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -47,5 +52,4 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: 13, fontWeight: '600', color: colors.slate500, textTransform: 'uppercase' },
   value: { fontSize: 15, color: colors.slate800, marginTop: spacing.xs, lineHeight: 22 },
-  note: { color: colors.slate500, marginTop: spacing.lg, lineHeight: 20, fontSize: 14 },
 });

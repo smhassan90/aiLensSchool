@@ -1,5 +1,5 @@
 import { apiFetch, buildQuery } from '@/lib/api';
-import { Homework, PaginatedResult } from '@/types/api';
+import { Homework, HomeworkResult, PaginatedResult } from '@/types/api';
 
 export async function fetchHomework(
   studentId: string,
@@ -14,16 +14,24 @@ export async function fetchHomeworkById(id: string, studentId: string): Promise<
   return apiFetch<Homework>(`/homework/${id}${buildQuery({ studentId })}`);
 }
 
-export function isHomeworkPending(item: Homework): boolean {
-  return new Date(item.dueDate) >= new Date();
+export async function submitHomework(
+  id: string,
+  payload: {
+    studentId: string;
+    answers: Array<{ questionId: string; optionId?: string; answerText?: string }>;
+  },
+): Promise<HomeworkResult & { title?: string }> {
+  return apiFetch<HomeworkResult & { title?: string }>(`/homework/${id}/submit`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
-export function isHomeworkDueToday(item: Homework): boolean {
-  const due = new Date(item.dueDate);
-  const today = new Date();
-  return (
-    due.getFullYear() === today.getFullYear() &&
-    due.getMonth() === today.getMonth() &&
-    due.getDate() === today.getDate()
-  );
-}
+export {
+  getHomeworkListStatus,
+  homeworkStatusLabel,
+  homeworkStatusTone,
+  isHomeworkDueToday,
+  isHomeworkPending,
+  needsHomeworkSubmission,
+} from '@/lib/homework-status';

@@ -48,6 +48,18 @@ export default function ProfileScreen() {
         {user?.school ? <Text style={styles.meta}>{user.school.name}</Text> : null}
         <Text style={styles.roles}>{user?.roles.join(', ')}</Text>
 
+        <View style={styles.quickLinks}>
+          <Pressable style={styles.quick} onPress={() => router.push('/fees')}>
+            <Text style={styles.quickText}>Fees</Text>
+          </Pressable>
+          <Pressable style={styles.quick} onPress={() => router.push('/report-cards')}>
+            <Text style={styles.quickText}>Report cards</Text>
+          </Pressable>
+          <Pressable style={styles.quick} onPress={() => router.push('/announcements')}>
+            <Text style={styles.quickText}>Announcements</Text>
+          </Pressable>
+        </View>
+
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Change password</Text>
           <Text style={styles.cardHint}>
@@ -76,15 +88,6 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
-        <Pressable style={styles.linkRow} onPress={() => router.push('/announcements')}>
-          <Text style={styles.link}>Announcements</Text>
-        </Pressable>
-        <Pressable style={styles.linkRow} onPress={() => router.push('/fees')}>
-          <Text style={styles.link}>Fees</Text>
-        </Pressable>
-        <Pressable style={styles.linkRow} onPress={() => router.push('/report-cards')}>
-          <Text style={styles.link}>Report cards</Text>
-        </Pressable>
         <Pressable style={styles.linkRow} onPress={() => router.push('/settings')}>
           <Text style={styles.link}>Settings</Text>
         </Pressable>
@@ -113,6 +116,21 @@ const styles = StyleSheet.create({
   email: { color: colors.slate600, marginTop: spacing.xs },
   meta: { color: colors.slate500, marginTop: spacing.sm },
   roles: { color: colors.primary, fontWeight: '600', marginTop: spacing.sm },
+  quickLinks: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  quick: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  quickText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
   card: {
     marginTop: spacing.xl,
     backgroundColor: colors.white,

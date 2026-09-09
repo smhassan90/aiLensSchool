@@ -4,6 +4,7 @@ import { RoleName } from '@prisma/client';
 import { IsOptional, IsString } from 'class-validator';
 import { HomeworkService } from './homework.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
+import { SubmitHomeworkDto } from './dto/submit-homework.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -39,6 +40,16 @@ export class HomeworkController {
   @Get()
   findAll(@Query() query: HomeworkQueryDto, @CurrentUser() user: AuthUser) {
     return this.homeworkService.findAll(user, query);
+  }
+
+  @Roles(RoleName.PARENT)
+  @Post(':id/submit')
+  submit(
+    @Param('id') id: string,
+    @Body() dto: SubmitHomeworkDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.homeworkService.submit(id, dto, user);
   }
 
   @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN, RoleName.PARENT)

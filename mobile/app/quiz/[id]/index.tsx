@@ -48,13 +48,16 @@ export default function QuizDetailScreen() {
 
   const quiz = quizQuery.data;
   const includedQuestions = quiz.questions?.filter((q: QuizQuestion) => q.included) ?? [];
+  const totalMarks =
+    quiz.totalMarks ??
+    includedQuestions.reduce((sum, question) => sum + Number(question.marks || 0), 0);
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>{quiz.title}</Text>
         <Text style={styles.meta}>
-          {selectedChild?.firstName} · {quiz.subject?.name} · {quiz.totalMarks ?? includedQuestions.length} marks
+          {selectedChild?.firstName} · {quiz.subject?.name} · {totalMarks} marks
         </Text>
         <Badge label={quiz.status} tone={quiz.status === 'PUBLISHED' ? 'success' : 'default'} />
 
@@ -68,20 +71,15 @@ export default function QuizDetailScreen() {
           </Pressable>
         ) : (
           <Pressable style={styles.resultLink} onPress={() => router.push(`/quiz/${id}/attempt`)}>
-            <Text style={styles.resultText}>View attempt status</Text>
+            <Text style={styles.resultText}>Take quiz</Text>
           </Pressable>
         )}
 
-        <Text style={styles.section}>Questions preview</Text>
-        {includedQuestions.length === 0 ? (
-          <EmptyState title="No questions to preview" />
-        ) : (
-          includedQuestions.map((question: QuizQuestion, index: number) => (
-            <Text key={question.id} style={styles.question}>
-              {index + 1}. {question.questionText} ({question.marks} marks)
-            </Text>
-          ))
-        )}
+        <Text style={styles.section}>Before you start</Text>
+        <Text style={styles.previewMeta}>
+          {includedQuestions.length} question{includedQuestions.length === 1 ? '' : 's'} ·{' '}
+          {totalMarks} marks total. Question text is shown only after you start the attempt.
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -94,7 +92,7 @@ const styles = StyleSheet.create({
   meta: { color: colors.slate500 },
   body: { fontSize: 16, lineHeight: 24, color: colors.slate700 },
   section: { fontSize: 18, fontWeight: '700', color: colors.slate800, marginTop: spacing.md },
-  question: { color: colors.slate700, lineHeight: 22, marginTop: spacing.sm },
+  previewMeta: { color: colors.slate600, lineHeight: 22 },
   resultLink: {
     backgroundColor: colors.primary,
     padding: spacing.md,

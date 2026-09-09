@@ -93,7 +93,9 @@ export default function QuizzesTabScreen() {
             <Card onPress={() => router.push(`/quiz/${item.id}`)}>
               <View style={styles.row}>
                 <Text style={styles.cardTitle}>{item.title}</Text>
-                {isQuizNew(item) ? <Badge label="New" tone="success" /> : null}
+                {isQuizNew(item, { hasResult: !!result }) ? (
+                  <Badge label="New" tone="success" />
+                ) : null}
               </View>
               <Text style={styles.cardMeta}>
                 {item.subject?.name} · {item.totalMarks ?? '—'} marks

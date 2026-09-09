@@ -35,7 +35,7 @@ export default function SchoolQuizzesPage() {
   const [quickGenerate, setQuickGenerate] = useState(true);
   const [mcqCount, setMcqCount] = useState(3);
   const [fillBlankCount, setFillBlankCount] = useState(1);
-  const [shortAnswerCount, setShortAnswerCount] = useState(1);
+  const [trueFalseCount, setTrueFalseCount] = useState(1);
   const quizzes = useQuery({ queryKey: ["quizzes"], queryFn: () => quizzesService.list({ limit: 50 }) });
   const sections = useQuery({ queryKey: ["sections"], queryFn: () => academicsService.listSections({ limit: 100 }) });
   const subjects = useQuery({ queryKey: ["subjects"], queryFn: () => academicsService.listSubjects({ limit: 100 }) });
@@ -82,7 +82,7 @@ export default function SchoolQuizzesPage() {
         quickGenerate,
         ...(quickGenerate
           ? { questionCount: 8 }
-          : { mcqCount, fillBlankCount, shortAnswerCount }),
+          : { mcqCount, fillBlankCount, trueFalseCount }),
       }),
     onSuccess: (quiz) => {
       toast({ title: "Quiz generated as draft", variant: "success" });
@@ -238,18 +238,18 @@ export default function SchoolQuizzesPage() {
               quickGenerate={quickGenerate}
               mcqCount={mcqCount}
               fillBlankCount={fillBlankCount}
-              shortAnswerCount={shortAnswerCount}
+              trueFalseCount={trueFalseCount}
               onQuickGenerateChange={setQuickGenerate}
               onMcqChange={setMcqCount}
               onFillBlankChange={setFillBlankCount}
-              onShortAnswerChange={setShortAnswerCount}
+              onTrueFalseChange={setTrueFalseCount}
             />
             <Button
               disabled={
                 !activeSectionId ||
                 !activeSubjectId ||
                 homeworkIds.length === 0 ||
-                (!quickGenerate && mcqCount + fillBlankCount + shortAnswerCount < 1)
+                (!quickGenerate && mcqCount + fillBlankCount + trueFalseCount < 1)
               }
               onClick={() => generate.mutate()}
             >

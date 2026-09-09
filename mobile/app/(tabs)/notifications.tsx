@@ -8,11 +8,18 @@ import { fetchNotifications, markNotificationRead } from '@/services/notificatio
 
 function resolveDeepLink(deepLink?: string | null): string | null {
   if (!deepLink) return null;
-  if (deepLink.startsWith('/quiz/')) return deepLink.replace('/quiz/', '/quiz/');
   if (deepLink.startsWith('/quizzes/')) return deepLink.replace('/quizzes/', '/quiz/');
+  if (deepLink.startsWith('/quiz/')) return deepLink;
   if (deepLink.startsWith('/homework/')) return deepLink;
-  if (deepLink.startsWith('/announcement/')) return deepLink.replace('/announcements/', '/announcement/');
-  return deepLink;
+  if (deepLink.startsWith('/announcements/')) {
+    return deepLink.replace('/announcements/', '/announcement/');
+  }
+  if (deepLink.startsWith('/announcement/')) return deepLink;
+  if (deepLink.startsWith('/lessons/')) return deepLink.replace('/lessons/', '/lesson/');
+  if (deepLink.startsWith('/lesson/')) return deepLink;
+  if (deepLink.startsWith('/events/')) return deepLink.replace('/events/', '/event/');
+  if (deepLink.startsWith('/event/')) return deepLink;
+  return deepLink.startsWith('/') ? deepLink : null;
 }
 
 export default function NotificationsTabScreen() {

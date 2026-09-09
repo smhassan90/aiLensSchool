@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   Alert,
   Image,
@@ -10,7 +9,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Redirect, router } from 'expo-router';
+import { useState } from 'react';
+import { Href, Redirect, router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -27,7 +27,7 @@ const schema = z.object({
 type LoginForm = z.infer<typeof schema>;
 
 export default function LoginScreen() {
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading, user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
 
   const {
@@ -37,13 +37,17 @@ export default function LoginScreen() {
   } = useForm<LoginForm>({
     resolver: zodResolver(schema),
     defaultValues: {
-      username: __DEV__ ? 'tps.032123234543' : '',
-      password: __DEV__ ? 'Parent123!' : '',
+      username: '',
+      password: '',
     },
   });
 
   if (isLoading) {
     return <LoadingState message="Loading…" />;
+  }
+
+  if (isAuthenticated && user?.mustChangePassword) {
+    return <Redirect href={'/change-password' as Href} />;
   }
 
   if (isAuthenticated) {
@@ -53,8 +57,12 @@ export default function LoginScreen() {
   const onSubmit = handleSubmit(async (values) => {
     setSubmitting(true);
     try {
-      await login(values.username, values.password);
-      router.replace('/(tabs)/home');
+      const nextUser = await login(values.username.trim(), values.password);
+      if (nextUser.mustChangePassword) {
+        router.replace('/change-password' as Href);
+      } else {
+        router.replace('/(tabs)/home');
+      }
     } catch (error) {
       const message =
         error instanceof ApiError ? error.message : 'Login failed. Check your credentials.';
@@ -90,7 +98,7 @@ export default function LoginScreen() {
               autoCapitalize="none"
               autoComplete="username"
               style={styles.input}
-              placeholder="tps.032123234543"
+              placeholder="e.g. dtps.03001234567"
               onBlur={onBlur}
               onChangeText={onChange}
               value={value}
@@ -124,7 +132,10 @@ export default function LoginScreen() {
           <Text style={styles.buttonText}>{submitting ? 'Signing in…' : 'Sign in'}</Text>
         </Pressable>
 
-        <Text style={styles.hint}>Use the username and password the school gave you. You can change the password after login.</Text>
+        <Text style={styles.hint}>
+          Use the parent username from school (usually schoolcode.phone). You can change the password
+          after login.
+        </Text>
       </View>
     </KeyboardAvoidingView>
   );

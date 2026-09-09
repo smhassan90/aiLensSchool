@@ -576,6 +576,7 @@ model Student {
   enrollments  StudentEnrollment[]
   quizAttempts QuizAttempt[]
   quizResults  QuizResult[]
+  homeworkResults HomeworkResult[]
   attendances  Attendance[]
   quizAssignments QuizAssignment[]
   fees            StudentFee[]
@@ -1112,8 +1113,10 @@ model Homework {
   createdById    String    @map("created_by_id")
   title          String
   description    String?   @db.Text
-  /// Teacher-only correct answers for auto-matching later. Never sent to parents/students.
+  /// Teacher-only correct answers for review. Never sent to parents/students.
   answerKey      String?   @map("answer_key") @db.Text
+  /// Auto-gradable items: [{ id, type, questionText, marks, correctAnswer, options? }]
+  questionsJson  Json?     @map("questions_json")
   dueDate        DateTime  @map("due_date")
   publishedAt    DateTime? @map("published_at")
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -1127,6 +1130,7 @@ model Homework {
   lesson       DailyLesson?         @relation(fields: [lessonId], references: [id])
   createdBy    User                 @relation("HomeworkCreatedBy", fields: [createdById], references: [id])
   attachments  HomeworkAttachment[]
+  results      HomeworkResult[]
 
   @@index([schoolId])
   @@index([sectionId])
@@ -1146,6 +1150,28 @@ model HomeworkAttachment {
 
   @@index([homeworkId])
   @@map("homework_attachments")
+}
+
+model HomeworkResult {
+  id          String   @id @default(uuid())
+  homeworkId  String   @map("homework_id")
+  studentId   String   @map("student_id")
+  score       Decimal  @db.Decimal(8, 2)
+  totalMarks  Decimal  @map("total_marks") @db.Decimal(8, 2)
+  percentage  Decimal  @db.Decimal(5, 2)
+  /// [{ questionId, optionId?, answerText?, isCorrect, marksAwarded }]
+  answersJson Json     @map("answers_json")
+  submittedAt DateTime @default(now()) @map("submitted_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  homework Homework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  student  Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([homeworkId, studentId])
+  @@index([studentId])
+  @@index([homeworkId])
+  @@map("homework_results")
 }
 
 // ===================== ASSESSMENTS =====================

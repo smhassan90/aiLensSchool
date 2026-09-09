@@ -11,9 +11,14 @@ import {
   Users,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/providers/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { SidebarFrame, SidebarNavItem } from "@/components/layout/sidebar-frame";
+import {
+  TeacherBackgroundPrefetch,
+  prefetchMenuHref,
+} from "@/components/layout/background-prefetch";
 import { personFullName } from "@/lib/person-name";
 
 const navItems = [
@@ -29,6 +34,7 @@ const navItems = [
 
 export function TeacherSidebar() {
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   const { user, logout } = useAuth();
 
   return (
@@ -44,6 +50,7 @@ export function TeacherSidebar() {
           label={label}
           icon={icon}
           active={pathname === href || pathname.startsWith(`${href}/`)}
+          onPrefetch={(path) => prefetchMenuHref(queryClient, path)}
         />
       ))}
     </SidebarFrame>
@@ -57,6 +64,7 @@ export function TeacherShell({ children }: { children: React.ReactNode }) {
       sidebar={<TeacherSidebar />}
       header={<p className="truncate text-sm font-medium text-muted-foreground">Teacher Hub</p>}
     >
+      <TeacherBackgroundPrefetch />
       {children}
     </AppShell>
   );

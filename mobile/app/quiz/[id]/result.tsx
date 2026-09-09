@@ -108,8 +108,10 @@ export default function QuizResultScreen() {
                   />
                 </View>
                 <Text style={styles.meta}>Your child’s answer: {answer.answerText ?? '—'}</Text>
-                {answer.question?.correctAnswer ? (
-                  <Text style={styles.meta}>Correct answer: {answer.question.correctAnswer}</Text>
+                {!answer.isCorrect ? (
+                  <Text style={styles.meta}>
+                    This answer needs review. Correct answers are kept with the school.
+                  </Text>
                 ) : null}
               </View>
             ))}

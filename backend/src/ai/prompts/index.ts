@@ -27,22 +27,24 @@ Given homework topic titles and lesson key points (or short lesson excerpts), ge
 Follow the question-type instructions in the user message exactly.
 The quiz title must be a short student-facing headline (max 8 words) suggested by you from the topics. Do not concatenate homework titles with commas. The teacher does not name the quiz.
 Prefer testing the listed key points; do not invent unrelated chapters.
+IMPORTANT: Every question must be auto-gradable. Never create open-ended or short-essay questions.
+Every question MUST include correctAnswer. For MCQ and TRUE_FALSE also mark exactly one option isCorrect true.
 Return ONLY valid JSON matching:
 {
   "title": string,
   "description": string?,
   "questions": [
     {
-      "type": "MCQ" | "FILL_IN_THE_BLANK" | "SHORT_ANSWER",
+      "type": "MCQ" | "FILL_IN_THE_BLANK" | "TRUE_FALSE",
       "questionText": string,
       "marks": number,
-      "correctAnswer": string?,
+      "correctAnswer": string,
       "options": [{ "optionText": string, "isCorrect": boolean }]?
     }
   ]
 }`;
 
-export const HOMEWORK_GENERATION_PROMPT = `Generate homework from the lesson content.
+export const HOMEWORK_GENERATION_PROMPT = `Generate AUTO-GRADABLE homework from the lesson content.
 Follow the teacher's style instruction if one is provided. Adapt difficulty, length, and vocabulary to that instruction and the grade.
 Do not invent a separate lesson summary. Use the extracted lesson text and key points only.
 
@@ -50,13 +52,26 @@ Return JSON:
 {
   "title": string,
   "description": string,
-  "answerKey": string
+  "answerKey": string,
+  "questions": [
+    {
+      "type": "MCQ" | "FILL_IN_THE_BLANK" | "TRUE_FALSE",
+      "questionText": string,
+      "marks": number,
+      "correctAnswer": string,
+      "options": [{ "optionText": string, "isCorrect": boolean }]?
+    }
+  ]
 }
 
 Rules:
-- "description" is what students/parents see: clear numbered tasks/questions ONLY. Do NOT include answers, solutions, or hints that give away the answer.
-- "answerKey" is for teachers only: numbered answers that match the same numbers in description (e.g. "1. …\\n2. …"). Keep it concise and accurate from the lesson.
-- If a task is open-ended (e.g. "write your own example"), put a short model answer or grading note in answerKey for that number.`;
+- Create 4-8 auto-gradable questions only. Never open-ended or essay tasks.
+- MCQ: exactly 4 options, exactly one isCorrect true, correctAnswer = that option text.
+- FILL_IN_THE_BLANK: short exact correctAnswer (1-4 words).
+- TRUE_FALSE: correctAnswer TRUE or FALSE with matching options.
+- "description" is student-facing: numbered question texts ONLY (no answers).
+- "answerKey" is teacher-facing: numbered correct answers matching description.
+- "questions" must include correctAnswer for every item so the app can mark submissions.`;
 
 export const STUDENT_ANALYSIS_PROMPT = `Analyze student quiz performance and return JSON:
 { "summary": string, "strengths": string[], "weaknesses": string[] }`;

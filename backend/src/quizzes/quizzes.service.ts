@@ -152,7 +152,10 @@ export class QuizzesService {
       });
     }
 
-    const customTotal = (dto.mcqCount ?? 0) + (dto.fillBlankCount ?? 0) + (dto.shortAnswerCount ?? 0);
+    const customTotal =
+      (dto.mcqCount ?? 0) +
+      (dto.fillBlankCount ?? 0) +
+      (dto.trueFalseCount ?? dto.shortAnswerCount ?? 0);
     if (dto.quickGenerate === false && customTotal < 1) {
       throw new BadRequestException({
         code: 'QUESTION_MIX_REQUIRED',
@@ -170,7 +173,7 @@ export class QuizzesService {
       quickGenerate: dto.quickGenerate,
       mcqCount: dto.mcqCount,
       fillBlankCount: dto.fillBlankCount,
-      shortAnswerCount: dto.shortAnswerCount,
+      trueFalseCount: dto.trueFalseCount ?? dto.shortAnswerCount,
     });
 
     const totalMarks = aiQuiz.questions.reduce((sum, q) => sum + q.marks, 0);
@@ -196,13 +199,19 @@ export class QuizzesService {
 
       for (let i = 0; i < aiQuiz.questions.length; i++) {
         const q = normalizeGeneratedQuestion(aiQuiz.questions[i]);
+        if (!q.correctAnswer?.trim()) {
+          throw new BadRequestException({
+            code: 'QUIZ_ANSWER_REQUIRED',
+            message: 'Generated quiz is missing correct answers. Please generate again.',
+          });
+        }
         const question = await tx.quizQuestion.create({
           data: {
             quizId: created.id,
             type: q.type as QuestionType,
             questionText: q.questionText,
             marks: Number(q.marks) || 1,
-            correctAnswer: q.correctAnswer ?? q.options?.find((opt) => opt.isCorrect)?.optionText,
+            correctAnswer: q.correctAnswer.trim(),
             order: i,
             source: QuestionSource.AI,
             included: true,
@@ -565,8 +574,11 @@ export class QuizzesService {
         : undefined;
       const text = given?.answerText?.trim() ?? '';
       let isCorrect = false;
-      if (question.type === QuestionType.MCQ) {
+      if (question.type === QuestionType.MCQ || question.type === QuestionType.TRUE_FALSE) {
         isCorrect = Boolean(selected?.isCorrect);
+        if (!isCorrect && text && question.correctAnswer) {
+          isCorrect = text.toLowerCase() === question.correctAnswer.trim().toLowerCase();
+        }
       } else if (question.correctAnswer) {
         isCorrect = text.toLowerCase() === question.correctAnswer.trim().toLowerCase();
       }

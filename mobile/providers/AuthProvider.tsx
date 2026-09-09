@@ -8,7 +8,7 @@ interface AuthContextValue {
   user: MeResponse | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<MeResponse>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -43,13 +43,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const login = useCallback(async (username: string, password: string) => {
     const response = await authLogin(username, password);
-    setUser(response.user as MeResponse);
+    let nextUser = response.user as MeResponse;
+    setUser(nextUser);
     try {
       const me = await getCurrentUser();
+      nextUser = me;
       setUser(me);
     } catch {
       // keep login response user
     }
+    return nextUser;
   }, []);
 
   const logout = useCallback(async () => {

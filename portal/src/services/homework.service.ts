@@ -23,6 +23,7 @@ export const homeworkService = {
     title: string;
     description?: string;
     answerKey?: string;
+    questionsJson?: unknown;
     dueDate: string;
     lessonId?: string;
   }) {

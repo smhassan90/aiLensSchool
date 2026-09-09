@@ -66,15 +66,19 @@ export function SidebarNavItem({
   label,
   icon: Icon,
   active,
+  onPrefetch,
 }: {
   href: string;
   label: string;
   icon: LucideIcon;
   active: boolean;
+  onPrefetch?: (href: string) => void;
 }) {
   return (
     <Link
       href={href}
+      onMouseEnter={() => onPrefetch?.(href)}
+      onFocus={() => onPrefetch?.(href)}
       className={cn(
         "group relative flex items-center gap-3 rounded-xl px-2 py-1.5 text-[13px] font-medium tracking-wide transition-all duration-200",
         active

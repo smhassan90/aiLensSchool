@@ -165,36 +165,41 @@ export class DashboardService {
   }
 
   async teacherSummary(user: AuthUser) {
-    return this.cache.getOrSet(`teacher:summary:${user.id}`, 20_000, () => this.loadTeacherSummary(user));
+    return this.cache.getOrSet(`teacher:summary:${user.id}`, 60_000, () => this.loadTeacherSummary(user));
   }
 
   private async loadTeacherSummary(user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
     const since = new Date();
     since.setDate(since.getDate() - 14);
+    const sinceDate = since.toISOString().slice(0, 10);
 
-    const classSubjects = await this.prisma.classSubject.findMany({
-      where: {
-        OR: [{ teacher: { userId: user.id } }, { assistantTeacher: { userId: user.id } }],
-      },
-      select: {
-        sectionId: true,
-        subjectId: true,
-        academicYearId: true,
-        branchId: true,
-        section: { select: { name: true, grade: { select: { id: true, name: true } } } },
-        subject: { select: { id: true, name: true } },
-        teacher: { select: { userId: true } },
-        assistantTeacher: { select: { userId: true } },
-      },
-    });
-
-    const gradeIds = [...new Set(classSubjects.map((item) => item.section.grade?.id).filter(Boolean))] as string[];
-    const subjectIds = [...new Set(classSubjects.map((item) => item.subjectId))];
-    const sectionIds = [...new Set(classSubjects.map((item) => item.sectionId))];
-
-    const [quizCount, homeworkCount, latestResults, lessons, attendanceDays, targets, lowQuizzes] =
-      await Promise.all([
+    // One parallel batch against the remote DB — avoid waiting on classes before other queries.
+    const [
+      classSubjects,
+      quizCount,
+      homeworkCount,
+      latestResults,
+      lessons,
+      attendanceDays,
+      targetRows,
+      lowQuizzes,
+    ] = await Promise.all([
+      this.prisma.classSubject.findMany({
+        where: {
+          OR: [{ teacher: { userId: user.id } }, { assistantTeacher: { userId: user.id } }],
+        },
+        select: {
+          sectionId: true,
+          subjectId: true,
+          academicYearId: true,
+          branchId: true,
+          section: { select: { name: true, grade: { select: { id: true, name: true } } } },
+          subject: { select: { id: true, name: true } },
+          teacher: { select: { userId: true } },
+          assistantTeacher: { select: { userId: true } },
+        },
+      }),
       this.prisma.quiz.count({ where: { schoolId, createdById: user.id } }),
       this.prisma.homework.count({ where: { schoolId, createdById: user.id } }),
       this.prisma.quizResult.findMany({
@@ -212,14 +217,30 @@ export class DashboardService {
         where: { schoolId, createdById: user.id, date: { gte: since } },
         select: { date: true, sectionId: true, subjectId: true },
       }),
-      this.prisma.attendance.findMany({
-        where: { schoolId, sectionId: { in: sectionIds.length ? sectionIds : ['none'] }, date: { gte: since } },
-        select: { date: true, sectionId: true },
-        distinct: ['date', 'sectionId'],
-      }),
-      this.prisma.quizTarget.findMany({
-        where: { schoolId, gradeId: { in: gradeIds.length ? gradeIds : ['none'] }, subjectId: { in: subjectIds.length ? subjectIds : ['none'] } },
-      }),
+      this.prisma.$queryRaw<Array<{ date: Date; sectionId: string }>>`
+        SELECT DISTINCT a.date AS date, a.section_id AS sectionId
+        FROM attendances a
+        INNER JOIN class_subjects cs ON cs.section_id = a.section_id
+        LEFT JOIN teacher_profiles tp ON tp.id = cs.teacher_id
+        LEFT JOIN teacher_profiles atp ON atp.id = cs.assistant_teacher_id
+        WHERE a.school_id = ${schoolId}
+          AND a.date >= ${sinceDate}
+          AND (tp.user_id = ${user.id} OR atp.user_id = ${user.id})
+      `,
+      this.prisma.$queryRaw<Array<{ minQuizzes: number }>>`
+        SELECT qt.min_quizzes AS minQuizzes
+        FROM quiz_targets qt
+        WHERE qt.school_id = ${schoolId}
+          AND EXISTS (
+            SELECT 1
+            FROM class_subjects cs
+            INNER JOIN sections s ON s.id = cs.section_id AND s.grade_id = qt.grade_id
+            LEFT JOIN teacher_profiles tp ON tp.id = cs.teacher_id
+            LEFT JOIN teacher_profiles atp ON atp.id = cs.assistant_teacher_id
+            WHERE cs.subject_id = qt.subject_id
+              AND (tp.user_id = ${user.id} OR atp.user_id = ${user.id})
+          )
+      `,
       this.prisma.$queryRaw<Array<{ title: string }>>`
         SELECT q.title AS title
         FROM quizzes q
@@ -237,7 +258,13 @@ export class DashboardService {
       lessons.map((row) => `${row.sectionId}:${row.subjectId}:${row.date.toISOString().slice(0, 10)}`),
     );
     const attendanceSet = new Set(
-      attendanceDays.map((row) => `${row.sectionId}:${row.date.toISOString().slice(0, 10)}`),
+      attendanceDays.map((row) => {
+        const day =
+          row.date instanceof Date
+            ? row.date.toISOString().slice(0, 10)
+            : String(row.date).slice(0, 10);
+        return `${row.sectionId}:${day}`;
+      }),
     );
 
     const lessonByClass = classSubjects.map((item) => {
@@ -293,7 +320,7 @@ export class DashboardService {
     const missingLessonDays = Math.max(0, expectedLessonSlots - doneLessonSlots);
     const missingAttendance = Math.max(0, expectedAttendanceSlots - doneAttendanceSlots);
 
-    const quizTarget = targets.reduce((sum, row) => sum + row.minQuizzes, 0);
+    const quizTarget = targetRows.reduce((sum, row) => sum + Number(row.minQuizzes), 0);
 
     const classes = classSubjects.map((item) => ({
       sectionId: item.sectionId,
@@ -327,9 +354,15 @@ export class DashboardService {
       classes,
       latestResults,
       nextActions: [
-        missingLessonDays > 0 ? `Add ${missingLessonDays} missing lesson${missingLessonDays === 1 ? '' : 's'} from the last 2 weeks` : 'Lessons look up to date',
-        missingAttendance > 0 ? `Mark attendance for ${missingAttendance} class day${missingAttendance === 1 ? '' : 's'}` : 'Attendance is marked',
-        quizTarget && quizCount < quizTarget ? `Quizzes ${quizCount}/${quizTarget} of your minimum` : 'Quiz count is on track',
+        missingLessonDays > 0
+          ? `Add ${missingLessonDays} missing lesson${missingLessonDays === 1 ? '' : 's'} from the last 2 weeks`
+          : 'Lessons look up to date',
+        missingAttendance > 0
+          ? `Mark attendance for ${missingAttendance} class day${missingAttendance === 1 ? '' : 's'}`
+          : 'Attendance is marked',
+        quizTarget && quizCount < quizTarget
+          ? `Quizzes ${quizCount}/${quizTarget} of your minimum`
+          : 'Quiz count is on track',
       ],
     };
   }

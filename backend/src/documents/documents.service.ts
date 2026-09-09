@@ -24,6 +24,11 @@ import { ParentsService } from '../parents/parents.service';
 import { TeacherGradeStyleService } from '../common/services/teacher-grade-style.service';
 import { applyDiaryStyle, generateStyledHomework, stripListMarker } from '../lessons/teacher-content-style';
 import {
+  answerKeyFromQuestions,
+  buildHomeworkQuestions,
+  descriptionFromQuestions,
+} from '../homework/homework-questions';
+import {
   fatherDisplayName,
   letterGrade,
   pickObtained,
@@ -244,7 +249,23 @@ export class DocumentsService {
       gradeName: lesson.grade?.name,
     });
 
-    let generated: { title: string; description: string; answerKey?: string } = fallback;
+    let generated: {
+      title: string;
+      description: string;
+      answerKey?: string;
+      questions?: Array<{
+        type: string;
+        questionText: string;
+        marks: number;
+        correctAnswer?: string;
+        options?: Array<{ optionText: string; isCorrect: boolean }>;
+      }>;
+    } = {
+      title: fallback.title,
+      description: fallback.description,
+      answerKey: fallback.answerKey,
+      questions: fallback.questions,
+    };
     try {
       generated = await this.homeworkAi.generate({
         schoolId,
@@ -260,12 +281,25 @@ export class DocumentsService {
       if (!generated.answerKey?.trim()) {
         generated = { ...generated, answerKey: fallback.answerKey };
       }
+      if (!generated.questions?.length) {
+        generated = { ...generated, questions: fallback.questions };
+      }
     } catch {
-      generated = fallback;
+      generated = {
+        title: fallback.title,
+        description: fallback.description,
+        answerKey: fallback.answerKey,
+        questions: fallback.questions,
+      };
     }
 
     const dueDate =
       dto.dueDate ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const questions = buildHomeworkQuestions(
+      generated.questions as never,
+      keyPoints,
+    );
 
     return {
       lessonId: lesson.id,
@@ -274,8 +308,10 @@ export class DocumentsService {
       subjectId: lesson.subjectId,
       branchId: lesson.branchId,
       title: generated.title,
-      description: generated.description ?? lessonContent,
-      answerKey: generated.answerKey?.trim() || undefined,
+      description:
+        generated.description?.trim() || descriptionFromQuestions(questions) || lessonContent,
+      answerKey: generated.answerKey?.trim() || answerKeyFromQuestions(questions) || undefined,
+      questionsJson: questions,
       dueDate,
     };
   }
@@ -380,6 +416,7 @@ export class DocumentsService {
       subjectName: subject.name,
     });
 
+    const questions = buildHomeworkQuestions(generated.questions as never, []);
     const homework = await this.prisma.homework.create({
       data: {
         schoolId,
@@ -390,8 +427,14 @@ export class DocumentsService {
         lessonId,
         createdById: user.id,
         title,
-        description: generated.description ?? lessonSummary,
-        answerKey: generated.answerKey?.trim() || undefined,
+        description:
+          generated.description?.trim() ||
+          descriptionFromQuestions(questions) ||
+          lessonSummary,
+        answerKey: generated.answerKey?.trim() || answerKeyFromQuestions(questions) || undefined,
+        questionsJson: questions.length
+          ? (questions as unknown as Prisma.InputJsonValue)
+          : undefined,
         dueDate: new Date(dto.dueDate),
         publishedAt: new Date(),
       },

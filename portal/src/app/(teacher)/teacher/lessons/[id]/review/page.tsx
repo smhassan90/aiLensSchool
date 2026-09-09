@@ -177,6 +177,7 @@ export default function ReviewLessonPage() {
           title: homeworkDraft.title.trim(),
           description: homeworkDraft.description.trim(),
           answerKey: homeworkDraft.answerKey?.trim() || undefined,
+          questionsJson: homeworkDraft.questionsJson,
           dueDate: homeworkDraft.dueDate,
           lessonId: homeworkDraft.lessonId,
         });

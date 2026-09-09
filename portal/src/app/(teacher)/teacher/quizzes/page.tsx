@@ -40,12 +40,12 @@ const generateSchema = z
     quickGenerate: z.boolean(),
     mcqCount: z.coerce.number().min(0).max(20),
     fillBlankCount: z.coerce.number().min(0).max(20),
-    shortAnswerCount: z.coerce.number().min(0).max(20),
+    trueFalseCount: z.coerce.number().min(0).max(20),
   })
   .superRefine((value, ctx) => {
     if (
       !value.quickGenerate &&
-      value.mcqCount + value.fillBlankCount + value.shortAnswerCount < 1
+      value.mcqCount + value.fillBlankCount + value.trueFalseCount < 1
     ) {
       ctx.addIssue({
         code: "custom",
@@ -86,7 +86,7 @@ export default function TeacherQuizzesPage() {
       quickGenerate: true,
       mcqCount: 3,
       fillBlankCount: 1,
-      shortAnswerCount: 1,
+      trueFalseCount: 1,
     },
   });
 
@@ -122,7 +122,7 @@ export default function TeacherQuizzesPage() {
           : {
               mcqCount: values.mcqCount,
               fillBlankCount: values.fillBlankCount,
-              shortAnswerCount: values.shortAnswerCount,
+              trueFalseCount: values.trueFalseCount,
             }),
       });
     },
@@ -286,11 +286,11 @@ export default function TeacherQuizzesPage() {
               quickGenerate={watch("quickGenerate")}
               mcqCount={watch("mcqCount")}
               fillBlankCount={watch("fillBlankCount")}
-              shortAnswerCount={watch("shortAnswerCount")}
+              trueFalseCount={watch("trueFalseCount")}
               onQuickGenerateChange={(value) => setValue("quickGenerate", value, { shouldValidate: true })}
               onMcqChange={(value) => setValue("mcqCount", value, { shouldValidate: true })}
               onFillBlankChange={(value) => setValue("fillBlankCount", value, { shouldValidate: true })}
-              onShortAnswerChange={(value) => setValue("shortAnswerCount", value, { shouldValidate: true })}
+              onTrueFalseChange={(value) => setValue("trueFalseCount", value, { shouldValidate: true })}
             />
             {errors.mcqCount && <p className="text-sm text-destructive">{errors.mcqCount.message}</p>}
             <p className="rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">

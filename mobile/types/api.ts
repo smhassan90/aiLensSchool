@@ -95,6 +95,31 @@ export interface Homework {
   lessonId?: string | null;
   subject?: Subject;
   section?: Section;
+  questions?: HomeworkQuestion[];
+  result?: HomeworkResult | null;
+}
+
+export interface HomeworkQuestion {
+  id: string;
+  type: string;
+  questionText: string;
+  marks: number;
+  options?: Array<{ id: string; optionText: string }>;
+}
+
+export interface HomeworkResult {
+  id: string;
+  score: number;
+  totalMarks: number;
+  percentage: number;
+  submittedAt: string;
+  answers?: Array<{
+    questionId: string;
+    optionId?: string | null;
+    answerText?: string | null;
+    isCorrect: boolean;
+    marksAwarded: number;
+  }>;
 }
 
 export interface Quiz {

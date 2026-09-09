@@ -71,6 +71,7 @@ export class OpenAiProvider implements AiProvider {
     quickGenerate?: boolean;
     mcqCount?: number;
     fillBlankCount?: number;
+    trueFalseCount?: number;
     shortAnswerCount?: number;
   }): Promise<AiCompletionResult<QuizOutput>> {
     const mix = resolveQuizMix(input);
@@ -99,16 +100,45 @@ export class OpenAiProvider implements AiProvider {
     subjectName?: string;
     gradeName?: string;
     styleInstruction?: string;
-  }): Promise<AiCompletionResult<{ title: string; description: string; answerKey?: string }>> {
+  }): Promise<
+    AiCompletionResult<{
+      title: string;
+      description: string;
+      answerKey?: string;
+      questions?: Array<{
+        type: string;
+        questionText: string;
+        marks: number;
+        correctAnswer?: string;
+        options?: Array<{ optionText: string; isCorrect: boolean }>;
+      }>;
+    }>
+  > {
     if (!this.apiKey) {
       // Mock path ONLY when OPENAI_API_KEY is missing.
       return {
         data: {
           title: `${input.subjectName ?? 'Subject'} practice`,
-          description: input.styleInstruction
-            ? `${input.styleInstruction}\n\nComplete exercises based on: ${input.lessonSummary.slice(0, 240)}`
-            : `Complete exercises based on: ${input.lessonSummary.slice(0, 120)}`,
-          answerKey: '1. Answers should match the main ideas in today’s lesson.',
+          description: '1. The main idea of today’s lesson is _____.\n2. Today’s lesson is important. True or False?',
+          answerKey: '1. concept\n2. TRUE',
+          questions: [
+            {
+              type: 'FILL_IN_THE_BLANK',
+              questionText: 'The main idea of today’s lesson is _____.',
+              marks: 1,
+              correctAnswer: 'concept',
+            },
+            {
+              type: 'TRUE_FALSE',
+              questionText: 'Today’s lesson is important.',
+              marks: 1,
+              correctAnswer: 'TRUE',
+              options: [
+                { optionText: 'TRUE', isCorrect: true },
+                { optionText: 'FALSE', isCorrect: false },
+              ],
+            },
+          ],
         },
         provider: 'mock',
         model: 'deterministic-mock',
@@ -134,6 +164,13 @@ export class OpenAiProvider implements AiProvider {
       title: string;
       description: string;
       answerKey?: string;
+      questions?: Array<{
+        type: string;
+        questionText: string;
+        marks: number;
+        correctAnswer?: string;
+        options?: Array<{ optionText: string; isCorrect: boolean }>;
+      }>;
     };
     return {
       data: parsed,

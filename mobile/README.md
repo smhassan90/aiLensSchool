@@ -1,13 +1,12 @@
-# SMS Parent Mobile App
+# HawkNexa Parent Mobile App
 
 Expo React Native (TypeScript) parent app for the School Management System backend.
 
 ## Stack
 
-- Expo SDK 52 · expo-router · TypeScript
+- Expo SDK ~57 · expo-router · TypeScript
 - TanStack Query · React Hook Form + Zod
 - expo-secure-store (tokens + selected child)
-- expo-notifications (device token registration stub on login)
 
 ## Setup
 
@@ -18,14 +17,21 @@ npm install
 npm start
 ```
 
-Ensure the backend is running at `http://localhost:3001/api/v1` (see `../backend/README.md`).
+Point `EXPO_PUBLIC_API_URL` at your API (local or hosted).
 
-### Seed login
+### Login
 
-| Email | Password | Children |
-|-------|----------|----------|
-| `parent1@example.com` | `Parent123!` | Ahmed (5-A), Ayesha (2-B), Ali (1-A) |
-| `parent2@example.com` | `Parent123!` | Ahmed (5-A) |
+Parents sign in with the **username the school issued**, usually:
+
+`schoolcode.phone` — e.g. `dtps.03001234567`
+
+Password is the temporary password from the school (change it on first login when required).
+
+Seeded demo schools (local seed only) may still use:
+
+| Username / email | Password | Notes |
+|------------------|----------|-------|
+| `abc.f.stu001` / `parent1@example.com` | `Parent123!` | Only on freshly seeded local DB |
 
 Login sends `expectedRole: PARENT` to `/auth/login`.
 
@@ -33,9 +39,9 @@ Login sends `expectedRole: PARENT` to `/auth/login`.
 
 | Variable | Default |
 |----------|---------|
-| `EXPO_PUBLIC_API_URL` | `http://localhost:3001/api/v1` |
+| `EXPO_PUBLIC_API_URL` | Hosted API in `app.config.ts`, or set in `.env` |
 
-For Android emulator, use `http://10.0.2.2:3001/api/v1`.
+For Android emulator against a PC API: `http://10.0.2.2:3001/api/v1`.
 
 ## Deep links
 
@@ -60,11 +66,7 @@ app/           Expo Router screens
 
 ### Child context
 
-Selected `studentId` is stored in secure storage and passed on every child-scoped API call (`homework`, `quizzes`, `attendance`, `results`). The backend verifies parent ownership — client selection is never trusted alone.
-
-### Lessons
-
-Parents call `GET /lessons?studentId=` — the backend verifies `StudentParent` ownership and only returns **CONFIRMED** lessons for the child's section.
+Selected `studentId` is stored in secure storage and passed on every child-scoped API call. The backend verifies parent ownership.
 
 ## Scripts
 
@@ -74,25 +76,3 @@ Parents call `GET /lessons?studentId=` — the backend verifies `StudentParent` 
 | `npm run android` | Open Android |
 | `npm run ios` | Open iOS simulator |
 | `npm run web` | Web preview |
-
-## Screens
-
-| Route | Purpose |
-|-------|---------|
-| `/` | Auth gate → login or home |
-| `/login` | Parent login (RHF + Zod) |
-| `/(tabs)/home` | Dashboard: lessons, homework, quizzes, events |
-| `/(tabs)/diary` | Attendance + homework timeline |
-| `/(tabs)/homework` | Homework list |
-| `/(tabs)/quizzes` | Published quizzes |
-| `/(tabs)/notifications` | Alerts with deep-link navigation |
-| `/child-selector` | Switch linked child |
-| `/lesson/[id]` | Lesson detail |
-| `/homework/[id]` | Homework detail |
-| `/quiz/[id]` | Quiz detail + result link |
-| `/quiz/[id]/attempt` | Child attempt status |
-| `/quiz/[id]/result` | Quiz result for selected child |
-| `/announcement/[id]` | Announcement detail |
-| `/event/[id]` | Event detail |
-| `/profile` | Account + sign out |
-| `/settings` | API URL info |

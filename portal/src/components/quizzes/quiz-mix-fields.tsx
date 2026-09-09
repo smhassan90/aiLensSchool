@@ -8,11 +8,11 @@ type QuizMixFieldsProps = {
   quickGenerate: boolean;
   mcqCount: number;
   fillBlankCount: number;
-  shortAnswerCount: number;
+  trueFalseCount: number;
   onQuickGenerateChange: (value: boolean) => void;
   onMcqChange: (value: number) => void;
   onFillBlankChange: (value: number) => void;
-  onShortAnswerChange: (value: number) => void;
+  onTrueFalseChange: (value: number) => void;
 };
 
 function CountField({
@@ -45,13 +45,13 @@ export function QuizMixFields({
   quickGenerate,
   mcqCount,
   fillBlankCount,
-  shortAnswerCount,
+  trueFalseCount,
   onQuickGenerateChange,
   onMcqChange,
   onFillBlankChange,
-  onShortAnswerChange,
+  onTrueFalseChange,
 }: QuizMixFieldsProps) {
-  const total = mcqCount + fillBlankCount + shortAnswerCount;
+  const total = mcqCount + fillBlankCount + trueFalseCount;
 
   return (
     <div className="space-y-3">
@@ -74,17 +74,17 @@ export function QuizMixFields({
       </div>
       {quickGenerate ? (
         <p className="text-sm text-muted-foreground">
-          AI will pick a mix of choose-the-best-answer, fill in the blanks, and simple text.
+          AI will pick a mix of choose-the-best-answer, fill in the blanks, and true/false — all auto-marked.
         </p>
       ) : (
         <>
           <div className="grid grid-cols-1 gap-3">
             <CountField id="mcqCount" label="Choose the best answer" value={mcqCount} onChange={onMcqChange} />
             <CountField id="fillBlankCount" label="Fill in the blanks" value={fillBlankCount} onChange={onFillBlankChange} />
-            <CountField id="shortAnswerCount" label="Simple text" value={shortAnswerCount} onChange={onShortAnswerChange} />
+            <CountField id="trueFalseCount" label="True / False" value={trueFalseCount} onChange={onTrueFalseChange} />
           </div>
           <p className="text-xs text-muted-foreground">
-            {total} question{total === 1 ? "" : "s"} total. Enter at least one.
+            {total} question{total === 1 ? "" : "s"} total. Enter at least one. Open-ended questions are not used.
           </p>
         </>
       )}
