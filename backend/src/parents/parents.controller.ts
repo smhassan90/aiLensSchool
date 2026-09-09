@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { IsOptional, IsString } from 'class-validator';
@@ -30,6 +30,12 @@ export class ParentsController {
   @Get()
   findAll(@Query() query: ParentQueryDto, @CurrentUser() user: AuthUser) {
     return this.parentsService.findAll(user, query);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @Post(':id/reset-password')
+  resetPassword(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.parentsService.resetPassword(id, user);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN)

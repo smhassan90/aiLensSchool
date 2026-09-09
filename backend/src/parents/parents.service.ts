@@ -1,15 +1,19 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
+import { generateParentPassword } from '../students/parent-accounts';
 
 @Injectable()
 export class ParentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantService,
+    private readonly audit: AuditService,
   ) {}
 
   async findAll(user: AuthUser, query: PaginationDto & { search?: string }) {
@@ -115,6 +119,53 @@ export class ParentsService {
       isPrimary: sp.isPrimary,
       student: sp.student,
     }));
+  }
+
+  async resetPassword(id: string, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const parent = await this.prisma.parentProfile.findFirst({
+      where: { id, schoolId },
+      select: {
+        id: true,
+        userId: true,
+        user: { select: { id: true, username: true, firstName: true, lastName: true } },
+      },
+    });
+    if (!parent) {
+      throw new NotFoundException({ code: 'PARENT_NOT_FOUND', message: 'Parent not found' });
+    }
+
+    const temporaryPassword = generateParentPassword();
+    const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: parent.userId },
+        data: {
+          passwordHash,
+          mustChangePassword: true,
+        },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId: parent.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'PARENT_PASSWORD_RESET',
+      entityType: 'ParentProfile',
+      entityId: parent.id,
+    });
+
+    return {
+      parentId: parent.id,
+      username: parent.user.username,
+      temporaryPassword,
+      mustChangePassword: true,
+    };
   }
 
   async getParentChildren(parentProfileId: string, user: AuthUser) {
