@@ -39,10 +39,11 @@ import { studentsService } from "@/services/students.service";
 import { feesService } from "@/services/fees.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
-import type { ClassSubject, TeacherRef } from "@/lib/types";
-import { teacherDisplayNameFromUser } from "@/lib/person-name";
+import { personFullName, teacherDisplayNameFromUser } from "@/lib/person-name";
 import { formatPkr, optionalMoney } from "@/lib/money";
 import { ClassFeeFields } from "@/components/academics/class-fee-fields";
+import { ClassFeeStatus } from "@/components/academics/class-fee-status";
+import { ClassTeachingBoard } from "@/components/academics/class-teaching-board";
 import { ArrowLeft, Plus, Users } from "lucide-react";
 
 const sectionSchema = z.object({
@@ -74,11 +75,6 @@ type SectionValues = z.infer<typeof sectionSchema>;
 type TeacherValues = z.infer<typeof teacherSchema>;
 type EnrollValues = z.infer<typeof enrollSchema>;
 
-function teacherName(teacher?: TeacherRef | null) {
-  if (!teacher) return "—";
-  return teacherDisplayNameFromUser(teacher.user, teacher.gender);
-}
-
 export default function ClassDetailPage() {
   const params = useParams<{ id: string }>();
   const classId = params.id;
@@ -103,6 +99,10 @@ export default function ClassDetailPage() {
     queryFn: () => academicsService.listYears({ limit: 20 }),
   });
   const subjects = useQuery({
+    queryKey: ["subjects", classId],
+    queryFn: () => academicsService.listSubjects({ gradeId: classId, limit: 100 }),
+  });
+  const schoolSubjects = useQuery({
     queryKey: ["subjects"],
     queryFn: () => academicsService.listSubjects({ limit: 100 }),
   });
@@ -124,7 +124,7 @@ export default function ClassDetailPage() {
   });
   const enrollments = useQuery({
     queryKey: ["enrollments", classId],
-    queryFn: () => academicsService.listEnrollments({ gradeId: classId, limit: 100 }),
+    queryFn: () => academicsService.listEnrollments({ gradeId: classId, status: "ACTIVE", limit: 100 }),
   });
   const assignments = useQuery({
     queryKey: ["class-subjects", classId],
@@ -141,6 +141,13 @@ export default function ClassDetailPage() {
     const name = item.name.toLowerCase();
     return !name.endsWith(" monthly tuition") && !name.endsWith(" admission");
   });
+  const classSubjectIds = new Set((subjects.data?.items ?? []).map((item) => item.id));
+  const otherSchoolSubjects = (schoolSubjects.data?.items ?? []).filter((item) => !classSubjectIds.has(item.id));
+  const teachingRows =
+    sections.some((section) => (section.classSubjects ?? []).length)
+      ? sections.flatMap((section) => section.classSubjects ?? [])
+      : (assignments.data?.items ?? []);
+  const teachingCount = new Set(teachingRows.map((item) => item.subjectId)).size;
 
   const sectionForm = useForm<SectionValues>({
     resolver: zodResolver(sectionSchema),
@@ -174,6 +181,7 @@ export default function ClassDetailPage() {
     queryClient.invalidateQueries({ queryKey: ["sections"] });
     queryClient.invalidateQueries({ queryKey: ["enrollments", classId] });
     queryClient.invalidateQueries({ queryKey: ["class-subjects", classId] });
+    queryClient.invalidateQueries({ queryKey: ["class-fee-status", classId] });
   };
 
   const addSection = useMutation({
@@ -378,15 +386,18 @@ export default function ClassDetailPage() {
         <TabsList>
           <TabsTrigger value="fees">Fees</TabsTrigger>
           <TabsTrigger value="sections">Sections ({sections.length})</TabsTrigger>
-          <TabsTrigger value="teachers">Teachers ({assignments.data?.items.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="teachers">Subjects & teachers ({teachingCount})</TabsTrigger>
           <TabsTrigger value="students">Students ({enrollments.data?.items.length ?? 0})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="fees">
-          <div className="space-y-6 rounded-lg border bg-card p-4">
+          <div className="space-y-8">
+            <ClassFeeStatus gradeId={classId} sections={sections} />
+
+            <div className="space-y-6 rounded-lg border bg-card p-4">
             <div className="space-y-4">
               <div>
-                <h2 className="font-medium">This class’s fees</h2>
+                <h2 className="font-medium">Fee setup for this class</h2>
                 <p className="text-sm text-muted-foreground">
                   Put the class in a school section, then set monthly tuition and admission.
                 </p>
@@ -455,6 +466,7 @@ export default function ClassDetailPage() {
                 {addExtraFee.isPending ? "Adding…" : "Add charge"}
               </Button>
             </div>
+            </div>
           </div>
         </TabsContent>
 
@@ -492,7 +504,27 @@ export default function ClassDetailPage() {
                       <TableCell>{section.branch?.name ?? "—"}</TableCell>
                       <TableCell>{section.capacity ?? "—"}</TableCell>
                       <TableCell>{section._count?.enrollments ?? 0}</TableCell>
-                      <TableCell>{section._count?.classSubjects ?? section.classSubjects?.length ?? 0}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const rows = (section.classSubjects ?? []).length
+                            ? section.classSubjects ?? []
+                            : (assignments.data?.items ?? []).filter((item) => item.sectionId === section.id);
+                          const names = [
+                            ...new Set(
+                              rows
+                                .map((item) => item.subject?.name)
+                                .filter((name): name is string => Boolean(name)),
+                            ),
+                          ];
+                          if (!names.length) return "—";
+                          return (
+                            <div>
+                              <span className="font-medium">{names.length}</span>
+                              <p className="max-w-[280px] text-xs text-muted-foreground">{names.join(" · ")}</p>
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell>
                         <select
                           className="h-9 max-w-[180px] rounded-md border bg-background px-2 text-sm"
@@ -521,48 +553,11 @@ export default function ClassDetailPage() {
         </TabsContent>
 
         <TabsContent value="teachers">
-          <div className="mb-4 flex justify-end">
-            <Button onClick={openTeacherDialog} disabled={!sections.length}>
-              <Plus className="h-4 w-4" />
-              Assign teacher
-            </Button>
-          </div>
-          {!assignments.data?.items.length ? (
-            <EmptyState
-              title="No teachers assigned"
-              description="Assign a subject teacher to a section. You can also add an assistant teacher."
-              action={
-                <Button onClick={openTeacherDialog} disabled={!sections.length}>
-                  Assign teacher
-                </Button>
-              }
-            />
-          ) : (
-            <div className="rounded-lg border bg-card">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Section</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Teacher</TableHead>
-                    <TableHead>Assistant</TableHead>
-                    <TableHead>Year</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {assignments.data.items.map((item: ClassSubject) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.section?.name ?? "—"}</TableCell>
-                      <TableCell>{item.subject?.name ?? "—"}</TableCell>
-                      <TableCell>{teacherName(item.teacher)}</TableCell>
-                      <TableCell>{teacherName(item.assistantTeacher)}</TableCell>
-                      <TableCell>{item.academicYear?.name ?? "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          <ClassTeachingBoard
+            sections={sections}
+            assignments={assignments.data?.items}
+            onAssign={openTeacherDialog}
+          />
         </TabsContent>
 
         <TabsContent value="students">
@@ -598,7 +593,9 @@ export default function ClassDetailPage() {
                   {enrollments.data.items.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">
-                        {item.student ? `${item.student.firstName} ${item.student.lastName}` : "—"}
+                        {item.student
+                          ? personFullName(item.student.firstName, item.student.lastName)
+                          : "—"}
                       </TableCell>
                       <TableCell>{item.student?.studentCode ?? "—"}</TableCell>
                       <TableCell>{item.section?.name ?? "—"}</TableCell>
@@ -714,11 +711,20 @@ export default function ClassDetailPage() {
               <Label htmlFor="subjectId">Subject</Label>
               <Select id="subjectId" {...teacherForm.register("subjectId")}>
                 <option value="">Select subject</option>
-                {subjects.data?.items.map((subject) => (
+                {(subjects.data?.items ?? []).map((subject) => (
                   <option key={subject.id} value={subject.id}>
-                    {subject.name} ({subject.code})
+                    {subject.name}{subject.code ? ` (${subject.code})` : ""}
                   </option>
                 ))}
+                {otherSchoolSubjects.length ? (
+                  <optgroup label="Other school subjects">
+                    {otherSchoolSubjects.map((subject) => (
+                      <option key={subject.id} value={subject.id}>
+                        {subject.name}{subject.code ? ` (${subject.code})` : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
               </Select>
               {teacherForm.formState.errors.subjectId && (
                 <p className="text-sm text-destructive">{teacherForm.formState.errors.subjectId.message}</p>
@@ -795,7 +801,7 @@ export default function ClassDetailPage() {
                 <option value="">Select student</option>
                 {availableStudents.map((student) => (
                   <option key={student.id} value={student.id}>
-                    {student.firstName} {student.lastName} ({student.studentCode})
+                    {personFullName(student.firstName, student.lastName)} ({student.studentCode})
                   </option>
                 ))}
               </Select>

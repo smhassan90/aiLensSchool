@@ -176,6 +176,7 @@ export const academicsService = {
     sectionId?: string;
     academicYearId?: string;
     gradeId?: string;
+    status?: string;
   }) {
     return apiClient<Paginated<Enrollment>>(`/academics/enrollments${buildQuery(params ?? {})}`);
   },

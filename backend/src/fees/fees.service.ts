@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, StudentFeeStatus } from '@prisma/client';
+import { EnrollmentStatus, Prisma, StudentFeeStatus } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
@@ -519,6 +519,123 @@ export class FeesService {
     });
 
     return { assigned: created.length, items: created };
+  }
+
+  async classMonthStatus(
+    user: AuthUser,
+    query: { gradeId?: string; sectionId?: string; month?: string },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    if (!query.gradeId && !query.sectionId) {
+      throw new BadRequestException({
+        code: 'CLASS_REQUIRED',
+        message: 'gradeId or sectionId is required',
+      });
+    }
+
+    const sections = await this.prisma.section.findMany({
+      where: {
+        schoolId,
+        ...(query.sectionId ? { id: query.sectionId } : { gradeId: query.gradeId }),
+      },
+      select: { id: true, name: true },
+    });
+    if (!sections.length) {
+      throw new NotFoundException({
+        code: 'SECTION_NOT_FOUND',
+        message: 'Class section not found',
+      });
+    }
+
+    const sectionIds = sections.map((section) => section.id);
+    const year = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      orderBy: { startDate: 'desc' },
+      select: { id: true },
+    });
+    const range = monthRange(query.month);
+
+    const enrollments = await this.prisma.studentEnrollment.findMany({
+      where: {
+        sectionId: { in: sectionIds },
+        status: EnrollmentStatus.ACTIVE,
+        ...(year ? { academicYearId: year.id } : {}),
+      },
+      select: {
+        studentId: true,
+        section: { select: { id: true, name: true } },
+        student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
+      },
+      orderBy: { student: { firstName: 'asc' } },
+    });
+
+    const studentIds = enrollments.map((row) => row.studentId);
+    const fees = studentIds.length
+      ? await this.prisma.studentFee.findMany({
+          where: {
+            schoolId,
+            studentId: { in: studentIds },
+            OR: [{ dueDate: { gte: range.start, lt: range.end } }, { periodLabel: range.label }],
+          },
+          select: {
+            studentId: true,
+            amount: true,
+            paidAmount: true,
+            discountAmount: true,
+            status: true,
+          },
+        })
+      : [];
+
+    const feesByStudent = new Map<string, typeof fees>();
+    for (const fee of fees) {
+      const list = feesByStudent.get(fee.studentId) ?? [];
+      list.push(fee);
+      feesByStudent.set(fee.studentId, list);
+    }
+
+    const items = enrollments.map((row) => {
+      const studentFees = feesByStudent.get(row.studentId) ?? [];
+      const billed = round2(studentFees.reduce((sum, fee) => sum + money(fee.amount), 0));
+      const paid = round2(studentFees.reduce((sum, fee) => sum + money(fee.paidAmount), 0));
+      const remaining = round2(
+        studentFees.reduce((sum, fee) => {
+          if (fee.status === StudentFeeStatus.WAIVED) return sum;
+          return sum + outstandingOf(fee);
+        }, 0),
+      );
+      let status: 'PAID' | 'PARTIAL' | 'DUE' | 'UNBILLED' = 'UNBILLED';
+      if (studentFees.length) {
+        if (remaining <= 0.009) status = 'PAID';
+        else if (paid > 0.009) status = 'PARTIAL';
+        else status = 'DUE';
+      }
+      return {
+        studentId: row.student.id,
+        firstName: row.student.firstName,
+        lastName: row.student.lastName,
+        studentCode: row.student.studentCode,
+        sectionId: row.section.id,
+        sectionName: row.section.name,
+        billed,
+        paid,
+        remaining,
+        status,
+      };
+    });
+
+    return {
+      monthLabel: range.label,
+      students: items.length,
+      paidStudents: items.filter((item) => item.status === 'PAID').length,
+      dueStudents: items.filter((item) => item.status === 'DUE').length,
+      partialStudents: items.filter((item) => item.status === 'PARTIAL').length,
+      unbilledStudents: items.filter((item) => item.status === 'UNBILLED').length,
+      billedAmount: round2(items.reduce((sum, item) => sum + item.billed, 0)),
+      receivedAmount: round2(items.reduce((sum, item) => sum + item.paid, 0)),
+      remainingAmount: round2(items.reduce((sum, item) => sum + item.remaining, 0)),
+      items,
+    };
   }
 
   async listStudentFees(

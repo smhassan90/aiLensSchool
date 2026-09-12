@@ -204,6 +204,57 @@ export class AcademicsService {
     };
   }
 
+  private async currentAcademicYear(schoolId: string) {
+    return this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      orderBy: { startDate: 'desc' },
+      select: { id: true, name: true },
+    });
+  }
+
+  private sectionClassSelect(yearId?: string | null): Prisma.SectionSelect {
+    const yearWhere = yearId ? { academicYearId: yearId } : {};
+    const teacherSelect = {
+      select: {
+        id: true,
+        gender: true,
+        user: { select: { firstName: true, lastName: true } },
+      },
+    };
+    return {
+      id: true,
+      name: true,
+      gradeId: true,
+      branchId: true,
+      capacity: true,
+      classTeacherId: true,
+      branch: { select: { id: true, name: true } },
+      classTeacher: teacherSelect,
+      _count: {
+        select: {
+          enrollments: {
+            where: { status: EnrollmentStatus.ACTIVE, ...yearWhere },
+          },
+          classSubjects: { where: yearWhere },
+        },
+      },
+      classSubjects: {
+        where: yearWhere,
+        orderBy: { subject: { name: 'asc' } },
+        select: {
+          id: true,
+          subjectId: true,
+          teacherId: true,
+          assistantTeacherId: true,
+          academicYearId: true,
+          subject: { select: { id: true, name: true, code: true } },
+          teacher: teacherSelect,
+          assistantTeacher: teacherSelect,
+        },
+      },
+    };
+  }
+
   async createGrade(dto: CreateGradeDto, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
     if (dto.stageId) {
@@ -327,11 +378,22 @@ export class AcademicsService {
 
   async getGrade(id: string, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
+    const year = await this.currentAcademicYear(schoolId);
     const grade = await this.prisma.grade.findFirst({
       where: { id, schoolId },
       include: {
         stage: { select: { id: true, name: true } },
-        _count: { select: { sections: true, enrollments: true } },
+        _count: {
+          select: {
+            sections: true,
+            enrollments: {
+              where: {
+                status: EnrollmentStatus.ACTIVE,
+                ...(year ? { academicYearId: year.id } : {}),
+              },
+            },
+          },
+        },
         feeStructures: {
           where: { active: true },
           orderBy: [{ kind: 'asc' }, { name: 'asc' }],
@@ -346,17 +408,7 @@ export class AcademicsService {
         },
         sections: {
           orderBy: { name: 'asc' },
-          select: {
-            id: true,
-            name: true,
-            gradeId: true,
-            branchId: true,
-            capacity: true,
-            classTeacherId: true,
-            branch: { select: { id: true, name: true } },
-            classTeacher: { select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } } },
-            _count: { select: { enrollments: true, classSubjects: true } },
-          },
+          select: this.sectionClassSelect(year?.id),
         },
       },
     });
@@ -479,6 +531,7 @@ export class AcademicsService {
     query: PaginationDto & { branchId?: string; gradeId?: string },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
+    const year = await this.currentAcademicYear(schoolId);
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const where: Prisma.SectionWhereInput = {
@@ -494,23 +547,8 @@ export class AcademicsService {
           skip,
           take,
           select: {
-            id: true,
-            name: true,
-            gradeId: true,
-            branchId: true,
-            capacity: true,
-            classTeacherId: true,
+            ...this.sectionClassSelect(year?.id),
             grade: { select: { id: true, name: true, level: true } },
-            branch: { select: { id: true, name: true } },
-            classTeacher: { select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } } },
-            _count: { select: { enrollments: true, classSubjects: true } },
-            classSubjects: {
-              select: {
-                subjectId: true,
-                academicYearId: true,
-                subject: { select: { id: true, name: true } },
-              },
-            },
           },
         }),
       () => this.prisma.section.count({ where }),
@@ -522,33 +560,12 @@ export class AcademicsService {
 
   async getSection(id: string, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
+    const year = await this.currentAcademicYear(schoolId);
     const section = await this.prisma.section.findFirst({
       where: { id, schoolId },
       select: {
-        id: true,
-        name: true,
-        gradeId: true,
-        branchId: true,
-        capacity: true,
-        classTeacherId: true,
+        ...this.sectionClassSelect(year?.id),
         grade: { select: { id: true, name: true, level: true, tuitionFee: true } },
-        branch: { select: { id: true, name: true } },
-        classTeacher: {
-          select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } },
-        },
-        _count: { select: { enrollments: true, classSubjects: true } },
-        classSubjects: {
-          select: {
-            id: true,
-            subjectId: true,
-            teacherId: true,
-            academicYearId: true,
-            subject: { select: { id: true, name: true } },
-            teacher: {
-              select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } },
-            },
-          },
-        },
       },
     });
     if (!section) {
@@ -596,9 +613,24 @@ export class AcademicsService {
     const schoolId = this.tenant.requireSchoolId(user);
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+    const year = query.gradeId ? await this.currentAcademicYear(schoolId) : null;
     const where: Prisma.SubjectWhereInput = {
       schoolId,
-      ...(query.gradeId ? { gradeId: query.gradeId } : {}),
+      ...(query.gradeId
+        ? {
+            OR: [
+              { gradeId: query.gradeId },
+              {
+                classSubjects: {
+                  some: {
+                    section: { gradeId: query.gradeId },
+                    ...(year ? { academicYearId: year.id } : {}),
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
     };
     const [items, total] = await pageQuery(
       (skip, take) =>
@@ -703,16 +735,25 @@ export class AcademicsService {
 
   async listEnrollments(
     user: AuthUser,
-    query: PaginationDto & { sectionId?: string; academicYearId?: string; gradeId?: string },
+    query: PaginationDto & {
+      sectionId?: string;
+      academicYearId?: string;
+      gradeId?: string;
+      status?: EnrollmentStatus;
+    },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+    const yearId =
+      query.academicYearId ??
+      (query.gradeId || query.sectionId ? (await this.currentAcademicYear(schoolId))?.id : undefined);
     const where: Prisma.StudentEnrollmentWhereInput = {
       student: { schoolId },
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
-      ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+      ...(yearId ? { academicYearId: yearId } : {}),
       ...(query.gradeId ? { gradeId: query.gradeId } : {}),
+      ...(query.status ? { status: query.status } : {}),
     };
     const [items, total] = await pageQuery(
       (skip, take) =>
@@ -825,10 +866,11 @@ export class AcademicsService {
     const schoolId = this.tenant.requireSchoolId(user);
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+    const yearId = query.academicYearId ?? (await this.currentAcademicYear(schoolId))?.id;
     const where: Prisma.ClassSubjectWhereInput = {
       section: { schoolId, ...(query.gradeId ? { gradeId: query.gradeId } : {}) },
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
-      ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+      ...(yearId ? { academicYearId: yearId } : {}),
     };
     const [items, total] = await pageQuery(
       (skip, take) =>

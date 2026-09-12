@@ -432,6 +432,34 @@ export interface StudentFee {
   section?: { id: string; name: string; grade?: { name: string } | null };
 }
 
+export type ClassFeeStudentStatus = "PAID" | "PARTIAL" | "DUE" | "UNBILLED";
+
+export interface ClassFeeStudent {
+  studentId: string;
+  firstName: string;
+  lastName: string;
+  studentCode: string;
+  sectionId: string;
+  sectionName: string;
+  billed: number;
+  paid: number;
+  remaining: number;
+  status: ClassFeeStudentStatus;
+}
+
+export interface ClassFeeStatus {
+  monthLabel: string;
+  students: number;
+  paidStudents: number;
+  dueStudents: number;
+  partialStudents: number;
+  unbilledStudents: number;
+  billedAmount: number;
+  receivedAmount: number;
+  remainingAmount: number;
+  items: ClassFeeStudent[];
+}
+
 export interface FeeCollection {
   id: string;
   amount: number;

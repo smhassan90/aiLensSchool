@@ -63,6 +63,20 @@ class FeeCollectionsQueryDto extends PaginationDto {
   month?: string;
 }
 
+class ClassFeeStatusQueryDto {
+  @IsOptional()
+  @IsString()
+  gradeId?: string;
+
+  @IsOptional()
+  @IsString()
+  sectionId?: string;
+
+  @IsOptional()
+  @IsString()
+  month?: string;
+}
+
 @ApiTags('Fees')
 @ApiBearerAuth()
 @Controller({ path: 'fees', version: '1' })
@@ -97,6 +111,12 @@ export class FeesController {
   @Get('collections')
   listCollections(@Query() query: FeeCollectionsQueryDto, @CurrentUser() user: AuthUser) {
     return this.feesService.listCollections(user, query);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @Get('class-status')
+  classMonthStatus(@Query() query: ClassFeeStatusQueryDto, @CurrentUser() user: AuthUser) {
+    return this.feesService.classMonthStatus(user, query);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER, RoleName.PARENT)

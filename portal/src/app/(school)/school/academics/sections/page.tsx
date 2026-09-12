@@ -118,7 +118,24 @@ export default function SectionsPage() {
                   <TableCell>{section.branch?.name ?? "—"}</TableCell>
                   <TableCell>{section._count?.enrollments ?? 0}</TableCell>
                   <TableCell>
-                    {section._count?.classSubjects ?? section.classSubjects?.length ?? 0}
+                    {(() => {
+                      const names = [
+                        ...new Set(
+                          (section.classSubjects ?? [])
+                            .map((item) => item.subject?.name)
+                            .filter((name): name is string => Boolean(name)),
+                        ),
+                      ];
+                      if (!names.length) {
+                        return section._count?.classSubjects ?? 0;
+                      }
+                      return (
+                        <div>
+                          <span className="font-medium">{names.length}</span>
+                          <p className="max-w-[240px] text-xs text-muted-foreground">{names.join(" · ")}</p>
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
                     <Label className="sr-only" htmlFor={`class-teacher-${section.id}`}>

@@ -1,6 +1,15 @@
 import { apiClient, buildQuery } from "@/lib/api-client";
 import { currentMonthLabel, feeBelongsToThisMonth, feeIsStillDue } from "@/lib/fees-month";
-import type { FeeAccount, FeeCollection, FeeLookupItem, FeeReceipt, FeeStructure, Paginated, StudentFee } from "@/lib/types";
+import type {
+  ClassFeeStatus,
+  FeeAccount,
+  FeeCollection,
+  FeeLookupItem,
+  FeeReceipt,
+  FeeStructure,
+  Paginated,
+  StudentFee,
+} from "@/lib/types";
 
 export const feesService = {
   listStructures() {
@@ -97,6 +106,9 @@ export const feesService = {
         monthLabel: currentMonthLabel(),
       };
     }
+  },
+  classMonthStatus(params: { gradeId?: string; sectionId?: string; month?: string }) {
+    return apiClient<ClassFeeStatus>(`/fees/class-status${buildQuery(params)}`);
   },
   lookup(q: string) {
     return apiClient<{ items: FeeLookupItem[] }>(`/fees/lookup${buildQuery({ q })}`);

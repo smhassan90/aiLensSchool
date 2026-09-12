@@ -33,6 +33,7 @@ describe('FeesService', () => {
       schoolStage: { findFirst: jest.fn() },
       grade: { findMany: jest.fn(), update: jest.fn() },
       studentEnrollment: { findMany: jest.fn() },
+      section: { findMany: jest.fn() },
       student: { findMany: jest.fn(), findFirst: jest.fn() },
       school: { findUnique: jest.fn() },
       studentFee: {
@@ -232,5 +233,41 @@ describe('FeesService', () => {
         admin,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('summarises this month’s paid and due students for a class', async () => {
+    prisma.section.findMany.mockResolvedValue([{ id: 'sec-1', name: 'A' }]);
+    prisma.academicYear.findFirst.mockResolvedValue({ id: 'year-1' });
+    prisma.studentEnrollment.findMany.mockResolvedValue([
+      {
+        studentId: 'st-paid',
+        section: { id: 'sec-1', name: 'A' },
+        student: { id: 'st-paid', firstName: 'Ali', lastName: 'Khan', studentCode: 'S1' },
+      },
+      {
+        studentId: 'st-due',
+        section: { id: 'sec-1', name: 'A' },
+        student: { id: 'st-due', firstName: 'Sara', lastName: 'Ahmed', studentCode: 'S2' },
+      },
+      {
+        studentId: 'st-partial',
+        section: { id: 'sec-1', name: 'A' },
+        student: { id: 'st-partial', firstName: 'Omar', lastName: 'Raza', studentCode: 'S3' },
+      },
+    ]);
+    prisma.studentFee.findMany.mockResolvedValue([
+      { studentId: 'st-paid', amount: 5000, paidAmount: 5000, discountAmount: 0, status: StudentFeeStatus.PAID },
+      { studentId: 'st-due', amount: 5000, paidAmount: 0, discountAmount: 0, status: StudentFeeStatus.DUE },
+      { studentId: 'st-partial', amount: 5000, paidAmount: 2000, discountAmount: 0, status: StudentFeeStatus.PARTIAL },
+    ]);
+
+    const result = await service.classMonthStatus(admin, { gradeId: 'grade-1' });
+
+    expect(result.students).toBe(3);
+    expect(result.paidStudents).toBe(1);
+    expect(result.dueStudents).toBe(1);
+    expect(result.partialStudents).toBe(1);
+    expect(result.receivedAmount).toBe(7000);
+    expect(result.remainingAmount).toBe(8000);
   });
 });

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { RoleName } from '@prisma/client';
-import { IsOptional, IsString } from 'class-validator';
+import { EnrollmentStatus, RoleName } from '@prisma/client';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { AcademicsService } from './academics.service';
 import {
   AssignClassSubjectDto,
@@ -48,6 +48,10 @@ class EnrollmentQueryDto extends PaginationDto {
   @IsOptional()
   @IsString()
   gradeId?: string;
+
+  @IsOptional()
+  @IsEnum(EnrollmentStatus)
+  status?: EnrollmentStatus;
 }
 
 class ClassSubjectQueryDto extends PaginationDto {
