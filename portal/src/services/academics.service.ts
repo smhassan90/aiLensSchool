@@ -131,6 +131,17 @@ export const academicsService = {
     return apiClient<Paginated<Section>>(`/academics/sections${buildQuery(params ?? {})}`);
   },
 
+  async getSection(id: string) {
+    try {
+      return await apiClient<Section>(`/academics/sections/${id}`);
+    } catch {
+      const listed = await academicsService.listSections({ limit: 100 });
+      const found = listed.items.find((section) => section.id === id);
+      if (!found) throw new Error("Class section not found");
+      return found;
+    }
+  },
+
   createSection(payload: CreateSectionPayload) {
     return apiClient<Section>("/academics/sections", {
       method: "POST",

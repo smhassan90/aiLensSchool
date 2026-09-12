@@ -14,6 +14,7 @@ import { insightsService } from "@/services/insights.service";
 import { feesService } from "@/services/fees.service";
 import { studentsService } from "@/services/students.service";
 import { formatDate } from "@/lib/utils";
+import { personFullName } from "@/lib/person-name";
 import { BarChart } from "@/components/charts/simple-charts";
 import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/providers/toast-provider";
@@ -85,8 +86,12 @@ export default function Student360Page() {
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title={`${student.firstName} ${student.lastName}`}
-        description={`${student.studentCode} · ${student.grade?.name ?? "Unassigned"} ${student.section?.name ?? ""} · ${student.academicYear?.name ?? ""}`}
+        title={personFullName(student.firstName, student.lastName)}
+        description={`${student.studentCode}${
+          student.admissionNumber && student.admissionNumber !== student.studentCode
+            ? ` · Adm. ${student.admissionNumber}`
+            : ""
+        } · ${student.grade?.name ?? "Unassigned"} ${student.section?.name ?? ""} · ${student.academicYear?.name ?? ""}`}
         actions={
           <Link href="/school/students">
             <Button variant="outline"><ArrowLeft className="h-4 w-4" />Back</Button>
@@ -125,7 +130,7 @@ export default function Student360Page() {
             <CardContent className="space-y-2 text-sm">
               {(student.parents ?? []).map((p, i) => (
                 <p key={i}>
-                  {p.parent.user.firstName} {p.parent.user.lastName} · {p.relationship}
+                  {personFullName(p.parent.user.firstName, p.parent.user.lastName)} · {p.relationship}
                   {p.parent.user.username ? ` · login ${p.parent.user.username}` : ""}
                   {p.parent.user.phone ? ` · ${p.parent.user.phone}` : ""}
                 </p>

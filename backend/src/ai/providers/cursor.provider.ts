@@ -22,14 +22,20 @@ export class CursorProvider implements AiProvider {
   private readonly logger = new Logger(CursorProvider.name);
   private readonly apiKey: string | undefined;
   private readonly model: string;
+  private readonly jsonModel: string;
   private readonly visionModel: string;
+  private readonly jsonTimeoutMs: number;
 
   constructor(private readonly config: ConfigService) {
     this.apiKey = readEnv('CURSOR_API_KEY') || this.config.get<string>('CURSOR_API_KEY')?.trim() || undefined;
     this.model = this.config.get<string>('CURSOR_MODEL') ?? 'auto';
+    this.jsonModel =
+      this.config.get<string>('CURSOR_JSON_MODEL')?.trim() ||
+      (this.model === 'auto' ? 'composer-2.5-fast' : this.model);
     this.visionModel =
       this.config.get<string>('CURSOR_VISION_MODEL')?.trim() ||
       (this.model === 'auto' ? 'composer-2.5' : this.model);
+    this.jsonTimeoutMs = isServerlessRuntime() ? 28_000 : 40_000;
   }
 
   async processLesson(input: {
@@ -98,9 +104,13 @@ export class CursorProvider implements AiProvider {
       return this.mockQuiz(input.subjectName, mix);
     }
 
-    const content = await this.complete(
-      QUIZ_GENERATION_PROMPT,
-      `Subject: ${input.subjectName ?? 'General'}\n${quizMixInstructions(mix)}\n\nTopics:\n${input.lessonSummaries.join('\n---\n')}`,
+    const content = await this.withTimeout(
+      this.complete(
+        QUIZ_GENERATION_PROMPT,
+        `Subject: ${input.subjectName ?? 'General'}\n${quizMixInstructions(mix)}\n\nTopics:\n${input.lessonSummaries.join('\n---\n')}`,
+      ),
+      this.jsonTimeoutMs,
+      'Quiz generation',
     );
     try {
       const parsed = QuizOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
@@ -163,17 +173,23 @@ export class CursorProvider implements AiProvider {
       };
     }
 
-    const content = await this.complete(
-      HOMEWORK_GENERATION_PROMPT,
-      [
-        `Subject: ${input.subjectName ?? 'General'}`,
-        input.gradeName ? `Grade: ${input.gradeName}` : '',
-        input.styleInstruction ? `Teacher style instruction: ${input.styleInstruction}` : '',
-        '',
-        input.lessonSummary,
-      ]
-        .filter((line) => line !== '')
-        .join('\n'),
+    const content = await this.withTimeout(
+      this.complete(
+        HOMEWORK_GENERATION_PROMPT,
+        [
+          `Subject: ${input.subjectName ?? 'General'}`,
+          input.gradeName ? `Grade: ${input.gradeName}` : '',
+          input.styleInstruction ? `Teacher style instruction: ${input.styleInstruction}` : '',
+          '',
+          input.lessonSummary.length > 2500
+            ? `${input.lessonSummary.slice(0, 2500).trim()}…`
+            : input.lessonSummary,
+        ]
+          .filter((line) => line !== '')
+          .join('\n'),
+      ),
+      this.jsonTimeoutMs,
+      'Homework generation',
     );
     const parsed = JSON.parse(this.extractJson(content.text)) as {
       title: string;
@@ -210,7 +226,11 @@ export class CursorProvider implements AiProvider {
       };
     }
 
-    const content = await this.complete(STUDENT_ANALYSIS_PROMPT, input.resultsSummary);
+    const content = await this.withTimeout(
+      this.complete(STUDENT_ANALYSIS_PROMPT, input.resultsSummary),
+      this.jsonTimeoutMs,
+      'Student analysis',
+    );
     const parsed = JSON.parse(this.extractJson(content.text)) as {
       summary: string;
       strengths: string[];
@@ -250,7 +270,11 @@ export class CursorProvider implements AiProvider {
       return { data: fallback, provider: 'mock', model: 'deterministic-mock', inputTokens: 0, outputTokens: 0, estimatedCost: 0 };
     }
     try {
-      const content = await this.complete(TEACHER_COACH_PROMPT, input.facts);
+      const content = await this.withTimeout(
+        this.complete(TEACHER_COACH_PROMPT, input.facts),
+        this.jsonTimeoutMs,
+        'Teacher coach',
+      );
       const parsed = JSON.parse(this.extractJson(content.text)) as typeof fallback;
       return { data: parsed, ...content.meta };
     } catch {
@@ -258,9 +282,10 @@ export class CursorProvider implements AiProvider {
     }
   }
 
-  private prepareLocalRuntime() {
-    const cwd = join(tmpdir(), 'ailens-cursor-cwd');
-    const storeDir = join(tmpdir(), 'ailens-cursor-store');
+  private prepareLocalRuntime(suffix = 'main') {
+    const id = `${suffix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const cwd = join(tmpdir(), 'ailens-cursor-cwd', id);
+    const storeDir = join(tmpdir(), 'ailens-cursor-store', id);
     mkdirSync(cwd, { recursive: true });
     mkdirSync(storeDir, { recursive: true });
     if (isServerlessRuntime()) {
@@ -274,28 +299,32 @@ export class CursorProvider implements AiProvider {
 
   private async completeWithImages(system: string, user: string, images: LessonImageInput[]) {
     const pages = images.slice(0, 3);
+    const shrunk = await Promise.all(pages.map((page) => this.shrinkLessonImage(page)));
+    this.logger.log(`Cursor vision ${shrunk.length} page(s) in parallel`);
+    const pageTexts = await Promise.all(
+      shrunk.map((page, index) =>
+        this.withTimeout(
+          this.transcribeSinglePage(system, user, page, index + 1, shrunk.length),
+          45_000,
+          `Lesson page ${index + 1}`,
+        ),
+      ),
+    );
+
     const summaries: string[] = [];
     let chapterName: string | undefined;
     let topicName: string | undefined;
     const concepts: string[] = [];
 
-    for (let index = 0; index < pages.length; index++) {
-      const page = await this.shrinkLessonImage(pages[index]);
-      this.logger.log(
-        `Cursor vision page ${index + 1}/${pages.length} (${Math.round(page.buffer.length / 1024)}KB)`,
-      );
-      const pageText = await this.withTimeout(
-        this.transcribeSinglePage(system, user, page, index + 1, pages.length),
-        75_000,
-        `Lesson page ${index + 1}`,
-      );
+    for (let index = 0; index < pageTexts.length; index++) {
+      const pageText = pageTexts[index];
       try {
         const parsed = LessonOutputSchema.parse(JSON.parse(this.extractJson(pageText)));
         if (!chapterName && parsed.chapterName) chapterName = parsed.chapterName;
         if (!topicName && parsed.topicName) topicName = parsed.topicName;
         if (parsed.summary?.trim()) {
           summaries.push(
-            pages.length > 1 ? `Page ${index + 1}\n${parsed.summary.trim()}` : parsed.summary.trim(),
+            shrunk.length > 1 ? `Page ${index + 1}\n${parsed.summary.trim()}` : parsed.summary.trim(),
           );
         }
         for (const concept of parsed.concepts ?? []) {
@@ -304,7 +333,7 @@ export class CursorProvider implements AiProvider {
       } catch {
         const raw = pageText.trim();
         if (raw) {
-          summaries.push(pages.length > 1 ? `Page ${index + 1}\n${raw}` : raw);
+          summaries.push(shrunk.length > 1 ? `Page ${index + 1}\n${raw}` : raw);
         }
       }
     }
@@ -341,7 +370,7 @@ export class CursorProvider implements AiProvider {
   ) {
     const { writeFile, unlink } = await import('fs/promises');
     const { Agent, JsonlLocalAgentStore } = await import('@cursor/sdk');
-    const runtime = this.prepareLocalRuntime();
+    const runtime = this.prepareLocalRuntime(`page-${pageNum}`);
     const fileName = `page-${pageNum}.jpg`;
     const filePath = join(runtime.cwd, fileName);
     await writeFile(filePath, image.buffer);
@@ -397,8 +426,8 @@ export class CursorProvider implements AiProvider {
         : (sharpModule as unknown as (i: Buffer) => import('sharp').Sharp);
       const buffer = await sharpFn(image.buffer)
         .rotate()
-        .resize({ width: 1100, height: 1100, fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 62, mozjpeg: true })
+        .resize({ width: 960, height: 960, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 55, mozjpeg: true })
         .toBuffer();
       return {
         buffer,
@@ -415,29 +444,33 @@ export class CursorProvider implements AiProvider {
 
   private async complete(system: string, user: string) {
     const { Agent, JsonlLocalAgentStore } = await import('@cursor/sdk');
-    const runtime = this.prepareLocalRuntime();
-    const result = await Agent.prompt(
-      `${system}\n\n${user}\n\nReturn ONLY valid JSON. Do not edit files or run tools.`,
-      {
-        apiKey: this.apiKey,
-        model: { id: this.model },
-        local: {
-          cwd: runtime.cwd,
-          store: new JsonlLocalAgentStore(runtime.storeDir),
+    const runtime = this.prepareLocalRuntime('json');
+    type CursorRunResult = {
+      status: string;
+      result?: string;
+      model?: { id?: string };
+    };
+    const result = (await this.withTimeout(
+      Agent.prompt(
+        `${system}\n\n${user}\n\nReturn ONLY valid JSON. Do not edit files or run tools.`,
+        {
+          apiKey: this.apiKey,
+          model: { id: this.jsonModel },
+          local: {
+            cwd: runtime.cwd,
+            store: new JsonlLocalAgentStore(runtime.storeDir),
+          },
         },
-      },
-    );
+      ),
+      this.jsonTimeoutMs,
+      'Cursor JSON',
+    )) as CursorRunResult;
 
     if (result.status !== 'finished') {
       throw new Error(`Cursor agent ${result.status || 'failed'} before returning quiz JSON`);
     }
 
-    const text =
-      typeof result.result === 'string'
-        ? result.result
-        : result.result
-          ? JSON.stringify(result.result)
-          : '';
+    const text = typeof result.result === 'string' ? result.result : '';
     if (!text.trim()) {
       throw new Error('Cursor agent returned an empty result. Try generating the quiz again.');
     }
@@ -446,7 +479,7 @@ export class CursorProvider implements AiProvider {
       text,
       meta: {
         provider: 'cursor',
-        model: result.model?.id ?? this.model,
+        model: result.model?.id ?? this.jsonModel,
         inputTokens: 0,
         outputTokens: 0,
         estimatedCost: 0,

@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName, StudentFeeStatus } from '@prisma/client';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { FeesService } from './fees.service';
 import {
   AssignFeesDto,
@@ -37,6 +38,29 @@ class FeeListQueryDto extends PaginationDto {
   @IsOptional()
   @IsString()
   sectionId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  dueThisMonth?: boolean;
+
+  @IsOptional()
+  @IsString()
+  month?: string;
+}
+
+class FeeCollectionsQueryDto extends PaginationDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  sectionId?: string;
+
+  @IsOptional()
+  @IsString()
+  month?: string;
 }
 
 @ApiTags('Fees')
@@ -67,6 +91,12 @@ export class FeesController {
   @Post('assign')
   assign(@Body() dto: AssignFeesDto, @CurrentUser() user: AuthUser) {
     return this.feesService.assign(dto, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @Get('collections')
+  listCollections(@Query() query: FeeCollectionsQueryDto, @CurrentUser() user: AuthUser) {
+    return this.feesService.listCollections(user, query);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER, RoleName.PARENT)

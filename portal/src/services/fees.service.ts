@@ -1,5 +1,6 @@
 import { apiClient, buildQuery } from "@/lib/api-client";
-import type { FeeAccount, FeeLookupItem, FeeReceipt, FeeStructure, Paginated, StudentFee } from "@/lib/types";
+import { currentMonthLabel, feeBelongsToThisMonth, feeIsStillDue } from "@/lib/fees-month";
+import type { FeeAccount, FeeCollection, FeeLookupItem, FeeReceipt, FeeStructure, Paginated, StudentFee } from "@/lib/types";
 
 export const feesService = {
   listStructures() {
@@ -40,8 +41,62 @@ export const feesService = {
       },
     );
   },
-  list(params?: { search?: string; status?: string; studentId?: string; sectionId?: string; limit?: number }) {
-    return apiClient<Paginated<StudentFee>>(`/fees${buildQuery(params ?? {})}`);
+  list(params?: {
+    search?: string;
+    status?: string;
+    studentId?: string;
+    sectionId?: string;
+    dueThisMonth?: boolean | string;
+    month?: string;
+    limit?: number;
+    page?: number;
+  }) {
+    const { dueThisMonth, ...rest } = params ?? {};
+    return apiClient<Paginated<StudentFee> & { monthLabel?: string }>(
+      `/fees${buildQuery({
+        ...rest,
+        dueThisMonth: dueThisMonth ? "true" : undefined,
+      })}`,
+    );
+  },
+  listCollections(params?: { search?: string; sectionId?: string; month?: string; limit?: number; page?: number }) {
+    return apiClient<Paginated<FeeCollection> & { totalAmount: number; monthLabel: string }>(
+      `/fees/collections${buildQuery(params ?? {})}`,
+    );
+  },
+  async listDueThisMonth(params?: { search?: string; sectionId?: string; limit?: number }) {
+    const shared = {
+      search: params?.search,
+      sectionId: params?.sectionId,
+      limit: params?.limit ?? 100,
+    };
+    const [due, partial] = await Promise.all([
+      feesService.list({ ...shared, status: "DUE" }),
+      feesService.list({ ...shared, status: "PARTIAL" }),
+    ]);
+    const inMonth = [...due.items, ...partial.items].filter(
+      (fee) => feeIsStillDue(fee) && feeBelongsToThisMonth(fee),
+    );
+    return {
+      unpaid: inMonth.filter((fee) => fee.status !== "PARTIAL"),
+      partial: inMonth.filter((fee) => fee.status === "PARTIAL"),
+      monthLabel: currentMonthLabel(),
+    };
+  },
+  async listCollectionsThisMonth(params?: { search?: string; sectionId?: string; limit?: number }) {
+    try {
+      return await feesService.listCollections(params);
+    } catch {
+      return {
+        items: [],
+        page: 1,
+        limit: params?.limit ?? 20,
+        total: 0,
+        totalPages: 1,
+        totalAmount: 0,
+        monthLabel: currentMonthLabel(),
+      };
+    }
   },
   lookup(q: string) {
     return apiClient<{ items: FeeLookupItem[] }>(`/fees/lookup${buildQuery({ q })}`);

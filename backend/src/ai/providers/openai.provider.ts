@@ -37,6 +37,10 @@ export class OpenAiProvider implements AiProvider {
     return Boolean(this.apiKey);
   }
 
+  hasJson() {
+    return Boolean(this.apiKey);
+  }
+
   async processLesson(input: {
     sourceText: string;
     subjectName?: string;

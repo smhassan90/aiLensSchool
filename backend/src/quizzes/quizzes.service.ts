@@ -199,10 +199,13 @@ export class QuizzesService {
 
       for (let i = 0; i < aiQuiz.questions.length; i++) {
         const q = normalizeGeneratedQuestion(aiQuiz.questions[i]);
-        if (!q.correctAnswer?.trim()) {
+        const isChoice = q.type === 'MCQ' || q.type === 'TRUE_FALSE';
+        const isFillBlank = q.type === 'FILL_IN_THE_BLANK';
+        const hasMarkedOption = Boolean(q.options?.some((opt) => opt.isCorrect));
+        if (!q.correctAnswer?.trim() || (!isChoice && !isFillBlank) || (isChoice && !hasMarkedOption)) {
           throw new BadRequestException({
             code: 'QUIZ_ANSWER_REQUIRED',
-            message: 'Generated quiz is missing correct answers. Please generate again.',
+            message: 'Generated quiz must only include auto-gradable questions (multiple choice, fill in the blank, or true/false). Please generate again.',
           });
         }
         const question = await tx.quizQuestion.create({
@@ -638,7 +641,7 @@ export class QuizzesService {
   }
 
   /** Prefer key points; otherwise keep a short slice of lesson text for the AI prompt. */
-  private slimTopicText(text: string, max = 900) {
+  private slimTopicText(text: string, max = 500) {
     const trimmed = text.trim();
     if (!trimmed) return '';
     if (trimmed.length <= max) return trimmed;

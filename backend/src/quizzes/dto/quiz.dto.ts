@@ -68,7 +68,7 @@ export class GenerateQuizDto {
   @Max(20)
   mcqCount?: number;
 
-  @ApiPropertyOptional({ description: 'Fill-in-the-blank count' })
+  @ApiPropertyOptional({ description: 'Fill-in-the-blank count (short exact answer, auto-marked)' })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

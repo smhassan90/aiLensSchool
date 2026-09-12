@@ -4,7 +4,7 @@ import { PrismaService } from '../database/prisma.service';
 import { TenantService } from '../common/services/tenant.service';
 import { MemoryCacheService } from '../common/services/memory-cache.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { AI_PROVIDER, AiProvider } from '../ai/providers/ai.provider';
+import { FAST_AI_PROVIDER, AiProvider } from '../ai/providers/ai.provider';
 import { teacherDisplayName } from '../common/utils/person-name';
 
 function monthKey(d: Date) {
@@ -31,7 +31,7 @@ export class DashboardService {
     private readonly prisma: PrismaService,
     private readonly tenant: TenantService,
     private readonly cache: MemoryCacheService,
-    @Inject(AI_PROVIDER) private readonly ai: AiProvider,
+    @Inject(FAST_AI_PROVIDER) private readonly ai: AiProvider,
   ) {}
 
   async schoolSummary(user: AuthUser) {
@@ -61,8 +61,12 @@ export class DashboardService {
         _sum: { amount: true },
       }),
       this.prisma.studentFee.aggregate({
-        where: { schoolId, status: { not: StudentFeeStatus.PAID }, dueDate: { gte: monthStart, lt: nextMonth } },
-        _sum: { amount: true, paidAmount: true },
+        where: {
+          schoolId,
+          status: { in: [StudentFeeStatus.DUE, StudentFeeStatus.PARTIAL] },
+          dueDate: { gte: monthStart, lt: nextMonth },
+        },
+        _sum: { amount: true, paidAmount: true, discountAmount: true },
       }),
       this.prisma.feePayment.findMany({
         where: { paidAt: { gte: rangeStart }, studentFee: { schoolId } },
@@ -100,7 +104,9 @@ export class DashboardService {
 
     const remainingThisMonth = Math.max(
       0,
-      Number(outstandingAgg._sum.amount ?? 0) - Number(outstandingAgg._sum.paidAmount ?? 0),
+      Number(outstandingAgg._sum.amount ?? 0) -
+        Number(outstandingAgg._sum.paidAmount ?? 0) -
+        Number(outstandingAgg._sum.discountAmount ?? 0),
     );
 
     const collectedByMonth: Record<string, number> = {};
@@ -145,8 +151,10 @@ export class DashboardService {
       expenseCategories: Object.keys(expenseTotals) as ExpenseCategory[],
       classTeachers: classTeachers.map((section) => ({
         sectionId: section.id,
+        gradeId: section.grade.id,
         className: `${section.grade.name} ${section.name}`,
         students: section._count.enrollments,
+        classTeacherId: section.classTeacher?.id ?? null,
         classTeacher: section.classTeacher
           ? teacherDisplayName(
               section.classTeacher.user.firstName,

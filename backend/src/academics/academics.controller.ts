@@ -146,6 +146,12 @@ export class AcademicsController {
     return this.academicsService.listSections(user, query);
   }
 
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)
+  @Get('sections/:id')
+  getSection(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.academicsService.getSection(id, user);
+  }
+
   @Roles(RoleName.SCHOOL_ADMIN)
   @RequirePermission('MANAGE_CLASSES')
   @Post('subjects')
@@ -169,6 +175,12 @@ export class AcademicsController {
   @Get('enrollments')
   listEnrollments(@Query() query: EnrollmentQueryDto, @CurrentUser() user: AuthUser) {
     return this.academicsService.listEnrollments(user, query);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)
+  @Get('class-subjects')
+  listClassSubjects(@Query() query: ClassSubjectQueryDto, @CurrentUser() user: AuthUser) {
+    return this.academicsService.listClassSubjects(user, query);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN)

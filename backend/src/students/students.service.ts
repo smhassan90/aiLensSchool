@@ -27,6 +27,8 @@ import {
   generateParentPassword,
   parentLocalEmail,
 } from './parent-accounts';
+import { personFullName, sanitizeLastName } from '../common/utils/person-name';
+import { studentSearchWhere } from '../common/utils/student-search';
 
 @Injectable()
 export class StudentsService {
@@ -88,8 +90,8 @@ export class StudentsService {
           branchId: dto.branchId,
           studentCode: dto.studentCode,
           admissionNumber: dto.admissionNumber,
-          firstName: dto.firstName,
-          lastName: dto.lastName,
+          firstName: dto.firstName.trim(),
+          lastName: sanitizeLastName(dto.lastName),
           dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
           gender: dto.gender,
           address: dto.address?.trim() || null,
@@ -124,7 +126,7 @@ export class StudentsService {
             schoolCode: school.code,
             studentId: student.id,
             studentCode: dto.studentCode,
-            studentLastName: dto.lastName,
+            studentLastName: sanitizeLastName(dto.lastName),
             parentRoleId: parentRole.id,
             relationship: ParentRelationship.FATHER,
             input: dto.father,
@@ -138,7 +140,7 @@ export class StudentsService {
             schoolCode: school.code,
             studentId: student.id,
             studentCode: dto.studentCode,
-            studentLastName: dto.lastName,
+            studentLastName: sanitizeLastName(dto.lastName),
             parentRoleId: parentRole.id,
             relationship: ParentRelationship.MOTHER,
             input: dto.mother,
@@ -175,7 +177,7 @@ export class StudentsService {
       input: CreateParentInlineDto;
     },
   ) {
-    const lastName = args.input.lastName?.trim() || args.studentLastName;
+    const lastName = sanitizeLastName(args.input.lastName) || args.studentLastName;
     const email = args.input.email?.trim().toLowerCase();
     const phone = args.input.phone?.trim();
 
@@ -223,7 +225,7 @@ export class StudentsService {
       });
       return {
         relationship: args.relationship,
-        name: `${existing.firstName} ${existing.lastName}`,
+        name: personFullName(existing.firstName, existing.lastName),
         username: existing.username ?? existing.email,
         password: null as string | null,
         existing: true,
@@ -268,7 +270,7 @@ export class StudentsService {
 
     return {
       relationship: args.relationship,
-      name: `${parentUser.firstName} ${parentUser.lastName}`,
+      name: personFullName(parentUser.firstName, parentUser.lastName),
       username,
       password,
       existing: false,
@@ -334,6 +336,20 @@ export class StudentsService {
 
     const needsEnrollmentFilter = Boolean(sectionFilter || query.gradeId);
 
+    const search = query.search?.trim();
+    const fullNameIds = search
+      ? (
+          await this.prisma.$queryRaw<{ id: string }[]>`
+            SELECT id FROM students
+            WHERE school_id = ${schoolId}
+              AND LOWER(CONCAT(TRIM(first_name), ' ', TRIM(REPLACE(IFNULL(last_name, ''), '-', ''))))
+                LIKE ${`%${search.toLowerCase().replace(/[%_]/g, '\\$&')}%`}
+            LIMIT 300
+          `
+        ).map((row) => row.id)
+      : [];
+    const tokenWhere = studentSearchWhere(search);
+
     const where: Prisma.StudentWhereInput = {
       schoolId,
       ...(query.branchId ? { branchId: query.branchId } : {}),
@@ -349,28 +365,11 @@ export class StudentsService {
             },
           }
         : {}),
-      ...(query.search
+      ...(search
         ? {
             OR: [
-              { firstName: { contains: query.search } },
-              { lastName: { contains: query.search } },
-              { studentCode: { contains: query.search } },
-              { admissionNumber: { contains: query.search } },
-              {
-                parents: {
-                  some: {
-                    parent: {
-                      OR: [
-                        { phone: { contains: query.search } },
-                        { user: { firstName: { contains: query.search } } },
-                        { user: { lastName: { contains: query.search } } },
-                        { user: { email: { contains: query.search } } },
-                        { user: { phone: { contains: query.search } } },
-                      ],
-                    },
-                  },
-                },
-              },
+              ...(fullNameIds.length ? [{ id: { in: fullNameIds } }] : []),
+              ...(tokenWhere ? [tokenWhere] : []),
             ],
           }
         : {}),
@@ -400,7 +399,19 @@ export class StudentsService {
               take: 1,
               select: {
                 grade: { select: { id: true, name: true } },
-                section: { select: { id: true, name: true } },
+                section: {
+                  select: {
+                    id: true,
+                    name: true,
+                    classTeacher: {
+                      select: {
+                        id: true,
+                        gender: true,
+                        user: { select: { firstName: true, lastName: true } },
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -414,6 +425,7 @@ export class StudentsService {
       const active = student.enrollments[0];
       return {
         ...student,
+        lastName: sanitizeLastName(student.lastName),
         grade: active?.grade ?? null,
         section: active?.section ?? null,
       };

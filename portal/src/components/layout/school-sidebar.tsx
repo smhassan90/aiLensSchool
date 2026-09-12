@@ -61,6 +61,7 @@ function isActivePath(pathname: string, href: string, matchSetup?: boolean) {
     return setupPathPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
   }
   if (pathname === href) return true;
+  if (href === "/school/dashboard" && pathname.startsWith("/school/classes")) return true;
   if (!pathname.startsWith(`${href}/`)) return false;
   if (href === "/school/fees" && pathname.startsWith("/school/fees")) return true;
   return true;

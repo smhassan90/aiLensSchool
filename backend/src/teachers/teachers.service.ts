@@ -13,7 +13,7 @@ import { MemoryCacheService } from '../common/services/memory-cache.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
-import { AI_PROVIDER, AiProvider } from '../ai/providers/ai.provider';
+import { FAST_AI_PROVIDER, AiProvider } from '../ai/providers/ai.provider';
 import { teacherDisplayName } from '../common/utils/person-name';
 import {
   PERFORMANCE_CRITERIA,
@@ -30,7 +30,7 @@ export class TeachersService {
     private readonly audit: AuditService,
     private readonly tenant: TenantService,
     private readonly cache: MemoryCacheService,
-    @Inject(AI_PROVIDER) private readonly ai: AiProvider,
+    @Inject(FAST_AI_PROVIDER) private readonly ai: AiProvider,
   ) {}
 
   async create(dto: CreateTeacherDto, user: AuthUser) {

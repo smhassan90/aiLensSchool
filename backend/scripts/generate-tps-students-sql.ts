@@ -60,8 +60,8 @@ function normalizePhone(raw: string | undefined): string | null {
 
 function splitPersonName(full: string): { firstName: string; lastName: string } {
   const parts = full.trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
-  if (!parts.length) return { firstName: 'Unknown', lastName: '-' };
-  if (parts.length === 1) return { firstName: parts[0], lastName: '-' };
+  if (!parts.length) return { firstName: 'Unknown', lastName: '' };
+  if (parts.length === 1) return { firstName: parts[0], lastName: '' };
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
 }
 
@@ -98,7 +98,7 @@ function parseCsv(text: string): ParsedRow[] {
       studentFirst: student.firstName,
       studentLast: student.lastName,
       fatherFirst: father.firstName,
-      fatherLast: father.lastName === '-' ? student.lastName : father.lastName,
+      fatherLast: !father.lastName || father.lastName === '-' ? student.lastName : father.lastName,
       phone,
     });
   }

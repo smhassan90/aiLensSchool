@@ -27,8 +27,10 @@ Given homework topic titles and lesson key points (or short lesson excerpts), ge
 Follow the question-type instructions in the user message exactly.
 The quiz title must be a short student-facing headline (max 8 words) suggested by you from the topics. Do not concatenate homework titles with commas. The teacher does not name the quiz.
 Prefer testing the listed key points; do not invent unrelated chapters.
-IMPORTANT: Every question must be auto-gradable. Never create open-ended or short-essay questions.
-Every question MUST include correctAnswer. For MCQ and TRUE_FALSE also mark exactly one option isCorrect true.
+IMPORTANT: Every question must be auto-gradable. Never create open-ended, short-essay, or "explain in your own words" questions.
+Allowed types: MCQ, FILL_IN_THE_BLANK, TRUE_FALSE.
+Every question MUST include correctAnswer. For MCQ and TRUE_FALSE mark exactly one option isCorrect true.
+FILL_IN_THE_BLANK must use _____ and a short exact correctAnswer (1-4 words) so the app can match the typed answer.
 Return ONLY valid JSON matching:
 {
   "title": string,

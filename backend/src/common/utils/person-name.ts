@@ -1,12 +1,24 @@
+/** Import placeholders used when a person has only one name. */
+export function isPlaceholderName(value?: string | null): boolean {
+  const v = (value ?? '').trim();
+  if (!v) return true;
+  const lower = v.toLowerCase();
+  return v === '-' || v === '—' || v === '.' || lower === 'n/a' || lower === 'na' || lower === 'none';
+}
+
+export function sanitizeLastName(value?: string | null): string {
+  return isPlaceholderName(value) ? '' : (value ?? '').trim();
+}
+
 /** Build a person's display name without duplicating a missing last name. */
 export function personFullName(
   firstName?: string | null,
   lastName?: string | null,
 ): string {
   const first = (firstName ?? '').trim();
-  const last = (lastName ?? '').trim();
+  const last = sanitizeLastName(lastName);
   if (!first && !last) return '';
-  if (!last || last === '-' || last.toLowerCase() === first.toLowerCase()) {
+  if (!last || last.toLowerCase() === first.toLowerCase()) {
     return first || last;
   }
   return `${first} ${last}`.replace(/\s+/g, ' ').trim();

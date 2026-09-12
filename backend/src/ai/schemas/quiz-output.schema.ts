@@ -36,7 +36,9 @@ const QuestionTypeSchema = z.preprocess((value) => {
     .replace(/[\s-]+/g, '_');
   if (raw === 'TRUE/FALSE' || raw === 'TRUEFALSE' || raw === 'TF') return 'TRUE_FALSE';
   if (raw === 'FILL_BLANK' || raw === 'FILLINTHEBLANK' || raw === 'FIB') return 'FILL_IN_THE_BLANK';
-  if (raw === 'SHORT' || raw === 'SA' || raw === 'SHORT_ANSWER') return 'FILL_IN_THE_BLANK';
+  if (raw === 'SHORT' || raw === 'SA' || raw === 'SHORT_ANSWER' || raw === 'OPEN_ENDED' || raw === 'ESSAY') {
+    return 'FILL_IN_THE_BLANK';
+  }
   if (raw === 'MULTIPLE_CHOICE' || raw === 'MULTIPLECHOICE') return 'MCQ';
   return raw;
 }, z.enum(['MCQ', 'FILL_IN_THE_BLANK', 'TRUE_FALSE']));

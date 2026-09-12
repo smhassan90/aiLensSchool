@@ -3,7 +3,8 @@ import { AttendanceStatus } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
-import { personFullName, teacherDisplayName } from '../common/utils/person-name';
+import { personFullName, sanitizeLastName, teacherDisplayName } from '../common/utils/person-name';
+import { studentSearchWhere } from '../common/utils/student-search';
 
 @Injectable()
 export class InsightsService {
@@ -23,28 +24,7 @@ export class InsightsService {
       this.prisma.student.findMany({
         where: {
           schoolId,
-          OR: [
-            { firstName: { contains: term } },
-            { lastName: { contains: term } },
-            { studentCode: { contains: term } },
-            { admissionNumber: { contains: term } },
-            {
-              parents: {
-                some: {
-                  parent: {
-                    OR: [
-                      { phone: { contains: term } },
-                      { user: { firstName: { contains: term } } },
-                      { user: { lastName: { contains: term } } },
-                      { user: { email: { contains: term } } },
-                      { user: { username: { contains: term } } },
-                      { user: { phone: { contains: term } } },
-                    ],
-                  },
-                },
-              },
-            },
-          ],
+          ...(studentSearchWhere(term) ?? {}),
         },
         take: 12,
         include: {
@@ -234,6 +214,7 @@ export class InsightsService {
     return {
       student: {
         ...student,
+        lastName: sanitizeLastName(student.lastName),
         grade: enrollment?.grade ?? null,
         section: enrollment?.section ?? null,
         academicYear: enrollment?.academicYear ?? null,

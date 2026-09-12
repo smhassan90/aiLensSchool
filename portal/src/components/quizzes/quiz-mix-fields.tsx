@@ -84,7 +84,7 @@ export function QuizMixFields({
             <CountField id="trueFalseCount" label="True / False" value={trueFalseCount} onChange={onTrueFalseChange} />
           </div>
           <p className="text-xs text-muted-foreground">
-            {total} question{total === 1 ? "" : "s"} total. Enter at least one. Open-ended questions are not used.
+            {total} question{total === 1 ? "" : "s"} total. Enter at least one. Open-ended essays are not used; fill-in-the-blank answers must be a short exact word or phrase.
           </p>
         </>
       )}

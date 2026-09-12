@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageLoader } from "@/components/layout/page-loader";
 import { FeeReceiptSheet, receiptWhatsAppText } from "@/components/fees/fee-receipt";
+import { FeeMonthViews } from "@/components/fees/fee-month-views";
 import { feesService } from "@/services/fees.service";
 import { academicsService } from "@/services/academics.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { formatPkr, whatsappUrl } from "@/lib/money";
+import { cn } from "@/lib/utils";
 import type { FeeReceipt } from "@/lib/types";
 import { Search, Wallet, MessageCircle, Printer } from "lucide-react";
 
@@ -29,10 +31,19 @@ function round2(value: number) {
 export default function FeesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const viewParam = searchParams.get("view");
+  const sectionId = searchParams.get("sectionId") ?? "";
+  const studentId = searchParams.get("studentId") ?? "";
+  const view: "collect" | "collected" | "due" =
+    studentId
+      ? "collect"
+      : viewParam === "collected" || viewParam === "due"
+        ? viewParam
+        : "collect";
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [studentId, setStudentId] = useState(searchParams.get("studentId") ?? "");
   const [selectedFeeId, setSelectedFeeId] = useState<string>("");
   const [collected, setCollected] = useState("");
   const [discount, setDiscount] = useState("0");
@@ -53,6 +64,34 @@ export default function FeesPage() {
   const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [localBrackets, setLocalBrackets] = useState<number[]>([]);
 
+  const setStudentId = (id: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (id) {
+      params.set("studentId", id);
+      params.delete("view");
+    } else {
+      params.delete("studentId");
+    }
+    const qs = params.toString();
+    router.replace(qs ? `/school/fees?${qs}` : "/school/fees");
+  };
+
+  const goToView = (next: "collect" | "collected" | "due") => {
+    const params = new URLSearchParams();
+    if (next !== "collect") params.set("view", next);
+    if (sectionId) params.set("sectionId", sectionId);
+    const qs = params.toString();
+    router.replace(qs ? `/school/fees?${qs}` : "/school/fees");
+  };
+
+  const setSectionFilter = (id: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (id) params.set("sectionId", id);
+    else params.delete("sectionId");
+    const qs = params.toString();
+    router.replace(qs ? `/school/fees?${qs}` : "/school/fees");
+  };
+
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(search.trim()), 250);
     return () => clearTimeout(timer);
@@ -60,8 +99,6 @@ export default function FeesPage() {
 
   useEffect(() => {
     if (searchParams.get("focus") === "types") setStructureOpen(true);
-    const fromUrl = searchParams.get("studentId");
-    if (fromUrl) setStudentId(fromUrl);
   }, [searchParams]);
 
   const lookup = useQuery({
@@ -155,6 +192,9 @@ export default function FeesPage() {
       setReceipt(res);
       queryClient.invalidateQueries({ queryKey: ["fee-account", studentId] });
       queryClient.invalidateQueries({ queryKey: ["fees"] });
+      queryClient.invalidateQueries({ queryKey: ["fee-collections"] });
+      queryClient.invalidateQueries({ queryKey: ["fees-due"] });
+      queryClient.invalidateQueries({ queryKey: ["school-dashboard"] });
     },
     onError: (err) =>
       toast({
@@ -252,8 +292,20 @@ export default function FeesPage() {
     <div className="p-4 sm:p-6 lg:p-8 print:p-0">
       <div className="print:hidden">
         <PageHeader
-          title="Collect fees"
-          description="Class tuition is set on each class. Search a child, take cash, then print or WhatsApp the receipt."
+          title={
+            view === "collected"
+              ? "Collected this month"
+              : view === "due"
+                ? "Still due this month"
+                : "Collect fees"
+          }
+          description={
+            view === "collected"
+              ? "Every payment taken this month, newest first. Filter by student or class."
+              : view === "due"
+                ? "Students who have not paid this month, then those who paid only part of the fee."
+                : "Class tuition is set on each class. Search a child, take cash, then print or WhatsApp the receipt."
+          }
           actions={
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setStructureOpen(true)}>Fee types</Button>
@@ -262,7 +314,35 @@ export default function FeesPage() {
           }
         />
 
-        {!studentId ? (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {(
+            [
+              ["collect", "Collect"],
+              ["collected", "Collected this month"],
+              ["due", "Still due"],
+            ] as const
+          ).map(([key, label]) => (
+            <Button
+              key={key}
+              type="button"
+              size="sm"
+              variant={view === key ? "default" : "outline"}
+              className={cn(view === key ? "" : "bg-background")}
+              onClick={() => goToView(key)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+
+        {view === "collected" || view === "due" ? (
+          <FeeMonthViews
+            view={view}
+            sectionId={sectionId}
+            onSectionChange={setSectionFilter}
+            collectHref={(id) => `/school/fees?studentId=${id}`}
+          />
+        ) : !studentId ? (
           <Card className="max-w-2xl">
             <CardHeader>
               <CardTitle>Who is paying?</CardTitle>

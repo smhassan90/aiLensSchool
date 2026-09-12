@@ -18,8 +18,10 @@ export interface SchoolDashboardSummary {
   expenseCategories: string[];
   classTeachers: Array<{
     sectionId: string;
+    gradeId: string;
     className: string;
     students: number;
+    classTeacherId: string | null;
     classTeacher: string | null;
     subjects: Array<{ subject: string; teacher: string }>;
   }>;

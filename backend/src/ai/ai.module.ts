@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AI_PROVIDER } from './providers/ai.provider';
+import { AI_PROVIDER, FAST_AI_PROVIDER } from './providers/ai.provider';
 import { CursorProvider } from './providers/cursor.provider';
 import { OpenAiProvider } from './providers/openai.provider';
 import { LessonProcessingService } from './services/lesson-processing.service';
@@ -21,6 +21,12 @@ import { StudentAnalysisService } from './services/student-analysis.service';
         openai: OpenAiProvider,
       ) => ((config.get<string>('AI_PROVIDER') ?? 'cursor') === 'openai' ? openai : cursor),
     },
+    {
+      provide: FAST_AI_PROVIDER,
+      inject: [CursorProvider, OpenAiProvider],
+      useFactory: (cursor: CursorProvider, openai: OpenAiProvider) =>
+        openai.hasJson() ? openai : cursor,
+    },
     LessonProcessingService,
     QuizGenerationService,
     HomeworkGenerationService,
@@ -28,6 +34,7 @@ import { StudentAnalysisService } from './services/student-analysis.service';
   ],
   exports: [
     AI_PROVIDER,
+    FAST_AI_PROVIDER,
     LessonProcessingService,
     QuizGenerationService,
     HomeworkGenerationService,

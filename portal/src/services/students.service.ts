@@ -11,7 +11,7 @@ export interface ParentCredential {
 
 export interface CreateStudentPayload {
   firstName: string;
-  lastName: string;
+  lastName?: string;
   studentCode: string;
   admissionNumber: string;
   dateOfBirth?: string;
@@ -53,6 +53,25 @@ export const studentsService = {
     status?: string;
   }) {
     return apiClient<Paginated<Student>>(`/students${buildQuery(params ?? {})}`);
+  },
+
+  async listAll(params?: {
+    branchId?: string;
+    sectionId?: string;
+    gradeId?: string;
+    teacherId?: string;
+    status?: string;
+  }) {
+    const limit = 100;
+    const first = await studentsService.list({ ...params, limit, page: 1 });
+    if (first.totalPages <= 1) return first;
+    const rest = await Promise.all(
+      Array.from({ length: first.totalPages - 1 }, (_, index) =>
+        studentsService.list({ ...params, limit, page: index + 2 }),
+      ),
+    );
+    const items = first.items.concat(...rest.map((page) => page.items));
+    return { ...first, items, total: items.length, page: 1, limit: items.length, totalPages: 1 };
   },
 
   create(payload: CreateStudentPayload) {

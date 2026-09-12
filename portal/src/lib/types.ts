@@ -114,7 +114,11 @@ export interface Student {
   scienceGroup?: string | null;
   branch?: { id: string; name: string };
   grade?: { id: string; name: string; level?: number };
-  section?: { id: string; name: string };
+  section?: {
+    id: string;
+    name: string;
+    classTeacher?: TeacherRef | null;
+  };
   enrollments?: Enrollment[];
   parents?: StudentParentLink[];
 }
@@ -425,7 +429,25 @@ export interface StudentFee {
   name?: string;
   student?: { id: string; firstName: string; lastName: string; studentCode: string };
   feeStructure?: FeeStructure;
-  section?: { id: string; name: string };
+  section?: { id: string; name: string; grade?: { name: string } | null };
+}
+
+export interface FeeCollection {
+  id: string;
+  amount: number;
+  discountAmount: number;
+  receiptNumber: string | null;
+  method: string;
+  notes?: string | null;
+  paidAt: string;
+  studentFee: {
+    id: string;
+    periodLabel: string;
+    status: string;
+    student: { id: string; firstName: string; lastName: string; studentCode: string };
+    feeStructure?: { id: string; name: string } | null;
+    section?: { id: string; name: string; grade?: { name: string } | null } | null;
+  };
 }
 
 export interface FeeParent {

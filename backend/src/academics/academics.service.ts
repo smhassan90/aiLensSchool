@@ -520,6 +520,43 @@ export class AcademicsService {
     return paginate(items, total, page, limit);
   }
 
+  async getSection(id: string, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const section = await this.prisma.section.findFirst({
+      where: { id, schoolId },
+      select: {
+        id: true,
+        name: true,
+        gradeId: true,
+        branchId: true,
+        capacity: true,
+        classTeacherId: true,
+        grade: { select: { id: true, name: true, level: true, tuitionFee: true } },
+        branch: { select: { id: true, name: true } },
+        classTeacher: {
+          select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } },
+        },
+        _count: { select: { enrollments: true, classSubjects: true } },
+        classSubjects: {
+          select: {
+            id: true,
+            subjectId: true,
+            teacherId: true,
+            academicYearId: true,
+            subject: { select: { id: true, name: true } },
+            teacher: {
+              select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!section) {
+      throw new NotFoundException({ code: 'SECTION_NOT_FOUND', message: 'Class section not found' });
+    }
+    return section;
+  }
+
   async createSubject(dto: CreateSubjectDto, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
     if (dto.gradeId) {

@@ -32,7 +32,7 @@ const SCHOOL_MENU_PREFETCH: PrefetchItem[] = [
   { key: ["grades"], fn: () => academicsService.listGrades({ limit: 50 }) },
   { key: ["academic-years"], fn: () => academicsService.listYears({ limit: 20 }) },
   { key: ["teachers"], fn: () => teachersService.list({ limit: 50 }) },
-  { key: ["students", ""], fn: () => studentsService.list({ limit: 50 }) },
+  { key: ["students-roster", "", "", ""], fn: () => studentsService.listAll() },
   { key: ["homework"], fn: () => homeworkService.list({ limit: 50 }) },
   { key: ["quizzes"], fn: () => quizzesService.list({ limit: 50 }) },
 ];

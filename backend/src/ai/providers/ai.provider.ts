@@ -75,3 +75,5 @@ export interface AiProvider {
 }
 
 export const AI_PROVIDER = Symbol('AI_PROVIDER');
+/** JSON-only tasks (quiz, homework, coach). Prefers OpenAI chat when a key is set. */
+export const FAST_AI_PROVIDER = Symbol('FAST_AI_PROVIDER');

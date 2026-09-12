@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -22,23 +23,28 @@ import { PageLoader } from "@/components/layout/page-loader";
 import { studentsService } from "@/services/students.service";
 import { academicsService } from "@/services/academics.service";
 import { teachersService } from "@/services/teachers.service";
-import { personFullName, teacherDisplayNameFromUser } from "@/lib/person-name";
+import { personFullName, studentMatchesQuery, teacherDisplayNameFromUser } from "@/lib/person-name";
 import { GraduationCap, Plus } from "lucide-react";
 
 export default function StudentsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [sectionId, setSectionId] = useState("");
-  const [teacherId, setTeacherId] = useState("");
+  const sectionId = searchParams.get("sectionId") ?? "";
+  const teacherId = searchParams.get("teacherId") ?? "";
+  const status = searchParams.get("status") ?? "";
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(search.trim()), 250);
-    return () => clearTimeout(timer);
-  }, [search]);
+  const setFilter = (key: "sectionId" | "teacherId" | "status", value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(key, value);
+    else params.delete(key);
+    const qs = params.toString();
+    router.replace(qs ? `/school/students?${qs}` : "/school/students");
+  };
 
   const sections = useQuery({
     queryKey: ["sections"],
-    queryFn: () => academicsService.listSections({ limit: 200 }),
+    queryFn: () => academicsService.listSections({ limit: 100 }),
   });
   const teachers = useQuery({
     queryKey: ["teachers"],
@@ -46,14 +52,15 @@ export default function StudentsPage() {
   });
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["students", debounced, sectionId, teacherId],
+    queryKey: ["students-roster", sectionId, teacherId, status],
     queryFn: () =>
-      studentsService.list({
-        limit: 100,
-        search: debounced || undefined,
+      studentsService.listAll({
         sectionId: sectionId || undefined,
         teacherId: teacherId || undefined,
+        status: status || undefined,
       }),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const classTeacherBySection = useMemo(() => {
@@ -68,6 +75,11 @@ export default function StudentsPage() {
     }
     return map;
   }, [sections.data]);
+
+  const items = useMemo(() => {
+    const rows = data?.items ?? [];
+    return search.trim() ? rows.filter((student) => studentMatchesQuery(student, search)) : rows;
+  }, [data?.items, search]);
 
   const filterSummary = useMemo(() => {
     const parts: string[] = [];
@@ -85,10 +97,13 @@ export default function StudentsPage() {
           : "selected teacher",
       );
     }
+    if (status) {
+      parts.push(status === "ACTIVE" ? "active" : status.toLowerCase());
+    }
     return parts;
-  }, [sectionId, teacherId, sections.data, teachers.data]);
+  }, [sectionId, teacherId, status, sections.data, teachers.data]);
 
-  const hasFilters = Boolean(debounced || sectionId || teacherId);
+  const hasFilters = Boolean(search.trim() || sectionId || teacherId || status);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -110,7 +125,7 @@ export default function StudentsPage() {
           <Label htmlFor="student-search">Search</Label>
           <Input
             id="student-search"
-            placeholder="Name, code, parent name or phone"
+            placeholder="Name, code, class — instant, no wait"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -120,7 +135,7 @@ export default function StudentsPage() {
           <Select
             id="student-class"
             value={sectionId}
-            onChange={(e) => setSectionId(e.target.value)}
+            onChange={(e) => setFilter("sectionId", e.target.value)}
           >
             <option value="">All classes</option>
             {(sections.data?.items ?? []).map((section) => (
@@ -135,7 +150,7 @@ export default function StudentsPage() {
           <Select
             id="student-teacher"
             value={teacherId}
-            onChange={(e) => setTeacherId(e.target.value)}
+            onChange={(e) => setFilter("teacherId", e.target.value)}
           >
             <option value="">All teachers</option>
             {(teachers.data?.items ?? []).map((teacher) => (
@@ -146,22 +161,32 @@ export default function StudentsPage() {
             ))}
           </Select>
         </div>
+        <div>
+          <Label htmlFor="student-status">Status</Label>
+          <Select id="student-status" value={status} onChange={(e) => setFilter("status", e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="INACTIVE">Inactive</option>
+            <option value="WITHDRAWN">Withdrawn</option>
+            <option value="GRADUATED">Graduated</option>
+          </Select>
+        </div>
       </div>
 
-      {(sectionId || teacherId) && (
+      {(search.trim() || sectionId || teacherId || status) && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span>
-            Showing students
+            Showing {items.length}
+            {data?.items.length != null ? ` of ${data.items.length}` : ""}
             {filterSummary.length ? ` for ${filterSummary.join(" · ")}` : ""}
-            {data?.total != null ? ` (${data.total})` : ""}
           </span>
           <Button
             type="button"
             size="sm"
             variant="ghost"
             onClick={() => {
-              setSectionId("");
-              setTeacherId("");
+              setSearch("");
+              router.replace("/school/students");
             }}
           >
             Clear filters
@@ -178,13 +203,13 @@ export default function StudentsPage() {
       <div className="rounded-lg border bg-card">
         {isLoading ? (
           <PageLoader variant="panel" />
-        ) : !data?.items.length ? (
+        ) : !items.length ? (
           <EmptyState
             icon={<GraduationCap className="h-10 w-10" />}
             title={hasFilters ? "No students match" : "No students yet"}
             description={
               hasFilters
-                ? "Try another class or teacher, or clear the filters."
+                ? "Try another name, class or teacher, or clear the filters."
                 : "Add your first student with parent details."
             }
             action={
@@ -193,9 +218,7 @@ export default function StudentsPage() {
                   variant="outline"
                   onClick={() => {
                     setSearch("");
-                    setDebounced("");
-                    setSectionId("");
-                    setTeacherId("");
+                    router.replace("/school/students");
                   }}
                 >
                   Clear filters
@@ -212,8 +235,7 @@ export default function StudentsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Admission #</TableHead>
+                <TableHead>Student ID</TableHead>
                 <TableHead>Class / Section</TableHead>
                 <TableHead>Class teacher</TableHead>
                 <TableHead>Branch</TableHead>
@@ -222,22 +244,42 @@ export default function StudentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.items.map((student) => (
-                <TableRow key={student.id}>
+              {items.map((student) => (
+                <TableRow
+                  key={student.id}
+                  className="cursor-pointer"
+                  tabIndex={0}
+                  onClick={() => router.push(`/school/students/${student.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      router.push(`/school/students/${student.id}`);
+                    }
+                  }}
+                >
                   <TableCell className="font-medium">
-                    <Link href={`/school/students/${student.id}`} className="hover:underline">
-                      {student.firstName} {student.lastName}
-                    </Link>
+                    <span className="hover:underline">{personFullName(student.firstName, student.lastName)}</span>
                   </TableCell>
-                  <TableCell>{student.studentCode}</TableCell>
-                  <TableCell>{student.admissionNumber}</TableCell>
+                  <TableCell>
+                    {student.studentCode}
+                    {student.admissionNumber && student.admissionNumber !== student.studentCode ? (
+                      <span className="block text-xs text-muted-foreground">
+                        Adm. {student.admissionNumber}
+                      </span>
+                    ) : null}
+                  </TableCell>
                   <TableCell>
                     {student.grade?.name ?? "—"} / {student.section?.name ?? "—"}
                   </TableCell>
                   <TableCell>
-                    {student.section?.id
-                      ? classTeacherBySection.get(student.section.id) ?? "—"
-                      : "—"}
+                    {student.section?.classTeacher
+                      ? teacherDisplayNameFromUser(
+                          student.section.classTeacher.user,
+                          student.section.classTeacher.gender,
+                        )
+                      : student.section?.id
+                        ? classTeacherBySection.get(student.section.id) ?? "—"
+                        : "—"}
                   </TableCell>
                   <TableCell>{student.branch?.name ?? "—"}</TableCell>
                   <TableCell>
@@ -246,11 +288,9 @@ export default function StudentsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Link href={`/school/students/${student.id}`}>
-                      <Button size="sm" variant="outline">
-                        360 view
-                      </Button>
-                    </Link>
+                    <Button size="sm" variant="outline">
+                      360 view
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

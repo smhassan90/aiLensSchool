@@ -19,6 +19,7 @@ import {
 } from './dto/fees.dto';
 import { ParentsService } from '../parents/parents.service';
 import { positiveAmount, classFeeName } from './class-fees';
+import { studentSearchWhere } from '../common/utils/student-search';
 
 function money(value: Prisma.Decimal | number | string | null | undefined | unknown) {
   return Number(value ?? 0);
@@ -26,6 +27,23 @@ function money(value: Prisma.Decimal | number | string | null | undefined | unkn
 
 function round2(value: number) {
   return Number(value.toFixed(2));
+}
+
+function monthRange(month?: string) {
+  const now = new Date();
+  let year = now.getFullYear();
+  let monthIndex = now.getMonth();
+  if (month && /^\d{4}-\d{2}$/.test(month)) {
+    year = Number(month.slice(0, 4));
+    monthIndex = Number(month.slice(5, 7)) - 1;
+  }
+  const start = new Date(year, monthIndex, 1);
+  const end = new Date(year, monthIndex + 1, 1);
+  return {
+    start,
+    end,
+    label: start.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+  };
 }
 
 function outstandingOf(fee: { amount: unknown; paidAmount: unknown; discountAmount?: unknown }) {
@@ -510,6 +528,8 @@ export class FeesService {
       status?: StudentFeeStatus;
       studentId?: string;
       sectionId?: string;
+      dueThisMonth?: boolean;
+      month?: string;
     },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
@@ -524,43 +544,27 @@ export class FeesService {
     }
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
+    const range = query.dueThisMonth ? monthRange(query.month) : null;
+    const studentWhere = studentSearchWhere(query.search?.trim());
     const where: Prisma.StudentFeeWhereInput = {
       schoolId,
-      ...(query.status ? { status: query.status } : {}),
+      ...(query.status
+        ? { status: query.status }
+        : query.dueThisMonth
+          ? { status: { in: [StudentFeeStatus.DUE, StudentFeeStatus.PARTIAL] } }
+          : {}),
       ...(query.studentId ? { studentId: query.studentId } : {}),
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
-      ...(query.search
-        ? {
-            student: {
-              OR: [
-                { firstName: { contains: query.search } },
-                { lastName: { contains: query.search } },
-                { studentCode: { contains: query.search } },
-                { admissionNumber: { contains: query.search } },
-                {
-                  parents: {
-                    some: {
-                      parent: {
-                        OR: [
-                          { phone: { contains: query.search } },
-                          { user: { firstName: { contains: query.search } } },
-                          { user: { lastName: { contains: query.search } } },
-                          { user: { phone: { contains: query.search } } },
-                        ],
-                      },
-                    },
-                  },
-                },
-              ],
-            },
-          }
-        : {}),
+      ...(range ? { dueDate: { gte: range.start, lt: range.end } } : {}),
+      ...(studentWhere ? { student: studentWhere } : {}),
     };
 
     const [items, total] = await pageQuery(
       this.prisma.studentFee.findMany({
         where,
-        orderBy: { dueDate: 'desc' },
+        orderBy: query.dueThisMonth
+          ? [{ status: 'asc' }, { student: { firstName: 'asc' } }]
+          : [{ dueDate: 'desc' }],
         skip: (page - 1) * limit,
         take: limit,
         select: {
@@ -573,24 +577,99 @@ export class FeesService {
           periodLabel: true,
           student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
           feeStructure: { select: { id: true, name: true } },
-          section: { select: { id: true, name: true } },
+          section: { select: { id: true, name: true, grade: { select: { name: true } } } },
         },
       }),
       this.prisma.studentFee.count({ where }),
     );
 
-    return paginate(
-      items.map((item) => ({
-        ...item,
-        amount: money(item.amount),
-        paidAmount: money(item.paidAmount),
-        discountAmount: money(item.discountAmount),
-        balance: outstandingOf(item),
-      })),
-      total,
-      page,
-      limit,
-    );
+    return {
+      ...paginate(
+        items.map((item) => ({
+          ...item,
+          amount: money(item.amount),
+          paidAmount: money(item.paidAmount),
+          discountAmount: money(item.discountAmount),
+          balance: outstandingOf(item),
+        })),
+        total,
+        page,
+        limit,
+      ),
+      monthLabel: range?.label,
+    };
+  }
+
+  async listCollections(
+    user: AuthUser,
+    query: PaginationDto & { search?: string; sectionId?: string; month?: string },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
+    const range = monthRange(query.month);
+    const search = query.search?.trim();
+    const studentWhere = studentSearchWhere(search);
+    const where: Prisma.FeePaymentWhereInput = {
+      paidAt: { gte: range.start, lt: range.end },
+      studentFee: {
+        schoolId,
+        ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+      },
+      ...(search
+        ? {
+            OR: [
+              { receiptNumber: { contains: search } },
+              { studentFee: { student: studentWhere } },
+            ],
+          }
+        : {}),
+    };
+
+    const [items, total, sum] = await Promise.all([
+      this.prisma.feePayment.findMany({
+        where,
+        orderBy: { paidAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          amount: true,
+          discountAmount: true,
+          receiptNumber: true,
+          method: true,
+          notes: true,
+          paidAt: true,
+          studentFee: {
+            select: {
+              id: true,
+              periodLabel: true,
+              status: true,
+              student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
+              feeStructure: { select: { id: true, name: true } },
+              section: { select: { id: true, name: true, grade: { select: { name: true } } } },
+            },
+          },
+        },
+      }),
+      this.prisma.feePayment.count({ where }),
+      this.prisma.feePayment.aggregate({ where, _sum: { amount: true } }),
+    ]);
+
+    return {
+      ...paginate(
+        items.map((item) => ({
+          ...item,
+          amount: money(item.amount),
+          discountAmount: money(item.discountAmount),
+        })),
+        total,
+        page,
+        limit,
+      ),
+      totalAmount: money(sum._sum.amount),
+      monthLabel: range.label,
+    };
   }
 
   async recordPayment(dto: RecordPaymentDto, user: AuthUser) {
@@ -685,26 +764,7 @@ export class FeesService {
     const students = await this.prisma.student.findMany({
       where: {
         schoolId,
-        OR: [
-          { firstName: { contains: term } },
-          { lastName: { contains: term } },
-          { studentCode: { contains: term } },
-          { admissionNumber: { contains: term } },
-          {
-            parents: {
-              some: {
-                parent: {
-                  OR: [
-                    { phone: { contains: term } },
-                    { user: { firstName: { contains: term } } },
-                    { user: { lastName: { contains: term } } },
-                    { user: { phone: { contains: term } } },
-                  ],
-                },
-              },
-            },
-          },
-        ],
+        ...(studentSearchWhere(term) ?? {}),
       },
       take: 20,
       orderBy: { firstName: 'asc' },

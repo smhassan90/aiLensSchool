@@ -1,12 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AIRequestStatus, AIRequestType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { AI_PROVIDER, AiProvider } from '../providers/ai.provider';
+import { FAST_AI_PROVIDER, AiProvider } from '../providers/ai.provider';
 
 @Injectable()
 export class HomeworkGenerationService {
   constructor(
-    @Inject(AI_PROVIDER) private readonly ai: AiProvider,
+    @Inject(FAST_AI_PROVIDER) private readonly ai: AiProvider,
     private readonly prisma: PrismaService,
   ) {}
 

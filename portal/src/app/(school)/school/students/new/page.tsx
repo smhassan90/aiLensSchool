@@ -25,7 +25,7 @@ import { ArrowLeft } from "lucide-react";
 const schema = z
   .object({
     firstName: z.string().min(1, "Required"),
-    lastName: z.string().min(1, "Required"),
+    lastName: z.string().optional(),
     studentCode: z.string().min(1, "Required"),
     admissionNumber: z.string().min(1, "Required"),
     dateOfBirth: z.string().optional(),
@@ -88,7 +88,7 @@ export default function NewStudentPage() {
     mutationFn: (values: FormValues) =>
       studentsService.create({
         firstName: values.firstName,
-        lastName: values.lastName,
+        lastName: values.lastName?.trim() || undefined,
         studentCode: values.studentCode,
         admissionNumber: values.admissionNumber,
         dateOfBirth: values.dateOfBirth || undefined,
@@ -165,19 +165,21 @@ export default function NewStudentPage() {
                 {errors.firstName && <p className="text-sm text-destructive">{errors.firstName.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input id="lastName" {...register("lastName")} />
+                <Label htmlFor="lastName">Last name (optional)</Label>
+                <Input id="lastName" {...register("lastName")} placeholder="Leave blank if only one name" />
                 {errors.lastName && <p className="text-sm text-destructive">{errors.lastName.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="studentCode">Student Code</Label>
-                <Input id="studentCode" {...register("studentCode")} />
+                <Label htmlFor="studentCode">Student ID</Label>
+                <Input id="studentCode" {...register("studentCode")} placeholder="Daily ID / computer number" />
                 {errors.studentCode && <p className="text-sm text-destructive">{errors.studentCode.message}</p>}
+                <p className="text-xs text-muted-foreground">Used on lists, ID cards, and search.</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="admissionNumber">Admission Number</Label>
-                <Input id="admissionNumber" {...register("admissionNumber")} />
+                <Label htmlFor="admissionNumber">Admission number</Label>
+                <Input id="admissionNumber" {...register("admissionNumber")} placeholder="School register number" />
                 {errors.admissionNumber && <p className="text-sm text-destructive">{errors.admissionNumber.message}</p>}
+                <p className="text-xs text-muted-foreground">Official number in the admission register. Can match Student ID.</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dateOfBirth">Date of Birth</Label>
