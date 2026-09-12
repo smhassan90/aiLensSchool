@@ -22,6 +22,7 @@ const TEACHER_MENU_PREFETCH: PrefetchItem[] = [
   { key: ["teacher-lessons"], fn: () => lessonsService.list({ limit: 50 }) },
   { key: ["homework"], fn: () => homeworkService.list({ limit: 50 }) },
   { key: ["teacher-quizzes"], fn: () => quizzesService.list({ limit: 50 }) },
+  { key: ["teacher-exam-papers"], fn: () => quizzesService.list({ limit: 50, paperKind: "EXAM" }) },
   { key: ["results"], fn: () => resultsService.list({ limit: 100 }) },
 ];
 
@@ -44,8 +45,9 @@ const HREF_PREFETCH: Record<string, PrefetchItem[]> = {
   "/teacher/lessons": [TEACHER_MENU_PREFETCH[2], TEACHER_MENU_PREFETCH[1]],
   "/teacher/homework": [TEACHER_MENU_PREFETCH[3], TEACHER_MENU_PREFETCH[1]],
   "/teacher/quizzes": [TEACHER_MENU_PREFETCH[4], TEACHER_MENU_PREFETCH[1]],
+  "/teacher/exams": [TEACHER_MENU_PREFETCH[5], TEACHER_MENU_PREFETCH[1]],
   "/teacher/marks": [TEACHER_MENU_PREFETCH[1]],
-  "/teacher/results": [TEACHER_MENU_PREFETCH[5]],
+  "/teacher/results": [TEACHER_MENU_PREFETCH[6]],
   "/school/dashboard": [SCHOOL_MENU_PREFETCH[0]],
   "/school/academics": [SCHOOL_MENU_PREFETCH[1], SCHOOL_MENU_PREFETCH[2], SCHOOL_MENU_PREFETCH[3]],
   "/school/teachers": [SCHOOL_MENU_PREFETCH[5]],

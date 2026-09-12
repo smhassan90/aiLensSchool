@@ -26,6 +26,10 @@ class QuizQueryDto extends PaginationDto {
   @IsOptional()
   @IsString()
   studentId?: string;
+
+  @IsOptional()
+  @IsString()
+  paperKind?: string;
 }
 
 @ApiTags('Quizzes')
@@ -75,6 +79,12 @@ export class QuizzesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.quizzesService.publish(id, dto, user);
+  }
+
+  @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)
+  @Post(':id/submit-paper')
+  submitPaper(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.quizzesService.submitForPrint(id, user);
   }
 
   @Roles(RoleName.PARENT)

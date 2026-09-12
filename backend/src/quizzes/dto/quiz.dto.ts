@@ -39,13 +39,19 @@ export class GenerateQuizDto {
   @IsString({ each: true })
   homeworkIds?: string[];
 
+  @ApiPropertyOptional({ type: [String], description: 'Confirmed lecture IDs to include in an exam paper' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  lessonIds?: string[];
+
   @ApiPropertyOptional()
-  @ValidateIf((dto: GenerateQuizDto) => !dto.homeworkIds?.length)
+  @ValidateIf((dto: GenerateQuizDto) => !dto.homeworkIds?.length && !dto.lessonIds?.length)
   @IsDateString()
   lessonDateFrom?: string;
 
   @ApiPropertyOptional()
-  @ValidateIf((dto: GenerateQuizDto) => !dto.homeworkIds?.length)
+  @ValidateIf((dto: GenerateQuizDto) => !dto.homeworkIds?.length && !dto.lessonIds?.length)
   @IsDateString()
   lessonDateTo?: string;
 
@@ -65,7 +71,7 @@ export class GenerateQuizDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(20)
+  @Max(40)
   mcqCount?: number;
 
   @ApiPropertyOptional({ description: 'Fill-in-the-blank count (short exact answer, auto-marked)' })
@@ -73,25 +79,62 @@ export class GenerateQuizDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(20)
+  @Max(40)
   fillBlankCount?: number;
 
-  @ApiPropertyOptional({ description: 'True/False count (auto-gradable)' })
+  @ApiPropertyOptional({ description: 'True/False count' })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(20)
+  @Max(40)
   trueFalseCount?: number;
 
-  /** @deprecated Prefer trueFalseCount — short answers are no longer generated. */
-  @ApiPropertyOptional({ description: 'Deprecated: mapped to trueFalseCount' })
+  @ApiPropertyOptional({ description: 'Open-ended / short-answer count for printed exam papers' })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(20)
+  @Max(40)
+  openEndedCount?: number;
+
+  /** @deprecated Prefer trueFalseCount for quizzes, openEndedCount for exam papers. */
+  @ApiPropertyOptional({ description: 'Deprecated: mapped to trueFalseCount on quizzes' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(40)
   shortAnswerCount?: number;
+
+  @ApiPropertyOptional({ description: 'Total marks for the MCQ section' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(200)
+  mcqMarks?: number;
+
+  @ApiPropertyOptional({ description: 'Total marks for the true/false section' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(200)
+  trueFalseMarks?: number;
+
+  @ApiPropertyOptional({ description: 'Total marks for the open-ended section' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(200)
+  openEndedMarks?: number;
+
+  @ApiPropertyOptional({ description: 'ASSESSMENT, MID_TERM, FINAL_TERM, or QUIZ' })
+  @IsOptional()
+  @IsString()
+  paperKind?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -20,6 +20,7 @@ import {
   ClipboardCheck,
   CreditCard,
   BarChart3,
+  FileText,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -88,6 +89,12 @@ const setupSections: SetupSection[] = [
         description: "Your school’s papers, marks, dates, and quiz minima — not a shared template",
         icon: Trophy,
         permission: "MANAGE_EXAMS",
+      },
+      {
+        href: "/school/exam-papers",
+        title: "Exam printouts",
+        description: "Papers teachers generated from lectures — print for the class",
+        icon: FileText,
       },
     ],
   },

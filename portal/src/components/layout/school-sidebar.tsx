@@ -35,6 +35,7 @@ const setupPathPrefixes = [
   "/school/parents",
   "/school/lessons",
   "/school/quizzes",
+  "/school/exam-papers",
   "/school/results",
   "/school/attendance",
   "/school/report-cards",

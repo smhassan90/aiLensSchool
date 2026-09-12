@@ -1192,6 +1192,8 @@ model Quiz {
   lessonDateFrom DateTime?  @map("lesson_date_from") @db.Date
   lessonDateTo   DateTime?  @map("lesson_date_to") @db.Date
   totalMarks     Decimal    @default(0) @map("total_marks") @db.Decimal(8, 2)
+  paperKind      String     @default("QUIZ") @map("paper_kind") @db.VarChar(32)
+  submittedAt    DateTime?  @map("submitted_at")
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
@@ -1210,6 +1212,7 @@ model Quiz {
   @@index([sectionId])
   @@index([subjectId])
   @@index([status])
+  @@index([paperKind])
   @@map("quizzes")
 }
 

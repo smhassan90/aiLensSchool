@@ -3,7 +3,7 @@ import { AIRequestStatus, AIRequestType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { FAST_AI_PROVIDER, AiProvider } from '../providers/ai.provider';
 import { QuizOutput } from '../schemas/quiz-output.schema';
-import { sanitizeGeneratedQuiz } from '../quiz-mix';
+import { resolveQuizMix, sanitizeGeneratedExam, sanitizeGeneratedQuiz } from '../quiz-mix';
 
 @Injectable()
 export class QuizGenerationService {
@@ -19,10 +19,16 @@ export class QuizGenerationService {
     subjectName?: string;
     questionCount?: number;
     quickGenerate?: boolean;
+    examPaper?: boolean;
     mcqCount?: number;
     fillBlankCount?: number;
     trueFalseCount?: number;
     shortAnswerCount?: number;
+    openEndedCount?: number;
+    mcqMarks?: number;
+    trueFalseMarks?: number;
+    openEndedMarks?: number;
+    fillBlankMarks?: number;
   }): Promise<QuizOutput> {
     const request = await this.prisma.aIRequest.create({
       data: {
@@ -41,12 +47,23 @@ export class QuizGenerationService {
         subjectName: input.subjectName,
         questionCount: input.questionCount,
         quickGenerate: input.quickGenerate,
+        examPaper: input.examPaper,
         mcqCount: input.mcqCount,
         fillBlankCount: input.fillBlankCount,
-        trueFalseCount: input.trueFalseCount ?? input.shortAnswerCount,
+        trueFalseCount: input.trueFalseCount ?? (input.examPaper ? undefined : input.shortAnswerCount),
+        openEndedCount: input.openEndedCount ?? (input.examPaper ? input.shortAnswerCount : undefined),
+        mcqMarks: input.mcqMarks,
+        trueFalseMarks: input.trueFalseMarks,
+        openEndedMarks: input.openEndedMarks,
+        fillBlankMarks: input.fillBlankMarks,
       });
 
-      const data = sanitizeGeneratedQuiz(result.data);
+      const mix = resolveQuizMix({
+        ...input,
+        trueFalseCount: input.trueFalseCount ?? (input.examPaper ? undefined : input.shortAnswerCount),
+        openEndedCount: input.openEndedCount ?? (input.examPaper ? input.shortAnswerCount : undefined),
+      });
+      const data = mix.mode === 'exam' ? sanitizeGeneratedExam(result.data, mix) : sanitizeGeneratedQuiz(result.data);
 
       await this.prisma.aIRequest.update({
         where: { id: request.id },

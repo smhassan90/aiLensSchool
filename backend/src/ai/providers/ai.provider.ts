@@ -29,10 +29,16 @@ export interface AiProvider {
     subjectName?: string;
     questionCount?: number;
     quickGenerate?: boolean;
+    examPaper?: boolean;
     mcqCount?: number;
     fillBlankCount?: number;
     trueFalseCount?: number;
     shortAnswerCount?: number;
+    openEndedCount?: number;
+    mcqMarks?: number;
+    trueFalseMarks?: number;
+    openEndedMarks?: number;
+    fillBlankMarks?: number;
   }): Promise<AiCompletionResult<QuizOutput>>;
 
   generateHomework(input: {

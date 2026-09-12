@@ -9,12 +9,19 @@ export interface GenerateQuizPayload {
   lessonDateFrom?: string;
   lessonDateTo?: string;
   homeworkIds?: string[];
+  lessonIds?: string[];
   questionCount?: number;
   quickGenerate?: boolean;
+  examPaper?: boolean;
   mcqCount?: number;
   fillBlankCount?: number;
   shortAnswerCount?: number;
   trueFalseCount?: number;
+  openEndedCount?: number;
+  mcqMarks?: number;
+  trueFalseMarks?: number;
+  openEndedMarks?: number;
+  paperKind?: string;
   title?: string;
 }
 
@@ -28,7 +35,7 @@ export interface UpdateQuizQuestionPayload {
 }
 
 export const quizzesService = {
-  list(params?: { page?: number; limit?: number; sectionId?: string; status?: string }) {
+  list(params?: { page?: number; limit?: number; sectionId?: string; status?: string; paperKind?: string }) {
     return apiClient<Paginated<Quiz>>(`/quizzes${buildQuery(params ?? {})}`);
   },
 
@@ -55,5 +62,9 @@ export const quizzesService = {
       method: "POST",
       body: JSON.stringify(payload ?? {}),
     });
+  },
+
+  submitPaper(id: string) {
+    return apiClient<Quiz>(`/quizzes/${id}/submit-paper`, { method: "POST" });
   },
 };

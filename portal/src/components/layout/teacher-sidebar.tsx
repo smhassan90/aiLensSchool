@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   FileQuestion,
+  FileText,
   LayoutDashboard,
   Trophy,
   User,
@@ -30,6 +31,7 @@ const baseNavItems = [
   { href: "/teacher/lessons", label: "Lessons", icon: BookOpen },
   { href: "/teacher/homework", label: "Homework", icon: ClipboardList },
   { href: "/teacher/quizzes", label: "Quizzes", icon: FileQuestion },
+  { href: "/teacher/exams", label: "Exam papers", icon: FileText },
   { href: "/teacher/marks", label: "Tests & reports", icon: Trophy },
   { href: "/teacher/profile", label: "Profile", icon: User },
 ];

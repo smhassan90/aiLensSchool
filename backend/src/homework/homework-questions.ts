@@ -52,7 +52,7 @@ export function buildHomeworkQuestions(
     }));
     return {
       id: randomUUID(),
-      type: normalized.type,
+      type: normalized.type === 'SHORT_ANSWER' ? 'FILL_IN_THE_BLANK' : normalized.type,
       questionText: normalized.questionText,
       marks: Number(normalized.marks) || 1,
       correctAnswer: (normalized.correctAnswer ?? '').trim() || options.find((o) => o.isCorrect)?.optionText || '',

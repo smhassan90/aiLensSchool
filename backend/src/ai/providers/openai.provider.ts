@@ -8,6 +8,7 @@ import {
 import { LessonOutput, LessonOutputSchema } from '../schemas/lesson-output.schema';
 import { QuizOutput, QuizOutputSchema } from '../schemas/quiz-output.schema';
 import {
+  EXAM_GENERATION_PROMPT,
   HOMEWORK_GENERATION_PROMPT,
   LESSON_PROCESSING_PROMPT,
   QUIZ_GENERATION_PROMPT,
@@ -73,10 +74,16 @@ export class OpenAiProvider implements AiProvider {
     subjectName?: string;
     questionCount?: number;
     quickGenerate?: boolean;
+    examPaper?: boolean;
     mcqCount?: number;
     fillBlankCount?: number;
     trueFalseCount?: number;
     shortAnswerCount?: number;
+    openEndedCount?: number;
+    mcqMarks?: number;
+    trueFalseMarks?: number;
+    openEndedMarks?: number;
+    fillBlankMarks?: number;
   }): Promise<AiCompletionResult<QuizOutput>> {
     const mix = resolveQuizMix(input);
     if (!this.apiKey) {
@@ -85,8 +92,8 @@ export class OpenAiProvider implements AiProvider {
     }
 
     const content = await this.chat(
-      QUIZ_GENERATION_PROMPT,
-      `Subject: ${input.subjectName ?? 'General'}\n${quizMixInstructions(mix)}\n\nLessons:\n${input.lessonSummaries.join('\n---\n')}`,
+      mix.mode === 'exam' ? EXAM_GENERATION_PROMPT : QUIZ_GENERATION_PROMPT,
+      `Subject: ${input.subjectName ?? 'General'}\n${quizMixInstructions(mix)}\n\nLectures:\n${input.lessonSummaries.join('\n---\n')}`,
     );
     const parsed = QuizOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
     return {

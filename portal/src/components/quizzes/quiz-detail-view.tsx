@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLoader } from "@/components/layout/page-loader";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { QuizReviewQuestion } from "@/components/quizzes/quiz-review-question";
 import { QuizEditorActions } from "@/components/quizzes/quiz-editor-actions";
 import { QuizAnalysis } from "@/components/quizzes/quiz-analysis";
+import { ExamPrintView } from "@/components/exams/exam-print-view";
 import { quizzesService } from "@/services/quizzes.service";
+import { examPaperLabel, examStatusLabel, isExamPaper } from "@/lib/exam-paper";
 
 interface QuizDetailViewProps {
   quizId: string;
@@ -53,7 +55,8 @@ export function QuizDetailView({ quizId, listHref, listQueryKey }: QuizDetailVie
   }
 
   const includedCount = quiz.questions?.filter((q) => q.included).length ?? 0;
-  const isDraft = quiz.status !== "PUBLISHED";
+  const examPaper = isExamPaper(quiz.paperKind);
+  const isDraft = quiz.status === "DRAFT";
 
   const questions = (
     <div className="space-y-4">
@@ -83,21 +86,33 @@ export function QuizDetailView({ quizId, listHref, listQueryKey }: QuizDetailVie
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={quiz.title}
-        description={`${quiz.subject?.name ?? ""} · Section ${quiz.section?.name ?? ""} · Headline suggested by the system`}
+        description={
+          examPaper
+            ? `${examPaperLabel(quiz.paperKind)} · ${quiz.subject?.name ?? ""} · Section ${quiz.section?.name ?? ""}`
+            : `${quiz.subject?.name ?? ""} · Section ${quiz.section?.name ?? ""} · Headline suggested by the system`
+        }
         actions={
-          <Link href={listHref}>
-            <Button variant="outline">
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {examPaper ? (
+              <Button onClick={() => window.print()}>
+                <Printer className="h-4 w-4" />
+                Print
+              </Button>
+            ) : null}
+            <Link href={listHref}>
+              <Button variant="outline">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+            </Link>
+          </div>
         }
       />
 
       <div className="min-w-0 space-y-6">
         <div className="flex items-center gap-3">
-          <Badge variant={quiz.status === "PUBLISHED" ? "success" : "warning"}>
-            {quiz.status}
+          <Badge variant={quiz.status === "PUBLISHED" || quiz.status === "CLOSED" ? "success" : "warning"}>
+            {examPaper ? examStatusLabel(quiz.status, quiz.paperKind) : quiz.status}
           </Badge>
           <span className="text-sm text-muted-foreground">
             {includedCount} of {quiz.questions?.length ?? 0} questions included
@@ -114,6 +129,8 @@ export function QuizDetailView({ quizId, listHref, listQueryKey }: QuizDetailVie
               listQueryKey={listQueryKey}
             />
           </>
+        ) : examPaper ? (
+          <ExamPrintView quiz={quiz} showAnswers />
         ) : (
           <Tabs defaultValue="analysis">
             <TabsList>

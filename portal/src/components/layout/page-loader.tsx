@@ -11,6 +11,8 @@ export type LoaderTask =
   | "homework"
   | "quizzes"
   | "quiz"
+  | "exams"
+  | "exam"
   | "teacher"
   | "school"
   | "admin";
@@ -27,6 +29,8 @@ const TASK_PHRASES: Record<LoaderTask, string[]> = {
   homework: ["Loading homework", "Checking assignments for this class", "Almost ready"],
   quizzes: ["Loading quizzes", "Checking drafts and published papers", "Almost ready"],
   quiz: ["Opening this quiz", "Loading the questions", "Almost ready"],
+  exams: ["Loading exam papers", "Checking drafts and printouts", "Almost ready"],
+  exam: ["Opening this paper", "Loading the questions", "Almost ready"],
   teacher: ["Opening the teacher hub", "Checking your classes", "Almost there"],
   school: ["Opening the school workspace", "Loading school records", "Almost there"],
   admin: ["Opening admin tools", "Loading platform records", "Almost there"],

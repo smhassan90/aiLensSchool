@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiClientError } from "@/lib/api-client";
 import type { Quiz } from "@/lib/types";
+import { isExamPaper } from "@/lib/exam-paper";
 import { useToast } from "@/providers/toast-provider";
 import { quizzesService } from "@/services/quizzes.service";
 
@@ -53,6 +54,7 @@ export function QuizEditorActions({
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishMode, setPublishMode] = useState<"immediate" | "schedule">("immediate");
   const [dueAt, setDueAt] = useState("");
+  const examPaper = isExamPaper(quiz.paperKind);
 
   const includedCount = quiz.questions?.filter((q) => q.included).length ?? 0;
 
@@ -107,9 +109,32 @@ export function QuizEditorActions({
     },
   });
 
-  if (quiz.status === "PUBLISHED") return null;
+  const submitPaper = useMutation({
+    mutationFn: async () => {
+      if (includedCount === 0) {
+        throw new Error("Include at least one question before submitting");
+      }
+      await quizzesService.updateQuestions(quizId, questionPayload(quiz));
+      return quizzesService.submitPaper(quizId);
+    },
+    onSuccess: () => {
+      toast({ title: "Submitted for printout", description: "The office can print this paper now.", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["quiz", quizId] });
+      queryClient.invalidateQueries({ queryKey: listQueryKey });
+      router.push(listHref);
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not submit paper",
+        description: err instanceof ApiClientError ? err.message : (err as Error).message,
+        variant: "error",
+      });
+    },
+  });
 
-  const busy = saveDraft.isPending || publish.isPending;
+  if (quiz.status === "PUBLISHED" || quiz.status === "CLOSED") return null;
+
+  const busy = saveDraft.isPending || publish.isPending || submitPaper.isPending;
 
   return (
     <>
@@ -127,16 +152,25 @@ export function QuizEditorActions({
           type="button"
           disabled={busy || includedCount === 0}
           onClick={() => {
+            if (examPaper) {
+              submitPaper.mutate();
+              return;
+            }
             setPublishMode("immediate");
             setDueAt("");
             setPublishOpen(true);
           }}
         >
           <Send className="h-4 w-4" />
-          Publish
+          {examPaper
+            ? submitPaper.isPending
+              ? "Submitting…"
+              : "Submit for printout"
+            : "Publish"}
         </Button>
       </div>
 
+      {!examPaper ? (
       <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
         <DialogContent onClose={() => setPublishOpen(false)}>
           <DialogHeader>
@@ -209,6 +243,7 @@ export function QuizEditorActions({
           </div>
         </DialogContent>
       </Dialog>
+      ) : null}
     </>
   );
 }

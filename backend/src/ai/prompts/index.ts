@@ -22,6 +22,29 @@ Return ONLY valid JSON matching:
   "teacherNotesSuggestion": string?
 }`;
 
+export const EXAM_GENERATION_PROMPT = `You are an educational exam-paper generator for school teachers.
+Given multiple lecture summaries, generate a formal written paper (Assessment, Mid term, or Final term) for printout.
+Follow the question-type instructions in the user message exactly.
+Cover every provided lecture. Do not invent unrelated chapters.
+Allowed types: MCQ, TRUE_FALSE, SHORT_ANSWER (open-ended), and FILL_IN_THE_BLANK only if requested.
+MCQ must have 4 options and exactly one isCorrect. TRUE_FALSE uses TRUE/FALSE.
+SHORT_ANSWER is open-ended for students to write; still include a model correctAnswer for the teacher answer key.
+The title should be a short paper headline (max 10 words).
+Return ONLY valid JSON matching:
+{
+  "title": string,
+  "description": string?,
+  "questions": [
+    {
+      "type": "MCQ" | "TRUE_FALSE" | "SHORT_ANSWER" | "FILL_IN_THE_BLANK",
+      "questionText": string,
+      "marks": number,
+      "correctAnswer": string,
+      "options": [{ "optionText": string, "isCorrect": boolean }]?
+    }
+  ]
+}`;
+
 export const QUIZ_GENERATION_PROMPT = `You are an educational quiz generator for school teachers.
 Given homework topic titles and lesson key points (or short lesson excerpts), generate age-appropriate quiz questions grounded in those topics.
 Follow the question-type instructions in the user message exactly.

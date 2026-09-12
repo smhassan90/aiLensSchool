@@ -7,6 +7,7 @@ import { AiCompletionResult, AiProvider, LessonImageInput } from './ai.provider'
 import { LessonOutput, LessonOutputSchema } from '../schemas/lesson-output.schema';
 import { QuizOutput, QuizOutputSchema } from '../schemas/quiz-output.schema';
 import {
+  EXAM_GENERATION_PROMPT,
   HOMEWORK_GENERATION_PROMPT,
   LESSON_PROCESSING_PROMPT,
   QUIZ_GENERATION_PROMPT,
@@ -94,10 +95,16 @@ export class CursorProvider implements AiProvider {
     subjectName?: string;
     questionCount?: number;
     quickGenerate?: boolean;
+    examPaper?: boolean;
     mcqCount?: number;
     fillBlankCount?: number;
     trueFalseCount?: number;
     shortAnswerCount?: number;
+    openEndedCount?: number;
+    mcqMarks?: number;
+    trueFalseMarks?: number;
+    openEndedMarks?: number;
+    fillBlankMarks?: number;
   }): Promise<AiCompletionResult<QuizOutput>> {
     const mix = resolveQuizMix(input);
     if (!this.apiKey) {
@@ -106,11 +113,11 @@ export class CursorProvider implements AiProvider {
 
     const content = await this.withTimeout(
       this.complete(
-        QUIZ_GENERATION_PROMPT,
-        `Subject: ${input.subjectName ?? 'General'}\n${quizMixInstructions(mix)}\n\nTopics:\n${input.lessonSummaries.join('\n---\n')}`,
+        mix.mode === 'exam' ? EXAM_GENERATION_PROMPT : QUIZ_GENERATION_PROMPT,
+        `Subject: ${input.subjectName ?? 'General'}\n${quizMixInstructions(mix)}\n\nLectures:\n${input.lessonSummaries.join('\n---\n')}`,
       ),
       this.jsonTimeoutMs,
-      'Quiz generation',
+      mix.mode === 'exam' ? 'Exam generation' : 'Quiz generation',
     );
     try {
       const parsed = QuizOutputSchema.parse(JSON.parse(this.extractJson(content.text)));

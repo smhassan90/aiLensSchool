@@ -301,11 +301,16 @@ export interface Quiz {
   id: string;
   title: string;
   status: string;
+  paperKind?: string;
+  submittedAt?: string | null;
+  totalMarks?: number | string;
   dueAt?: string;
   createdAt: string;
+  description?: string | null;
   questions?: QuizQuestion[];
-  section?: { id: string; name: string };
+  section?: { id: string; name: string; grade?: { id: string; name: string } | null };
   subject?: { id: string; name: string };
+  createdBy?: { firstName: string; lastName: string } | null;
 }
 
 export interface QuizAnalysisStudent {

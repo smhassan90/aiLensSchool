@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   LessonStatus,
+  NotificationType,
   Prisma,
   QuestionSource,
   QuestionType,
@@ -24,7 +25,7 @@ import {
   SubmitQuizDto,
   UpdateQuizQuestionsDto,
 } from './dto/quiz.dto';
-import { NotificationType } from '@prisma/client';
+import { examPaperLabel, EXAM_PAPER_KINDS, isExamPaperKind } from './exam-paper';
 import { normalizeGeneratedQuestion } from '../ai/quiz-mix';
 
 @Injectable()
@@ -113,6 +114,43 @@ export class QuizzesService {
       rangeTo ??= new Date(Math.max(...dueDates.map((d) => d.getTime())));
     }
 
+    if (dto.lessonIds?.length) {
+      const lessons = await this.prisma.dailyLesson.findMany({
+        where: {
+          id: { in: dto.lessonIds },
+          schoolId,
+          sectionId: dto.sectionId,
+          subjectId: dto.subjectId,
+          status: LessonStatus.CONFIRMED,
+        },
+        select: {
+          date: true,
+          topicName: true,
+          chapterName: true,
+          aiSummary: true,
+          concepts: { select: { name: true }, take: 12 },
+        },
+        orderBy: { date: 'asc' },
+      });
+      if (!lessons.length) {
+        throw new BadRequestException({
+          code: 'NO_CONFIRMED_LECTURES',
+          message: 'Select confirmed lectures for this class and subject',
+        });
+      }
+      topicSummaries.push(
+        ...lessons.map((l) => {
+          const concepts = l.concepts.map((c) => c.name).filter(Boolean);
+          const body = concepts.length
+            ? `Key points: ${concepts.join('; ')}`
+            : this.slimTopicText(l.aiSummary ?? l.topicName ?? l.chapterName ?? 'Lecture');
+          return `${l.date.toISOString().slice(0, 10)}: ${l.topicName ?? l.chapterName ?? 'Lecture'}\n${body}`;
+        }),
+      );
+      rangeFrom ??= lessons[0]?.date;
+      rangeTo ??= lessons[lessons.length - 1]?.date;
+    }
+
     if (dto.lessonDateFrom && dto.lessonDateTo) {
       const lessons = await this.prisma.dailyLesson.findMany({
         where: {
@@ -148,14 +186,17 @@ export class QuizzesService {
     if (!topicSummaries.length) {
       throw new BadRequestException({
         code: 'NO_QUIZ_TOPICS',
-        message: 'Select homework topics or a lesson date range to generate a quiz',
+        message: 'Select lectures, homework topics, or a lesson date range',
       });
     }
 
+    const examPaper = isExamPaperKind(dto.paperKind);
     const customTotal =
       (dto.mcqCount ?? 0) +
       (dto.fillBlankCount ?? 0) +
-      (dto.trueFalseCount ?? dto.shortAnswerCount ?? 0);
+      (dto.trueFalseCount ?? 0) +
+      (dto.openEndedCount ?? (examPaper ? dto.shortAnswerCount ?? 0 : 0)) +
+      (examPaper ? 0 : dto.shortAnswerCount ?? 0);
     if (dto.quickGenerate === false && customTotal < 1) {
       throw new BadRequestException({
         code: 'QUESTION_MIX_REQUIRED',
@@ -170,13 +211,23 @@ export class QuizzesService {
       lessonSummaries: topicSummaries,
       subjectName: subject?.name,
       questionCount: dto.questionCount,
-      quickGenerate: dto.quickGenerate,
+      quickGenerate: examPaper ? false : dto.quickGenerate,
+      examPaper,
       mcqCount: dto.mcqCount,
       fillBlankCount: dto.fillBlankCount,
-      trueFalseCount: dto.trueFalseCount ?? dto.shortAnswerCount,
+      trueFalseCount: dto.trueFalseCount ?? (examPaper ? undefined : dto.shortAnswerCount),
+      openEndedCount: dto.openEndedCount ?? (examPaper ? dto.shortAnswerCount : undefined),
+      mcqMarks: dto.mcqMarks,
+      trueFalseMarks: dto.trueFalseMarks,
+      openEndedMarks: dto.openEndedMarks,
     });
 
     const totalMarks = aiQuiz.questions.reduce((sum, q) => sum + q.marks, 0);
+
+    const paperKind = examPaper ? dto.paperKind! : 'QUIZ';
+    const paperTitle =
+      dto.title?.trim() ||
+      (examPaper ? `${examPaperLabel(paperKind)} — ${subject?.name ?? 'Subject'}` : aiQuiz.title.trim() || `${subject?.name ?? 'Class'} quiz`);
 
     const quiz = await this.prisma.$transaction(
       async (tx) => {
@@ -187,13 +238,14 @@ export class QuizzesService {
           academicYearId: dto.academicYearId,
           sectionId: dto.sectionId,
           subjectId: dto.subjectId,
-          title: aiQuiz.title.trim() || `${subject?.name ?? 'Class'} quiz`,
+          title: paperTitle,
           description: aiQuiz.description,
           status: QuizStatus.DRAFT,
           createdById: user.id,
           lessonDateFrom: rangeFrom,
           lessonDateTo: rangeTo,
           totalMarks,
+          paperKind,
         },
       });
 
@@ -201,11 +253,24 @@ export class QuizzesService {
         const q = normalizeGeneratedQuestion(aiQuiz.questions[i]);
         const isChoice = q.type === 'MCQ' || q.type === 'TRUE_FALSE';
         const isFillBlank = q.type === 'FILL_IN_THE_BLANK';
+        const isOpenEnded = q.type === 'SHORT_ANSWER';
         const hasMarkedOption = Boolean(q.options?.some((opt) => opt.isCorrect));
-        if (!q.correctAnswer?.trim() || (!isChoice && !isFillBlank) || (isChoice && !hasMarkedOption)) {
+        if (!examPaper) {
+          if (!q.correctAnswer?.trim() || (!isChoice && !isFillBlank) || (isChoice && !hasMarkedOption)) {
+            throw new BadRequestException({
+              code: 'QUIZ_ANSWER_REQUIRED',
+              message: 'Generated quiz must only include auto-gradable questions (multiple choice, fill in the blank, or true/false). Please generate again.',
+            });
+          }
+        } else if (isChoice && !hasMarkedOption) {
           throw new BadRequestException({
-            code: 'QUIZ_ANSWER_REQUIRED',
-            message: 'Generated quiz must only include auto-gradable questions (multiple choice, fill in the blank, or true/false). Please generate again.',
+            code: 'EXAM_CHOICE_REQUIRED',
+            message: 'Multiple-choice and true/false questions need a marked correct option. Please generate again.',
+          });
+        } else if (!isChoice && !isFillBlank && !isOpenEnded) {
+          throw new BadRequestException({
+            code: 'EXAM_QUESTION_TYPE',
+            message: 'Exam papers can include MCQ, true/false, and open-ended questions only.',
           });
         }
         const question = await tx.quizQuestion.create({
@@ -214,7 +279,7 @@ export class QuizzesService {
             type: q.type as QuestionType,
             questionText: q.questionText,
             marks: Number(q.marks) || 1,
-            correctAnswer: q.correctAnswer.trim(),
+            correctAnswer: (q.correctAnswer ?? '').trim() || (examPaper ? 'See answer key after marking.' : ''),
             order: i,
             source: QuestionSource.AI,
             included: true,
@@ -325,6 +390,12 @@ export class QuizzesService {
 
   async publish(id: string, dto: PublishQuizDto, user: AuthUser) {
     const quiz = await this.findOne(id, user);
+    if (isExamPaperKind(quiz.paperKind)) {
+      throw new BadRequestException({
+        code: 'EXAM_NOT_PUBLISHABLE',
+        message: 'Submit this paper for printout instead of publishing it to parents',
+      });
+    }
     if (quiz.status !== QuizStatus.DRAFT) {
       throw new BadRequestException({
         code: 'QUIZ_ALREADY_PUBLISHED',
@@ -404,9 +475,50 @@ export class QuizzesService {
     return updated;
   }
 
+  async submitForPrint(id: string, user: AuthUser) {
+    const quiz = await this.findOne(id, user);
+    if (!isExamPaperKind(quiz.paperKind)) {
+      throw new BadRequestException({
+        code: 'NOT_AN_EXAM_PAPER',
+        message: 'Only assessment, mid-term, and final papers can be submitted for printout',
+      });
+    }
+    if (quiz.status !== QuizStatus.DRAFT) {
+      throw new BadRequestException({
+        code: 'EXAM_ALREADY_SUBMITTED',
+        message: 'This paper is already submitted',
+      });
+    }
+    const includedCount = quiz.questions.filter((q) => q.included).length;
+    if (includedCount === 0) {
+      throw new BadRequestException({
+        code: 'NO_QUESTIONS_INCLUDED',
+        message: 'Include at least one question before submitting',
+      });
+    }
+
+    const updated = await this.prisma.quiz.update({
+      where: { id },
+      data: {
+        status: QuizStatus.CLOSED,
+        submittedAt: new Date(),
+      },
+    });
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId: quiz.schoolId,
+      action: 'EXAM_PAPER_SUBMITTED',
+      entityType: 'Quiz',
+      entityId: id,
+    });
+
+    return this.findOne(updated.id, user);
+  }
+
   async findAll(
     user: AuthUser,
-    query: PaginationDto & { sectionId?: string; status?: QuizStatus; studentId?: string },
+    query: PaginationDto & { sectionId?: string; status?: QuizStatus; studentId?: string; paperKind?: string },
   ) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -425,6 +537,7 @@ export class QuizzesService {
       const where: Prisma.QuizWhereInput = {
         sectionId: enrollment.sectionId,
         status: QuizStatus.PUBLISHED,
+        paperKind: 'QUIZ',
         schoolId: this.tenant.requireSchoolId(user),
       };
       const [items, total] = await pageQuery(
@@ -457,8 +570,15 @@ export class QuizzesService {
     }
 
     const schoolId = this.tenant.requireSchoolId(user);
+    const examFilter =
+      query.paperKind === 'EXAM'
+        ? { paperKind: { in: [...EXAM_PAPER_KINDS] } }
+        : query.paperKind
+          ? { paperKind: query.paperKind }
+          : { paperKind: 'QUIZ' };
     const where: Prisma.QuizWhereInput = {
       schoolId,
+      ...examFilter,
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(this.tenant.isTeacher(user) && !this.tenant.isSchoolAdmin(user)
@@ -477,6 +597,9 @@ export class QuizzesService {
             id: true,
             title: true,
             status: true,
+            paperKind: true,
+            submittedAt: true,
+            totalMarks: true,
             createdAt: true,
             publishedAt: true,
             sectionId: true,
@@ -500,8 +623,9 @@ export class QuizzesService {
       include: {
         questions: { include: { options: true }, orderBy: { order: 'asc' } },
         subject: true,
-        section: true,
+        section: { include: { grade: { select: { id: true, name: true } } } },
         assignments: true,
+        createdBy: { select: { firstName: true, lastName: true } },
       },
     });
     if (!quiz) {
@@ -516,7 +640,7 @@ export class QuizzesService {
         });
       }
       await this.parentsService.assertParentChildInSection(user.id, studentId, quiz.sectionId);
-      if (quiz.status !== QuizStatus.PUBLISHED) {
+      if (quiz.status !== QuizStatus.PUBLISHED || isExamPaperKind(quiz.paperKind)) {
         throw new ForbiddenException({
           code: 'QUIZ_NOT_AVAILABLE',
           message: 'Quiz is not available',

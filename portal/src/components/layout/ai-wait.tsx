@@ -2,7 +2,7 @@
 
 import { PageLoader } from "@/components/layout/page-loader";
 
-export type AiWaitKind = "extract" | "key-points" | "homework" | "diary" | "quiz" | "coach";
+export type AiWaitKind = "extract" | "key-points" | "homework" | "diary" | "quiz" | "exam" | "coach";
 
 const AI_WAIT: Record<
   AiWaitKind,
@@ -57,6 +57,16 @@ const AI_WAIT: Record<
       "Your quiz draft is almost ready",
     ],
     hint: "The headline is written by the system. Stay on this page.",
+  },
+  exam: {
+    phrases: [
+      "Reading the lectures you selected",
+      "Building MCQs, true/false, and open-ended questions",
+      "Spreading marks across each section",
+      "Writing a paper the office can print",
+      "Your exam draft is almost ready",
+    ],
+    hint: "Nothing is sent to the office until you review and submit.",
   },
   coach: {
     phrases: [

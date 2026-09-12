@@ -2,12 +2,38 @@ import {
   isAutoGradableQuestion,
   mockQuestionsForMix,
   resolveQuizMix,
+  sanitizeGeneratedExam,
   sanitizeGeneratedQuiz,
 } from './quiz-mix';
 
 describe('resolveQuizMix', () => {
   it('uses quick mix when no counts are provided', () => {
     expect(resolveQuizMix({})).toEqual({ mode: 'quick', questionCount: 8 });
+  });
+
+  it('builds an exam mix with open-ended questions and section marks', () => {
+    expect(
+      resolveQuizMix({
+        examPaper: true,
+        mcqCount: 10,
+        trueFalseCount: 5,
+        openEndedCount: 3,
+        mcqMarks: 20,
+        trueFalseMarks: 10,
+        openEndedMarks: 15,
+      }),
+    ).toEqual({
+      mode: 'exam',
+      mcqCount: 10,
+      fillBlankCount: 0,
+      trueFalseCount: 5,
+      openEndedCount: 3,
+      questionCount: 18,
+      mcqMarks: 20,
+      trueFalseMarks: 10,
+      openEndedMarks: 15,
+      fillBlankMarks: 0,
+    });
   });
 
   it('keeps fill-in-the-blank as its own auto-gradable type', () => {
@@ -89,5 +115,48 @@ describe('sanitizeGeneratedQuiz', () => {
       true,
     );
     expect(questions.some((q) => q.type === 'FILL_IN_THE_BLANK')).toBe(true);
+  });
+});
+
+describe('sanitizeGeneratedExam', () => {
+  it('keeps open-ended questions on exam papers and applies section marks', () => {
+    const quiz = sanitizeGeneratedExam(
+      {
+        title: 'Mid term',
+        questions: [
+          {
+            type: 'MCQ',
+            questionText: 'Pick one',
+            marks: 1,
+            correctAnswer: 'A',
+            options: [
+              { optionText: 'A', isCorrect: true },
+              { optionText: 'B', isCorrect: false },
+            ],
+          },
+          {
+            type: 'SHORT_ANSWER',
+            questionText: 'Explain the water cycle.',
+            marks: 1,
+            correctAnswer: 'Evaporation, condensation, precipitation.',
+          },
+        ],
+      },
+      {
+        mode: 'exam',
+        mcqCount: 1,
+        fillBlankCount: 0,
+        trueFalseCount: 0,
+        openEndedCount: 1,
+        questionCount: 2,
+        mcqMarks: 10,
+        trueFalseMarks: 0,
+        openEndedMarks: 15,
+        fillBlankMarks: 0,
+      },
+    );
+    expect(quiz.questions.map((q) => q.type)).toEqual(['MCQ', 'SHORT_ANSWER']);
+    expect(quiz.questions[0].marks).toBe(10);
+    expect(quiz.questions[1].marks).toBe(15);
   });
 });
