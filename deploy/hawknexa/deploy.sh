@@ -26,12 +26,12 @@ git reset --hard "origin/${BRANCH}"
 echo "=== Sync deploy configs (keep server .env) ==="
 mkdir -p "${DEPLOY_DIR}"
 rsync -a --exclude '.env' "${REPO_DIR}/deploy/hawknexa/" "${DEPLOY_DIR}/"
-sed -i 's/\r$//' "${DEPLOY_DIR}/deploy.sh" "${DEPLOY_DIR}/docker-compose.prod.yml" "${DEPLOY_DIR}/Caddyfile" 2>/dev/null || true
-chmod +x "${DEPLOY_DIR}/deploy.sh" "${DEPLOY_DIR}/import-remote-sms-db.sh" 2>/dev/null || true
+sed -i 's/\r$//' "${DEPLOY_DIR}/deploy.sh" "${DEPLOY_DIR}/deploy-webhook.py" "${DEPLOY_DIR}/docker-compose.prod.yml" "${DEPLOY_DIR}/Caddyfile" "${DEPLOY_DIR}/Dockerfile.deploy-webhook" 2>/dev/null || true
+chmod +x "${DEPLOY_DIR}/deploy.sh" "${DEPLOY_DIR}/deploy-webhook.py" "${DEPLOY_DIR}/import-remote-sms-db.sh" 2>/dev/null || true
 
 echo "=== Build and start containers ==="
 cd "${DEPLOY_DIR}"
-docker compose -f "${COMPOSE_FILE}" build --pull backend portal
+docker compose -f "${COMPOSE_FILE}" build --pull backend portal deploy-webhook
 docker compose -f "${COMPOSE_FILE}" up -d
 
 echo "=== Health check ==="

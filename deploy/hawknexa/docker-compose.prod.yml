@@ -68,6 +68,19 @@ services:
     networks:
       - hawknexa_internal
 
+  deploy-webhook:
+    build:
+      context: .
+      dockerfile: Dockerfile.deploy-webhook
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - /opt/apps/hawknexa:/opt/apps/hawknexa
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - hawknexa_internal
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped

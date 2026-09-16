@@ -7,7 +7,15 @@ hawknexa.fynals.com {
 # API (NestJS — /api/v1, /uploads, /api/docs)
 hawknexabackend.fynals.com {
 	encode gzip
-	reverse_proxy backend:3001
+
+	# GitHub Actions deploy trigger (Bearer token required)
+	handle /internal/deploy {
+		reverse_proxy deploy-webhook:9000
+	}
+
+	handle {
+		reverse_proxy backend:3001
+	}
 }
 
 # Legacy Hostinger hostname → new portal domain

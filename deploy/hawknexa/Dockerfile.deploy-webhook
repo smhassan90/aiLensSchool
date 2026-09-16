@@ -1,0 +1,8 @@
+FROM docker:27-cli
+RUN apk add --no-cache python3 bash git curl rsync
+WORKDIR /app
+COPY deploy-webhook.py /app/deploy-webhook.py
+RUN chmod +x /app/deploy-webhook.py
+ENV DEPLOY_SCRIPT=/opt/apps/hawknexa/deploy/deploy.sh
+EXPOSE 9000
+CMD ["python3", "/app/deploy-webhook.py"]

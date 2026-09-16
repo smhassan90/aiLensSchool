@@ -25,23 +25,19 @@ Workflow: `.github/workflows/deploy-hawknexa-vps.yml`
 
 **Triggers:** push to `main` when `backend/`, `portal/`, or `deploy/hawknexa/` changes. You can also run it manually from **Actions → Deploy HawkNexa VPS → Run workflow**.
 
-### One-time: add repository secrets
+### One-time: deploy webhook + GitHub secret
+
+GitHub Actions cannot SSH into Hostinger VPS (port 22 is blocked from GitHub runners). Deploy uses an **HTTPS webhook** on port 443 instead.
+
+On the VPS, the `deploy-webhook` Docker service handles deploy triggers. `DEPLOY_WEBHOOK_SECRET` must be set in `/opt/apps/hawknexa/deploy/.env`.
 
 GitHub → **Settings → Secrets and variables → Actions → New repository secret**
 
 | Secret | Value |
 |--------|--------|
-| `HAWKNEXA_VPS_HOST` | `187.53.141.109` |
-| `HAWKNEXA_VPS_USER` | `root` |
-| `HAWKNEXA_VPS_SSH_KEY` | Full private key file (created during setup as `hawknexa_github_actions` on your PC). Copy **every line** including `-----BEGIN OPENSSH PRIVATE KEY-----` and `-----END OPENSSH PRIVATE KEY-----`. |
+| `HAWKNEXA_DEPLOY_WEBHOOK_SECRET` | Same value as `DEPLOY_WEBHOOK_SECRET` in the server `.env` |
 
-On Windows, open the key in Notepad:
-
-```powershell
-notepad $env:USERPROFILE\.ssh\hawknexa_github_actions
-```
-
-The matching public key must be in `/root/.ssh/authorized_keys` on the VPS (label: `hawknexa-github-actions`).
+Optional variable: `HAWKNEXA_DEPLOY_URL` (default `https://hawknexabackend.fynals.com/internal/deploy`).
 
 Vercel auto-deploy is disabled; production deploys go through this workflow only.
 
