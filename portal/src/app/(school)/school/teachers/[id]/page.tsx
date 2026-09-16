@@ -50,7 +50,7 @@ type ClassAssignmentRow = {
   sectionId: string | null;
   className?: string;
   classNumber?: number | null;
-  sectionName: string | null;
+  sectionName?: string | null;
   subject: string | null;
   role: string;
 };

@@ -18,8 +18,8 @@ import {
 import { formatDate } from "@/lib/utils";
 
 export type GenerateExamPaperFormValues = {
-  examConfigId: string;
-  classKey: string;
+  examConfigId?: string;
+  classKey?: string;
   difficulty: number;
   lessonIds: string[];
   mcqCount: number;
