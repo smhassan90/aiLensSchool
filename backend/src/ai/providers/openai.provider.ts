@@ -69,23 +69,9 @@ export class OpenAiProvider implements AiProvider {
     };
   }
 
-  async generateQuiz(input: {
-    lessonSummaries: string[];
-    subjectName?: string;
-    questionCount?: number;
-    quickGenerate?: boolean;
-    examPaper?: boolean;
-    mcqCount?: number;
-    fillBlankCount?: number;
-    trueFalseCount?: number;
-    shortAnswerCount?: number;
-    openEndedCount?: number;
-    mcqMarks?: number;
-    trueFalseMarks?: number;
-    openEndedMarks?: number;
-    fillBlankMarks?: number;
-    difficulty?: number;
-  }): Promise<AiCompletionResult<QuizOutput>> {
+  async generateQuiz(
+    input: Parameters<AiProvider['generateQuiz']>[0],
+  ): Promise<AiCompletionResult<QuizOutput>> {
     const mix = resolveQuizMix(input);
     if (!this.apiKey) {
       // Mock path ONLY when OPENAI_API_KEY is missing — enables local E2E without billed AI.

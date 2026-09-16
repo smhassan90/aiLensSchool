@@ -50,9 +50,13 @@ export function buildHomeworkQuestions(
       optionText: opt.optionText,
       isCorrect: Boolean(opt.isCorrect),
     }));
+    const type: HomeworkQuestionItem['type'] =
+      normalized.type === 'MCQ' || normalized.type === 'TRUE_FALSE' || normalized.type === 'FILL_IN_THE_BLANK'
+        ? normalized.type
+        : 'FILL_IN_THE_BLANK';
     return {
       id: randomUUID(),
-      type: normalized.type === 'SHORT_ANSWER' ? 'FILL_IN_THE_BLANK' : normalized.type,
+      type,
       questionText: normalized.questionText,
       marks: Number(normalized.marks) || 1,
       correctAnswer: (normalized.correctAnswer ?? '').trim() || options.find((o) => o.isCorrect)?.optionText || '',

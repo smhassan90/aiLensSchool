@@ -1,3 +1,4 @@
+import type { QuizMixRequest } from '../quiz-mix';
 import { LessonOutput } from '../schemas/lesson-output.schema';
 import { QuizOutput } from '../schemas/quiz-output.schema';
 
@@ -24,23 +25,12 @@ export interface AiProvider {
     images?: LessonImageInput[];
   }): Promise<AiCompletionResult<LessonOutput>>;
 
-  generateQuiz(input: {
-    lessonSummaries: string[];
-    subjectName?: string;
-    questionCount?: number;
-    quickGenerate?: boolean;
-    examPaper?: boolean;
-    mcqCount?: number;
-    fillBlankCount?: number;
-    trueFalseCount?: number;
-    shortAnswerCount?: number;
-    openEndedCount?: number;
-    mcqMarks?: number;
-    trueFalseMarks?: number;
-    openEndedMarks?: number;
-    fillBlankMarks?: number;
-    difficulty?: number;
-  }): Promise<AiCompletionResult<QuizOutput>>;
+  generateQuiz(
+    input: QuizMixRequest & {
+      lessonSummaries: string[];
+      subjectName?: string;
+    },
+  ): Promise<AiCompletionResult<QuizOutput>>;
 
   generateHomework(input: {
     lessonSummary: string;
