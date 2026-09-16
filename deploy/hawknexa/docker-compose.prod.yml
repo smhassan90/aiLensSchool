@@ -40,6 +40,8 @@ services:
     build:
       context: ../repo/backend
       dockerfile: Dockerfile
+      args:
+        BUILD_SHA: ${BUILD_SHA:-unknown}
     restart: unless-stopped
     env_file:
       - .env

@@ -32,7 +32,7 @@ export function ExamPaperAssignmentsEditor({
   });
 
   const defaultDue = data.data?.defaultDueAt ? data.data.defaultDueAt.slice(0, 10) : "";
-  const totalAssignments = data.data?.targetCount ?? data.data?.rows.length ?? 0;
+  const totalAssignments = data.data?.targetCount ?? data.data?.rows?.length ?? 0;
 
   useEffect(() => {
     if (defaultDue && !dueDate) {
@@ -43,6 +43,13 @@ export function ExamPaperAssignmentsEditor({
   const apply = useMutation({
     mutationFn: (release: boolean) => {
       if (!dueDate) throw new Error("Choose a paper submission due date");
+      const rows = (data.data?.rows ?? []).map((row) => ({
+        sectionId: row.sectionId,
+        subjectId: row.subjectId,
+        maxMarks: defaultMaxMarks,
+        submissionDueAt: dueDate,
+        enabled: true,
+      }));
       return academicsService.saveExamPaperAssignments({
         examConfigId,
         release,
@@ -50,6 +57,7 @@ export function ExamPaperAssignmentsEditor({
         maxMarks: defaultMaxMarks,
         submissionDueAt: dueDate,
         questionSpec: buildQuestionSpecForMarks(defaultMaxMarks),
+        rows,
       });
     },
     onSuccess: (_, release) => {

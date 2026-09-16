@@ -10,6 +10,11 @@ export class HealthController {
   @Public()
   @Get()
   check() {
-    return { status: 'ok', service: 'sms-backend', timestamp: new Date().toISOString() };
+    return {
+      status: 'ok',
+      service: 'sms-backend',
+      commit: process.env.BUILD_SHA ?? null,
+      timestamp: new Date().toISOString(),
+    };
   }
 }

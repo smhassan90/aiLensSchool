@@ -18,9 +18,11 @@ RUN npm run build
 
 FROM node:20-bookworm-slim AS runner
 
+ARG BUILD_SHA=dev
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV BUILD_SHA=${BUILD_SHA}
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \

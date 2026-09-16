@@ -12,7 +12,7 @@ on:
 
 concurrency:
   group: hawknexa-vps-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -74,18 +74,29 @@ jobs:
             exit 1
           fi
 
-      - name: Wait for API health
+      - name: Wait for VPS deploy to finish
         env:
           HEALTH_URL: ${{ vars.HAWKNEXA_HEALTH_URL || 'https://hawknexabackend.fynals.com/api/v1/health' }}
+          EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          for i in $(seq 1 36); do
-            if curl -fsS "${HEALTH_URL}" >/dev/null; then
-              echo "OK: ${HEALTH_URL}"
-              exit 0
+          short_sha="$(echo "${EXPECTED_SHA}" | cut -c1-7)"
+          echo "Waiting for VPS deploy (commit ${short_sha})..."
+          for i in $(seq 1 60); do
+            body="$(curl -fsS "${HEALTH_URL}" 2>/dev/null || true)"
+            if [ -n "${body}" ]; then
+              echo "${body}"
+              if echo "${body}" | grep -q "\"commit\":\"${short_sha}\""; then
+                echo "OK: deployed ${short_sha}"
+                exit 0
+              fi
+              if echo "${body}" | grep -q '"status":"ok"' && [ "${i}" -ge 42 ]; then
+                echo "::warning::API is up but commit ${short_sha} not reported yet (older backend image may still be running)."
+                exit 0
+              fi
             fi
-            echo "Waiting for API... (${i}/36)"
+            echo "Waiting for deploy... (${i}/60)"
             sleep 10
           done
-          echo "::error::Health check failed: ${HEALTH_URL}"
+          echo "::error::Deploy did not complete within 10 minutes: ${HEALTH_URL}"
           exit 1

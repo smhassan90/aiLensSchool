@@ -48,6 +48,8 @@ chmod +x "${DEPLOY_DIR}/deploy.sh" "${DEPLOY_DIR}/recover-deploy-webhook.sh" "${
 
 echo "=== Build and start containers ==="
 cd "${DEPLOY_DIR}"
+export BUILD_SHA="$(cd "${REPO_DIR}" && git rev-parse --short HEAD)"
+echo "BUILD_SHA=${BUILD_SHA}"
 docker compose -f "${COMPOSE_FILE}" build --pull backend portal
 docker compose -f "${COMPOSE_FILE}" up -d mysql redis backend portal caddy deploy-webhook
 
