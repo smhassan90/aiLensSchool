@@ -43,8 +43,12 @@ jobs:
           webhook_code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 "${WEBHOOK_HEALTH_URL}" || echo "000")
           echo "Webhook health HTTP ${webhook_code}"
           if [ "${webhook_code}" != "200" ]; then
-            echo "::warning::Deploy webhook is not healthy (HTTP ${webhook_code})."
-            echo "On the VPS run: cd /opt/apps/hawknexa/deploy && docker compose -f docker-compose.prod.yml up -d deploy-webhook"
+            echo "::error::Deploy webhook is not healthy (HTTP ${webhook_code})."
+            echo "On the VPS (Hostinger browser terminal) run:"
+            echo "  bash /opt/apps/hawknexa/deploy/recover-deploy-webhook.sh"
+            echo "Or if that script is missing:"
+            echo "  cd /opt/apps/hawknexa/deploy && docker compose -f docker-compose.prod.yml up -d --build deploy-webhook caddy"
+            exit 1
           fi
 
       - name: Trigger deploy on VPS

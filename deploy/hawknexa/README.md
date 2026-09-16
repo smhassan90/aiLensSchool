@@ -49,18 +49,29 @@ bash /opt/apps/hawknexa/deploy/deploy.sh
 
 ### If GitHub Actions shows HTTP 502 on `/internal/deploy`
 
-The deploy webhook container is down. In **Hostinger VPS browser terminal** (or SSH):
+The deploy webhook container is down or Caddy cannot reach it. In **Hostinger VPS browser terminal** (or SSH):
 
 ```bash
+bash /opt/apps/hawknexa/deploy/recover-deploy-webhook.sh
+```
+
+If the script is not on the server yet, run manually:
+
+```bash
+cd /opt/apps/hawknexa/repo && git pull origin main
+rsync -a --exclude '.env' /opt/apps/hawknexa/repo/deploy/hawknexa/ /opt/apps/hawknexa/deploy/
 cd /opt/apps/hawknexa/deploy
-docker compose -f docker-compose.prod.yml up -d --build deploy-webhook
+docker compose -f docker-compose.prod.yml up -d --build deploy-webhook caddy
 docker compose -f docker-compose.prod.yml logs deploy-webhook --tail 30
 curl -sS https://hawknexabackend.fynals.com/internal/deploy/health
 ```
 
-You should see `ok`. Then re-run the GitHub Actions workflow, or run `bash deploy.sh` manually.
+You should see `ok` (not a JSON 404 from the API). Then re-run the GitHub Actions workflow.
 
-Ensure `/opt/apps/hawknexa/deploy/.env` contains `DEPLOY_WEBHOOK_SECRET` matching the GitHub secret `HAWKNEXA_DEPLOY_WEBHOOK_SECRET`.
+**Checklist:**
+1. `/opt/apps/hawknexa/deploy/.env` has `DEPLOY_WEBHOOK_SECRET=...` (same as GitHub secret `HAWKNEXA_DEPLOY_WEBHOOK_SECRET`)
+2. `docker compose -f docker-compose.prod.yml ps deploy-webhook` shows **Up** (not restarting)
+3. `curl https://hawknexabackend.fynals.com/internal/deploy/health` returns plain text `ok`
 
 ## Run server prep (one-time)
 

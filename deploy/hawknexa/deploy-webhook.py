@@ -126,8 +126,10 @@ class DeployHandler(BaseHTTPRequestHandler):
 
 def main():
     if not SECRET:
-        print("ERROR: DEPLOY_WEBHOOK_SECRET is required", file=sys.stderr)
-        sys.exit(1)
+        print(
+            "WARNING: DEPLOY_WEBHOOK_SECRET is not set — health works but POST /internal/deploy returns 500",
+            file=sys.stderr,
+        )
     server = HTTPServer((LISTEN_HOST, LISTEN_PORT), DeployHandler)
     print(f"Deploy webhook listening on {LISTEN_HOST}:{LISTEN_PORT}", flush=True)
     server.serve_forever()

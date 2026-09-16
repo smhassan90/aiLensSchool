@@ -1,0 +1,59 @@
+name: Recover HawkNexa VPS Webhook
+
+on:
+  workflow_dispatch:
+
+jobs:
+  recover:
+    name: SSH recover deploy webhook
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check SSH secret
+        env:
+          SSH_KEY: ${{ secrets.HAWKNEXA_VPS_SSH_KEY }}
+        run: |
+          if [ -z "${SSH_KEY}" ]; then
+            echo "::error::Missing GitHub secret HAWKNEXA_VPS_SSH_KEY (private key for root@187.53.141.109)."
+            echo "Add it under Settings → Secrets and variables → Actions, then re-run this workflow."
+            exit 1
+          fi
+
+      - name: Recover webhook on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ vars.HAWKNEXA_VPS_HOST || '187.53.141.109' }}
+          username: ${{ vars.HAWKNEXA_VPS_USER || 'root' }}
+          key: ${{ secrets.HAWKNEXA_VPS_SSH_KEY }}
+          script_stop: true
+          command_timeout: 15m
+          script: |
+            set -euo pipefail
+            REPO_DIR="/opt/apps/hawknexa/repo"
+            DEPLOY_DIR="/opt/apps/hawknexa/deploy"
+            COMPOSE_FILE="${DEPLOY_DIR}/docker-compose.prod.yml"
+
+            if [ ! -f "${DEPLOY_DIR}/.env" ]; then
+              echo "ERROR: ${DEPLOY_DIR}/.env not found" >&2
+              exit 1
+            fi
+            if ! grep -qE '^DEPLOY_WEBHOOK_SECRET=.+$' "${DEPLOY_DIR}/.env"; then
+              echo "ERROR: DEPLOY_WEBHOOK_SECRET missing in ${DEPLOY_DIR}/.env" >&2
+              exit 1
+            fi
+
+            if [ -d "${REPO_DIR}/.git" ]; then
+              cd "${REPO_DIR}"
+              git fetch origin main
+              git reset --hard origin/main
+              rsync -a --exclude '.env' "${REPO_DIR}/deploy/hawknexa/" "${DEPLOY_DIR}/"
+            fi
+
+            cd "${DEPLOY_DIR}"
+            docker compose -f "${COMPOSE_FILE}" build deploy-webhook
+            docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook caddy
+            sleep 3
+            docker compose -f "${COMPOSE_FILE}" ps deploy-webhook caddy
+            docker compose -f "${COMPOSE_FILE}" logs deploy-webhook --tail 30
+            curl -fsS https://hawknexabackend.fynals.com/internal/deploy/health
+            echo ""
+            echo "Webhook recovered."
