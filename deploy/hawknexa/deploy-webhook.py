@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """HTTPS deploy webhook — triggered by GitHub Actions over port 443 (no inbound SSH)."""
-import fcntl
 import hmac
 import os
 import subprocess
@@ -11,7 +10,19 @@ SECRET = os.environ.get("DEPLOY_WEBHOOK_SECRET", "")
 DEPLOY_SCRIPT = os.environ.get("DEPLOY_SCRIPT", "/opt/apps/hawknexa/deploy/deploy.sh")
 LISTEN_HOST = os.environ.get("DEPLOY_WEBHOOK_HOST", "0.0.0.0")
 LISTEN_PORT = int(os.environ.get("DEPLOY_WEBHOOK_PORT", "9000"))
-LOCK_PATH = "/tmp/hawknexa-deploy.lock"
+PID_FILE = "/tmp/hawknexa-deploy.pid"
+LOG_FILE = "/tmp/hawknexa-deploy.log"
+
+
+def deploy_running() -> bool:
+    if not os.path.exists(PID_FILE):
+        return False
+    try:
+        pid = int(open(PID_FILE, encoding="utf-8").read().strip())
+        os.kill(pid, 0)
+        return True
+    except (OSError, ValueError):
+        return False
 
 
 class DeployHandler(BaseHTTPRequestHandler):
@@ -33,33 +44,28 @@ class DeployHandler(BaseHTTPRequestHandler):
             self.send_error(401)
             return
 
-        lock_file = open(LOCK_PATH, "w")
-        try:
-            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
+        if deploy_running():
             self.send_response(409)
             self.end_headers()
             self.wfile.write(b"Deploy already in progress")
             return
 
-        try:
-            result = subprocess.run(
-                ["bash", DEPLOY_SCRIPT],
-                capture_output=True,
-                text=True,
-                timeout=1800,
-            )
-            body = (result.stdout or "") + (result.stderr or "")
-            if result.returncode == 0:
-                self.send_response(200)
-            else:
-                self.send_response(500)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(body.encode("utf-8", errors="replace"))
-        finally:
-            fcntl.flock(lock_file, fcntl.LOCK_UN)
-            lock_file.close()
+        log = open(LOG_FILE, "a", encoding="utf-8")
+        log.write("\n=== Deploy triggered ===\n")
+        log.flush()
+        proc = subprocess.Popen(
+            ["bash", DEPLOY_SCRIPT],
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+        with open(PID_FILE, "w", encoding="utf-8") as pid_file:
+            pid_file.write(str(proc.pid))
+
+        self.send_response(202)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(f"Deploy started (pid {proc.pid})\n".encode("utf-8"))
 
 
 def main():

@@ -7,6 +7,7 @@ DEPLOY_DIR="/opt/apps/hawknexa/deploy"
 COMPOSE_FILE="${DEPLOY_DIR}/docker-compose.prod.yml"
 BRANCH="${DEPLOY_BRANCH:-main}"
 HEALTH_URL="${DEPLOY_HEALTH_URL:-https://hawknexabackend.fynals.com/api/v1/health}"
+PID_FILE="/tmp/hawknexa-deploy.pid"
 
 if [[ ! -d "${REPO_DIR}/.git" ]]; then
   echo "ERROR: git repo not found at ${REPO_DIR}" >&2
@@ -17,6 +18,9 @@ if [[ ! -f "${DEPLOY_DIR}/.env" ]]; then
   echo "ERROR: ${DEPLOY_DIR}/.env not found (create it once on the server)." >&2
   exit 1
 fi
+
+echo "$$" > "${PID_FILE}"
+trap 'rm -f "${PID_FILE}"' EXIT
 
 echo "=== Pull latest ${BRANCH} ==="
 cd "${REPO_DIR}"
@@ -31,8 +35,12 @@ chmod +x "${DEPLOY_DIR}/deploy.sh" "${DEPLOY_DIR}/deploy-webhook.py" "${DEPLOY_D
 
 echo "=== Build and start containers ==="
 cd "${DEPLOY_DIR}"
-docker compose -f "${COMPOSE_FILE}" build --pull backend portal deploy-webhook
-docker compose -f "${COMPOSE_FILE}" up -d
+docker compose -f "${COMPOSE_FILE}" build --pull backend portal
+docker compose -f "${COMPOSE_FILE}" up -d mysql redis backend portal caddy
+
+echo "=== Refresh deploy webhook (after app containers) ==="
+docker compose -f "${COMPOSE_FILE}" build deploy-webhook
+docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook
 
 echo "=== Health check ==="
 for i in 1 2 3 4 5 6; do
