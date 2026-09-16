@@ -9,7 +9,7 @@ hawknexabackend.fynals.com {
 	encode gzip
 
 	# GitHub Actions deploy trigger (Bearer token required)
-	handle /internal/deploy {
+	handle /internal/deploy* {
 		reverse_proxy deploy-webhook:9000
 	}
 

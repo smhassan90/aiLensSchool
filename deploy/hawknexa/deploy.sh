@@ -8,6 +8,7 @@ COMPOSE_FILE="${DEPLOY_DIR}/docker-compose.prod.yml"
 BRANCH="${DEPLOY_BRANCH:-main}"
 HEALTH_URL="${DEPLOY_HEALTH_URL:-https://hawknexabackend.fynals.com/api/v1/health}"
 PID_FILE="/tmp/hawknexa-deploy.pid"
+SKIP_WEBHOOK_RESTART="${SKIP_WEBHOOK_RESTART:-false}"
 
 if [[ ! -d "${REPO_DIR}/.git" ]]; then
   echo "ERROR: git repo not found at ${REPO_DIR}" >&2
@@ -21,6 +22,18 @@ fi
 
 echo "$$" > "${PID_FILE}"
 trap 'rm -f "${PID_FILE}"' EXIT
+
+cd "${DEPLOY_DIR}"
+
+echo "=== Ensure deploy webhook is running ==="
+docker compose -f "${COMPOSE_FILE}" build deploy-webhook
+docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook
+sleep 2
+if ! docker compose -f "${COMPOSE_FILE}" ps deploy-webhook | grep -q "Up"; then
+  echo "ERROR: deploy-webhook failed to start. Check logs:" >&2
+  docker compose -f "${COMPOSE_FILE}" logs deploy-webhook --tail 30
+  exit 1
+fi
 
 echo "=== Pull latest ${BRANCH} ==="
 cd "${REPO_DIR}"
@@ -36,11 +49,13 @@ chmod +x "${DEPLOY_DIR}/deploy.sh" "${DEPLOY_DIR}/deploy-webhook.py" "${DEPLOY_D
 echo "=== Build and start containers ==="
 cd "${DEPLOY_DIR}"
 docker compose -f "${COMPOSE_FILE}" build --pull backend portal
-docker compose -f "${COMPOSE_FILE}" up -d mysql redis backend portal caddy
+docker compose -f "${COMPOSE_FILE}" up -d mysql redis backend portal caddy deploy-webhook
 
-echo "=== Refresh deploy webhook (after app containers) ==="
-docker compose -f "${COMPOSE_FILE}" build deploy-webhook
-docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook
+if [[ "${SKIP_WEBHOOK_RESTART}" != "true" ]]; then
+  echo "=== Refresh deploy webhook ==="
+  docker compose -f "${COMPOSE_FILE}" build deploy-webhook
+  docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook
+fi
 
 echo "=== Health check ==="
 for i in 1 2 3 4 5 6; do

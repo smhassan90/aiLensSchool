@@ -34,6 +34,19 @@ jobs:
             exit 1
           fi
 
+      - name: Check deploy webhook
+        env:
+          WEBHOOK_HEALTH_URL: ${{ vars.HAWKNEXA_WEBHOOK_HEALTH_URL || 'https://hawknexabackend.fynals.com/internal/deploy/health' }}
+        run: |
+          set -euo pipefail
+          echo "GET ${WEBHOOK_HEALTH_URL}"
+          webhook_code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 "${WEBHOOK_HEALTH_URL}" || echo "000")
+          echo "Webhook health HTTP ${webhook_code}"
+          if [ "${webhook_code}" != "200" ]; then
+            echo "::warning::Deploy webhook is not healthy (HTTP ${webhook_code})."
+            echo "On the VPS run: cd /opt/apps/hawknexa/deploy && docker compose -f docker-compose.prod.yml up -d deploy-webhook"
+          fi
+
       - name: Trigger deploy on VPS
         env:
           DEPLOY_URL: ${{ vars.HAWKNEXA_DEPLOY_URL || 'https://hawknexabackend.fynals.com/internal/deploy' }}
@@ -49,6 +62,10 @@ jobs:
             "${DEPLOY_URL}")
           echo "HTTP ${http_code}"
           cat deploy-response.txt
+          if [ "${http_code}" = "502" ] || [ "${http_code}" = "503" ]; then
+            echo "::error::Deploy webhook returned ${http_code}. SSH/Hostinger console: cd /opt/apps/hawknexa/deploy && docker compose -f docker-compose.prod.yml up -d --build deploy-webhook"
+            exit 1
+          fi
           if [ "${http_code}" != "202" ] && [ "${http_code}" != "200" ]; then
             exit 1
           fi

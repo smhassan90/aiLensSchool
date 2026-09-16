@@ -47,6 +47,21 @@ Manual deploy on the server:
 bash /opt/apps/hawknexa/deploy/deploy.sh
 ```
 
+### If GitHub Actions shows HTTP 502 on `/internal/deploy`
+
+The deploy webhook container is down. In **Hostinger VPS browser terminal** (or SSH):
+
+```bash
+cd /opt/apps/hawknexa/deploy
+docker compose -f docker-compose.prod.yml up -d --build deploy-webhook
+docker compose -f docker-compose.prod.yml logs deploy-webhook --tail 30
+curl -sS https://hawknexabackend.fynals.com/internal/deploy/health
+```
+
+You should see `ok`. Then re-run the GitHub Actions workflow, or run `bash deploy.sh` manually.
+
+Ensure `/opt/apps/hawknexa/deploy/.env` contains `DEPLOY_WEBHOOK_SECRET` matching the GitHub secret `HAWKNEXA_DEPLOY_WEBHOOK_SECRET`.
+
 ## Run server prep (one-time)
 
 ```bash
