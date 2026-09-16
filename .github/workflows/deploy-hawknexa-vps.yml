@@ -22,17 +22,22 @@ jobs:
     steps:
       - name: Check required secrets
         env:
-          HAWKNEXA_DEPLOY_WEBHOOK_SECRET: ${{ secrets.HAWKNEXA_DEPLOY_WEBHOOK_SECRET }}
+          SECRET_PRIMARY: ${{ secrets.HAWKNEXA_DEPLOY_WEBHOOK_SECRET }}
+          SECRET_ALIAS: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
         run: |
-          if [ -z "$HAWKNEXA_DEPLOY_WEBHOOK_SECRET" ]; then
-            echo "::error::Missing repository secret: HAWKNEXA_DEPLOY_WEBHOOK_SECRET"
+          if [ -n "$SECRET_PRIMARY" ]; then
+            echo "DEPLOY_SECRET=$SECRET_PRIMARY" >> "$GITHUB_ENV"
+          elif [ -n "$SECRET_ALIAS" ]; then
+            echo "DEPLOY_SECRET=$SECRET_ALIAS" >> "$GITHUB_ENV"
+          else
+            echo "::error::Missing repository secret. Add one named HAWKNEXA_DEPLOY_WEBHOOK_SECRET (or DEPLOY_WEBHOOK_SECRET) in Settings → Secrets and variables → Actions."
             exit 1
           fi
 
       - name: Trigger deploy on VPS
         env:
           DEPLOY_URL: ${{ vars.HAWKNEXA_DEPLOY_URL || 'https://hawknexabackend.fynals.com/internal/deploy' }}
-          DEPLOY_SECRET: ${{ secrets.HAWKNEXA_DEPLOY_WEBHOOK_SECRET }}
+          DEPLOY_SECRET: ${{ env.DEPLOY_SECRET }}
         run: |
           set -euo pipefail
           echo "POST ${DEPLOY_URL}"
