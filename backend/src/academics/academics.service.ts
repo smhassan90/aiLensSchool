@@ -1836,14 +1836,19 @@ export class AcademicsService {
 
     const maxMarks = body.maxMarks ?? exam.maxMarks;
     const submissionDueAt = body.submissionDueAt;
-    if (body.applyToAll && !submissionDueAt) {
+    const shouldApplyToAll =
+      body.applyToAll === true ||
+      body.rows === undefined ||
+      (Array.isArray(body.rows) && body.rows.length === 0);
+
+    if (shouldApplyToAll && !submissionDueAt) {
       throw new BadRequestException({
         code: 'INVALID_DUE_DATE',
         message: 'Choose a paper submission due date',
       });
     }
 
-    const enabledRows = body.applyToAll
+    const enabledRows = shouldApplyToAll
       ? targets.map((target) => ({
           sectionId: target.sectionId,
           subjectId: target.subjectId,
