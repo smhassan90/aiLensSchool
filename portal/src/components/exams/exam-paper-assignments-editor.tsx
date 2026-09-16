@@ -12,12 +12,6 @@ import { useToast } from "@/providers/toast-provider";
 import { formatDate } from "@/lib/utils";
 import { buildQuestionSpecForMarks } from "@/lib/exam-paper-question-spec";
 
-type RowState = {
-  sectionId: string;
-  subjectId: string;
-  submissionDueAt: string;
-};
-
 export function ExamPaperAssignmentsEditor({
   examConfigId,
   examName,
@@ -29,7 +23,6 @@ export function ExamPaperAssignmentsEditor({
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [rows, setRows] = useState<RowState[]>([]);
   const [dueDate, setDueDate] = useState("");
 
   const data = useQuery({
@@ -39,17 +32,7 @@ export function ExamPaperAssignmentsEditor({
   });
 
   const defaultDue = data.data?.defaultDueAt ? data.data.defaultDueAt.slice(0, 10) : "";
-
-  useEffect(() => {
-    if (!data.data?.rows) return;
-    setRows(
-      data.data.rows.map((row) => ({
-        sectionId: row.sectionId,
-        subjectId: row.subjectId,
-        submissionDueAt: row.assignment?.submissionDueAt.slice(0, 10) ?? defaultDue,
-      })),
-    );
-  }, [data.data, defaultDue]);
+  const totalAssignments = data.data?.targetCount ?? data.data?.rows.length ?? 0;
 
   useEffect(() => {
     if (defaultDue && !dueDate) {
@@ -63,14 +46,10 @@ export function ExamPaperAssignmentsEditor({
       return academicsService.saveExamPaperAssignments({
         examConfigId,
         release,
+        applyToAll: true,
+        maxMarks: defaultMaxMarks,
+        submissionDueAt: dueDate,
         questionSpec: buildQuestionSpecForMarks(defaultMaxMarks),
-        rows: rows.map((row) => ({
-          sectionId: row.sectionId,
-          subjectId: row.subjectId,
-          maxMarks: defaultMaxMarks,
-          submissionDueAt: dueDate,
-          enabled: true,
-        })),
       });
     },
     onSuccess: (_, release) => {
@@ -94,23 +73,21 @@ export function ExamPaperAssignmentsEditor({
 
   if (data.isLoading) return <PageLoader variant="panel" task="exams" />;
 
-  const totalAssignments = rows.length;
-
   return (
     <div className="space-y-5">
       <div className="rounded-xl border bg-muted/20 px-4 py-4">
         <p className="text-sm text-muted-foreground">
           Apply <span className="font-medium text-foreground">{examName}</span> ({defaultMaxMarks} marks) to{" "}
-          <span className="font-medium text-foreground">all classes and all subjects</span>. Teachers will generate
-          and submit their exam papers by the due date below.
+          <span className="font-medium text-foreground">all classes and all subjects</span>. Teachers are matched
+          automatically from class assignments or subject expertise.
         </p>
         {totalAssignments ? (
           <p className="mt-2 text-sm text-muted-foreground">
-            {totalAssignments} teacher assignment{totalAssignments === 1 ? "" : "s"} will be created.
+            {totalAssignments} class-subject assignment{totalAssignments === 1 ? "" : "s"} will be created.
           </p>
         ) : (
           <p className="mt-2 text-sm text-amber-800">
-            No assignments found. Assign teachers to classes under Setup first.
+            No classes or subjects found. Add them under Setup first.
           </p>
         )}
       </div>

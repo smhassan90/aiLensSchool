@@ -1573,6 +1573,134 @@ export class AcademicsService {
     };
   }
 
+  private async examPaperAssignmentTargets(schoolId: string, academicYearId: string) {
+    const [sections, subjects, classSubjects] = await Promise.all([
+      this.prisma.section.findMany({
+        where: { schoolId },
+        select: {
+          id: true,
+          name: true,
+          branchId: true,
+          gradeId: true,
+          classTeacherId: true,
+          grade: { select: { name: true, level: true } },
+        },
+        orderBy: [{ grade: { level: 'asc' } }, { name: 'asc' }],
+      }),
+      this.prisma.subject.findMany({
+        where: { schoolId },
+        select: { id: true, name: true, gradeId: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.classSubject.findMany({
+        where: { academicYearId, section: { schoolId } },
+        select: {
+          sectionId: true,
+          subjectId: true,
+          teacherId: true,
+          assistantTeacherId: true,
+          teacher: {
+            select: {
+              id: true,
+              userId: true,
+              gender: true,
+              user: { select: { firstName: true, lastName: true } },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const classSubjectByKey = new Map(
+      classSubjects.map((row) => [`${row.sectionId}:${row.subjectId}`, row]),
+    );
+
+    const targets: Array<{
+      sectionId: string;
+      subjectId: string;
+      branchId: string;
+      classTeacherId: string | null;
+      className: string;
+      subjectName: string;
+      teacherId: string | null;
+      assistantTeacherId: string | null;
+      teacher: (typeof classSubjects)[number]['teacher'];
+    }> = [];
+
+    for (const section of sections) {
+      const gradeSubjects = subjects.filter(
+        (subject) => !subject.gradeId || subject.gradeId === section.gradeId,
+      );
+      for (const subject of gradeSubjects) {
+        const classSubject = classSubjectByKey.get(`${section.id}:${subject.id}`);
+        targets.push({
+          sectionId: section.id,
+          subjectId: subject.id,
+          branchId: section.branchId,
+          classTeacherId: section.classTeacherId,
+          className: `${section.grade.name} ${section.name}`,
+          subjectName: subject.name,
+          teacherId: classSubject?.teacherId ?? null,
+          assistantTeacherId: classSubject?.assistantTeacherId ?? null,
+          teacher: classSubject?.teacher ?? null,
+        });
+      }
+    }
+
+    return targets;
+  }
+
+  private async teacherIdsBySubject(schoolId: string, academicYearId: string) {
+    const rows = await this.prisma.teacherSubject.findMany({
+      where: { academicYearId, teacher: { schoolId } },
+      select: { subjectId: true, teacherId: true, teacher: { select: { userId: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    const bySubject = new Map<string, Array<{ teacherId: string; userId: string }>>();
+    for (const row of rows) {
+      const list = bySubject.get(row.subjectId) ?? [];
+      list.push({ teacherId: row.teacherId, userId: row.teacher.userId });
+      bySubject.set(row.subjectId, list);
+    }
+    return bySubject;
+  }
+
+  private resolveTeacherForExamTarget(
+    target: {
+      sectionId: string;
+      subjectId: string;
+      teacherId: string | null;
+      assistantTeacherId: string | null;
+      classTeacherId: string | null;
+      teacher: { id: string; userId: string } | null;
+    },
+    teachersBySubject: Map<string, Array<{ teacherId: string; userId: string }>>,
+    teachersInSection: Map<string, string[]>,
+  ): { teacherId: string | null; userId: string | null } {
+    if (target.teacherId) {
+      return {
+        teacherId: target.teacherId,
+        userId: target.teacher?.userId ?? null,
+      };
+    }
+    if (target.assistantTeacherId) {
+      return { teacherId: target.assistantTeacherId, userId: null };
+    }
+    const subjectTeachers = teachersBySubject.get(target.subjectId) ?? [];
+    const sectionTeachers = new Set(teachersInSection.get(target.sectionId) ?? []);
+    const inSection = subjectTeachers.find((row) => sectionTeachers.has(row.teacherId));
+    if (inSection) {
+      return { teacherId: inSection.teacherId, userId: inSection.userId };
+    }
+    if (subjectTeachers[0]) {
+      return { teacherId: subjectTeachers[0].teacherId, userId: subjectTeachers[0].userId };
+    }
+    if (target.classTeacherId) {
+      return { teacherId: target.classTeacherId, userId: null };
+    }
+    return { teacherId: null, userId: null };
+  }
+
   async listExamPaperAssignments(user: AuthUser, examConfigId: string) {
     const schoolId = this.tenant.requireSchoolId(user);
     const exam = await this.prisma.examConfig.findFirst({
@@ -1583,29 +1711,7 @@ export class AcademicsService {
       throw new NotFoundException({ code: 'EXAM_NOT_FOUND', message: 'Exam not found' });
     }
 
-    const classSubjects = await this.prisma.classSubject.findMany({
-      where: {
-        academicYearId: exam.academicYearId,
-        section: { schoolId },
-        teacherId: { not: null },
-      },
-      select: {
-        sectionId: true,
-        subjectId: true,
-        teacherId: true,
-        section: { select: { id: true, name: true, grade: { select: { name: true } } } },
-        subject: { select: { id: true, name: true } },
-        teacher: {
-          select: {
-            id: true,
-            userId: true,
-            gender: true,
-            user: { select: { firstName: true, lastName: true } },
-          },
-        },
-      },
-      orderBy: [{ section: { grade: { name: 'asc' } } }, { section: { name: 'asc' } }],
-    });
+    const targets = await this.examPaperAssignmentTargets(schoolId, exam.academicYearId);
 
     const existing = await this.prisma.examPaperAssignment.findMany({
       where: { examConfigId, schoolId },
@@ -1636,7 +1742,8 @@ export class AcademicsService {
     return {
       exam,
       defaultDueAt: defaultDue?.toISOString() ?? null,
-      rows: classSubjects.map((row) => {
+      targetCount: targets.length,
+      rows: targets.map((row) => {
         const key = `${row.sectionId}:${row.subjectId}`;
         const assignment = byKey.get(key);
         const teacherName = teacherDisplayName(
@@ -1647,11 +1754,11 @@ export class AcademicsService {
         return {
           sectionId: row.sectionId,
           subjectId: row.subjectId,
-          className: `${row.section.grade.name} ${row.section.name}`,
-          subjectName: row.subject.name,
+          className: row.className,
+          subjectName: row.subjectName,
           defaultTeacherId: row.teacherId,
           defaultTeacherUserId: row.teacher?.userId ?? null,
-          defaultTeacherName: teacherName,
+          defaultTeacherName: teacherName || 'Auto-assigned on apply',
           assignment: assignment
             ? {
                 id: assignment.id,
@@ -1672,8 +1779,11 @@ export class AcademicsService {
     body: {
       examConfigId: string;
       release?: boolean;
+      applyToAll?: boolean;
+      maxMarks?: number;
+      submissionDueAt?: string;
       questionSpec?: ExamPaperQuestionSpec | null;
-      rows: Array<{
+      rows?: Array<{
         sectionId: string;
         subjectId: string;
         teacherId?: string | null;
@@ -1692,8 +1802,11 @@ export class AcademicsService {
     body: {
       examConfigId: string;
       release?: boolean;
+      applyToAll?: boolean;
+      maxMarks?: number;
+      submissionDueAt?: string;
       questionSpec?: ExamPaperQuestionSpec | null;
-      rows: Array<{
+      rows?: Array<{
         sectionId: string;
         subjectId: string;
         teacherId?: string | null;
@@ -1707,17 +1820,44 @@ export class AcademicsService {
     const schoolId = this.tenant.requireSchoolId(user);
     const exam = await this.prisma.examConfig.findFirst({
       where: { id: body.examConfigId, schoolId },
-      select: { id: true, name: true, academicYearId: true },
+      select: { id: true, name: true, maxMarks: true, academicYearId: true },
     });
     if (!exam) {
       throw new NotFoundException({ code: 'EXAM_NOT_FOUND', message: 'Exam not found' });
     }
 
-    const enabledRows = body.rows.filter((row) => row.enabled !== false);
+    const targets = await this.examPaperAssignmentTargets(schoolId, exam.academicYearId);
+    if (!targets.length) {
+      throw new BadRequestException({
+        code: 'NO_ASSIGNMENTS',
+        message: 'Add classes and subjects under Setup before applying an exam.',
+      });
+    }
+
+    const maxMarks = body.maxMarks ?? exam.maxMarks;
+    const submissionDueAt = body.submissionDueAt;
+    if (body.applyToAll && !submissionDueAt) {
+      throw new BadRequestException({
+        code: 'INVALID_DUE_DATE',
+        message: 'Choose a paper submission due date',
+      });
+    }
+
+    const enabledRows = body.applyToAll
+      ? targets.map((target) => ({
+          sectionId: target.sectionId,
+          subjectId: target.subjectId,
+          maxMarks,
+          submissionDueAt: submissionDueAt!,
+          questionSpec: body.questionSpec ?? null,
+          enabled: true,
+        }))
+      : (body.rows ?? []).filter((row) => row.enabled !== false);
+
     if (!enabledRows.length) {
       throw new BadRequestException({
         code: 'NO_ASSIGNMENTS',
-        message: 'No class-subject rows to assign. Make sure teachers are assigned to classes first.',
+        message: 'No class-subject rows to assign.',
       });
     }
 
@@ -1731,27 +1871,36 @@ export class AcademicsService {
       assignmentId: string;
     }> = [];
 
-    const classSubjects = await this.prisma.classSubject.findMany({
-      where: {
-        academicYearId: exam.academicYearId,
-        section: { schoolId },
-        OR: enabledRows.map((row) => ({
-          sectionId: row.sectionId,
-          subjectId: row.subjectId,
-        })),
-      },
-      select: {
-        sectionId: true,
-        subjectId: true,
-        teacherId: true,
-        section: { select: { name: true, grade: { select: { name: true } } } },
-        subject: { select: { name: true } },
-        teacher: { select: { userId: true } },
-      },
-    });
+    const [teachersBySubject, classSubjectsForYear, teacherProfiles] = await Promise.all([
+      this.teacherIdsBySubject(schoolId, exam.academicYearId),
+      this.prisma.classSubject.findMany({
+        where: { academicYearId: exam.academicYearId, section: { schoolId } },
+        select: {
+          sectionId: true,
+          subjectId: true,
+          teacherId: true,
+          assistantTeacherId: true,
+        },
+      }),
+      this.prisma.teacherProfile.findMany({
+        where: { schoolId },
+        select: { id: true, userId: true },
+      }),
+    ]);
     const classSubjectByKey = new Map(
-      classSubjects.map((row) => [`${row.sectionId}:${row.subjectId}`, row]),
+      classSubjectsForYear.map((row) => [`${row.sectionId}:${row.subjectId}`, row]),
     );
+    const targetByKey = new Map(
+      targets.map((row) => [`${row.sectionId}:${row.subjectId}`, row]),
+    );
+    const teachersInSection = new Map<string, string[]>();
+    for (const row of classSubjectsForYear) {
+      if (!row.teacherId) continue;
+      const list = teachersInSection.get(row.sectionId) ?? [];
+      list.push(row.teacherId);
+      teachersInSection.set(row.sectionId, list);
+    }
+    const teacherUserById = new Map(teacherProfiles.map((row) => [row.id, row.userId]));
 
     const existingAssignments = await this.prisma.examPaperAssignment.findMany({
       where: { examConfigId: body.examConfigId, schoolId },
@@ -1797,16 +1946,45 @@ export class AcademicsService {
           }
 
           const key = `${row.sectionId}:${row.subjectId}`;
-          const classSubject = classSubjectByKey.get(key);
-          if (!classSubject) {
+          const target = targetByKey.get(key);
+          if (!target) {
             throw new BadRequestException({
               code: 'CLASS_SUBJECT_NOT_FOUND',
               message: 'Class and subject combination was not found',
             });
           }
 
-          const teacherId = row.teacherId ?? classSubject.teacherId;
+          const resolvedTeacher = this.resolveTeacherForExamTarget(
+            target,
+            teachersBySubject,
+            teachersInSection,
+          );
+          const teacherId = row.teacherId ?? resolvedTeacher.teacherId;
           const existing = existingByKey.get(key);
+
+          let classSubject = classSubjectByKey.get(key);
+          if (!classSubject) {
+            await tx.classSubject.create({
+              data: {
+                sectionId: row.sectionId,
+                subjectId: row.subjectId,
+                academicYearId: exam.academicYearId,
+                branchId: target.branchId,
+                teacherId,
+              },
+            });
+          } else if (teacherId && !classSubject.teacherId) {
+            await tx.classSubject.update({
+              where: {
+                sectionId_subjectId_academicYearId: {
+                  sectionId: row.sectionId,
+                  subjectId: row.subjectId,
+                  academicYearId: exam.academicYearId,
+                },
+              },
+              data: { teacherId },
+            });
+          }
 
           const data = {
             schoolId,
@@ -1841,11 +2019,13 @@ export class AcademicsService {
               });
           saved.push(record.id);
 
-          if (releasedAt && classSubject.teacher?.userId) {
+          const notifyUserId =
+            resolvedTeacher.userId ?? (teacherId ? teacherUserById.get(teacherId) ?? null : null);
+          if (releasedAt && notifyUserId) {
             notifyRows.push({
-              teacherUserId: classSubject.teacher.userId,
-              className: `${classSubject.section.grade.name} ${classSubject.section.name}`,
-              subjectName: classSubject.subject.name,
+              teacherUserId: notifyUserId,
+              className: target.className,
+              subjectName: target.subjectName,
               maxMarks: row.maxMarks,
               submissionDueAt: due,
               assignmentId: record.id,

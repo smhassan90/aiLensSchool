@@ -286,6 +286,7 @@ export const academicsService = {
     return apiClient<{
       exam: { id: string; name: string; maxMarks: number; academicYearId: string; startDate?: string | null };
       defaultDueAt: string | null;
+      targetCount: number;
       rows: Array<{
         sectionId: string;
         subjectId: string;
@@ -309,8 +310,11 @@ export const academicsService = {
   saveExamPaperAssignments(payload: {
     examConfigId: string;
     release?: boolean;
+    applyToAll?: boolean;
+    maxMarks?: number;
+    submissionDueAt?: string;
     questionSpec?: ExamPaperQuestionSpec | null;
-    rows: Array<{
+    rows?: Array<{
       sectionId: string;
       subjectId: string;
       teacherId?: string | null;

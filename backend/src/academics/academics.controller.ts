@@ -266,6 +266,9 @@ export class AcademicsController {
     body: {
       examConfigId: string;
       release?: boolean;
+      applyToAll?: boolean;
+      maxMarks?: number;
+      submissionDueAt?: string;
       questionSpec?: {
         mcqCount: number;
         fillBlankCount: number;
@@ -278,7 +281,7 @@ export class AcademicsController {
         shortAnswerMarks: number;
         longAnswerMarks: number;
       } | null;
-      rows: Array<{
+      rows?: Array<{
         sectionId: string;
         subjectId: string;
         teacherId?: string | null;
