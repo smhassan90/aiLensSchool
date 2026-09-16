@@ -9,6 +9,7 @@ BRANCH="${DEPLOY_BRANCH:-main}"
 HEALTH_URL="${DEPLOY_HEALTH_URL:-https://hawknexabackend.fynals.com/api/v1/health}"
 STATUS_FILE="${DEPLOY_DIR}/.last-deploy.json"
 PID_FILE="/tmp/hawknexa-deploy.pid"
+LOCK_DIR="/tmp/hawknexa-deploy.lockdir"
 SKIP_WEBHOOK_RESTART="${SKIP_WEBHOOK_RESTART:-false}"
 
 write_status() {
@@ -48,8 +49,17 @@ if [[ ! -f "${DEPLOY_DIR}/.env" ]]; then
   exit 1
 fi
 
+if ! mkdir "${LOCK_DIR}" 2>/dev/null; then
+  echo "ERROR: Another deploy is already running (${LOCK_DIR})" >&2
+  exit 1
+fi
+
 echo "$$" > "${PID_FILE}"
-trap 'rm -f "${PID_FILE}"' EXIT
+cleanup() {
+  rm -f "${PID_FILE}"
+  rmdir "${LOCK_DIR}" 2>/dev/null || true
+}
+trap cleanup EXIT
 
 write_status "running" "Deploy started"
 
@@ -83,12 +93,23 @@ cd "${DEPLOY_DIR}"
 export BUILD_SHA="$(cd "${REPO_DIR}" && git rev-parse --short HEAD)"
 echo "BUILD_SHA=${BUILD_SHA}"
 docker compose -f "${COMPOSE_FILE}" build --pull backend portal
-docker compose -f "${COMPOSE_FILE}" up -d mysql redis backend portal caddy deploy-webhook
 
-if [[ "${SKIP_WEBHOOK_RESTART}" != "true" ]]; then
-  echo "=== Refresh deploy webhook ==="
-  docker compose -f "${COMPOSE_FILE}" build deploy-webhook
-  docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook
+compose_up() {
+  local attempt="$1"
+  echo "=== Start app containers (attempt ${attempt}) ==="
+  if [[ "${SKIP_WEBHOOK_RESTART}" == "true" ]]; then
+    docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans mysql redis backend portal caddy
+  else
+    docker compose -f "${COMPOSE_FILE}" build deploy-webhook
+    docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans mysql redis backend portal caddy deploy-webhook
+  fi
+}
+
+if ! compose_up 1; then
+  echo "WARN: compose up failed, pruning stale containers and retrying once..." >&2
+  docker compose -f "${COMPOSE_FILE}" rm -sf backend portal 2>/dev/null || true
+  sleep 3
+  compose_up 2
 fi
 
 echo "=== Health check ==="
