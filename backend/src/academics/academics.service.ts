@@ -1852,6 +1852,7 @@ export class AcademicsService {
       ? targets.map((target) => ({
           sectionId: target.sectionId,
           subjectId: target.subjectId,
+          teacherId: null as string | null,
           maxMarks,
           submissionDueAt: submissionDueAt!,
           questionSpec: body.questionSpec ?? null,
