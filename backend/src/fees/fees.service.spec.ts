@@ -36,8 +36,13 @@ describe('FeesService', () => {
       section: { findMany: jest.fn() },
       student: { findMany: jest.fn(), findFirst: jest.fn() },
       school: { findUnique: jest.fn() },
+      schoolSettings: {
+        findUnique: jest.fn().mockResolvedValue({ lateFeeAmount: 0, feeDueDay: 10 }),
+        upsert: jest.fn(),
+      },
       studentFee: {
         upsert: jest.fn(),
+        create: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
         count: jest.fn(),
@@ -269,5 +274,177 @@ describe('FeesService', () => {
     expect(result.partialStudents).toBe(1);
     expect(result.receivedAmount).toBe(7000);
     expect(result.remainingAmount).toBe(8000);
+  });
+
+  const enrolledStudent = () => ({
+    id: 'st-1',
+    schoolId: 'school-1',
+    branchId: 'b1',
+    firstName: 'Ali',
+    lastName: 'Khan',
+    studentCode: 'S1',
+    admissionNumber: 'A1',
+    enrollments: [
+      {
+        sectionId: 'sec-1',
+        academicYear: { id: 'year-1', name: '2026-27' },
+        grade: { id: 'g1', name: 'Class 1', tuitionFee: 8000, admissionFee: 0 },
+        section: { name: 'A' },
+      },
+    ],
+    parents: [],
+  });
+
+  it('marks this month as already paid even if the bill is not labelled MONTHLY', async () => {
+    const periodLabel = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    prisma.student.findFirst.mockResolvedValue(enrolledStudent());
+    prisma.school.findUnique.mockResolvedValue({ name: 'School', address: null, phone: null, code: 'SCH' });
+    prisma.feeStructure.findFirst.mockResolvedValue({ id: 'fs-1' });
+    prisma.studentFee.findMany.mockResolvedValue([
+      {
+        id: 'fee-1',
+        periodLabel,
+        amount: 8000,
+        paidAmount: 8000,
+        discountAmount: 0,
+        status: StudentFeeStatus.PAID,
+        dueDate: new Date(),
+        feeStructure: { id: 'fs-1', name: 'Class 1 tuition', frequency: 'ANNUAL', kind: 'TUITION' },
+      },
+    ]);
+
+    const account = await service.getAccount('st-1', admin);
+
+    expect(account.suggested.alreadyPaid).toBe(true);
+    expect(account.suggested.amount).toBe(0);
+    expect(account.suggested.paidAmount).toBe(8000);
+  });
+
+  it('refuses to collect again when this month is already paid', async () => {
+    const periodLabel = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    prisma.student.findFirst.mockResolvedValue(enrolledStudent());
+    prisma.studentFee.findMany.mockResolvedValue([
+      {
+        id: 'fee-1',
+        periodLabel,
+        amount: 8000,
+        paidAmount: 8000,
+        discountAmount: 0,
+        status: StudentFeeStatus.PAID,
+        dueDate: new Date(),
+        feeStructure: { name: 'Tuition', frequency: 'MONTHLY', kind: 'TUITION' },
+      },
+    ]);
+
+    await expect(service.collect({ studentId: 'st-1', collectedAmount: 8000 }, admin)).rejects.toMatchObject({
+      response: { code: 'ALREADY_PAID_THIS_MONTH' },
+    });
+    expect(prisma.studentFee.upsert).not.toHaveBeenCalled();
+  });
+
+  it('adds the school late fee when collecting after the due date', async () => {
+    prisma.student.findFirst.mockResolvedValue(enrolledStudent());
+    prisma.schoolSettings.findUnique.mockResolvedValue({ lateFeeAmount: 200, feeDueDay: 10 });
+    prisma.studentFee.findFirst.mockResolvedValue({
+      id: 'fee-1',
+      amount: 8000,
+      paidAmount: 0,
+      discountAmount: 0,
+      lateFeeAmount: 0,
+      lateFeeWaived: false,
+      periodLabel: 'September 2026',
+      dueDate: new Date('2026-09-01T00:00:00Z'),
+      feeStructure: { name: 'Tuition' },
+    });
+    prisma.studentFee.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      id: 'fee-1',
+      amount: data.amount ?? 8000,
+      paidAmount: 0,
+      discountAmount: 0,
+      lateFeeAmount: data.lateFeeAmount ?? 0,
+      lateFeeWaived: false,
+      periodLabel: 'September 2026',
+      feeStructure: { name: 'Tuition' },
+    }));
+    prisma.school.findUnique.mockResolvedValue({ name: 'School', address: null, phone: null, code: 'SCH' });
+    prisma.feePayment.findFirst.mockResolvedValue(null);
+    prisma.feePayment.create.mockResolvedValue({
+      id: 'p1',
+      amount: 8200,
+      discountAmount: 0,
+      lateFeeAmount: 200,
+      lateFeeWaived: false,
+      receiptNumber: 'SCH-202609-0001',
+      method: 'CASH',
+      notes: 'Late fee 200',
+      paidAt: new Date('2026-09-12'),
+      recordedBy: { firstName: 'School', lastName: 'Admin' },
+    });
+
+    const receipt = await service.collect(
+      { studentId: 'st-1', studentFeeId: 'fee-1', collectedAmount: 8200 },
+      admin,
+    );
+
+    expect(receipt.lateFee).toBe(200);
+    expect(receipt.lateFeeWaived).toBe(false);
+    expect(prisma.studentFee.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ amount: 8200, lateFeeAmount: 200 }),
+      }),
+    );
+  });
+
+  it('waives the late fee when the office asks', async () => {
+    prisma.student.findFirst.mockResolvedValue(enrolledStudent());
+    prisma.schoolSettings.findUnique.mockResolvedValue({ lateFeeAmount: 200, feeDueDay: 10 });
+    prisma.studentFee.findFirst.mockResolvedValue({
+      id: 'fee-1',
+      amount: 8000,
+      paidAmount: 0,
+      discountAmount: 0,
+      lateFeeAmount: 0,
+      lateFeeWaived: false,
+      periodLabel: 'September 2026',
+      dueDate: new Date('2026-09-01T00:00:00Z'),
+      feeStructure: { name: 'Tuition' },
+    });
+    prisma.studentFee.update.mockResolvedValue({
+      id: 'fee-1',
+      amount: 8000,
+      paidAmount: 0,
+      discountAmount: 0,
+      lateFeeAmount: 0,
+      lateFeeWaived: true,
+      periodLabel: 'September 2026',
+      feeStructure: { name: 'Tuition' },
+    });
+    prisma.school.findUnique.mockResolvedValue({ name: 'School', address: null, phone: null, code: 'SCH' });
+    prisma.feePayment.findFirst.mockResolvedValue(null);
+    prisma.feePayment.create.mockResolvedValue({
+      id: 'p1',
+      amount: 8000,
+      discountAmount: 0,
+      lateFeeAmount: 0,
+      lateFeeWaived: true,
+      receiptNumber: 'SCH-202609-0002',
+      method: 'CASH',
+      notes: 'Late fee waived for September 2026',
+      paidAt: new Date('2026-09-12'),
+      recordedBy: { firstName: 'School', lastName: 'Admin' },
+    });
+
+    const receipt = await service.collect(
+      { studentId: 'st-1', studentFeeId: 'fee-1', collectedAmount: 8000, waiveLateFee: true },
+      admin,
+    );
+
+    expect(receipt.lateFee).toBe(0);
+    expect(receipt.lateFeeWaived).toBe(true);
+    expect(prisma.studentFee.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ lateFeeWaived: true }),
+      }),
+    );
   });
 });

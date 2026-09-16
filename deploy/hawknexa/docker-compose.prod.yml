@@ -1,0 +1,96 @@
+name: hawknexa
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - hawknexa_mysql_data:/var/lib/mysql
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - hawknexa_internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - hawknexa_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - hawknexa_internal
+
+  backend:
+    build:
+      context: ../repo/backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RUN_SEED: ${RUN_SEED:-false}
+    volumes:
+      - hawknexa_uploads:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - hawknexa_internal
+
+  portal:
+    build:
+      context: ../repo/portal
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+        NEXT_PUBLIC_USE_LOCAL_API: "true"
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - hawknexa_internal
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - hawknexa_caddy_data:/data
+      - hawknexa_caddy_config:/config
+    depends_on:
+      - portal
+      - backend
+    networks:
+      - hawknexa_internal
+
+networks:
+  hawknexa_internal:
+    driver: bridge
+
+volumes:
+  hawknexa_mysql_data:
+  hawknexa_redis_data:
+  hawknexa_uploads:
+  hawknexa_caddy_data:
+  hawknexa_caddy_config:

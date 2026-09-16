@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
@@ -51,6 +52,23 @@ export default function TeacherDashboardPage() {
           </Button>
         }
       />
+
+      {(data?.examPaperPendingCount ?? 0) > 0 ? (
+        <Link
+          href="/teacher/exams"
+          className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 transition-colors hover:bg-amber-100"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="font-medium">
+              {data?.examPaperPendingCount} exam paper{(data?.examPaperPendingCount ?? 0) === 1 ? "" : "s"} still to generate and submit
+            </p>
+            <p className="mt-0.5 text-sm text-amber-900/80">
+              Open exam papers to see what the office assigned and prepare them before the due date.
+            </p>
+          </div>
+        </Link>
+      ) : null}
 
       <TeacherPaceBoard
         expectedLessonSlots={expectedLessons}

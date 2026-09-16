@@ -228,6 +228,7 @@ export class AcademicsController {
     @Body() body: {
       academicYearId: string;
       pattern: string;
+      examSubmissionDaysBefore?: number;
       exams?: Array<{ name: string; maxMarks: number; sequence: number; startDate?: string; endDate?: string }>;
     },
     @CurrentUser() user: AuthUser,
@@ -239,6 +240,67 @@ export class AcademicsController {
   @Get('exam-configs')
   listExamConfigs(@Query('academicYearId') academicYearId: string | undefined, @CurrentUser() user: AuthUser) {
     return this.academicsService.listExamConfigs(user, academicYearId);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)
+  @Get('exam-settings')
+  getExamSettings(@CurrentUser() user: AuthUser) {
+    return this.academicsService.getExamSettings(user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_EXAMS')
+  @Get('exam-paper-assignments')
+  listExamPaperAssignments(
+    @Query('examConfigId') examConfigId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.academicsService.listExamPaperAssignments(user, examConfigId);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_EXAMS')
+  @Post('exam-paper-assignments')
+  saveExamPaperAssignments(
+    @Body()
+    body: {
+      examConfigId: string;
+      release?: boolean;
+      rows: Array<{
+        sectionId: string;
+        subjectId: string;
+        teacherId?: string | null;
+        maxMarks: number;
+        submissionDueAt: string;
+        enabled?: boolean;
+      }>;
+    },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.academicsService.saveExamPaperAssignments(user, body);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Get('my-exam-paper-assignments')
+  listMyExamPaperAssignments(@CurrentUser() user: AuthUser) {
+    return this.academicsService.listMyExamPaperAssignments(user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @Get('exam-paper-submissions')
+  getExamPaperSubmissions(
+    @Query('examConfigId') examConfigId: string | undefined,
+    @Query('sectionId') sectionId: string | undefined,
+    @Query('subjectId') subjectId: string | undefined,
+    @Query('teacherId') teacherId: string | undefined,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.academicsService.getExamPaperSubmissions(user, {
+      examConfigId,
+      sectionId,
+      subjectId,
+      teacherId,
+    });
   }
 
   @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)

@@ -1,10 +1,10 @@
 "use client";
 
 import {
+  FileText,
   GraduationCap,
   LayoutDashboard,
   Receipt,
-  Search,
   Settings2,
   UserSquare2,
   Wallet,
@@ -36,6 +36,7 @@ const setupPathPrefixes = [
   "/school/lessons",
   "/school/quizzes",
   "/school/exam-papers",
+  "/school/submitted-exam-papers",
   "/school/results",
   "/school/attendance",
   "/school/report-cards",
@@ -49,9 +50,9 @@ const mainNav: Array<{
   matchSetup?: boolean;
 }> = [
   { href: "/school/dashboard", label: "Dashboard", icon: LayoutDashboard, permission: "VIEW_DASHBOARD" },
-  { href: "/school/front-desk", label: "Find a child", icon: Search, permission: "SEARCH_STUDENTS" },
   { href: "/school/students", label: "Students", icon: GraduationCap },
   { href: "/school/teachers", label: "Teachers", icon: UserSquare2 },
+  { href: "/school/submitted-exam-papers", label: "Exam papers", icon: FileText },
   { href: "/school/fees", label: "Collect fees", icon: Wallet, permission: "VIEW_FINANCE" },
   { href: "/school/expenses", label: "Salaries & bills", icon: Receipt, permission: "MANAGE_EXPENSES" },
   { href: "/school/setup", label: "Setup", icon: Settings2, matchSetup: true },

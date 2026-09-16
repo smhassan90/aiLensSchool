@@ -126,7 +126,7 @@ export function TeacherRankList({
         return (
           <li key={row.teacher.id}>
             <Link
-              href={`/school/teachers/${row.teacher.id}?ai=1`}
+              href={`/school/teachers/${row.teacher.id}/progress?ai=1`}
               className="block rounded-xl border bg-white p-3 hover:bg-slate-50"
             >
               {content}

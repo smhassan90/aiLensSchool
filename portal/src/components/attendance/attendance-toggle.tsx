@@ -64,6 +64,9 @@ export function AttendanceRoster({
 }) {
   const presentCount = rows.filter((row) => row.status === "PRESENT").length;
   const absentCount = rows.length - presentCount;
+  const sortedRows = [...rows].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+  );
 
   return (
     <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -77,7 +80,7 @@ export function AttendanceRoster({
         </div>
       </div>
       <ul className="divide-y">
-        {rows.map((row, index) => {
+        {sortedRows.map((row, index) => {
           const present = row.status === "PRESENT";
           const initials = row.name
             .split(" ")

@@ -193,6 +193,7 @@ function CollectedTable({
     studentFee: {
       student: { id: string; firstName: string; lastName: string; studentCode: string };
       periodLabel: string;
+      status?: string;
       section?: { name: string; grade?: { name: string } | null } | null;
       feeStructure?: { name: string } | null;
     };
@@ -233,6 +234,7 @@ function CollectedTable({
               <TableHead>Bill</TableHead>
               <TableHead>Receipt</TableHead>
               <TableHead className="text-right">Amount</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -254,12 +256,19 @@ function CollectedTable({
                   <span className="block text-xs text-muted-foreground">{row.method}</span>
                 </TableCell>
                 <TableCell className="text-right font-medium">{formatPkr(row.amount)}</TableCell>
+                <TableCell>{statusBadge(row.studentFee.status ?? "PAID")}</TableCell>
                 <TableCell>
-                  <Link href={collectHref(row.studentFee.student.id)}>
-                    <Button size="sm" variant="outline">
-                      Collect
-                    </Button>
-                  </Link>
+                  {row.studentFee.status === "PARTIAL" ? (
+                    <Link href={collectHref(row.studentFee.student.id)}>
+                      <Button size="sm">Collect remaining</Button>
+                    </Link>
+                  ) : (
+                    <Link href={collectHref(row.studentFee.student.id)}>
+                      <Button size="sm" variant="ghost">
+                        Account
+                      </Button>
+                    </Link>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

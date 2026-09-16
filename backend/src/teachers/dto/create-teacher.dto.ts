@@ -10,7 +10,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Gender } from '@prisma/client';
+import { Gender, TeacherStatus } from '@prisma/client';
 
 class ClassSubjectAssignmentDto {
   @ApiProperty()
@@ -76,6 +76,11 @@ export class CreateTeacherDto {
   @IsOptional()
   @IsDateString()
   hireDate?: string;
+
+  @ApiPropertyOptional({ enum: TeacherStatus })
+  @IsOptional()
+  @IsEnum(TeacherStatus)
+  status?: TeacherStatus;
 
   @ApiPropertyOptional({ type: [TeacherSubjectAssignmentDto] })
   @IsOptional()

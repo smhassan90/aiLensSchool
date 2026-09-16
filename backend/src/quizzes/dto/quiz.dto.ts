@@ -98,14 +98,21 @@ export class GenerateQuizDto {
   @Max(40)
   openEndedCount?: number;
 
-  /** @deprecated Prefer trueFalseCount for quizzes, openEndedCount for exam papers. */
-  @ApiPropertyOptional({ description: 'Deprecated: mapped to trueFalseCount on quizzes' })
+  @ApiPropertyOptional({ description: 'Short-answer count for printed exam papers' })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
   @Max(40)
   shortAnswerCount?: number;
+
+  @ApiPropertyOptional({ description: 'Long-answer count for printed exam papers' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(40)
+  longAnswerCount?: number;
 
   @ApiPropertyOptional({ description: 'Total marks for the MCQ section' })
   @IsOptional()
@@ -123,6 +130,14 @@ export class GenerateQuizDto {
   @Max(200)
   trueFalseMarks?: number;
 
+  @ApiPropertyOptional({ description: 'Total marks for the fill-in-the-blank section' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(200)
+  fillBlankMarks?: number;
+
   @ApiPropertyOptional({ description: 'Total marks for the open-ended section' })
   @IsOptional()
   @Type(() => Number)
@@ -130,6 +145,22 @@ export class GenerateQuizDto {
   @Min(0)
   @Max(200)
   openEndedMarks?: number;
+
+  @ApiPropertyOptional({ description: 'Total marks for short-answer questions' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(200)
+  shortAnswerMarks?: number;
+
+  @ApiPropertyOptional({ description: 'Total marks for long-answer questions' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(200)
+  longAnswerMarks?: number;
 
   @ApiPropertyOptional({ description: 'ASSESSMENT, MID_TERM, FINAL_TERM, or QUIZ' })
   @IsOptional()
@@ -140,6 +171,30 @@ export class GenerateQuizDto {
   @IsOptional()
   @IsString()
   title?: string;
+
+  @ApiPropertyOptional({ description: 'Difficulty 1 (easiest) to 10 (hardest)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  difficulty?: number;
+
+  @ApiPropertyOptional({ description: 'School exam paper from setup (1st Assessment, Mid term, etc.)' })
+  @IsOptional()
+  @IsString()
+  examConfigId?: string;
+
+  @ApiPropertyOptional({ description: 'Admin-assigned exam paper task (required for teachers)' })
+  @IsOptional()
+  @IsString()
+  examPaperAssignmentId?: string;
+}
+
+export class RejectExamPaperDto {
+  @ApiProperty()
+  @IsString()
+  reason!: string;
 }
 
 class UpdateQuestionDto {
@@ -171,6 +226,52 @@ class UpdateQuestionDto {
   @IsOptional()
   @IsEnum(QuestionType)
   type?: QuestionType;
+
+  @ApiPropertyOptional({ description: 'Display order (0-based)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  order?: number;
+}
+
+class QuizOptionInputDto {
+  @ApiProperty()
+  @IsString()
+  optionText!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isCorrect?: boolean;
+}
+
+export class AddQuizQuestionDto {
+  @ApiProperty({ enum: QuestionType })
+  @IsEnum(QuestionType)
+  type!: QuestionType;
+
+  @ApiProperty()
+  @IsString()
+  questionText!: string;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.5)
+  marks!: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  correctAnswer?: string;
+
+  @ApiPropertyOptional({ type: [QuizOptionInputDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => QuizOptionInputDto)
+  options?: QuizOptionInputDto[];
 }
 
 export class UpdateQuizQuestionsDto {
@@ -196,6 +297,15 @@ export class PublishQuizDto {
   @IsOptional()
   @IsDateString()
   dueAt?: string;
+}
+
+export class SubmitExamPaperDto {
+  @ApiPropertyOptional({ type: [UpdateQuestionDto], description: 'Final question list before submit' })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateQuestionDto)
+  questions?: UpdateQuestionDto[];
 }
 
 export class QuizAnswerInputDto {

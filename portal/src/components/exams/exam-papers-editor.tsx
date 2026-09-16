@@ -81,7 +81,7 @@ export function ExamPapersEditor({ papers, onChange }: ExamPapersEditorProps) {
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Add papers in any order, set max marks, and optionally the date range for each exam. Every school keeps its own schedule.
+        Add papers in any order, set max marks, and mark a tentative date for each exam. Every school keeps its own schedule.
       </p>
 
       <ol className="space-y-2">
@@ -138,7 +138,7 @@ export function ExamPapersEditor({ papers, onChange }: ExamPapersEditorProps) {
               </div>
               <div className="grid gap-2 sm:grid-cols-2 sm:pl-10">
                 <div>
-                  <Label>Starts (optional)</Label>
+                  <Label>Tentative date (optional)</Label>
                   <Input
                     type="date"
                     value={paper.startDate ?? ""}
@@ -146,7 +146,7 @@ export function ExamPapersEditor({ papers, onChange }: ExamPapersEditorProps) {
                   />
                 </div>
                 <div>
-                  <Label>Ends (optional)</Label>
+                  <Label>End date (optional)</Label>
                   <Input
                     type="date"
                     value={paper.endDate ?? ""}

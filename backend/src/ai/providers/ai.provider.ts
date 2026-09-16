@@ -39,6 +39,7 @@ export interface AiProvider {
     trueFalseMarks?: number;
     openEndedMarks?: number;
     fillBlankMarks?: number;
+    difficulty?: number;
   }): Promise<AiCompletionResult<QuizOutput>>;
 
   generateHomework(input: {

@@ -16,10 +16,17 @@ import {
   CreateFeeStructureDto,
   MarkPaidDto,
   RecordPaymentDto,
+  UpdateFeePolicyDto,
 } from './dto/fees.dto';
 import { ParentsService } from '../parents/parents.service';
 import { positiveAmount, classFeeName } from './class-fees';
 import { studentSearchWhere } from '../common/utils/student-search';
+import {
+  clampFeeDueDay,
+  dueDateForMonth,
+  lateFeeProposal,
+  parsePeriodMonth,
+} from './late-fee';
 
 function money(value: Prisma.Decimal | number | string | null | undefined | unknown) {
   return Number(value ?? 0);
@@ -54,8 +61,47 @@ function currentPeriodLabel(date = new Date()) {
   return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 }
 
-function lastDayOfMonth(date = new Date()) {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+function belongsToMonth(
+  fee: { periodLabel?: string | null; dueDate?: Date | string | null },
+  at = new Date(),
+  periodLabel = currentPeriodLabel(at),
+) {
+  if ((fee.periodLabel ?? '').trim() === periodLabel) return true;
+  if (fee.dueDate) {
+    const due = typeof fee.dueDate === 'string' ? new Date(fee.dueDate) : fee.dueDate;
+    if (!Number.isNaN(due.getTime())) {
+      if (due.getFullYear() === at.getFullYear() && due.getMonth() === at.getMonth()) return true;
+      if (due.getUTCFullYear() === at.getFullYear() && due.getUTCMonth() === at.getMonth()) return true;
+    }
+  }
+  const label = (fee.periodLabel ?? '').toLowerCase();
+  if (!label) return false;
+  const monthLong = at.toLocaleString('en-US', { month: 'long' }).toLowerCase();
+  const monthShort = at.toLocaleString('en-US', { month: 'short' }).toLowerCase().replace('.', '');
+  const year = String(at.getFullYear());
+  return label.includes(year) && (label.includes(monthLong) || label.includes(monthShort));
+}
+
+function pickThisMonthBill<
+  T extends {
+    periodLabel?: string | null;
+    dueDate?: Date | string | null;
+    amount: unknown;
+    paidAmount: unknown;
+    discountAmount?: unknown;
+    feeStructure?: { frequency?: string | null; kind?: string | null } | null;
+  },
+>(fees: T[], at = new Date()) {
+  const periodLabel = currentPeriodLabel(at);
+  const matches = fees.filter((fee) => belongsToMonth(fee, at, periodLabel));
+  if (!matches.length) return null;
+  const unpaid = matches.filter((fee) => outstandingOf(fee) > 0.009);
+  const pool = unpaid.length ? unpaid : matches;
+  return (
+    pool.find((fee) => fee.feeStructure?.frequency === 'MONTHLY') ??
+    pool.find((fee) => fee.feeStructure?.kind === 'TUITION') ??
+    pool[0]
+  );
 }
 
 function parentDisplay(parent: {
@@ -182,6 +228,41 @@ export class FeesService {
     }
     return {
       amounts: [...amounts].sort((a, b) => a - b),
+    };
+  }
+
+  async getPolicy(user: AuthUser) {
+    return this.readPolicy(this.tenant.requireSchoolId(user));
+  }
+
+  async updatePolicy(dto: UpdateFeePolicyDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const current = await this.readPolicy(schoolId);
+    const lateFeeAmount = round2(Math.max(0, dto.lateFeeAmount ?? current.lateFeeAmount));
+    const feeDueDay = clampFeeDueDay(dto.feeDueDay ?? current.feeDueDay);
+    await this.prisma.schoolSettings.upsert({
+      where: { schoolId },
+      create: { schoolId, lateFeeAmount, feeDueDay },
+      update: { lateFeeAmount, feeDueDay },
+    });
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'FEE_POLICY_UPDATED',
+      entityType: 'SchoolSettings',
+      metadata: { lateFeeAmount, feeDueDay },
+    });
+    return { lateFeeAmount, feeDueDay };
+  }
+
+  private async readPolicy(schoolId: string) {
+    const row = await this.prisma.schoolSettings.findUnique({
+      where: { schoolId },
+      select: { lateFeeAmount: true, feeDueDay: true },
+    });
+    return {
+      lateFeeAmount: money(row?.lateFeeAmount),
+      feeDueDay: clampFeeDueDay(row?.feeDueDay ?? 10),
     };
   }
 
@@ -944,23 +1025,54 @@ export class FeesService {
       select: { name: true, address: true, phone: true, code: true },
     });
 
-    const fees = year
+    const feeStructureSelect = { id: true, name: true, frequency: true, kind: true } as const;
+    const range = monthRange();
+    const periodLabel = range.label;
+    let fees = year
       ? await this.prisma.studentFee.findMany({
           where: { studentId: student.id, academicYearId: year.id },
           orderBy: { dueDate: 'asc' },
-          include: { feeStructure: { select: { id: true, name: true, frequency: true } } },
+          include: { feeStructure: { select: feeStructureSelect } },
         })
       : [];
 
-    const periodLabel = currentPeriodLabel();
+    if (!fees.some((fee) => belongsToMonth(fee, new Date(), periodLabel))) {
+      const extra = await this.prisma.studentFee.findMany({
+        where: {
+          studentId: student.id,
+          schoolId,
+          OR: [{ periodLabel }, { dueDate: { gte: range.start, lt: range.end } }],
+        },
+        orderBy: { dueDate: 'asc' },
+        include: { feeStructure: { select: feeStructureSelect } },
+      });
+      const seen = new Set(fees.map((fee) => fee.id));
+      for (const fee of extra) {
+        if (!seen.has(fee.id)) fees.push(fee);
+      }
+    }
+
     const tuitionDefault = enrollment?.grade.tuitionFee != null ? money(enrollment.grade.tuitionFee) : 0;
     const admissionDefault = enrollment?.grade.admissionFee != null ? money(enrollment.grade.admissionFee) : 0;
     const tuitionStructure = enrollment
       ? await this.findTuitionStructure(schoolId, enrollment.grade)
       : null;
-    const currentBill = fees.find(
-      (fee) => fee.periodLabel === periodLabel && fee.feeStructure.frequency === 'MONTHLY',
-    );
+    const thisMonthBills = fees.filter((fee) => belongsToMonth(fee, new Date(), periodLabel));
+    const unpaidThisMonth = thisMonthBills.filter((fee) => outstandingOf(fee) > 0.009);
+    const currentBill = pickThisMonthBill(fees);
+    const alreadyPaid = thisMonthBills.length > 0 && unpaidThisMonth.length === 0;
+    const policy = await this.readPolicy(schoolId);
+    const lateFeeOf = (fee: {
+      dueDate?: Date | string | null;
+      lateFeeAmount?: unknown;
+      lateFeeWaived?: boolean | null;
+    }) =>
+      lateFeeProposal({
+        dueDate: fee.dueDate,
+        lateFeeCharged: money(fee.lateFeeAmount),
+        lateFeeWaived: Boolean(fee.lateFeeWaived),
+        policyAmount: policy.lateFeeAmount,
+      });
 
     return {
       school,
@@ -978,13 +1090,19 @@ export class FeesService {
       tuitionDefault,
       admissionDefault,
       suggested: {
-        studentFeeId: currentBill?.id ?? null,
+        studentFeeId: alreadyPaid ? null : currentBill?.id ?? null,
         feeStructureId: tuitionStructure?.id ?? null,
         periodLabel,
-        amount: currentBill ? outstandingOf(currentBill) : tuitionDefault,
+        amount: alreadyPaid ? 0 : currentBill ? outstandingOf(currentBill) : tuitionDefault,
         billedAmount: currentBill ? money(currentBill.amount) : tuitionDefault,
+        paidAmount: currentBill ? money(currentBill.paidAmount) : 0,
+        alreadyPaid,
         label: currentBill?.feeStructure.name ?? 'Monthly tuition',
+        lateFee: currentBill
+          ? lateFeeOf(currentBill)
+          : { overdue: false, amount: 0, waived: false, charged: false },
       },
+      policy,
       fees: fees.map((fee) => ({
         id: fee.id,
         periodLabel: fee.periodLabel,
@@ -995,6 +1113,7 @@ export class FeesService {
         balance: outstandingOf(fee),
         status: fee.status,
         dueDate: fee.dueDate,
+        lateFee: lateFeeOf(fee),
       })),
     };
   }
@@ -1009,6 +1128,7 @@ export class FeesService {
         message: 'Enter the amount collected, a discount, or both',
       });
     }
+    const policy = await this.readPolicy(schoolId);
 
     const student = await this.prisma.student.findFirst({
       where: { id: dto.studentId, schoolId },
@@ -1036,12 +1156,36 @@ export class FeesService {
       });
     }
 
+    let createdNow = false;
     let fee = dto.studentFeeId
       ? await this.prisma.studentFee.findFirst({
           where: { id: dto.studentFeeId, schoolId, studentId: student.id },
           include: { feeStructure: true },
         })
       : null;
+
+    if (!fee) {
+      const periodLabel = dto.periodLabel?.trim() || currentPeriodLabel();
+      const range = monthRange();
+      const existingThisMonth = await this.prisma.studentFee.findMany({
+        where: {
+          studentId: student.id,
+          schoolId,
+          OR: [{ periodLabel }, { dueDate: { gte: range.start, lt: range.end } }],
+        },
+        include: { feeStructure: true },
+      });
+      const existing = pickThisMonthBill(existingThisMonth);
+      if (existing) {
+        if (outstandingOf(existing) <= 0.009) {
+          throw new BadRequestException({
+            code: 'ALREADY_PAID_THIS_MONTH',
+            message: `${existing.periodLabel} fees are already paid for this student`,
+          });
+        }
+        fee = existing;
+      }
+    }
 
     if (!fee) {
       const periodLabel = dto.periodLabel?.trim() || currentPeriodLabel();
@@ -1084,29 +1228,34 @@ export class FeesService {
           message: 'Set monthly tuition for this class before collecting fees',
         });
       }
-      fee = await this.prisma.studentFee.upsert({
+      const existingBill = await this.prisma.studentFee.findFirst({
         where: {
-          studentId_feeStructureId_periodLabel: {
-            studentId: student.id,
-            feeStructureId: structure.id,
-            periodLabel,
-          },
-        },
-        create: {
-          schoolId,
-          branchId: student.branchId,
           studentId: student.id,
           feeStructureId: structure.id,
-          academicYearId: year.id,
-          sectionId: enrollment?.sectionId,
           periodLabel,
-          amount: billed,
-          dueDate: lastDayOfMonth(),
-          status: StudentFeeStatus.DUE,
         },
-        update: {},
         include: { feeStructure: true },
       });
+      if (existingBill) {
+        fee = existingBill;
+      } else {
+        fee = await this.prisma.studentFee.create({
+          data: {
+            schoolId,
+            branchId: student.branchId,
+            studentId: student.id,
+            feeStructureId: structure.id,
+            academicYearId: year.id,
+            sectionId: enrollment?.sectionId,
+            periodLabel,
+            amount: billed,
+            dueDate: dueDateForMonth(policy.feeDueDay, parsePeriodMonth(periodLabel)),
+            status: StudentFeeStatus.DUE,
+          },
+          include: { feeStructure: true },
+        });
+        createdNow = true;
+      }
     }
 
     if (!fee) {
@@ -1116,7 +1265,42 @@ export class FeesService {
       });
     }
 
+    let paymentLateFee = 0;
+    let paymentLateFeeWaived = Boolean(fee.lateFeeWaived);
+    if (!createdNow) {
+      const proposal = lateFeeProposal({
+        dueDate: fee.dueDate,
+        lateFeeCharged: money(fee.lateFeeAmount),
+        lateFeeWaived: Boolean(fee.lateFeeWaived),
+        policyAmount: policy.lateFeeAmount,
+      });
+      if (proposal.amount > 0.009) {
+        if (dto.waiveLateFee) {
+          paymentLateFeeWaived = true;
+          fee = await this.prisma.studentFee.update({
+            where: { id: fee.id },
+            data: { lateFeeWaived: true },
+            include: { feeStructure: true },
+          });
+        } else {
+          const billedWithLate = round2(money(fee.amount) + proposal.amount);
+          fee = await this.prisma.studentFee.update({
+            where: { id: fee.id },
+            data: { amount: billedWithLate, lateFeeAmount: proposal.amount },
+            include: { feeStructure: true },
+          });
+          paymentLateFee = proposal.amount;
+        }
+      }
+    }
+
     const due = outstandingOf(fee);
+    if (due <= 0.009) {
+      throw new BadRequestException({
+        code: 'ALREADY_PAID',
+        message: `${fee.periodLabel} is already paid for this student`,
+      });
+    }
     const applied = round2(collected + discount);
     if (applied - due > 0.009) {
       throw new BadRequestException({
@@ -1141,6 +1325,13 @@ export class FeesService {
       select: { name: true, address: true, phone: true, code: true },
     });
     const receiptNumber = await this.nextReceiptNumber(schoolId, school?.code ?? 'SCH');
+    const noteParts = [dto.notes?.trim()].filter(Boolean) as string[];
+    if (paymentLateFeeWaived && paymentLateFee <= 0.009) {
+      noteParts.push(`Late fee waived for ${fee.periodLabel}`);
+    } else if (paymentLateFee > 0.009) {
+      noteParts.push(`Late fee ${paymentLateFee}`);
+    }
+    const notes = noteParts.length ? noteParts.join('. ') : undefined;
 
     const payment = await this.prisma.$transaction(async (tx) => {
       const created = await tx.feePayment.create({
@@ -1148,9 +1339,11 @@ export class FeesService {
           studentFeeId: fee.id,
           amount: collected,
           discountAmount: discount,
+          lateFeeAmount: paymentLateFee,
+          lateFeeWaived: paymentLateFeeWaived,
           receiptNumber,
           method: dto.method ?? 'CASH',
-          notes: dto.notes,
+          notes,
           recordedById: user.id,
         },
         include: {
@@ -1174,7 +1367,15 @@ export class FeesService {
     });
 
     return this.toReceipt({
-      payment: { ...payment, amount: collected, discountAmount: discount, receiptNumber },
+      payment: {
+        ...payment,
+        amount: collected,
+        discountAmount: discount,
+        lateFeeAmount: paymentLateFee,
+        lateFeeWaived: paymentLateFeeWaived,
+        receiptNumber,
+        notes,
+      },
       fee: { ...fee, amount: billed, paidAmount: paid, discountAmount: discounted, status },
       student,
       enrollment,
@@ -1228,6 +1429,8 @@ export class FeesService {
       id: string;
       amount: unknown;
       discountAmount?: unknown;
+      lateFeeAmount?: unknown;
+      lateFeeWaived?: boolean | null;
       receiptNumber?: string | null;
       method?: string | null;
       notes?: string | null;
@@ -1266,6 +1469,8 @@ export class FeesService {
   }) {
     const collected = money(input.payment.amount);
     const discount = money(input.payment.discountAmount);
+    const lateFee = money(input.payment.lateFeeAmount);
+    const lateFeeWaived = Boolean(input.payment.lateFeeWaived);
     const parents = input.student.parents.map(parentDisplay);
     return {
       id: input.payment.id,
@@ -1294,6 +1499,8 @@ export class FeesService {
       },
       collected,
       discount,
+      lateFee,
+      lateFeeWaived,
       balance: input.remaining,
       receivedBy: `${input.recordedBy.firstName} ${input.recordedBy.lastName}`.trim(),
     };

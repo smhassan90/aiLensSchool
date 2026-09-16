@@ -1,49 +1,14 @@
 "use client";
 
-import { PageLoader } from "@/components/layout/page-loader";
-
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PageHeader } from "@/components/layout/page-header";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageLoader } from "@/components/layout/page-loader";
+import { Student360View, type Student360Data } from "@/components/students/student-360-view";
 import { insightsService } from "@/services/insights.service";
 import { feesService } from "@/services/fees.service";
 import { studentsService } from "@/services/students.service";
-import { formatDate } from "@/lib/utils";
-import { personFullName } from "@/lib/person-name";
-import { BarChart } from "@/components/charts/simple-charts";
-import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
-import { ReportCardSheet } from "@/components/report-cards/report-card-sheet";
-import type { ReportCard } from "@/lib/types";
-import { Select } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-
-type Overview = {
-  student: {
-    firstName: string;
-    lastName: string;
-    studentCode: string;
-    admissionNumber: string;
-    status: string;
-    scienceGroup?: string | null;
-    grade?: { name: string; level?: number };
-    section?: { name: string };
-    academicYear?: { name: string };
-    parents?: Array<{ relationship: string; parent: { user: { firstName: string; lastName: string; email: string; username?: string; phone?: string } } }>;
-  };
-  attendance: { total: number; present: number; absent: number; late: number; rate: number; recent: Array<{ date: string; status: string }> };
-  quizzes: { average: number; results: Array<{ id: string; title: string; subject: string; percentage: number; submittedAt: string }> };
-  homework: Array<{ id: string; title: string; dueDate: string; subject?: { name: string } }>;
-  diaries: Array<{ id: string; date: string; title: string; lessonSummary: string; homeworkNotes: string }>;
-  reportCards: Array<ReportCard>;
-  fees: { billed: number; paid: number; due: number; items: Array<{ id: string; periodLabel: string; status: string; amount: number; paidAmount: number }> };
-};
 
 export default function Student360Page() {
   const params = useParams<{ id: string }>();
@@ -51,7 +16,7 @@ export default function Student360Page() {
   const { toast } = useToast();
   const query = useQuery({
     queryKey: ["student-360", params.id],
-    queryFn: () => insightsService.student(params.id) as Promise<Overview>,
+    queryFn: () => insightsService.student(params.id) as Promise<Student360Data>,
   });
   const markPaid = useMutation({
     mutationFn: (studentFeeId: string) => feesService.markPaid(studentFeeId),
@@ -61,16 +26,25 @@ export default function Student360Page() {
       queryClient.invalidateQueries({ queryKey: ["fees"] });
     },
     onError: (err) =>
-      toast({ title: "Could not mark paid", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
+      toast({
+        title: "Could not mark paid",
+        description: err instanceof ApiClientError ? err.message : "",
+        variant: "error",
+      }),
   });
   const saveStream = useMutation({
-    mutationFn: (scienceGroup: string) => studentsService.update(params.id, { scienceGroup: scienceGroup || null }),
+    mutationFn: (scienceGroup: string) =>
+      studentsService.update(params.id, { scienceGroup: scienceGroup || null }),
     onSuccess: () => {
       toast({ title: "Science group saved", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["student-360", params.id] });
     },
     onError: (err) =>
-      toast({ title: "Could not save", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
+      toast({
+        title: "Could not save",
+        description: err instanceof ApiClientError ? err.message : "",
+        variant: "error",
+      }),
   });
 
   if (query.isLoading) {
@@ -80,176 +54,18 @@ export default function Student360Page() {
     return <div className="p-4 sm:p-6 lg:p-8">Student not found.</div>;
   }
 
-  const data = query.data;
-  const student = data.student;
-
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <PageHeader
-        title={personFullName(student.firstName, student.lastName)}
-        description={`${student.studentCode}${
-          student.admissionNumber && student.admissionNumber !== student.studentCode
-            ? ` · Adm. ${student.admissionNumber}`
-            : ""
-        } · ${student.grade?.name ?? "Unassigned"} ${student.section?.name ?? ""} · ${student.academicYear?.name ?? ""}`}
-        actions={
-          <Link href="/school/students">
-            <Button variant="outline"><ArrowLeft className="h-4 w-4" />Back</Button>
-          </Link>
-        }
+      <Student360View
+        data={query.data}
+        studentId={params.id}
+        backHref="/school/students"
+        backLabel="All students"
+        onMarkPaid={(id) => markPaid.mutate(id)}
+        markPaidPending={markPaid.isPending}
+        onScienceGroupChange={(value) => saveStream.mutate(value)}
+        scienceGroupPending={saveStream.isPending}
       />
-
-      <div className="mb-6 grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card><CardHeader><CardTitle className="text-sm">Attendance</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data.attendance.rate}%</CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm">Quiz average</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data.quizzes.average}%</CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm">Fees due</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data.fees.due}</CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm">Status</CardTitle></CardHeader><CardContent><Badge variant={student.status === "ACTIVE" ? "success" : "secondary"}>{student.status}</Badge></CardContent></Card>
-      </div>
-
-      <Tabs defaultValue="progress">
-        <TabsList>
-          <TabsTrigger value="progress">Progress</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
-          <TabsTrigger value="reports">Report cards</TabsTrigger>
-          <TabsTrigger value="diary">Diary / homework</TabsTrigger>
-          <TabsTrigger value="fees">Fees</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="progress" className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader><CardTitle>Quiz trend</CardTitle></CardHeader>
-            <CardContent>
-              <BarChart
-                items={data.quizzes.results.map((r) => ({ label: r.subject, value: r.percentage }))}
-              />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>Family</CardTitle></CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {(student.parents ?? []).map((p, i) => (
-                <p key={i}>
-                  {personFullName(p.parent.user.firstName, p.parent.user.lastName)} · {p.relationship}
-                  {p.parent.user.username ? ` · login ${p.parent.user.username}` : ""}
-                  {p.parent.user.phone ? ` · ${p.parent.user.phone}` : ""}
-                </p>
-              ))}
-              {student.grade?.level === 9 || student.grade?.level === 10 || /\b(9|10|ix|x)\b/i.test(student.grade?.name ?? "") ? (
-                <div className="pt-2">
-                  <Label>Science group</Label>
-                  <Select
-                    className="mt-1"
-                    value={student.scienceGroup ?? ""}
-                    onChange={(e) => saveStream.mutate(e.target.value)}
-                    disabled={saveStream.isPending}
-                  >
-                    <option value="">Not set</option>
-                    <option value="COMPUTER">Comp. science</option>
-                    <option value="BIOLOGY">Bio. science</option>
-                  </Select>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="attendance">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="mb-4 text-sm text-muted-foreground">
-                Present {data.attendance.present} · Absent {data.attendance.absent} · Late {data.attendance.late}
-              </p>
-              <div className="space-y-2">
-                {data.attendance.recent.map((row) => (
-                  <div key={row.date} className="flex justify-between text-sm">
-                    <span>{formatDate(row.date)}</span>
-                    <Badge variant={row.status === "PRESENT" ? "success" : row.status === "ABSENT" ? "destructive" : "warning"}>{row.status}</Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="quizzes">
-          <Card>
-            <CardContent className="space-y-3 pt-6">
-              {data.quizzes.results.length === 0 && <p className="text-sm text-muted-foreground">No quiz results yet.</p>}
-              {data.quizzes.results.map((row) => (
-                <div key={row.id} className="flex items-center justify-between text-sm">
-                  <div>
-                    <p className="font-medium">{row.title}</p>
-                    <p className="text-muted-foreground">{row.subject} · {formatDate(row.submittedAt)}</p>
-                  </div>
-                  <Badge>{row.percentage}%</Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="reports">
-          <div className="space-y-4">
-            {data.reportCards.length === 0 && <p className="text-sm text-muted-foreground">No report cards generated yet.</p>}
-            {data.reportCards.map((card) => (
-              <ReportCardSheet key={card.id} card={card} />
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="diary" className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader><CardTitle>Home diary</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              {data.diaries.map((d) => (
-                <div key={d.id} className="rounded-md border p-3 text-sm">
-                  <p className="font-medium">{formatDate(d.date)}</p>
-                  <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{d.lessonSummary}</p>
-                  <p className="mt-2"><span className="font-medium">Homework:</span> {d.homeworkNotes}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>Homework</CardTitle></CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {data.homework.map((h) => (
-                <p key={h.id}>{h.subject?.name}: {h.title} · due {formatDate(h.dueDate)}</p>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="fees">
-          <Card>
-            <CardContent className="space-y-2 pt-6 text-sm">
-              <Link href={`/school/fees?studentId=${params.id}`}>
-                <Button size="sm" className="mb-3">Collect fees</Button>
-              </Link>
-              {data.fees.items.length === 0 ? (
-                <p className="text-muted-foreground">No fee records yet.</p>
-              ) : (
-                data.fees.items.map((item) => (
-                  <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
-                    <span>{item.periodLabel}</span>
-                    <span className="text-muted-foreground">
-                      {Number(item.paidAmount)}/{Number(item.amount)} · {item.status}
-                    </span>
-                    {item.status !== "PAID" ? (
-                      <Button size="sm" onClick={() => markPaid.mutate(item.id)} disabled={markPaid.isPending}>
-                        Mark paid
-                      </Button>
-                    ) : (
-                      <Badge variant="success">Paid</Badge>
-                    )}
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }

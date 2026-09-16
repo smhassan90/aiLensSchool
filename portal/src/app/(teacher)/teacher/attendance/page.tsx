@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ export default function TeacherAttendancePage() {
   const [sectionId, setSectionId] = useState("");
   const [date, setDate] = useState(() => localDateISO());
   const [marks, setMarks] = useState<Record<string, AttendanceMark>>({});
+  const saving = useRef(false);
   const classes = useQuery({ queryKey: ["teacher-classes"], queryFn: () => teachersService.myClasses() });
   const enrollments = useQuery({
     queryKey: ["enrollments", sectionId],
@@ -59,32 +60,52 @@ export default function TeacherAttendancePage() {
     if (sectionId && !sections.some((s) => s.id === sectionId)) {
       setSectionId("");
       setMarks({});
+      return;
+    }
+    if (sections.length === 1 && !sectionId) {
+      setSectionId(sections[0].id);
     }
   }, [sectionId, sections]);
 
   const selected = sections.find((s) => s.id === sectionId);
+
+  const academicYearId = enrollments.data?.items[0]?.academicYearId ?? selected?.academicYearId;
 
   const merged = useMemo(() => {
     const students = enrollments.data?.items ?? [];
     const byStudent = new Map(
       (existing.data?.items ?? []).map((row) => [row.student?.id ?? "", toPresentAbsent(row.status)]),
     );
-    return students.map((enr) => {
+    const rows = new Map<string, { studentId: string; name: string; status: AttendanceMark }>();
+    for (const enr of students) {
       const studentId = enr.student?.id ?? enr.studentId;
-      return {
+      if (!studentId || rows.has(studentId)) continue;
+      rows.set(studentId, {
         studentId,
         name: enr.student ? `${enr.student.firstName} ${enr.student.lastName}` : studentId,
         status: marks[studentId] ?? byStudent.get(studentId) ?? "PRESENT",
-      };
-    });
+      });
+    }
+    return Array.from(rows.values());
   }, [enrollments.data, existing.data, marks]);
 
+  const canSave =
+    Boolean(sectionId) &&
+    Boolean(selected?.branchId) &&
+    Boolean(academicYearId) &&
+    merged.length > 0 &&
+    !enrollments.isLoading;
+
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
+      if (saving.current) return;
+      saving.current = true;
       if (!merged.length) throw new Error("No students in this class to mark");
-      if (!selected?.academicYearId || !selected.branchId) throw new Error("Class details incomplete");
+      if (!academicYearId || !selected?.branchId) {
+        throw new Error("Class details are still loading. Wait a moment and try again.");
+      }
       return attendanceService.mark({
-        academicYearId: selected.academicYearId,
+        academicYearId,
         sectionId,
         branchId: selected.branchId,
         date,
@@ -93,6 +114,7 @@ export default function TeacherAttendancePage() {
     },
     onSuccess: () => {
       toast({ title: "Attendance saved", variant: "success" });
+      setMarks({});
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
       queryClient.invalidateQueries({ queryKey: ["teacher-dashboard"] });
     },
@@ -102,6 +124,9 @@ export default function TeacherAttendancePage() {
         description: err instanceof Error ? err.message : "",
         variant: "error",
       }),
+    onSettled: () => {
+      saving.current = false;
+    },
   });
 
   if (classes.isLoading) {
@@ -160,7 +185,7 @@ export default function TeacherAttendancePage() {
           />
         </div>
         <div className="flex items-end">
-          <Button disabled={!sectionId || !merged.length || save.isPending} onClick={() => save.mutate()}>
+          <Button disabled={!canSave || save.isPending} onClick={() => save.mutate()}>
             {save.isPending ? "Saving…" : "Save"}
           </Button>
         </div>

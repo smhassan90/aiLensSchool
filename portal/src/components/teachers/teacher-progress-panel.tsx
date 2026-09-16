@@ -36,7 +36,7 @@ export function TeacherProgressPanel() {
   });
 
   return (
-    <Card className="mt-8 overflow-hidden border-teal-200">
+    <Card className="overflow-hidden rounded-2xl border-slate-200 shadow-sm">
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle>Teacher progress</CardTitle>

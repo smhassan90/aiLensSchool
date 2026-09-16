@@ -1,20 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLoader } from "@/components/layout/page-loader";
-import { AiWait } from "@/components/layout/ai-wait";
 import { EmptyState } from "@/components/layout/empty-state";
+import { GenerateExamPaperDialog } from "@/components/exams/generate-exam-paper-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -23,102 +20,83 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { quizzesService } from "@/services/quizzes.service";
 import { lessonsService } from "@/services/lessons.service";
 import { teachersService } from "@/services/teachers.service";
+import { academicsService } from "@/services/academics.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { examPaperLabel, examStatusLabel } from "@/lib/exam-paper";
+import { difficultyColorClass, difficultyLabel } from "@/lib/difficulty";
 import { formatDate } from "@/lib/utils";
-import { FileText, Plus } from "lucide-react";
+import { AlertTriangle, FileText, Plus } from "lucide-react";
 
 const schema = z
   .object({
-    paperKind: z.enum(["ASSESSMENT", "MID_TERM", "FINAL_TERM"]),
-    classKey: z.string().min(1, "Select a class"),
+    examConfigId: z.string().optional(),
+    classKey: z.string().optional(),
+    difficulty: z.coerce.number().min(1).max(10),
     lessonIds: z.array(z.string()).min(1, "Select at least one lecture"),
     mcqCount: z.coerce.number().min(0).max(40),
+    fillBlankCount: z.coerce.number().min(0).max(40),
     trueFalseCount: z.coerce.number().min(0).max(40),
-    openEndedCount: z.coerce.number().min(0).max(40),
+    shortAnswerCount: z.coerce.number().min(0).max(40),
+    longAnswerCount: z.coerce.number().min(0).max(40),
     mcqMarks: z.coerce.number().min(0).max(200),
+    fillBlankMarks: z.coerce.number().min(0).max(200),
     trueFalseMarks: z.coerce.number().min(0).max(200),
-    openEndedMarks: z.coerce.number().min(0).max(200),
+    shortAnswerMarks: z.coerce.number().min(0).max(200),
+    longAnswerMarks: z.coerce.number().min(0).max(200),
   })
   .superRefine((value, ctx) => {
-    if (value.mcqCount + value.trueFalseCount + value.openEndedCount < 1) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["mcqCount"],
-        message: "Add at least one question",
-      });
-    }
-    if (value.mcqCount && value.mcqMarks <= 0) {
-      ctx.addIssue({ code: "custom", path: ["mcqMarks"], message: "Enter marks for MCQs" });
-    }
-    if (value.trueFalseCount && value.trueFalseMarks <= 0) {
-      ctx.addIssue({ code: "custom", path: ["trueFalseMarks"], message: "Enter marks for true/false" });
-    }
-    if (value.openEndedCount && value.openEndedMarks <= 0) {
-      ctx.addIssue({ code: "custom", path: ["openEndedMarks"], message: "Enter marks for open-ended" });
+    const totalQuestions =
+      value.mcqCount + value.fillBlankCount + value.trueFalseCount + value.shortAnswerCount + value.longAnswerCount;
+    if (totalQuestions < 1) {
+      ctx.addIssue({ code: "custom", path: ["mcqCount"], message: "Add at least one question" });
     }
   });
 
 type FormValues = z.infer<typeof schema>;
 
-function MixField({
-  countId,
-  marksId,
-  label,
-  count,
-  marks,
-  onCount,
-  onMarks,
-}: {
-  countId: string;
-  marksId: string;
-  label: string;
-  count: number;
-  marks: number;
-  onCount: (value: number) => void;
-  onMarks: (value: number) => void;
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <div className="space-y-1.5">
-        <Label htmlFor={countId}>{label}</Label>
-        <Input
-          id={countId}
-          type="number"
-          min={0}
-          max={40}
-          value={count}
-          onChange={(e) => onCount(Math.max(0, Number(e.target.value) || 0))}
-        />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor={marksId}>Marks</Label>
-        <Input
-          id={marksId}
-          type="number"
-          min={0}
-          max={200}
-          value={marks}
-          onChange={(e) => onMarks(Math.max(0, Number(e.target.value) || 0))}
-        />
-      </div>
-    </div>
-  );
+const defaultValues: FormValues = {
+  examConfigId: "",
+  classKey: "",
+  difficulty: 3,
+  lessonIds: [],
+  mcqCount: 8,
+  fillBlankCount: 3,
+  trueFalseCount: 5,
+  shortAnswerCount: 3,
+  longAnswerCount: 1,
+  mcqMarks: 16,
+  fillBlankMarks: 6,
+  trueFalseMarks: 5,
+  shortAnswerMarks: 12,
+  longAnswerMarks: 8,
+};
+
+function assignmentStatusLabel(status: string) {
+  if (status === "NOT_STARTED") return "Not started";
+  if (status === "DRAFT") return "Draft";
+  if (status === "REJECTED") return "Rejected — revise";
+  if (status === "PENDING_REVIEW") return "Submitted";
+  if (status === "APPROVED") return "Approved";
+  return status;
 }
 
 export default function TeacherExamsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
 
   const papers = useQuery({
     queryKey: ["teacher-exam-papers"],
     queryFn: () => quizzesService.list({ limit: 50, paperKind: "EXAM" }),
+  });
+  const assignments = useQuery({
+    queryKey: ["my-exam-paper-assignments"],
+    queryFn: () => academicsService.listMyExamPaperAssignments(),
   });
   const classes = useQuery({
     queryKey: ["teacher-classes"],
@@ -127,20 +105,15 @@ export default function TeacherExamsPage() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      paperKind: "ASSESSMENT",
-      lessonIds: [],
-      mcqCount: 8,
-      trueFalseCount: 5,
-      openEndedCount: 4,
-      mcqMarks: 16,
-      trueFalseMarks: 5,
-      openEndedMarks: 20,
-    },
+    defaultValues,
   });
 
-  const classKey = form.watch("classKey");
+  const activeAssignment = assignments.data?.assignments.find((row) => row.id === activeAssignmentId);
+  const classKey = activeAssignment
+    ? `${activeAssignment.sectionId}:${activeAssignment.subjectId}`
+    : form.watch("classKey");
   const selectedClass = classes.data?.find((row) => `${row.sectionId}:${row.subjectId}` === classKey);
+
   const lectures = useQuery({
     queryKey: ["exam-lectures", selectedClass?.sectionId, selectedClass?.subjectId],
     queryFn: () =>
@@ -154,49 +127,85 @@ export default function TeacherExamsPage() {
   });
 
   const selectedLessonIds = form.watch("lessonIds") ?? [];
-  const totals = useMemo(() => {
-    const questions =
-      Number(form.watch("mcqCount")) + Number(form.watch("trueFalseCount")) + Number(form.watch("openEndedCount"));
-    const marks =
-      Number(form.watch("mcqMarks")) + Number(form.watch("trueFalseMarks")) + Number(form.watch("openEndedMarks"));
-    return { questions, marks };
-  }, [form]);
 
   const generate = useMutation({
     mutationFn: (values: FormValues) => {
-      const cls = classes.data?.find((row) => `${row.sectionId}:${row.subjectId}` === values.classKey);
+      const assignment = assignments.data?.assignments.find((row) => row.id === activeAssignmentId);
+      const cls = assignment
+        ? classes.data?.find(
+            (row) => row.sectionId === assignment.sectionId && row.subjectId === assignment.subjectId,
+          )
+        : classes.data?.find((row) => `${row.sectionId}:${row.subjectId}` === values.classKey);
       if (!cls) throw new Error("Class not found");
+      if (!assignment) throw new Error("This exam was not assigned to you yet");
+
+      const totalMarks =
+        values.mcqMarks +
+        values.fillBlankMarks +
+        values.trueFalseMarks +
+        values.shortAnswerMarks +
+        values.longAnswerMarks;
+      if (totalMarks !== assignment.maxMarks) {
+        throw new Error(`Section marks must add up to exactly ${assignment.maxMarks}.`);
+      }
+
       return quizzesService.generate({
         academicYearId: cls.academicYearId,
         sectionId: cls.sectionId,
         subjectId: cls.subjectId,
         branchId: cls.branchId,
         lessonIds: values.lessonIds,
-        paperKind: values.paperKind,
+        examConfigId: assignment.examConfigId,
+        examPaperAssignmentId: assignment.id,
+        paperKind: assignment.examName.toLowerCase().includes("final")
+          ? "FINAL_TERM"
+          : assignment.examName.toLowerCase().includes("mid")
+            ? "MID_TERM"
+            : "ASSESSMENT",
+        difficulty: values.difficulty,
         quickGenerate: false,
         mcqCount: values.mcqCount,
+        fillBlankCount: values.fillBlankCount,
         trueFalseCount: values.trueFalseCount,
-        openEndedCount: values.openEndedCount,
+        shortAnswerCount: values.shortAnswerCount,
+        longAnswerCount: values.longAnswerCount,
         mcqMarks: values.mcqMarks,
+        fillBlankMarks: values.fillBlankMarks,
         trueFalseMarks: values.trueFalseMarks,
-        openEndedMarks: values.openEndedMarks,
+        shortAnswerMarks: values.shortAnswerMarks,
+        longAnswerMarks: values.longAnswerMarks,
       });
     },
     onSuccess: (paper) => {
-      toast({ title: "Paper generated", description: "Review it, then submit for printout.", variant: "success" });
+      toast({ title: "Paper generated", description: "Review it, then submit for approval.", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["teacher-exam-papers"] });
+      queryClient.invalidateQueries({ queryKey: ["my-exam-paper-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["teacher-dashboard"] });
       setOpen(false);
-      form.reset();
+      setActiveAssignmentId(null);
+      form.reset(defaultValues);
       window.location.href = `/teacher/exams/${paper.id}`;
     },
     onError: (err) => {
       toast({
         title: "Could not generate paper",
-        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        description: err instanceof ApiClientError ? err.message : (err as Error).message,
         variant: "error",
       });
     },
   });
+
+  const openForAssignment = (assignmentId: string) => {
+    const row = assignments.data?.assignments.find((item) => item.id === assignmentId);
+    if (!row) return;
+    setActiveAssignmentId(assignmentId);
+    form.reset({
+      ...defaultValues,
+      classKey: `${row.sectionId}:${row.subjectId}`,
+      examConfigId: row.examConfigId,
+    });
+    setOpen(true);
+  };
 
   const toggleLesson = (id: string) => {
     const next = selectedLessonIds.includes(id)
@@ -205,177 +214,196 @@ export default function TeacherExamsPage() {
     form.setValue("lessonIds", next, { shouldValidate: true });
   };
 
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) {
+      setActiveAssignmentId(null);
+      form.reset(defaultValues);
+    }
+  };
+
+  const pendingAssignments = (assignments.data?.assignments ?? []).filter((row) => row.pendingGeneration);
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Exam papers"
-        description="Generate an assessment, mid term, or final from multiple lectures, then submit it for the office to print."
-        actions={
-          <Button onClick={() => setOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Generate paper
-          </Button>
-        }
+        description="The office assigns exams with marks and due dates. Generate only when an assignment appears below."
       />
 
-      <div className="rounded-lg border bg-card">
-        {papers.isLoading ? (
-          <PageLoader variant="panel" task="exams" />
-        ) : !papers.data?.items.length ? (
-          <EmptyState
-            icon={<FileText className="h-10 w-10" />}
-            title="No exam papers yet"
-            description="Pick lectures, set MCQs, true/false, and open-ended marks, then generate."
-            action={<Button onClick={() => setOpen(true)}>Generate paper</Button>}
-          />
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Paper</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Marks</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {papers.data.items.map((paper) => (
-                <TableRow key={paper.id}>
-                  <TableCell className="font-medium">
-                    {paper.title}
-                    <p className="text-xs text-muted-foreground">{examPaperLabel(paper.paperKind)}</p>
-                  </TableCell>
-                  <TableCell>
-                    {paper.subject?.name ?? "—"} {paper.section?.name ?? ""}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={paper.status === "CLOSED" ? "success" : "warning"}>
-                      {examStatusLabel(paper.status, paper.paperKind)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{paper.totalMarks ?? "—"}</TableCell>
-                  <TableCell>
-                    <Link href={`/teacher/exams/${paper.id}`}>
-                      <Button size="sm" variant="outline">Open</Button>
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg" onClose={() => setOpen(false)}>
-          <DialogHeader>
-            <DialogTitle>Generate exam paper</DialogTitle>
-            <DialogDescription>
-              Choose the paper type, lectures, question counts, and marks for each section.
-            </DialogDescription>
-          </DialogHeader>
-          {generate.isPending ? (
-            <AiWait kind="exam" />
-          ) : (
-            <form className="space-y-4" onSubmit={form.handleSubmit((values) => generate.mutate(values))}>
-              <div className="space-y-2">
-                <Label htmlFor="paperKind">Paper</Label>
-                <Select id="paperKind" {...form.register("paperKind")}>
-                  <option value="ASSESSMENT">Assessment</option>
-                  <option value="MID_TERM">Mid term</option>
-                  <option value="FINAL_TERM">Final term</option>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="classKey">Class and subject</Label>
-                <Select id="classKey" {...form.register("classKey")}>
-                  <option value="">Select class</option>
-                  {(classes.data ?? []).map((row) => (
-                    <option key={`${row.sectionId}:${row.subjectId}`} value={`${row.sectionId}:${row.subjectId}`}>
-                      {row.gradeName} {row.sectionName} · {row.subjectName}
-                    </option>
-                  ))}
-                </Select>
-                {form.formState.errors.classKey && (
-                  <p className="text-sm text-destructive">{form.formState.errors.classKey.message}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Lectures</Label>
-                {!selectedClass ? (
-                  <p className="text-sm text-muted-foreground">Select a class to see confirmed lectures.</p>
-                ) : lectures.isLoading ? (
-                  <PageLoader variant="panel" />
-                ) : !lectures.data?.items.length ? (
+      {assignments.isLoading ? (
+        <PageLoader variant="panel" task="exams" />
+      ) : pendingAssignments.length ? (
+        <div className="mb-6 space-y-3">
+          <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
+            <AlertTriangle className="h-5 w-5 shrink-0" />
+            <p className="text-sm font-medium">
+              {pendingAssignments.length} exam paper{pendingAssignments.length === 1 ? "" : "s"} still to generate and submit
+            </p>
+          </div>
+          <div className="grid gap-3">
+            {pendingAssignments.map((row) => (
+              <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
+                <div>
+                  <p className="font-medium">{row.examName}</p>
                   <p className="text-sm text-muted-foreground">
-                    No confirmed lectures yet. Confirm lessons first, then generate the paper from them.
+                    {row.className} · {row.subjectName} · {row.maxMarks} marks · submit by {formatDate(row.submissionDueAt)}
                   </p>
-                ) : (
-                  <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-2">
-                    {lectures.data.items.map((lesson) => (
-                      <label key={lesson.id} className="flex cursor-pointer items-start gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          className="mt-1"
-                          checked={selectedLessonIds.includes(lesson.id)}
-                          onChange={() => toggleLesson(lesson.id)}
-                        />
-                        <span>
-                          <span className="font-medium">{lesson.topicName || lesson.chapterName || "Lecture"}</span>
-                          <span className="block text-xs text-muted-foreground">{formatDate(lesson.date)}</span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-                {form.formState.errors.lessonIds && (
-                  <p className="text-sm text-destructive">{form.formState.errors.lessonIds.message}</p>
-                )}
-              </div>
-              <MixField
-                countId="mcqCount"
-                marksId="mcqMarks"
-                label="MCQs"
-                count={form.watch("mcqCount")}
-                marks={form.watch("mcqMarks")}
-                onCount={(value) => form.setValue("mcqCount", value, { shouldValidate: true })}
-                onMarks={(value) => form.setValue("mcqMarks", value, { shouldValidate: true })}
-              />
-              <MixField
-                countId="trueFalseCount"
-                marksId="trueFalseMarks"
-                label="True / False"
-                count={form.watch("trueFalseCount")}
-                marks={form.watch("trueFalseMarks")}
-                onCount={(value) => form.setValue("trueFalseCount", value, { shouldValidate: true })}
-                onMarks={(value) => form.setValue("trueFalseMarks", value, { shouldValidate: true })}
-              />
-              <MixField
-                countId="openEndedCount"
-                marksId="openEndedMarks"
-                label="Open-ended"
-                count={form.watch("openEndedCount")}
-                marks={form.watch("openEndedMarks")}
-                onCount={(value) => form.setValue("openEndedCount", value, { shouldValidate: true })}
-                onMarks={(value) => form.setValue("openEndedMarks", value, { shouldValidate: true })}
-              />
-              <p className="text-xs text-muted-foreground">
-                {totals.questions} questions · {totals.marks} marks total
-              </p>
-              {form.formState.errors.mcqCount && (
-                <p className="text-sm text-destructive">{form.formState.errors.mcqCount.message}</p>
-              )}
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                  Cancel
+                  {row.status === "REJECTED" && row.rejectionReason ? (
+                    <p className="mt-1 text-sm text-amber-800">Office note: {row.rejectionReason}</p>
+                  ) : null}
+                </div>
+                <Button onClick={() => (row.quizId ? window.location.assign(`/teacher/exams/${row.quizId}`) : openForAssignment(row.id))}>
+                  {row.status === "DRAFT" || row.status === "REJECTED" ? "Continue draft" : "Generate paper"}
                 </Button>
-                <Button type="submit">Generate</Button>
               </div>
-            </form>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="mb-6 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+          No pending exam assignments right now. The office will release papers when it is time to prepare them.
+        </p>
+      )}
+
+      <section className="mb-6">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">All assignments</h2>
+        <div className="rounded-lg border bg-card">
+          {!assignments.data?.assignments.length ? (
+            <EmptyState
+              icon={<FileText className="h-10 w-10" />}
+              title="No assignments yet"
+              description="When the office releases an exam for your class, it will show up here."
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Exam</TableHead>
+                  <TableHead>Class</TableHead>
+                  <TableHead>Due</TableHead>
+                  <TableHead>Marks</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {assignments.data.assignments.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="font-medium">{row.examName}</TableCell>
+                    <TableCell>{row.className} · {row.subjectName}</TableCell>
+                    <TableCell>{formatDate(row.submissionDueAt)}</TableCell>
+                    <TableCell>{row.maxMarks}</TableCell>
+                    <TableCell>
+                      <Badge variant={row.pendingGeneration ? "warning" : "success"}>
+                        {assignmentStatusLabel(row.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {row.quizId ? (
+                        <Link href={`/teacher/exams/${row.quizId}`}>
+                          <Button size="sm" variant="outline">Open</Button>
+                        </Link>
+                      ) : row.pendingGeneration ? (
+                        <Button size="sm" onClick={() => openForAssignment(row.id)}>Generate</Button>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
-        </DialogContent>
-      </Dialog>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Your papers</h2>
+        <div className="rounded-lg border bg-card">
+          {papers.isLoading ? (
+            <PageLoader variant="panel" task="exams" />
+          ) : !papers.data?.items.length ? (
+            <EmptyState
+              icon={<FileText className="h-10 w-10" />}
+              title="No exam papers yet"
+              description="Generate a paper from an assignment above when the office releases it."
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Paper</TableHead>
+                  <TableHead>Class</TableHead>
+                  <TableHead>Difficulty</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Marks</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {papers.data.items.map((paper) => (
+                  <TableRow key={paper.id}>
+                    <TableCell className="font-medium">
+                      {paper.title}
+                      <p className="text-xs text-muted-foreground">{examPaperLabel(paper.paperKind)}</p>
+                    </TableCell>
+                    <TableCell>
+                      {paper.subject?.name ?? "—"} {paper.section?.name ?? ""}
+                    </TableCell>
+                    <TableCell>
+                      {paper.difficulty ? (
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${difficultyColorClass(paper.difficulty)}`}>
+                          {difficultyLabel(paper.difficulty)}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={paper.status === "CLOSED" ? "success" : "warning"}>
+                        {examStatusLabel(paper.status, paper.paperKind)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{paper.totalMarks ?? "—"}</TableCell>
+                    <TableCell>
+                      <Link href={`/teacher/exams/${paper.id}`}>
+                        <Button size="sm" variant="outline">Open</Button>
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </section>
+
+      <GenerateExamPaperDialog
+        open={open}
+        onOpenChange={handleOpenChange}
+        form={form}
+        classes={classes.data ?? []}
+        examConfigs={[]}
+        examConfigsLoading={false}
+        lectures={lectures.data?.items ?? []}
+        lecturesLoading={lectures.isLoading}
+        selectedClass={selectedClass}
+        selectedLessonIds={selectedLessonIds}
+        onToggleLesson={toggleLesson}
+        onSubmit={(values) => generate.mutate(values)}
+        isGenerating={generate.isPending}
+        assignment={
+          activeAssignment
+            ? {
+                id: activeAssignment.id,
+                examName: activeAssignment.examName,
+                className: activeAssignment.className,
+                subjectName: activeAssignment.subjectName,
+                maxMarks: activeAssignment.maxMarks,
+                submissionDueAt: activeAssignment.submissionDueAt,
+              }
+            : null
+        }
+      />
     </div>
   );
 }

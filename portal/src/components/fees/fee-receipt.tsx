@@ -14,6 +14,11 @@ export function receiptWhatsAppText(receipt: FeeReceipt) {
     `${receipt.fee.name} · ${receipt.fee.periodLabel}`,
     `Billed: ${formatPkr(receipt.fee.billed)}`,
     `Collected: ${formatPkr(receipt.collected)}`,
+    receipt.lateFeeWaived
+      ? "Late fee: waived"
+      : Number(receipt.lateFee ?? 0) > 0.009
+        ? `Late fee: ${formatPkr(receipt.lateFee ?? 0)}`
+        : "",
     `Discount: ${formatPkr(receipt.discount)}`,
     `Balance: ${formatPkr(receipt.balance)}`,
     `Received by: ${receipt.receivedBy}`,
@@ -64,6 +69,17 @@ export function FeeReceiptSheet({ receipt }: { receipt: FeeReceipt }) {
             <td className="border border-black px-2 py-1">Collected</td>
             <td className="border border-black px-2 py-1">{formatPkr(receipt.collected)}</td>
           </tr>
+          {receipt.lateFeeWaived ? (
+            <tr>
+              <td className="border border-black px-2 py-1">Late fee</td>
+              <td className="border border-black px-2 py-1">Waived</td>
+            </tr>
+          ) : Number(receipt.lateFee ?? 0) > 0.009 ? (
+            <tr>
+              <td className="border border-black px-2 py-1">Late fee</td>
+              <td className="border border-black px-2 py-1">{formatPkr(receipt.lateFee ?? 0)}</td>
+            </tr>
+          ) : null}
           <tr>
             <td className="border border-black px-2 py-1">Discount</td>
             <td className="border border-black px-2 py-1">{formatPkr(receipt.discount)}</td>

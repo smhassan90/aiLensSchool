@@ -76,6 +76,47 @@ export default function StudentsPage() {
     return map;
   }, [sections.data]);
 
+  const classTeachers = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        id: string;
+        gender?: string | null;
+        user?: { firstName?: string | null; lastName?: string | null } | null;
+        employeeCode?: string | null;
+      }
+    >();
+    for (const section of sections.data?.items ?? []) {
+      if (section.classTeacher?.id) {
+        map.set(section.classTeacher.id, section.classTeacher);
+      }
+    }
+    for (const teacher of teachers.data?.items ?? []) {
+      if (map.has(teacher.id)) {
+        map.set(teacher.id, { ...map.get(teacher.id)!, employeeCode: teacher.employeeCode });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      personFullName(a.user?.firstName, a.user?.lastName).localeCompare(
+        personFullName(b.user?.firstName, b.user?.lastName),
+      ),
+    );
+  }, [sections.data, teachers.data]);
+
+  const classOptions = useMemo(() => {
+    return [...(sections.data?.items ?? [])].sort((a, b) => {
+      const levelA = a.grade?.level ?? Number.POSITIVE_INFINITY;
+      const levelB = b.grade?.level ?? Number.POSITIVE_INFINITY;
+      if (levelA !== levelB) return levelA - levelB;
+      const gradeName = (a.grade?.name ?? "").localeCompare(b.grade?.name ?? "", undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+      if (gradeName !== 0) return gradeName;
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [sections.data]);
+
   const items = useMemo(() => {
     const rows = data?.items ?? [];
     return search.trim() ? rows.filter((student) => studentMatchesQuery(student, search)) : rows;
@@ -90,18 +131,18 @@ export default function StudentsPage() {
       );
     }
     if (teacherId) {
-      const teacher = teachers.data?.items.find((t) => t.id === teacherId);
+      const teacher = classTeachers.find((t) => t.id === teacherId);
       parts.push(
         teacher
-          ? personFullName(teacher.user?.firstName, teacher.user?.lastName)
-          : "selected teacher",
+          ? teacherDisplayNameFromUser(teacher.user, teacher.gender)
+          : "selected class teacher",
       );
     }
     if (status) {
       parts.push(status === "ACTIVE" ? "active" : status.toLowerCase());
     }
     return parts;
-  }, [sectionId, teacherId, status, sections.data, teachers.data]);
+  }, [sectionId, teacherId, status, sections.data, classTeachers]);
 
   const hasFilters = Boolean(search.trim() || sectionId || teacherId || status);
 
@@ -109,7 +150,7 @@ export default function StudentsPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Students"
-        description="Filter by class or teacher, then open a child for the full 360 view"
+        description="Filter by class or class teacher, then open a child for the full 360 view"
         actions={
           <Link href="/school/students/new">
             <Button>
@@ -138,7 +179,7 @@ export default function StudentsPage() {
             onChange={(e) => setFilter("sectionId", e.target.value)}
           >
             <option value="">All classes</option>
-            {(sections.data?.items ?? []).map((section) => (
+            {classOptions.map((section) => (
               <option key={section.id} value={section.id}>
                 {section.grade?.name} {section.name}
               </option>
@@ -146,16 +187,16 @@ export default function StudentsPage() {
           </Select>
         </div>
         <div>
-          <Label htmlFor="student-teacher">Teacher</Label>
+          <Label htmlFor="student-teacher">Class teacher</Label>
           <Select
             id="student-teacher"
             value={teacherId}
             onChange={(e) => setFilter("teacherId", e.target.value)}
           >
-            <option value="">All teachers</option>
-            {(teachers.data?.items ?? []).map((teacher) => (
+            <option value="">All class teachers</option>
+            {classTeachers.map((teacher) => (
               <option key={teacher.id} value={teacher.id}>
-                {personFullName(teacher.user?.firstName, teacher.user?.lastName)}
+                {teacherDisplayNameFromUser(teacher.user, teacher.gender)}
                 {teacher.employeeCode ? ` (${teacher.employeeCode})` : ""}
               </option>
             ))}

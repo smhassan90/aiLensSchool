@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma, RoleName } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
@@ -9,6 +9,7 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
 import { ParentsService } from '../parents/parents.service';
+import { dateFromIso } from '../teachers/teacher-checkin';
 
 @Injectable()
 export class AttendanceService {
@@ -22,16 +23,38 @@ export class AttendanceService {
 
   async mark(dto: MarkAttendanceDto, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
-    const date = new Date(dto.date);
 
-    if (!dto.entries.length) {
+    if (!dto.academicYearId?.trim() || !dto.branchId?.trim() || !dto.sectionId?.trim()) {
+      throw new BadRequestException({
+        code: 'ATTENDANCE_CONTEXT_REQUIRED',
+        message: 'Academic year, branch, and section are required before saving attendance',
+      });
+    }
+    if (!dto.date?.trim()) {
+      throw new BadRequestException({
+        code: 'DATE_REQUIRED',
+        message: 'Date is required',
+      });
+    }
+
+    const entries = [
+      ...new Map(
+        dto.entries
+          .filter((entry) => entry.studentId?.trim())
+          .map((entry) => [entry.studentId, entry]),
+      ).values(),
+    ];
+
+    if (!entries.length) {
       return [];
     }
 
     await this.assertCanMarkSection(user, schoolId, dto.sectionId);
 
+    const date = dateFromIso(dto.date.slice(0, 10));
+
     // One round-trip upsert for the whole roster (remote MySQL latency dominates N upserts).
-    const rows = dto.entries.map((entry) =>
+    const rows = entries.map((entry) =>
       Prisma.sql`(
         ${randomUUID()},
         ${schoolId},
@@ -66,7 +89,7 @@ export class AttendanceService {
     const results = await this.prisma.attendance.findMany({
       where: {
         date,
-        studentId: { in: dto.entries.map((entry) => entry.studentId) },
+        studentId: { in: entries.map((entry) => entry.studentId) },
       },
     });
 
@@ -111,7 +134,7 @@ export class AttendanceService {
       schoolId,
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
       ...(query.studentId ? { studentId: query.studentId } : {}),
-      ...(query.date ? { date: new Date(query.date) } : {}),
+      ...(query.date ? { date: dateFromIso(query.date.slice(0, 10)) } : {}),
     };
 
     const [items, total] = await pageQuery(

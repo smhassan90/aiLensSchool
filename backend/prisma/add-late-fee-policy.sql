@@ -1,0 +1,11 @@
+ALTER TABLE school_settings
+  ADD COLUMN late_fee_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  ADD COLUMN fee_due_day INT NOT NULL DEFAULT 10;
+
+ALTER TABLE student_fees
+  ADD COLUMN late_fee_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  ADD COLUMN late_fee_waived TINYINT(1) NOT NULL DEFAULT 0;
+
+ALTER TABLE fee_payments
+  ADD COLUMN late_fee_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  ADD COLUMN late_fee_waived TINYINT(1) NOT NULL DEFAULT 0;

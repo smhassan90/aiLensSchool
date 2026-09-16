@@ -54,6 +54,12 @@ const HREF_PREFETCH: Record<string, PrefetchItem[]> = {
   "/school/students": [SCHOOL_MENU_PREFETCH[6]],
   "/school/homework": [SCHOOL_MENU_PREFETCH[7], SCHOOL_MENU_PREFETCH[1], SCHOOL_MENU_PREFETCH[2]],
   "/school/quizzes": [SCHOOL_MENU_PREFETCH[8], SCHOOL_MENU_PREFETCH[1], SCHOOL_MENU_PREFETCH[2]],
+  "/school/submitted-exam-papers": [
+    {
+      key: ["school-exam-paper-submissions", "", "", "", ""],
+      fn: () => academicsService.getExamPaperSubmissions(),
+    },
+  ],
 };
 
 function runWhenIdle(cb: () => void, delayMs = 400) {

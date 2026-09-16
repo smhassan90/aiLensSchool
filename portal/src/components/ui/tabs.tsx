@@ -64,10 +64,12 @@ export function TabsTrigger({
   return (
     <button
       type="button"
+      data-state={active ? "active" : "inactive"}
       onClick={() => ctx.setValue(value)}
       className={cn(
         "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
-        active ? "bg-background text-foreground shadow-sm" : "hover:text-foreground",
+        "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+        "data-[state=inactive]:hover:text-foreground",
         className,
       )}
     >

@@ -38,7 +38,7 @@ export const PERFORMANCE_CRITERIA: Array<{
     key: 'teacherAttendance',
     label: 'Teacher attendance',
     points: 15,
-    why: 'Admin marks this. Being present is a fair professional standard.',
+    why: 'Check-in time is recorded. Late still counts as present.',
   },
   {
     key: 'quizCompletion',

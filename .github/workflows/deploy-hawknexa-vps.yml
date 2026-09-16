@@ -1,0 +1,32 @@
+name: Deploy HawkNexa VPS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'portal/**'
+      - 'deploy/hawknexa/**'
+      - '.github/workflows/deploy-hawknexa-vps.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: hawknexa-vps-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Ubuntu VPS
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HAWKNEXA_VPS_HOST }}
+          username: ${{ secrets.HAWKNEXA_VPS_USER }}
+          key: ${{ secrets.HAWKNEXA_VPS_SSH_KEY }}
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            bash /opt/apps/hawknexa/deploy/deploy.sh

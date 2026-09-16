@@ -178,6 +178,11 @@ export class CollectFeeDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ description: 'When the bill is overdue, skip the school late fee on this collection' })
+  @IsOptional()
+  @IsBoolean()
+  waiveLateFee?: boolean;
 }
 
 export class MarkPaidDto {
@@ -194,4 +199,20 @@ export class MarkPaidDto {
   @IsOptional()
   @IsString()
   notes?: string;
+}
+
+export class UpdateFeePolicyDto {
+  @ApiPropertyOptional({ description: 'Late fee charged after the due date. 0 means no late fee.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  lateFeeAmount?: number;
+
+  @ApiPropertyOptional({ description: 'Day of each month when fees are due (1-28)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  feeDueDay?: number;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -25,8 +25,8 @@ export default function AttendancePage() {
   const [sectionId, setSectionId] = useState("");
   const [date, setDate] = useState(() => localDateISO());
   const [marks, setMarks] = useState<Record<string, AttendanceMark>>({});
+  const saving = useRef(false);
   const sections = useQuery({ queryKey: ["sections"], queryFn: () => academicsService.listSections({ limit: 100 }) });
-  const years = useQuery({ queryKey: ["academic-years"], queryFn: () => academicsService.listYears({ limit: 20 }) });
   const enrollments = useQuery({
     queryKey: ["enrollments", sectionId],
     queryFn: () => academicsService.listEnrollments({ sectionId, limit: 100 }),
@@ -37,39 +37,77 @@ export default function AttendancePage() {
     queryFn: () => attendanceService.list({ sectionId, date, limit: 100 }),
     enabled: Boolean(sectionId),
   });
-  const section = sections.data?.items.find((s) => s.id === sectionId);
-  const year = years.data?.items.find((y) => y.isCurrent) ?? years.data?.items[0];
+  const sectionOptions = useMemo(() => sections.data?.items ?? [], [sections.data?.items]);
+  const section = sectionOptions.find((s) => s.id === sectionId);
+  const academicYearId = enrollments.data?.items[0]?.academicYearId;
+
+  useEffect(() => {
+    if (sectionId && !sectionOptions.some((s) => s.id === sectionId)) {
+      setSectionId("");
+      setMarks({});
+      return;
+    }
+    if (sectionOptions.length === 1 && !sectionId) {
+      setSectionId(sectionOptions[0].id);
+    }
+  }, [sectionId, sectionOptions]);
 
   const merged = useMemo(() => {
     const students = enrollments.data?.items ?? [];
     const byStudent = new Map(
       (existing.data?.items ?? []).map((row) => [row.student?.id ?? "", toPresentAbsent(row.status)]),
     );
-    return students.map((enr) => {
+    const rows = new Map<string, { studentId: string; name: string; status: AttendanceMark }>();
+    for (const enr of students) {
       const studentId = enr.student?.id ?? enr.studentId;
-      return {
+      if (!studentId || rows.has(studentId)) continue;
+      rows.set(studentId, {
         studentId,
         name: enr.student ? `${enr.student.firstName} ${enr.student.lastName}` : studentId,
         status: marks[studentId] ?? byStudent.get(studentId) ?? "PRESENT",
-      };
-    });
+      });
+    }
+    return Array.from(rows.values());
   }, [enrollments.data, existing.data, marks]);
 
+  const canSave =
+    Boolean(sectionId) &&
+    Boolean(section?.branchId) &&
+    Boolean(academicYearId) &&
+    merged.length > 0 &&
+    !sections.isLoading &&
+    !enrollments.isLoading;
+
   const save = useMutation({
-    mutationFn: () =>
-      attendanceService.mark({
-        academicYearId: year?.id ?? "",
+    mutationFn: async () => {
+      if (saving.current) return;
+      saving.current = true;
+      if (!merged.length) throw new Error("No students in this class to mark");
+      if (!academicYearId || !section?.branchId) {
+        throw new Error("Class details are still loading. Wait a moment and try again.");
+      }
+      return attendanceService.mark({
+        academicYearId,
         sectionId,
-        branchId: section?.branchId ?? "",
+        branchId: section.branchId,
         date,
         entries: merged.map((row) => ({ studentId: row.studentId, status: row.status })),
-      }),
+      });
+    },
     onSuccess: () => {
       toast({ title: "Attendance saved", variant: "success" });
+      setMarks({});
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
     },
     onError: (err) =>
-      toast({ title: "Save failed", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
+      toast({
+        title: "Save failed",
+        description: err instanceof ApiClientError || err instanceof Error ? err.message : "",
+        variant: "error",
+      }),
+    onSettled: () => {
+      saving.current = false;
+    },
   });
 
   return (
@@ -86,7 +124,7 @@ export default function AttendancePage() {
             }}
           >
             <option value="">Select</option>
-            {sections.data?.items.map((s) => (
+            {sectionOptions.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.grade?.name} {s.name}
               </option>
@@ -105,7 +143,7 @@ export default function AttendancePage() {
           />
         </div>
         <div className="flex items-end">
-          <Button disabled={!sectionId || save.isPending} onClick={() => save.mutate()}>
+          <Button disabled={!canSave || save.isPending} onClick={() => save.mutate()}>
             {save.isPending ? "Saving…" : "Save attendance"}
           </Button>
         </div>
@@ -113,6 +151,8 @@ export default function AttendancePage() {
       {sectionId &&
         (enrollments.isLoading || existing.isLoading ? (
           <PageLoader variant="panel" />
+        ) : merged.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No students enrolled in this section yet.</p>
         ) : (
           <AttendanceRoster
             rows={merged}
@@ -122,9 +162,3 @@ export default function AttendancePage() {
     </div>
   );
 }
-
-
-
-
-
-

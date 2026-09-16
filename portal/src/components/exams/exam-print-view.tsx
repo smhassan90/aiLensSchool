@@ -24,6 +24,18 @@ function groupedQuestions(questions: QuizQuestion[]) {
     .filter((group) => group.items.length);
 }
 
+function formatExamDate(quiz: Quiz) {
+  const raw = quiz.dueAt || quiz.submittedAt || quiz.createdAt;
+  if (!raw) return null;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export function ExamPrintView({
   quiz,
   showAnswers = false,
@@ -34,30 +46,41 @@ export function ExamPrintView({
   const groups = groupedQuestions(quiz.questions ?? []);
   const totalMarks = Number(quiz.totalMarks ?? 0);
   const classLabel = [quiz.section?.grade?.name, quiz.section?.name].filter(Boolean).join(" ");
+  const schoolName = quiz.school?.name?.trim() || "School";
+  const examDate = formatExamDate(quiz);
+  const paperLabel = examPaperLabel(quiz.paperKind);
   let number = 1;
 
   return (
-    <div className="exam-print mx-auto max-w-3xl bg-white text-black">
-      <header className="border-b-2 border-black pb-3 text-center">
-        <p className="text-sm uppercase tracking-wide">{examPaperLabel(quiz.paperKind)}</p>
-        <h1 className="mt-1 text-2xl font-semibold">{quiz.title}</h1>
-        <p className="mt-2 text-sm">
-          {quiz.subject?.name ?? "Subject"}
-          {classLabel ? ` · ${classLabel}` : ""}
-          {totalMarks ? ` · ${totalMarks} marks` : ""}
+    <div className="exam-print mx-auto max-w-3xl bg-white p-6 text-black print:max-w-none print:p-0">
+      <div className="exam-print-header border-b-2 border-black pb-4 text-center">
+        <h1 className="text-2xl font-bold uppercase tracking-wide">{schoolName}</h1>
+        <p className="mt-3 text-sm">
+          <span className="font-semibold">Date:</span> {examDate ?? "____________________"}
+        </p>
+        <p className="mt-2 text-xl font-semibold">{paperLabel}</p>
+        <p className="mt-2 text-base font-medium">
+          Class: {classLabel || "____________________"}
+        </p>
+        <p className="mt-1 text-sm">
+          {quiz.subject?.name ? `Subject: ${quiz.subject.name}` : null}
+          {quiz.subject?.name && totalMarks ? " · " : null}
+          {totalMarks ? `${totalMarks} marks` : null}
         </p>
         {quiz.createdBy ? (
-          <p className="mt-1 text-xs">
+          <p className="mt-1 text-xs text-neutral-700">
             Prepared by {personFullName(quiz.createdBy.firstName, quiz.createdBy.lastName)}
           </p>
         ) : null}
-      </header>
+      </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
-        <p>Name: ______________________________</p>
-        <p>Roll no: ____________________</p>
-        <p>Date: _______________________________</p>
-        <p>Time: ______________________</p>
+      <div className="mt-5 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+        <p>
+          <span className="font-semibold">Student name:</span> ______________________________
+        </p>
+        <p>
+          <span className="font-semibold">Roll number:</span> ____________________
+        </p>
       </div>
 
       {groups.map((group) => {
@@ -95,7 +118,7 @@ export function ExamPrintView({
                       <div className="mt-3 h-8 border-b border-neutral-400" />
                     )}
                     {showAnswers && question.correctAnswer ? (
-                      <p className="mt-2 text-xs text-neutral-700">
+                      <p className="mt-2 text-xs text-neutral-700 print:hidden">
                         Answer key: {question.correctAnswer}
                       </p>
                     ) : null}

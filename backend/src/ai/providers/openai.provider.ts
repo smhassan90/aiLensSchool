@@ -15,7 +15,7 @@ import {
   STUDENT_ANALYSIS_PROMPT,
   TEACHER_COACH_PROMPT,
 } from '../prompts';
-import { mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
+import { difficultyInstruction, mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
 
 interface OpenAiChatResponse {
   choices?: Array<{ message?: { content?: string } }>;
@@ -84,6 +84,7 @@ export class OpenAiProvider implements AiProvider {
     trueFalseMarks?: number;
     openEndedMarks?: number;
     fillBlankMarks?: number;
+    difficulty?: number;
   }): Promise<AiCompletionResult<QuizOutput>> {
     const mix = resolveQuizMix(input);
     if (!this.apiKey) {
@@ -91,9 +92,10 @@ export class OpenAiProvider implements AiProvider {
       return this.mockQuiz(input.subjectName, mix);
     }
 
+    const difficultyLine = difficultyInstruction(input.difficulty);
     const content = await this.chat(
       mix.mode === 'exam' ? EXAM_GENERATION_PROMPT : QUIZ_GENERATION_PROMPT,
-      `Subject: ${input.subjectName ?? 'General'}\n${quizMixInstructions(mix)}\n\nLectures:\n${input.lessonSummaries.join('\n---\n')}`,
+      `Subject: ${input.subjectName ?? 'General'}\n${difficultyLine ? `${difficultyLine}\n` : ''}${quizMixInstructions(mix)}\n\nLectures:\n${input.lessonSummaries.join('\n---\n')}`,
     );
     const parsed = QuizOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
     return {

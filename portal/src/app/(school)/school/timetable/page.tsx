@@ -108,7 +108,7 @@ export default function TimetablePage() {
             )}
             {(table.data.subjects ?? []).length > 0 ? (
               <ul className="list-disc space-y-1 pl-5 text-sm">
-                {table.data.subjects.map((subject) => (
+                {(table.data.subjects ?? []).map((subject) => (
                   <li key={subject.id}>
                     {subject.name}
                     {subject.teacher ? ` · ${teacherLabel(subject.teacher)}` : ""}

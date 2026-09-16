@@ -35,7 +35,11 @@ export interface CreateTeacherPayload {
   branchId: string;
   employeeCode: string;
   hireDate?: string;
+  gender?: "MALE" | "FEMALE" | "OTHER";
+  status?: "ACTIVE" | "INACTIVE" | "ON_LEAVE";
 }
+
+export type UpdateTeacherPayload = Partial<Omit<CreateTeacherPayload, "password">>;
 
 export type ScoreKey =
   | "annualResults"
@@ -108,11 +112,37 @@ export interface TeacherCoachResult {
   coaching: TeacherCoaching;
 }
 
+export type TeacherAttendanceStatus = "PRESENT" | "LATE" | "ABSENT";
+
+export interface TeacherAttendancePolicy {
+  lateAfter: string;
+  absentAfter: string;
+  timezone: string;
+}
+
 export interface TeacherAttendanceRow {
   teacherId: string;
   name: string;
   employeeCode: string;
-  status: "PRESENT" | "ABSENT";
+  status: TeacherAttendanceStatus | null;
+  checkedInAt: string | null;
+  source: string | null;
+}
+
+export interface TeacherAttendanceDay {
+  date: string;
+  policy: TeacherAttendancePolicy;
+  teachers: TeacherAttendanceRow[];
+  summary: { present: number; late: number; absent: number; waiting: number };
+}
+
+export interface TeacherCheckInResult {
+  teacherId: string;
+  date: string;
+  checkedInAt: string;
+  status: TeacherAttendanceStatus;
+  source: string;
+  alreadyCheckedIn: boolean;
 }
 
 export const teachersService = {
@@ -122,7 +152,7 @@ export const teachersService = {
     );
   },
 
-  list(params?: { page?: number; limit?: number; search?: string; branchId?: string }) {
+  list(params?: { page?: number; limit?: number; search?: string; branchId?: string; status?: string }) {
     return apiClient<Paginated<Teacher>>(`/teachers${buildQuery(params ?? {})}`);
   },
 
@@ -133,8 +163,15 @@ export const teachersService = {
     });
   },
 
+  update(id: string, payload: UpdateTeacherPayload) {
+    return apiClient<Teacher>(`/teachers/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
   getById(id: string) {
-    return apiClient<Teacher>(`/teachers/${id}`);
+    return apiClient<Teacher>(`/teachers/${id}`, { cache: "no-store" });
   },
 
   performance(id: string) {
@@ -146,16 +183,20 @@ export const teachersService = {
   },
 
   listAttendance(date: string) {
-    return apiClient<TeacherAttendanceRow[]>(`/teachers/attendance${buildQuery({ date })}`);
+    return apiClient<TeacherAttendanceDay>(`/teachers/attendance${buildQuery({ date })}`);
   },
 
-  markAttendance(payload: {
-    date: string;
-    entries: Array<{ teacherId: string; status: "PRESENT" | "ABSENT" }>;
-  }) {
-    return apiClient<{ saved: number }>("/teachers/attendance", {
-      method: "POST",
+  updateAttendancePolicy(payload: { teacherLateAfter: string; teacherAbsentAfter: string }) {
+    return apiClient<TeacherAttendancePolicy>("/teachers/attendance/policy", {
+      method: "PATCH",
       body: JSON.stringify(payload),
+    });
+  },
+
+  checkIn(teacherId: string) {
+    return apiClient<TeacherCheckInResult>("/teachers/attendance/check-in", {
+      method: "POST",
+      body: JSON.stringify({ teacherId }),
     });
   },
 

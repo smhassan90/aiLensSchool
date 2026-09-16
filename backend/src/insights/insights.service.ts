@@ -130,7 +130,21 @@ export class InsightsService {
         branch: true,
         enrollments: {
           where: { status: 'ACTIVE' },
-          include: { grade: true, section: true, academicYear: true },
+          include: {
+            grade: true,
+            academicYear: true,
+            section: {
+              include: {
+                classTeacher: {
+                  select: {
+                    id: true,
+                    gender: true,
+                    user: { select: { firstName: true, lastName: true } },
+                  },
+                },
+              },
+            },
+          },
           take: 1,
         },
         parents: {
@@ -218,6 +232,19 @@ export class InsightsService {
         grade: enrollment?.grade ?? null,
         section: enrollment?.section ?? null,
         academicYear: enrollment?.academicYear ?? null,
+        parents: student.parents.map((link) => ({
+          relationship: link.relationship,
+          parent: {
+            phone: link.parent.phone ?? link.parent.user.phone ?? null,
+            user: {
+              firstName: link.parent.user.firstName,
+              lastName: link.parent.user.lastName,
+              email: link.parent.user.email,
+              username: link.parent.user.username,
+              phone: link.parent.user.phone ?? link.parent.phone ?? null,
+            },
+          },
+        })),
       },
       attendance: {
         total: attendance.length,

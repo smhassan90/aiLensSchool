@@ -27,13 +27,16 @@ interface QuizEditorActionsProps {
   listQueryKey: unknown[];
 }
 
-function questionPayload(quiz: Quiz) {
-  return (quiz.questions ?? []).map((q) => ({
-    id: q.id,
-    included: q.included,
-    questionText: q.questionText,
-    marks: Number(q.marks),
-  }));
+function questionPayload(quiz: Quiz, forSubmit = false) {
+  return [...(quiz.questions ?? [])]
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .map((q, index) => ({
+      id: q.id,
+      included: q.included,
+      marks: Number(q.marks),
+      order: index,
+      ...(forSubmit ? {} : { questionText: q.questionText }),
+    }));
 }
 
 function localDateTimeToIso(value: string) {
@@ -114,11 +117,12 @@ export function QuizEditorActions({
       if (includedCount === 0) {
         throw new Error("Include at least one question before submitting");
       }
-      await quizzesService.updateQuestions(quizId, questionPayload(quiz));
-      return quizzesService.submitPaper(quizId);
+      return quizzesService.submitPaper(quizId, questionPayload(quiz, true));
     },
     onSuccess: () => {
-      toast({ title: "Submitted for printout", description: "The office can print this paper now.", variant: "success" });
+      toast({ title: "Submitted to office", description: "The office will review and approve your paper.", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["teacher-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["my-exam-paper-assignments"] });
       queryClient.invalidateQueries({ queryKey: ["quiz", quizId] });
       queryClient.invalidateQueries({ queryKey: listQueryKey });
       router.push(listHref);

@@ -25,10 +25,13 @@ const nextConfig = {
     return config;
   },
   async rewrites() {
+    if (process.env.NEXT_PUBLIC_USE_LOCAL_API === "true") {
+      return [];
+    }
     return [
       {
         source: "/api/v1/:path*",
-        destination: `${PRODUCTION_API_URL}/:path*`,
+        destination: `${publicApiUrl()}/:path*`,
       },
     ];
   },

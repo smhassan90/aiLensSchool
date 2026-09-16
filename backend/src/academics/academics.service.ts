@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EnrollmentStatus, Prisma } from '@prisma/client';
+import { EnrollmentStatus, ExamPaperReviewStatus, Prisma, QuizStatus } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
@@ -23,6 +23,8 @@ import {
 } from './dto/academics.dto';
 import { examsForPattern, normalizeExamPapers } from './exam-patterns';
 import { positiveAmount, syncClassFeeStructures } from '../fees/class-fees';
+import { EXAM_PAPER_KINDS } from '../quizzes/exam-paper';
+import { teacherDisplayName } from '../common/utils/person-name';
 
 @Injectable()
 export class AcademicsService {
@@ -543,7 +545,7 @@ export class AcademicsService {
       (skip, take) =>
         this.prisma.section.findMany({
           where,
-          orderBy: { name: 'asc' },
+          orderBy: [{ grade: { level: 'asc' } }, { name: 'asc' }],
           skip,
           take,
           select: {
@@ -759,7 +761,7 @@ export class AcademicsService {
       (skip, take) =>
         this.prisma.studentEnrollment.findMany({
           where,
-          orderBy: { createdAt: 'desc' },
+          orderBy: [{ student: { firstName: 'asc' } }, { student: { lastName: 'asc' } }],
           skip,
           take,
           select: {
@@ -920,11 +922,20 @@ export class AcademicsService {
     });
   }
 
+  getExamSettings(user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    return this.prisma.schoolSettings.findUnique({
+      where: { schoolId },
+      select: { examSubmissionDaysBefore: true },
+    });
+  }
+
   async saveExamPattern(
     user: AuthUser,
     dto: {
       academicYearId: string;
       pattern: string;
+      examSubmissionDaysBefore?: number;
       exams?: Array<{
         name: string;
         maxMarks: number;
@@ -945,8 +956,19 @@ export class AcademicsService {
     const examPattern = dto.exams?.length ? 'CUSTOM' : dto.pattern;
     await this.prisma.schoolSettings.upsert({
       where: { schoolId },
-      create: { schoolId, examPattern },
-      update: { examPattern },
+      create: {
+        schoolId,
+        examPattern,
+        ...(dto.examSubmissionDaysBefore !== undefined
+          ? { examSubmissionDaysBefore: dto.examSubmissionDaysBefore }
+          : {}),
+      },
+      update: {
+        examPattern,
+        ...(dto.examSubmissionDaysBefore !== undefined
+          ? { examSubmissionDaysBefore: dto.examSubmissionDaysBefore }
+          : {}),
+      },
     });
     await this.prisma.examConfig.deleteMany({ where: { schoolId, academicYearId: dto.academicYearId } });
     await this.prisma.examConfig.createMany({
@@ -1159,6 +1181,657 @@ export class AcademicsService {
         teacher: row.teacher,
       })),
       slots,
+    };
+  }
+
+  async getExamPaperSubmissions(
+    user: AuthUser,
+    query: {
+      examConfigId?: string;
+      sectionId?: string;
+      subjectId?: string;
+      teacherId?: string;
+    },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const settings = await this.prisma.schoolSettings.findUnique({
+      where: { schoolId },
+      select: { examSubmissionDaysBefore: true },
+    });
+    const submissionDaysBefore = settings?.examSubmissionDaysBefore ?? 5;
+
+    const year = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      orderBy: { startDate: 'desc' },
+      select: { id: true, name: true },
+    });
+    if (!year) {
+      return {
+        academicYear: null,
+        submissionDaysBefore,
+        selectedExam: null,
+        submitted: 0,
+        expected: 0,
+        exams: [],
+        filters: { sections: [], subjects: [], teachers: [] },
+        teachers: [],
+        papers: [],
+      };
+    }
+
+    const exams = await this.prisma.examConfig.findMany({
+      where: { schoolId, academicYearId: year.id },
+      orderBy: { sequence: 'asc' },
+      select: { id: true, name: true, startDate: true, sequence: true },
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const defaultExam =
+      exams.find((cfg) => cfg.startDate && cfg.startDate >= today) ??
+      exams.filter((cfg) => cfg.startDate).at(-1) ??
+      exams[0] ??
+      null;
+
+    const selectedExam =
+      (query.examConfigId ? exams.find((exam) => exam.id === query.examConfigId) : null) ??
+      defaultExam;
+
+    if (!selectedExam) {
+      return {
+        academicYear: year,
+        submissionDaysBefore,
+        selectedExam: null,
+        submitted: 0,
+        expected: 0,
+        exams,
+        filters: { sections: [], subjects: [], teachers: [] },
+        teachers: [],
+        papers: [],
+      };
+    }
+
+    const deadline = selectedExam.startDate
+      ? new Date(selectedExam.startDate)
+      : null;
+    if (deadline) {
+      deadline.setDate(deadline.getDate() - submissionDaysBefore);
+    }
+
+    const assignments = await this.prisma.classSubject.findMany({
+      where: {
+        section: { schoolId },
+        academicYearId: year.id,
+        teacherId: { not: null },
+        ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+        ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+        ...(query.teacherId ? { teacher: { userId: query.teacherId } } : {}),
+      },
+      select: {
+        sectionId: true,
+        subjectId: true,
+        section: { select: { id: true, name: true, grade: { select: { id: true, name: true } } } },
+        subject: { select: { id: true, name: true } },
+        teacher: {
+          select: {
+            id: true,
+            userId: true,
+            gender: true,
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+      orderBy: [{ section: { grade: { name: 'asc' } } }, { section: { name: 'asc' } }],
+    });
+
+    const allAssignments = await this.prisma.classSubject.findMany({
+      where: {
+        section: { schoolId },
+        academicYearId: year.id,
+        teacherId: { not: null },
+      },
+      select: {
+        sectionId: true,
+        subjectId: true,
+        section: { select: { id: true, name: true, grade: { select: { id: true, name: true } } } },
+        subject: { select: { id: true, name: true } },
+        teacher: {
+          select: {
+            id: true,
+            userId: true,
+            gender: true,
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+    });
+
+    const papers = await this.prisma.quiz.findMany({
+      where: {
+        schoolId,
+        academicYearId: year.id,
+        examConfigId: selectedExam.id,
+        paperKind: { in: [...EXAM_PAPER_KINDS] },
+        ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+        ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+        ...(query.teacherId ? { createdById: query.teacherId } : {}),
+      },
+      orderBy: { submittedAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        reviewStatus: true,
+        rejectionReason: true,
+        paperKind: true,
+        difficulty: true,
+        submittedAt: true,
+        totalMarks: true,
+        createdAt: true,
+        sectionId: true,
+        subjectId: true,
+        createdById: true,
+        examConfigId: true,
+        subject: { select: { id: true, name: true } },
+        section: { select: { id: true, name: true, grade: { select: { id: true, name: true } } } },
+        examConfig: { select: { id: true, name: true, startDate: true } },
+        createdBy: {
+          select: {
+            firstName: true,
+            lastName: true,
+            teacherProfile: { select: { gender: true } },
+          },
+        },
+      },
+    });
+
+    const paperByAssignment = new Map<string, (typeof papers)[number]>();
+    for (const paper of papers) {
+      const key = `${paper.createdById}:${paper.sectionId}:${paper.subjectId}`;
+      const existing = paperByAssignment.get(key);
+      if (!existing || paper.createdAt > existing.createdAt) {
+        paperByAssignment.set(key, paper);
+      }
+    }
+
+    type AssignmentRow = {
+      sectionId: string;
+      subjectId: string;
+      className: string;
+      subjectName: string;
+      status: 'SUBMITTED' | 'DRAFT' | 'MISSING' | 'REJECTED';
+      paperId: string | null;
+      submittedAt: string | null;
+    };
+
+    const teacherMap = new Map<
+      string,
+      {
+        teacherId: string;
+        teacherName: string;
+        gender: string | null;
+        submittedCount: number;
+        expectedCount: number;
+        assignments: AssignmentRow[];
+      }
+    >();
+
+    let submittedTotal = 0;
+    for (const row of assignments) {
+      if (!row.teacher?.userId) continue;
+      const teacherId = row.teacher.userId;
+      const className = `${row.section.grade.name} ${row.section.name}`;
+      const key = `${teacherId}:${row.sectionId}:${row.subjectId}`;
+      const paper = paperByAssignment.get(key);
+      let status: AssignmentRow['status'] = 'MISSING';
+      if (
+        paper?.status === QuizStatus.CLOSED &&
+        paper.reviewStatus !== ExamPaperReviewStatus.REJECTED
+      ) {
+        status = 'SUBMITTED';
+        submittedTotal += 1;
+      } else if (paper?.status === QuizStatus.DRAFT) {
+        status = paper.reviewStatus === ExamPaperReviewStatus.REJECTED ? 'REJECTED' : 'DRAFT';
+      }
+
+      const assignmentRow: AssignmentRow = {
+        sectionId: row.sectionId,
+        subjectId: row.subjectId,
+        className,
+        subjectName: row.subject.name,
+        status,
+        paperId: paper?.id ?? null,
+        submittedAt: paper?.submittedAt?.toISOString() ?? null,
+      };
+
+      const existing = teacherMap.get(teacherId);
+      if (existing) {
+        existing.expectedCount += 1;
+        if (status === 'SUBMITTED') existing.submittedCount += 1;
+        existing.assignments.push(assignmentRow);
+      } else {
+        teacherMap.set(teacherId, {
+          teacherId,
+          teacherName: teacherDisplayName(
+            row.teacher.user.firstName,
+            row.teacher.user.lastName,
+            row.teacher.gender,
+          ),
+          gender: row.teacher.gender,
+          submittedCount: status === 'SUBMITTED' ? 1 : 0,
+          expectedCount: 1,
+          assignments: [assignmentRow],
+        });
+      }
+    }
+
+    const teachers = [...teacherMap.values()].sort((a, b) =>
+      a.teacherName.localeCompare(b.teacherName),
+    );
+
+    const sectionOptions = new Map<string, string>();
+    const subjectOptions = new Map<string, string>();
+    const teacherOptions = new Map<string, string>();
+    for (const row of allAssignments) {
+      if (!row.teacher?.userId) continue;
+      sectionOptions.set(
+        row.sectionId,
+        `${row.section.grade.name} ${row.section.name}`,
+      );
+      subjectOptions.set(row.subjectId, row.subject.name);
+      teacherOptions.set(
+        row.teacher.userId,
+        teacherDisplayName(
+          row.teacher.user.firstName,
+          row.teacher.user.lastName,
+          row.teacher.gender,
+        ),
+      );
+    }
+
+    const submittedPapers = papers
+      .filter(
+        (paper) =>
+          paper.status === QuizStatus.CLOSED &&
+          paper.reviewStatus !== ExamPaperReviewStatus.REJECTED,
+      )
+      .map((paper) => ({
+        ...paper,
+        teacherName: teacherDisplayName(
+          paper.createdBy.firstName,
+          paper.createdBy.lastName,
+          paper.createdBy.teacherProfile?.gender ?? null,
+        ),
+        teacherGender: paper.createdBy.teacherProfile?.gender ?? null,
+      }));
+
+    return {
+      academicYear: year,
+      submissionDaysBefore,
+      selectedExam: {
+        id: selectedExam.id,
+        name: selectedExam.name,
+        examDate: selectedExam.startDate?.toISOString().slice(0, 10) ?? null,
+        deadline: deadline?.toISOString().slice(0, 10) ?? null,
+      },
+      submitted: submittedTotal,
+      expected: assignments.length,
+      exams,
+      filters: {
+        sections: [...sectionOptions.entries()]
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        subjects: [...subjectOptions.entries()]
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        teachers: [...teacherOptions.entries()]
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      },
+      teachers,
+      papers: submittedPapers,
+    };
+  }
+
+  async listExamPaperAssignments(user: AuthUser, examConfigId: string) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const exam = await this.prisma.examConfig.findFirst({
+      where: { id: examConfigId, schoolId },
+      select: { id: true, name: true, maxMarks: true, academicYearId: true, startDate: true },
+    });
+    if (!exam) {
+      throw new NotFoundException({ code: 'EXAM_NOT_FOUND', message: 'Exam not found' });
+    }
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        academicYearId: exam.academicYearId,
+        section: { schoolId },
+        teacherId: { not: null },
+      },
+      select: {
+        sectionId: true,
+        subjectId: true,
+        teacherId: true,
+        section: { select: { id: true, name: true, grade: { select: { name: true } } } },
+        subject: { select: { id: true, name: true } },
+        teacher: {
+          select: {
+            id: true,
+            userId: true,
+            gender: true,
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+      orderBy: [{ section: { grade: { name: 'asc' } } }, { section: { name: 'asc' } }],
+    });
+
+    const existing = await this.prisma.examPaperAssignment.findMany({
+      where: { examConfigId, schoolId },
+      include: {
+        teacher: {
+          select: {
+            id: true,
+            userId: true,
+            gender: true,
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+    });
+    const byKey = new Map(
+      existing.map((row) => [`${row.sectionId}:${row.subjectId}`, row]),
+    );
+
+    const settings = await this.prisma.schoolSettings.findUnique({
+      where: { schoolId },
+      select: { examSubmissionDaysBefore: true },
+    });
+    const daysBefore = settings?.examSubmissionDaysBefore ?? 5;
+    const defaultDue = exam.startDate
+      ? new Date(exam.startDate.getTime() - daysBefore * 24 * 60 * 60 * 1000)
+      : null;
+
+    return {
+      exam,
+      defaultDueAt: defaultDue?.toISOString() ?? null,
+      rows: classSubjects.map((row) => {
+        const key = `${row.sectionId}:${row.subjectId}`;
+        const assignment = byKey.get(key);
+        const teacherName = teacherDisplayName(
+          row.teacher?.user.firstName,
+          row.teacher?.user.lastName,
+          row.teacher?.gender,
+        );
+        return {
+          sectionId: row.sectionId,
+          subjectId: row.subjectId,
+          className: `${row.section.grade.name} ${row.section.name}`,
+          subjectName: row.subject.name,
+          defaultTeacherId: row.teacherId,
+          defaultTeacherUserId: row.teacher?.userId ?? null,
+          defaultTeacherName: teacherName,
+          assignment: assignment
+            ? {
+                id: assignment.id,
+                teacherId: assignment.teacherId,
+                maxMarks: assignment.maxMarks,
+                submissionDueAt: assignment.submissionDueAt.toISOString(),
+                releasedAt: assignment.releasedAt?.toISOString() ?? null,
+              }
+            : null,
+        };
+      }),
+    };
+  }
+
+  async saveExamPaperAssignments(
+    user: AuthUser,
+    body: {
+      examConfigId: string;
+      release?: boolean;
+      rows: Array<{
+        sectionId: string;
+        subjectId: string;
+        teacherId?: string | null;
+        maxMarks: number;
+        submissionDueAt: string;
+        enabled?: boolean;
+      }>;
+    },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const exam = await this.prisma.examConfig.findFirst({
+      where: { id: body.examConfigId, schoolId },
+      select: { id: true, academicYearId: true },
+    });
+    if (!exam) {
+      throw new NotFoundException({ code: 'EXAM_NOT_FOUND', message: 'Exam not found' });
+    }
+
+    const enabledRows = body.rows.filter((row) => row.enabled !== false);
+    if (!enabledRows.length) {
+      throw new BadRequestException({
+        code: 'NO_ASSIGNMENTS',
+        message: 'Select at least one class and subject to assign',
+      });
+    }
+
+    const releasedAt = body.release ? new Date() : null;
+    const results = await this.prisma.$transaction(async (tx) => {
+      const saved: string[] = [];
+      for (const row of enabledRows) {
+        if (!row.maxMarks || row.maxMarks < 1) {
+          throw new BadRequestException({
+            code: 'INVALID_MAX_MARKS',
+            message: 'Each assignment needs total marks of at least 1',
+          });
+        }
+        const due = new Date(row.submissionDueAt);
+        if (Number.isNaN(due.getTime())) {
+          throw new BadRequestException({
+            code: 'INVALID_DUE_DATE',
+            message: 'Enter a valid submission due date for each assignment',
+          });
+        }
+
+        const classSubject = await tx.classSubject.findFirst({
+          where: {
+            sectionId: row.sectionId,
+            subjectId: row.subjectId,
+            academicYearId: exam.academicYearId,
+            section: { schoolId },
+          },
+          select: { teacherId: true },
+        });
+        if (!classSubject) {
+          throw new BadRequestException({
+            code: 'CLASS_SUBJECT_NOT_FOUND',
+            message: 'Class and subject combination was not found',
+          });
+        }
+
+        const teacherId = row.teacherId ?? classSubject.teacherId;
+        const existing = await tx.examPaperAssignment.findUnique({
+          where: {
+            examConfigId_sectionId_subjectId: {
+              examConfigId: body.examConfigId,
+              sectionId: row.sectionId,
+              subjectId: row.subjectId,
+            },
+          },
+        });
+
+        const data = {
+          schoolId,
+          examConfigId: body.examConfigId,
+          sectionId: row.sectionId,
+          subjectId: row.subjectId,
+          teacherId,
+          maxMarks: row.maxMarks,
+          submissionDueAt: due,
+          assignedById: user.id,
+          ...(releasedAt && !existing?.releasedAt ? { releasedAt } : {}),
+          ...(releasedAt && existing && !existing.releasedAt ? { releasedAt } : {}),
+        };
+
+        const record = existing
+          ? await tx.examPaperAssignment.update({
+              where: { id: existing.id },
+              data: {
+                teacherId: data.teacherId,
+                maxMarks: data.maxMarks,
+                submissionDueAt: data.submissionDueAt,
+                assignedById: data.assignedById,
+                ...(data.releasedAt ? { releasedAt: data.releasedAt } : {}),
+              },
+            })
+          : await tx.examPaperAssignment.create({
+              data: {
+                ...data,
+                releasedAt: releasedAt,
+              },
+            });
+        saved.push(record.id);
+      }
+      return saved;
+    });
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'EXAM_PAPER_ASSIGNMENTS_SAVED',
+      entityType: 'ExamConfig',
+      entityId: body.examConfigId,
+      metadata: { count: results.length, released: Boolean(body.release) },
+    });
+
+    return { saved: results.length, released: Boolean(body.release) };
+  }
+
+  async listMyExamPaperAssignments(user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.prisma.teacherProfile.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    if (!teacher) {
+      return { assignments: [] };
+    }
+
+    const year = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      orderBy: { startDate: 'desc' },
+      select: { id: true },
+    });
+    if (!year) {
+      return { assignments: [] };
+    }
+
+    const assignments = await this.prisma.examPaperAssignment.findMany({
+      where: {
+        schoolId,
+        releasedAt: { not: null },
+        examConfig: { academicYearId: year.id },
+        OR: [
+          { teacherId: teacher.id },
+          {
+            teacherId: null,
+            section: {
+              classSubjects: {
+                some: {
+                  academicYearId: year.id,
+                  OR: [{ teacherId: teacher.id }, { assistantTeacherId: teacher.id }],
+                },
+              },
+            },
+          },
+        ],
+      },
+      include: {
+        examConfig: { select: { id: true, name: true, startDate: true } },
+        section: { select: { id: true, name: true, grade: { select: { name: true } } } },
+        subject: { select: { id: true, name: true } },
+        quizzes: {
+          where: { createdById: user.id, paperKind: { in: [...EXAM_PAPER_KINDS] } },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            reviewStatus: true,
+            rejectionReason: true,
+            submittedAt: true,
+            totalMarks: true,
+          },
+        },
+      },
+      orderBy: { submissionDueAt: 'asc' },
+    });
+
+    const filtered = assignments.filter((row) => {
+      if (row.teacherId && row.teacherId !== teacher.id) return false;
+      if (!row.teacherId) {
+        return true;
+      }
+      return true;
+    });
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        academicYearId: year.id,
+        OR: [{ teacherId: teacher.id }, { assistantTeacherId: teacher.id }],
+      },
+      select: { sectionId: true, subjectId: true },
+    });
+    const teachKeys = new Set(classSubjects.map((r) => `${r.sectionId}:${r.subjectId}`));
+
+    return {
+      assignments: filtered
+        .filter((row) => teachKeys.has(`${row.sectionId}:${row.subjectId}`))
+        .map((row) => {
+          const latestQuiz = row.quizzes[0] ?? null;
+          const submitted =
+            latestQuiz?.status === QuizStatus.CLOSED &&
+            latestQuiz.reviewStatus !== ExamPaperReviewStatus.REJECTED;
+          const pendingGeneration = !submitted;
+          return {
+            id: row.id,
+            examConfigId: row.examConfigId,
+            examName: row.examConfig.name,
+            examDate: row.examConfig.startDate?.toISOString().slice(0, 10) ?? null,
+            sectionId: row.sectionId,
+            subjectId: row.subjectId,
+            className: `${row.section.grade.name} ${row.section.name}`,
+            subjectName: row.subject.name,
+            maxMarks: row.maxMarks,
+            submissionDueAt: row.submissionDueAt.toISOString(),
+            releasedAt: row.releasedAt?.toISOString() ?? null,
+            status: !latestQuiz
+              ? 'NOT_STARTED'
+              : latestQuiz.reviewStatus === ExamPaperReviewStatus.REJECTED
+                ? 'REJECTED'
+                : latestQuiz.reviewStatus === ExamPaperReviewStatus.PENDING_REVIEW
+                  ? 'PENDING_REVIEW'
+                  : latestQuiz.reviewStatus === ExamPaperReviewStatus.APPROVED
+                    ? 'APPROVED'
+                    : latestQuiz.status === QuizStatus.CLOSED
+                      ? 'SUBMITTED'
+                      : 'DRAFT',
+            quizId: latestQuiz?.id ?? null,
+            rejectionReason: latestQuiz?.rejectionReason ?? null,
+            pendingGeneration,
+          };
+        }),
+      pendingCount: filtered.filter((row) => {
+        const key = `${row.sectionId}:${row.subjectId}`;
+        if (!teachKeys.has(key)) return false;
+        const latest = row.quizzes[0];
+        const submitted =
+          latest?.status === QuizStatus.CLOSED &&
+          latest.reviewStatus !== ExamPaperReviewStatus.REJECTED;
+        return !submitted;
+      }).length,
     };
   }
 }

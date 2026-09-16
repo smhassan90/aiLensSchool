@@ -14,28 +14,43 @@ import {
   STUDENT_ANALYSIS_PROMPT,
   TEACHER_COACH_PROMPT,
 } from '../prompts';
-import { mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
+import { difficultyInstruction, mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
 import { isFakeExtractText, isGarbledRtlOcr, looksLikeRealLessonText } from '../../common/extract-quality';
 import { isServerlessRuntime, readEnv } from '../../common/env';
+
+/** Cost-effective Composer models only — never fall back to GPT/Claude. */
+const DEFAULT_CURSOR_MODEL = 'composer-2.5';
+const COMPOSER_MODEL_FALLBACKS = ['composer-2.5', 'composer-2'];
 
 @Injectable()
 export class CursorProvider implements AiProvider {
   private readonly logger = new Logger(CursorProvider.name);
   private readonly apiKey: string | undefined;
   private readonly model: string;
-  private readonly jsonModel: string;
-  private readonly visionModel: string;
+  private readonly preferredJsonModel: string;
+  private readonly preferredVisionModel: string;
   private readonly jsonTimeoutMs: number;
+  /** Last model that worked for JSON / vision in this process. */
+  private resolvedJsonModel: string | null = null;
+  private resolvedVisionModel: string | null = null;
+  private availableModelIds: string[] | null = null;
+  private modelsListInFlight: Promise<string[]> | null = null;
 
   constructor(private readonly config: ConfigService) {
     this.apiKey = readEnv('CURSOR_API_KEY') || this.config.get<string>('CURSOR_API_KEY')?.trim() || undefined;
-    this.model = this.config.get<string>('CURSOR_MODEL') ?? 'auto';
-    this.jsonModel =
+    const configuredModel =
+      readEnv('CURSOR_MODEL')?.trim() ||
+      this.config.get<string>('CURSOR_MODEL')?.trim() ||
+      DEFAULT_CURSOR_MODEL;
+    this.model = configuredModel === 'auto' ? DEFAULT_CURSOR_MODEL : configuredModel;
+    this.preferredJsonModel =
+      readEnv('CURSOR_JSON_MODEL')?.trim() ||
       this.config.get<string>('CURSOR_JSON_MODEL')?.trim() ||
-      (this.model === 'auto' ? 'composer-2.5-fast' : this.model);
-    this.visionModel =
+      this.model;
+    this.preferredVisionModel =
+      readEnv('CURSOR_VISION_MODEL')?.trim() ||
       this.config.get<string>('CURSOR_VISION_MODEL')?.trim() ||
-      (this.model === 'auto' ? 'composer-2.5' : this.model);
+      this.model;
     this.jsonTimeoutMs = isServerlessRuntime() ? 28_000 : 40_000;
   }
 
@@ -105,16 +120,18 @@ export class CursorProvider implements AiProvider {
     trueFalseMarks?: number;
     openEndedMarks?: number;
     fillBlankMarks?: number;
+    difficulty?: number;
   }): Promise<AiCompletionResult<QuizOutput>> {
     const mix = resolveQuizMix(input);
     if (!this.apiKey) {
       return this.mockQuiz(input.subjectName, mix);
     }
 
+    const difficultyLine = difficultyInstruction(input.difficulty);
     const content = await this.withTimeout(
       this.complete(
         mix.mode === 'exam' ? EXAM_GENERATION_PROMPT : QUIZ_GENERATION_PROMPT,
-        `Subject: ${input.subjectName ?? 'General'}\n${quizMixInstructions(mix)}\n\nLectures:\n${input.lessonSummaries.join('\n---\n')}`,
+        `Subject: ${input.subjectName ?? 'General'}\n${difficultyLine ? `${difficultyLine}\n` : ''}${quizMixInstructions(mix)}\n\nLectures:\n${input.lessonSummaries.join('\n---\n')}`,
       ),
       this.jsonTimeoutMs,
       mix.mode === 'exam' ? 'Exam generation' : 'Quiz generation',
@@ -360,7 +377,7 @@ export class CursorProvider implements AiProvider {
       text: merged,
       meta: {
         provider: 'cursor',
-        model: this.visionModel,
+        model: this.resolvedVisionModel ?? this.preferredVisionModel,
         inputTokens: 0,
         outputTokens: 0,
         estimatedCost: 0,
@@ -381,40 +398,64 @@ export class CursorProvider implements AiProvider {
     const fileName = `page-${pageNum}.jpg`;
     const filePath = join(runtime.cwd, fileName);
     await writeFile(filePath, image.buffer);
-    const agent = await Agent.create({
-      apiKey: this.apiKey,
-      model: { id: this.visionModel },
-      local: {
-        cwd: runtime.cwd,
-        store: new JsonlLocalAgentStore(runtime.storeDir),
-      },
-    });
     try {
-      const run = await agent.send({
-        text: `${system}\n\n${user}\n\nTranscribe the attached textbook photo (page ${pageNum} of ${pageCount}) into the JSON schema. Keep English as English and Urdu/Arabic as Unicode script. Return ONLY valid JSON. Do not use tools. Do not read or write files.`,
-        images: [
-          {
-            data: image.buffer.toString('base64'),
-            mimeType: image.mimeType,
+      const models = await this.modelCandidates(
+        this.preferredVisionModel,
+        COMPOSER_MODEL_FALLBACKS,
+        this.resolvedVisionModel,
+      );
+      let lastError: unknown;
+
+      for (const modelId of models) {
+        const agent = await Agent.create({
+          apiKey: this.apiKey,
+          model: { id: modelId },
+          local: {
+            cwd: runtime.cwd,
+            store: new JsonlLocalAgentStore(runtime.storeDir),
           },
-        ],
-      });
-      const result = await run.wait();
-      if (result.status !== 'finished') {
-        throw new Error(`Cursor agent ${result.status || 'failed'} before reading page ${pageNum}`);
+        });
+        try {
+          const run = await agent.send({
+            text: `${system}\n\n${user}\n\nTranscribe the attached textbook photo (page ${pageNum} of ${pageCount}) into the JSON schema. Keep English as English and Urdu/Arabic as Unicode script. Return ONLY valid JSON. Do not use tools. Do not read or write files.`,
+            images: [
+              {
+                data: image.buffer.toString('base64'),
+                mimeType: image.mimeType,
+              },
+            ],
+          });
+          const result = await run.wait();
+          if (result.status !== 'finished') {
+            throw new Error(`Cursor agent ${result.status || 'failed'} before reading page ${pageNum}`);
+          }
+          const text =
+            typeof result.result === 'string'
+              ? result.result
+              : result.result
+                ? JSON.stringify(result.result)
+                : '';
+          if (!text.trim()) {
+            throw new Error(`Cursor agent returned an empty result for page ${pageNum}.`);
+          }
+          this.rememberModel('vision', modelId);
+          return text;
+        } catch (error) {
+          lastError = error;
+          if (!this.isUnavailableModelError(error)) throw error;
+          this.logger.warn(
+            `Vision model ${modelId} unavailable; trying next. ${error instanceof Error ? error.message : String(error)}`,
+          );
+          this.ingestAvailableModelsFromError(error);
+        } finally {
+          agent.close();
+        }
       }
-      const text =
-        typeof result.result === 'string'
-          ? result.result
-          : result.result
-            ? JSON.stringify(result.result)
-            : '';
-      if (!text.trim()) {
-        throw new Error(`Cursor agent returned an empty result for page ${pageNum}.`);
-      }
-      return text;
+
+      throw lastError instanceof Error
+        ? lastError
+        : new Error('No available Cursor vision model for lesson transcription');
     } finally {
-      agent.close();
       try {
         await unlink(filePath);
       } catch {
@@ -451,47 +492,177 @@ export class CursorProvider implements AiProvider {
 
   private async complete(system: string, user: string) {
     const { Agent, JsonlLocalAgentStore } = await import('@cursor/sdk');
-    const runtime = this.prepareLocalRuntime('json');
     type CursorRunResult = {
       status: string;
       result?: string;
       model?: { id?: string };
     };
-    const result = (await this.withTimeout(
-      Agent.prompt(
-        `${system}\n\n${user}\n\nReturn ONLY valid JSON. Do not edit files or run tools.`,
-        {
-          apiKey: this.apiKey,
-          model: { id: this.jsonModel },
-          local: {
-            cwd: runtime.cwd,
-            store: new JsonlLocalAgentStore(runtime.storeDir),
+    const models = await this.modelCandidates(this.preferredJsonModel, COMPOSER_MODEL_FALLBACKS, this.resolvedJsonModel);
+    let lastError: unknown;
+
+    for (const modelId of models) {
+      const runtime = this.prepareLocalRuntime('json');
+      try {
+        const result = (await this.withTimeout(
+          Agent.prompt(
+            `${system}\n\n${user}\n\nReturn ONLY valid JSON. Do not edit files or run tools.`,
+            {
+              apiKey: this.apiKey,
+              model: { id: modelId },
+              local: {
+                cwd: runtime.cwd,
+                store: new JsonlLocalAgentStore(runtime.storeDir),
+              },
+            },
+          ),
+          this.jsonTimeoutMs,
+          'Cursor JSON',
+        )) as CursorRunResult;
+
+        if (result.status !== 'finished') {
+          throw new Error(`Cursor agent ${result.status || 'failed'} before returning quiz JSON`);
+        }
+
+        const text = typeof result.result === 'string' ? result.result : '';
+        if (!text.trim()) {
+          throw new Error('Cursor agent returned an empty result. Try generating the quiz again.');
+        }
+
+        this.rememberModel('json', modelId);
+        return {
+          text,
+          meta: {
+            provider: 'cursor',
+            model: result.model?.id ?? modelId,
+            inputTokens: 0,
+            outputTokens: 0,
+            estimatedCost: 0,
           },
-        },
-      ),
-      this.jsonTimeoutMs,
-      'Cursor JSON',
-    )) as CursorRunResult;
-
-    if (result.status !== 'finished') {
-      throw new Error(`Cursor agent ${result.status || 'failed'} before returning quiz JSON`);
+        };
+      } catch (error) {
+        lastError = error;
+        if (!this.isUnavailableModelError(error)) throw error;
+        this.logger.warn(
+          `JSON model ${modelId} unavailable; trying next. ${error instanceof Error ? error.message : String(error)}`,
+        );
+        this.ingestAvailableModelsFromError(error);
+      }
     }
 
-    const text = typeof result.result === 'string' ? result.result : '';
-    if (!text.trim()) {
-      throw new Error('Cursor agent returned an empty result. Try generating the quiz again.');
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('No available Cursor model for quiz/homework generation');
+  }
+
+  private rememberModel(kind: 'json' | 'vision', modelId: string) {
+    if (kind === 'json') this.resolvedJsonModel = modelId;
+    else this.resolvedVisionModel = modelId;
+  }
+
+  private async modelCandidates(preferred: string, fallbacks: string[], sticky: string | null) {
+    const available = await this.listAvailableModelIds();
+    const stickyComposer = sticky && this.isComposerModel(sticky) ? sticky : null;
+    const preferredComposer = this.isComposerModel(preferred) ? preferred : DEFAULT_CURSOR_MODEL;
+    const ordered = [stickyComposer, preferredComposer, ...fallbacks].filter(
+      (id): id is string => Boolean(id),
+    );
+    const unique: string[] = [];
+    for (const id of ordered) {
+      const resolved = this.resolveToAvailableId(id, available) ?? id;
+      if (!this.isComposerModel(resolved)) continue;
+      if (!unique.includes(resolved)) unique.push(resolved);
     }
 
-    return {
-      text,
-      meta: {
-        provider: 'cursor',
-        model: result.model?.id ?? this.jsonModel,
-        inputTokens: 0,
-        outputTokens: 0,
-        estimatedCost: 0,
-      },
-    };
+    if (!available.length) return unique.length ? unique : [DEFAULT_CURSOR_MODEL];
+
+    const matched = unique.filter((id) => available.includes(id));
+    if (matched.length) return matched;
+
+    const composerFromAccount = this.pickComposerModels(available);
+    if (composerFromAccount.length) {
+      this.logger.warn(
+        `Preferred Composer models unavailable (${unique.join(', ')}); using ${composerFromAccount[0]}`,
+      );
+      return composerFromAccount;
+    }
+
+    this.logger.warn(
+      `No Composer models in account list; retrying ${DEFAULT_CURSOR_MODEL} only`,
+    );
+    return [DEFAULT_CURSOR_MODEL];
+  }
+
+  private isComposerModel(id: string) {
+    const normalized = id.replace(/-fast$/i, '');
+    return normalized === 'composer-2.5' || normalized === 'composer-2';
+  }
+
+  private pickComposerModels(available: string[]) {
+    const composer = available.filter((id) => this.isComposerModel(id));
+    composer.sort((a, b) => {
+      if (a.includes('composer-2.5')) return -1;
+      if (b.includes('composer-2.5')) return 1;
+      return 0;
+    });
+    return composer;
+  }
+
+  private resolveToAvailableId(id: string, available: string[]) {
+    if (!available.length) return null;
+    if (available.includes(id)) return id;
+    if (id.endsWith('-fast')) {
+      const base = id.replace(/-fast$/, '');
+      if (available.includes(base)) return base;
+    }
+    return null;
+  }
+
+  private async listAvailableModelIds(): Promise<string[]> {
+    if (this.availableModelIds) return this.availableModelIds;
+    if (!this.apiKey) return [];
+    if (this.modelsListInFlight) return this.modelsListInFlight;
+
+    this.modelsListInFlight = (async () => {
+      try {
+        const { Cursor } = await import('@cursor/sdk');
+        const models = await Cursor.models.list({ apiKey: this.apiKey });
+        const ids = new Set<string>();
+        for (const model of models ?? []) {
+          if (model?.id) ids.add(model.id);
+          for (const alias of model?.aliases ?? []) {
+            if (alias) ids.add(alias);
+          }
+        }
+        this.availableModelIds = [...ids];
+        return this.availableModelIds;
+      } catch (error) {
+        this.logger.warn(
+          `Could not list Cursor models: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return [];
+      } finally {
+        this.modelsListInFlight = null;
+      }
+    })();
+
+    return this.modelsListInFlight;
+  }
+
+  private isUnavailableModelError(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return /cannot use this model|available models:/i.test(message);
+  }
+
+  private ingestAvailableModelsFromError(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    const match = /Available models:\s*([^.]+)/i.exec(message);
+    if (!match?.[1]) return;
+    const ids = match[1]
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (!ids.length) return;
+    this.availableModelIds = [...new Set([...(this.availableModelIds ?? []), ...ids])];
   }
 
   private withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {

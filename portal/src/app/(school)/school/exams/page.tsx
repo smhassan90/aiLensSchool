@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -9,6 +11,7 @@ import { academicsService } from "@/services/academics.service";
 import { useToast } from "@/providers/toast-provider";
 import { useAuth } from "@/providers/auth-provider";
 import { ExamPapersEditor } from "@/components/exams/exam-papers-editor";
+import { ExamPaperAssignmentsEditor } from "@/components/exams/exam-paper-assignments-editor";
 import { createDraftPaper, defaultExamDrafts, toExamPayload, type DraftExamPaper } from "@/lib/exam-patterns";
 
 export default function ExamsPage() {
@@ -17,6 +20,8 @@ export default function ExamsPage() {
   const queryClient = useQueryClient();
   const [yearId, setYearId] = useState("");
   const [papers, setPapers] = useState<DraftExamPaper[]>(defaultExamDrafts);
+  const [submissionDaysBefore, setSubmissionDaysBefore] = useState(5);
+  const [assignExamId, setAssignExamId] = useState("");
   const years = useQuery({ queryKey: ["years"], queryFn: () => academicsService.listYears({ limit: 20 }) });
   const grades = useQuery({ queryKey: ["grades"], queryFn: () => academicsService.listGrades({ limit: 50 }) });
   const subjects = useQuery({ queryKey: ["subjects"], queryFn: () => academicsService.listSubjects({ limit: 100 }) });
@@ -26,6 +31,10 @@ export default function ExamsPage() {
     queryFn: () => academicsService.listExamConfigs(yearId),
     enabled: Boolean(yearId),
   });
+  const examSettings = useQuery({
+    queryKey: ["exam-settings"],
+    queryFn: () => academicsService.getExamSettings(),
+  });
 
   const loadedYear = useRef("");
 
@@ -33,6 +42,12 @@ export default function ExamsPage() {
     const current = years.data?.items.find((year) => year.isCurrent) ?? years.data?.items[0];
     if (current && !yearId) setYearId(current.id);
   }, [years.data, yearId]);
+
+  useEffect(() => {
+    if (examSettings.data?.examSubmissionDaysBefore) {
+      setSubmissionDaysBefore(examSettings.data.examSubmissionDaysBefore);
+    }
+  }, [examSettings.data?.examSubmissionDaysBefore]);
 
   useEffect(() => {
     if (!yearId || configs.isFetching) return;
@@ -50,7 +65,12 @@ export default function ExamsPage() {
       const exams = toExamPayload(papers);
       if (!yearId) throw new Error("Choose a year");
       if (!exams.length) throw new Error("Add at least one exam paper");
-      return academicsService.saveExamPattern({ academicYearId: yearId, pattern: "CUSTOM", exams });
+      return academicsService.saveExamPattern({
+        academicYearId: yearId,
+        pattern: "CUSTOM",
+        examSubmissionDaysBefore: submissionDaysBefore,
+        exams,
+      });
     },
     onSuccess: () => {
       toast({ title: "Exam papers saved", variant: "success" });
@@ -107,10 +127,45 @@ export default function ExamsPage() {
                 ))}
               </select>
               <ExamPapersEditor papers={papers} onChange={setPapers} />
+              <div className="space-y-2">
+                <Label htmlFor="submissionDaysBefore">Paper submission deadline</Label>
+                <p className="text-xs text-muted-foreground">
+                  Teachers must submit exam papers this many days before the tentative exam date.
+                </p>
+                <Input
+                  id="submissionDaysBefore"
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={submissionDaysBefore}
+                  onChange={(e) => setSubmissionDaysBefore(Math.max(1, Number(e.target.value) || 5))}
+                />
+              </div>
               <Button type="submit" disabled={save.isPending || !yearId}>
                 {save.isPending ? "Saving…" : "Save papers"}
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle>Assign exam papers to teachers</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <select
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              value={assignExamId}
+              onChange={(e) => setAssignExamId(e.target.value)}
+            >
+              <option value="">Choose exam to assign</option>
+              {(configs.data ?? []).map((exam) => (
+                <option key={exam.id} value={exam.id}>{exam.name}</option>
+              ))}
+            </select>
+            <ExamPaperAssignmentsEditor
+              examConfigId={assignExamId}
+              examName={(configs.data ?? []).find((exam) => exam.id === assignExamId)?.name ?? "Exam"}
+              defaultMaxMarks={(configs.data ?? []).find((exam) => exam.id === assignExamId)?.maxMarks ?? 50}
+            />
           </CardContent>
         </Card>
 

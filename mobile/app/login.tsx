@@ -65,7 +65,11 @@ export default function LoginScreen() {
       }
     } catch (error) {
       const message =
-        error instanceof ApiError ? error.message : 'Login failed. Check your credentials.';
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Login failed. Check your credentials.';
       Alert.alert('Login failed', message);
     } finally {
       setSubmitting(false);

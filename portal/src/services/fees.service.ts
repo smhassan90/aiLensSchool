@@ -11,12 +11,26 @@ import type {
   StudentFee,
 } from "@/lib/types";
 
+export type FeePolicy = {
+  lateFeeAmount: number;
+  feeDueDay: number;
+};
+
 export const feesService = {
   listStructures() {
     return apiClient<Paginated<FeeStructure>>("/fees/structures?limit=50");
   },
   listBrackets() {
     return apiClient<{ amounts: number[] }>("/fees/brackets");
+  },
+  getPolicy() {
+    return apiClient<FeePolicy>("/fees/policy");
+  },
+  updatePolicy(payload: FeePolicy) {
+    return apiClient<FeePolicy>("/fees/policy", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
   },
   createStructure(payload: {
     name: string;
@@ -126,6 +140,7 @@ export const feesService = {
     discountAmount?: number;
     method?: string;
     notes?: string;
+    waiveLateFee?: boolean;
   }) {
     return apiClient<FeeReceipt>("/fees/collect", {
       method: "POST",

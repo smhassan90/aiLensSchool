@@ -1,25 +1,46 @@
-import { Type } from 'class-transformer';
-import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsDateString, IsIn, IsString, ValidateNested } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsDateString, IsOptional, IsString, Matches } from 'class-validator';
 
-class TeacherAttendanceEntryDto {
+const TIME_HM = /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
+
+export class CheckInTeacherDto {
   @ApiProperty()
   @IsString()
   teacherId!: string;
 
-  @ApiProperty({ enum: ['PRESENT', 'ABSENT'] })
-  @IsIn(['PRESENT', 'ABSENT'])
-  status!: 'PRESENT' | 'ABSENT';
+  @ApiPropertyOptional({ description: 'ISO timestamp. Defaults to now.' })
+  @IsOptional()
+  @IsDateString()
+  checkedInAt?: string;
 }
 
-export class MarkTeacherAttendanceDto {
-  @ApiProperty()
-  @IsDateString()
-  date!: string;
+export class SyncTeacherAttendanceDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  teacherId?: string;
 
-  @ApiProperty({ type: [TeacherAttendanceEntryDto] })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => TeacherAttendanceEntryDto)
-  entries!: TeacherAttendanceEntryDto[];
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  employeeCode?: string;
+
+  @ApiProperty({ description: 'Punch time from the attendance machine' })
+  @IsDateString()
+  checkedInAt!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  externalId?: string;
+}
+
+export class UpdateTeacherAttendancePolicyDto {
+  @ApiProperty({ example: '08:15' })
+  @Matches(TIME_HM, { message: 'Late after must be HH:mm' })
+  teacherLateAfter!: string;
+
+  @ApiProperty({ example: '09:00' })
+  @Matches(TIME_HM, { message: 'Absent after must be HH:mm' })
+  teacherAbsentAfter!: string;
 }

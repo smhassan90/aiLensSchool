@@ -222,7 +222,9 @@ export default function NewStudentPage() {
                 <Label htmlFor="gradeId">Class</Label>
                 <Select id="gradeId" {...register("gradeId")}>
                   <option value="">Select class</option>
-                  {grades.data?.items.map((g) => (
+                  {[...(grades.data?.items ?? [])]
+                    .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }))
+                    .map((g) => (
                     <option key={g.id} value={g.id}>{g.name}</option>
                   ))}
                 </Select>

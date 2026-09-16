@@ -14,9 +14,17 @@ export function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const redirected = useRef(false);
+  /** Session that existed before this page load — not a fresh sign-in on this page. */
+  const hadSessionOnLoad = useRef<boolean | null>(null);
+
+  if (!isLoading && hadSessionOnLoad.current === null) {
+    hadSessionOnLoad.current = isAuthenticated;
+  }
+
+  const alreadySignedIn = hadSessionOnLoad.current === true;
 
   useEffect(() => {
-    if (isLoading || !isAuthenticated || redirected.current) return;
+    if (isLoading || !isAuthenticated || !alreadySignedIn || redirected.current) return;
     redirected.current = true;
     toast({
       title: "Already signed in",
@@ -24,7 +32,7 @@ export function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
       variant: "success",
     });
     router.replace(getRoleRedirectPath(user));
-  }, [isLoading, isAuthenticated, user, router, toast]);
+  }, [isLoading, isAuthenticated, alreadySignedIn, user, router, toast]);
 
   if (isLoading) {
     return (
@@ -34,7 +42,7 @@ export function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
     );
   }
 
-  if (isAuthenticated) {
+  if (isAuthenticated && alreadySignedIn) {
     return (
       <div className="flex min-h-dvh items-center justify-center text-sm text-muted-foreground">
         You are already signed in. Redirecting…

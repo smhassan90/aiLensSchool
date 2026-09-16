@@ -91,7 +91,7 @@ export function LoginForm({
               id="username"
               type="text"
               autoComplete="username"
-              placeholder="e.g. dtps.waleed"
+              placeholder="Login username"
               {...register("username")}
             />
             {errors.username && (

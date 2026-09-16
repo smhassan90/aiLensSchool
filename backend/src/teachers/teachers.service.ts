@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -13,8 +14,10 @@ import { MemoryCacheService } from '../common/services/memory-cache.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
+import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import { FAST_AI_PROVIDER, AiProvider } from '../ai/providers/ai.provider';
 import { teacherDisplayName } from '../common/utils/person-name';
+import { gradeClassLabel, gradeClassNumber } from '../common/utils/section-class-label';
 import {
   PERFORMANCE_CRITERIA,
   clampScore,
@@ -22,6 +25,17 @@ import {
   weightedTotal,
   type ScoreKey,
 } from './teacher-score';
+import {
+  dateFromIso,
+  earliestPunch,
+  finalizeTeacherAbsences,
+  hmToMinutes,
+  loadTeacherAttendancePolicy,
+  normalizeHm,
+  statusFromCheckIn,
+  zonedDateIso,
+  type TeacherAttendanceSource,
+} from './teacher-checkin';
 
 @Injectable()
 export class TeachersService {
@@ -79,7 +93,7 @@ export class TeachersService {
           lastName: (dto.lastName ?? '').trim(),
           phone: dto.phone,
           schoolId,
-          status: UserStatus.ACTIVE,
+          status: dto.status === TeacherStatus.ACTIVE || !dto.status ? UserStatus.ACTIVE : UserStatus.INACTIVE,
         },
       });
 
@@ -95,7 +109,7 @@ export class TeachersService {
           employeeCode: dto.employeeCode,
           hireDate: dto.hireDate ? new Date(dto.hireDate) : null,
           gender: dto.gender ?? null,
-          status: TeacherStatus.ACTIVE,
+          status: dto.status ?? TeacherStatus.ACTIVE,
         },
       });
 
@@ -231,14 +245,178 @@ export class TeachersService {
         branch: true,
         teacherSubjects: { include: { subject: true, academicYear: true } },
         classSubjects: {
-          include: { section: true, subject: true, academicYear: true },
+          include: {
+            section: { include: { grade: { select: { id: true, name: true, level: true } } } },
+            subject: true,
+            academicYear: true,
+          },
         },
         assistantClassSubjects: {
-          include: { section: true, subject: true, academicYear: true },
+          include: {
+            section: { include: { grade: { select: { id: true, name: true, level: true } } } },
+            subject: true,
+            academicYear: true,
+          },
         },
+        classSections: { include: { grade: { select: { id: true, name: true, level: true } } } },
       },
     });
-    return this.tenant.assertOwnedOrThrow(user, teacher, 'TEACHER_NOT_FOUND');
+    const owned = this.tenant.assertOwnedOrThrow(user, teacher, 'TEACHER_NOT_FOUND');
+    const gradeById = await this.gradeLookup(owned.schoolId, owned);
+    return {
+      ...owned,
+      assignments: this.teacherAssignments(owned, gradeById),
+    };
+  }
+
+  private async gradeLookup(
+    schoolId: string,
+    teacher: {
+      classSections: Array<{ gradeId: string; grade?: { id: string; name: string; level: number } | null }>;
+      classSubjects: Array<{ section?: { gradeId: string; grade?: { id: string; name: string; level: number } | null } | null }>;
+      assistantClassSubjects: Array<{ section?: { gradeId: string; grade?: { id: string; name: string; level: number } | null } | null }>;
+    },
+  ) {
+    const gradeIds = new Set<string>();
+    for (const section of teacher.classSections) gradeIds.add(section.gradeId);
+    for (const item of teacher.classSubjects) {
+      if (item.section?.gradeId) gradeIds.add(item.section.gradeId);
+    }
+    for (const item of teacher.assistantClassSubjects) {
+      if (item.section?.gradeId) gradeIds.add(item.section.gradeId);
+    }
+    const grades = await this.prisma.grade.findMany({
+      where: { schoolId, id: { in: [...gradeIds] } },
+      select: { id: true, name: true, level: true },
+    });
+    return new Map(grades.map((grade) => [grade.id, grade]));
+  }
+
+  private withGrade<T extends { gradeId: string; grade?: { name: string; level: number } | null }>(
+    section: T,
+    gradeById: Map<string, { id: string; name: string; level: number }>,
+  ) {
+    return {
+      ...section,
+      grade: section.grade ?? gradeById.get(section.gradeId) ?? null,
+    };
+  }
+
+  private teacherAssignments(
+    teacher: {
+      classSections: Array<{ id: string; name: string; gradeId: string; grade?: { name: string; level: number } | null }>;
+      classSubjects: Array<{
+        id: string;
+        subject?: { name: string } | null;
+        section?: { id: string; name: string; gradeId: string; grade?: { name: string; level: number } | null } | null;
+      }>;
+      assistantClassSubjects: Array<{
+        id: string;
+        subject?: { name: string } | null;
+        section?: { id: string; name: string; gradeId: string; grade?: { name: string; level: number } | null } | null;
+      }>;
+    },
+    gradeById: Map<string, { id: string; name: string; level: number }>,
+  ) {
+    const mapAssignment = (
+      id: string,
+      section: { id: string; name: string; gradeId: string; grade?: { name: string; level: number } | null },
+      subject: string | null,
+      role: 'Class teacher' | 'Subject teacher' | 'Assistant',
+    ) => {
+      const enriched = this.withGrade(section, gradeById);
+      return {
+        id,
+        sectionId: section.id,
+        className: gradeClassLabel(enriched),
+        classNumber: gradeClassNumber(enriched),
+        sectionName: section.name?.trim() || null,
+        subject,
+        role,
+      };
+    };
+
+    return [
+      ...teacher.classSections.map((section) =>
+        mapAssignment(`homeroom-${section.id}`, section, null, 'Class teacher'),
+      ),
+      ...teacher.classSubjects.flatMap((item) =>
+        item.section
+          ? [mapAssignment(item.id, item.section, item.subject?.name ?? null, 'Subject teacher')]
+          : [],
+      ),
+      ...teacher.assistantClassSubjects.flatMap((item) =>
+        item.section
+          ? [mapAssignment(`assistant-${item.id}`, item.section, item.subject?.name ?? null, 'Assistant')]
+          : [],
+      ),
+    ];
+  }
+
+  async update(id: string, dto: UpdateTeacherDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.findOne(id, user);
+
+    if (dto.branchId && dto.branchId !== teacher.branchId) {
+      const branch = await this.prisma.branch.findFirst({ where: { id: dto.branchId, schoolId } });
+      if (!branch) {
+        throw new NotFoundException({ code: 'BRANCH_NOT_FOUND', message: 'Branch not found' });
+      }
+    }
+
+    if (dto.employeeCode && dto.employeeCode !== teacher.employeeCode) {
+      const existingCode = await this.prisma.teacherProfile.findUnique({
+        where: { schoolId_employeeCode: { schoolId, employeeCode: dto.employeeCode } },
+      });
+      if (existingCode && existingCode.id !== teacher.id) {
+        throw new ConflictException({
+          code: 'EMPLOYEE_CODE_EXISTS',
+          message: 'Employee code already exists',
+        });
+      }
+    }
+
+    if (dto.email) {
+      const email = dto.email.toLowerCase();
+      const existingUser = await this.prisma.user.findUnique({ where: { email } });
+      if (existingUser && existingUser.id !== teacher.userId) {
+        throw new ConflictException({ code: 'EMAIL_EXISTS', message: 'Email already registered' });
+      }
+    }
+
+    const nextStatus = dto.status ?? teacher.status;
+    await this.prisma.$transaction([
+      this.prisma.teacherProfile.update({
+        where: { id },
+        data: {
+          ...(dto.branchId ? { branchId: dto.branchId } : {}),
+          ...(dto.employeeCode ? { employeeCode: dto.employeeCode } : {}),
+          ...(dto.hireDate !== undefined ? { hireDate: dto.hireDate ? new Date(dto.hireDate) : null } : {}),
+          ...(dto.gender !== undefined ? { gender: dto.gender } : {}),
+          ...(dto.status ? { status: dto.status } : {}),
+        },
+      }),
+      this.prisma.user.update({
+        where: { id: teacher.userId },
+        data: {
+          ...(dto.firstName ? { firstName: dto.firstName } : {}),
+          ...(dto.lastName !== undefined ? { lastName: (dto.lastName ?? '').trim() } : {}),
+          ...(dto.email ? { email: dto.email.toLowerCase() } : {}),
+          ...(dto.phone !== undefined ? { phone: dto.phone || null } : {}),
+          status: nextStatus === TeacherStatus.ACTIVE ? UserStatus.ACTIVE : UserStatus.INACTIVE,
+        },
+      }),
+    ]);
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'TEACHER_UPDATED',
+      entityType: 'TeacherProfile',
+      entityId: id,
+    });
+
+    return this.findOne(id, user);
   }
 
   async resetPassword(id: string, user: AuthUser) {
@@ -487,12 +665,50 @@ export class TeachersService {
     };
   }
 
-  async listTeacherAttendance(user: AuthUser, date: string) {
+  async updateTeacherAttendancePolicy(
+    user: AuthUser,
+    dto: { teacherLateAfter: string; teacherAbsentAfter: string },
+  ) {
     const schoolId = this.tenant.requireSchoolId(user);
-    const day = new Date(date);
+    const lateAfter = normalizeHm(dto.teacherLateAfter);
+    const absentAfter = normalizeHm(dto.teacherAbsentAfter);
+    if (!lateAfter || !absentAfter) {
+      throw new BadRequestException({
+        code: 'INVALID_CUTOFF',
+        message: 'Cut-off times must be HH:mm',
+      });
+    }
+    if (hmToMinutes(lateAfter) >= hmToMinutes(absentAfter)) {
+      throw new BadRequestException({
+        code: 'INVALID_CUTOFF',
+        message: 'Absent after must be later than late after',
+      });
+    }
+    await this.prisma.schoolSettings.upsert({
+      where: { schoolId },
+      create: { schoolId, teacherLateAfter: lateAfter, teacherAbsentAfter: absentAfter },
+      update: { teacherLateAfter: lateAfter, teacherAbsentAfter: absentAfter },
+    });
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'TEACHER_ATTENDANCE_POLICY_UPDATED',
+      entityType: 'SchoolSettings',
+      metadata: { lateAfter, absentAfter },
+    });
+    const policy = await loadTeacherAttendancePolicy(this.prisma, schoolId);
+    return policy;
+  }
+
+  async listTeacherAttendance(user: AuthUser, date?: string) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const policy = await loadTeacherAttendancePolicy(this.prisma, schoolId);
+    const dateIso = date || zonedDateIso(new Date(), policy.timezone);
+    await finalizeTeacherAbsences(this.prisma, schoolId, dateIso);
+    const day = dateFromIso(dateIso);
     const teachers = await this.prisma.teacherProfile.findMany({
       where: { schoolId, status: TeacherStatus.ACTIVE },
-      orderBy: { user: { firstName: 'asc' } },
+      orderBy: [{ user: { firstName: 'asc' } }, { user: { lastName: 'asc' } }],
       select: {
         id: true,
         employeeCode: true,
@@ -502,46 +718,162 @@ export class TeachersService {
     });
     const marks = await this.prisma.teacherAttendance.findMany({
       where: { schoolId, date: day },
-      select: { teacherId: true, status: true },
+      select: { teacherId: true, status: true, checkedInAt: true, source: true },
     });
-    const byTeacher = new Map(marks.map((row) => [row.teacherId, row.status]));
-    return teachers.map((teacher) => ({
-      teacherId: teacher.id,
-      name: teacherDisplayName(teacher.user.firstName, teacher.user.lastName, teacher.gender),
-      employeeCode: teacher.employeeCode,
-      status: byTeacher.get(teacher.id) ?? AttendanceStatus.PRESENT,
-    }));
+    const byTeacher = new Map(marks.map((row) => [row.teacherId, row]));
+    const rows = teachers.map((teacher) => {
+      const mark = byTeacher.get(teacher.id);
+      return {
+        teacherId: teacher.id,
+        name: teacherDisplayName(teacher.user.firstName, teacher.user.lastName, teacher.gender),
+        employeeCode: teacher.employeeCode,
+        status: mark?.status ?? null,
+        checkedInAt: mark?.checkedInAt?.toISOString() ?? null,
+        source: mark?.source ?? null,
+      };
+    });
+    const summary = {
+      present: rows.filter((row) => row.status === AttendanceStatus.PRESENT).length,
+      late: rows.filter((row) => row.status === AttendanceStatus.LATE).length,
+      absent: rows.filter((row) => row.status === AttendanceStatus.ABSENT).length,
+      waiting: rows.filter((row) => row.status == null).length,
+    };
+    return { date: dateIso, policy, teachers: rows, summary };
   }
 
-  async markTeacherAttendance(
+  async checkInTeacher(
     user: AuthUser,
-    dto: { date: string; entries: Array<{ teacherId: string; status: 'PRESENT' | 'ABSENT' }> },
+    dto: { teacherId: string; checkedInAt?: string },
+    source: TeacherAttendanceSource = 'ADMIN',
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
-    const day = new Date(dto.date);
-    await this.prisma.$transaction(
-      dto.entries.map((entry) =>
-        this.prisma.teacherAttendance.upsert({
-          where: { teacherId_date: { teacherId: entry.teacherId, date: day } },
-          create: {
-            schoolId,
-            teacherId: entry.teacherId,
-            date: day,
-            status: entry.status,
-            recordedById: user.id,
-          },
-          update: { status: entry.status, recordedById: user.id },
-        }),
-      ),
-    );
-    await this.audit.log({
-      actorUserId: user.id,
+    return this.recordTeacherCheckIn({
       schoolId,
-      action: 'TEACHER_ATTENDANCE_MARKED',
-      entityType: 'TeacherAttendance',
-      metadata: { date: dto.date, count: dto.entries.length },
+      teacherId: dto.teacherId,
+      checkedInAt: dto.checkedInAt ? new Date(dto.checkedInAt) : new Date(),
+      source,
+      recordedById: user.id,
+      actorUserId: user.id,
     });
-    return { saved: dto.entries.length };
+  }
+
+  async syncTeacherCheckIn(
+    user: AuthUser,
+    dto: { teacherId?: string; employeeCode?: string; checkedInAt: string; externalId?: string },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.findTeacherForPunch(schoolId, dto.teacherId, dto.employeeCode);
+    return this.recordTeacherCheckIn({
+      schoolId,
+      teacherId: teacher.id,
+      checkedInAt: new Date(dto.checkedInAt),
+      source: 'MACHINE',
+      externalId: dto.externalId,
+      recordedById: user.id,
+      actorUserId: user.id,
+    });
+  }
+
+  private async findTeacherForPunch(schoolId: string, teacherId?: string, employeeCode?: string) {
+    if (!teacherId && !employeeCode) {
+      throw new BadRequestException({
+        code: 'TEACHER_REQUIRED',
+        message: 'Provide teacherId or employeeCode',
+      });
+    }
+    const teacher = await this.prisma.teacherProfile.findFirst({
+      where: {
+        schoolId,
+        status: TeacherStatus.ACTIVE,
+        ...(teacherId ? { id: teacherId } : { employeeCode }),
+      },
+      select: { id: true },
+    });
+    if (!teacher) {
+      throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
+    }
+    return teacher;
+  }
+
+  private async recordTeacherCheckIn(input: {
+    schoolId: string;
+    teacherId: string;
+    checkedInAt: Date;
+    source: TeacherAttendanceSource;
+    externalId?: string;
+    recordedById?: string;
+    actorUserId?: string;
+  }) {
+    const teacher = await this.prisma.teacherProfile.findFirst({
+      where: { id: input.teacherId, schoolId: input.schoolId, status: TeacherStatus.ACTIVE },
+      select: { id: true },
+    });
+    if (!teacher) {
+      throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
+    }
+    if (Number.isNaN(input.checkedInAt.getTime())) {
+      throw new BadRequestException({
+        code: 'INVALID_CHECKIN',
+        message: 'Check-in time is not valid',
+      });
+    }
+
+    const policy = await loadTeacherAttendancePolicy(this.prisma, input.schoolId);
+    const dateIso = zonedDateIso(input.checkedInAt, policy.timezone);
+    const day = dateFromIso(dateIso);
+    const existing = await this.prisma.teacherAttendance.findUnique({
+      where: { teacherId_date: { teacherId: teacher.id, date: day } },
+    });
+
+    if (existing?.checkedInAt && existing.checkedInAt <= input.checkedInAt) {
+      return {
+        teacherId: teacher.id,
+        date: dateIso,
+        checkedInAt: existing.checkedInAt.toISOString(),
+        status: existing.status,
+        source: existing.source,
+        alreadyCheckedIn: true,
+      };
+    }
+
+    const checkedInAt = earliestPunch(existing?.checkedInAt, input.checkedInAt);
+    const status = statusFromCheckIn(checkedInAt, policy.lateAfter, policy.absentAfter, policy.timezone);
+    const row = await this.prisma.teacherAttendance.upsert({
+      where: { teacherId_date: { teacherId: teacher.id, date: day } },
+      create: {
+        schoolId: input.schoolId,
+        teacherId: teacher.id,
+        date: day,
+        status,
+        checkedInAt,
+        source: input.source,
+        externalId: input.externalId ?? null,
+        recordedById: input.recordedById ?? null,
+      },
+      update: {
+        status,
+        checkedInAt,
+        source: input.source,
+        ...(input.externalId ? { externalId: input.externalId } : {}),
+        ...(input.recordedById ? { recordedById: input.recordedById } : {}),
+      },
+    });
+    await this.audit.log({
+      actorUserId: input.actorUserId,
+      schoolId: input.schoolId,
+      action: 'TEACHER_CHECKED_IN',
+      entityType: 'TeacherAttendance',
+      entityId: row.id,
+      metadata: { date: dateIso, status, source: input.source, alreadyCheckedIn: false },
+    });
+    return {
+      teacherId: teacher.id,
+      date: dateIso,
+      checkedInAt: row.checkedInAt?.toISOString() ?? checkedInAt.toISOString(),
+      status: row.status,
+      source: row.source,
+      alreadyCheckedIn: false,
+    };
   }
 
   async coach(id: string, user: AuthUser) {
@@ -557,7 +889,7 @@ export class TeachersService {
       `Quiz completion in this teacher's subjects: ${facts.metrics.quizzes.completion ?? 'n/a'}%`,
       `Quiz marks ≥70% rate: ${facts.metrics.quizzes.goodMarks ?? 'n/a'}% · average ${facts.metrics.quizzes.average ?? 'n/a'}%`,
       `Annual/term results in this teacher's subjects: ${facts.metrics.annual.average ?? 'n/a'}% (${facts.metrics.annual.source})`,
-      `Teacher attendance (admin-marked): ${facts.metrics.teacherAttendance.present}/${facts.metrics.teacherAttendance.marked} days`,
+      `Teacher attendance (check-ins): ${facts.metrics.teacherAttendance.present}/${facts.metrics.teacherAttendance.marked} days`,
       `Student attendance in this teacher's classes: ${facts.metrics.studentAttendance.rate ?? 'n/a'}% (discuss, do not blame)`,
       `Class teacher of: ${facts.classTeacherOf?.join(', ') || 'none'}`,
       ...facts.byClass.map(
@@ -719,7 +1051,9 @@ export class TeachersService {
       ? Math.round((presentStudents / studentAttendance.length) * 100)
       : null;
 
-    const teacherPresent = teacherMarks.filter((row) => row.status === AttendanceStatus.PRESENT).length;
+    const teacherPresent = teacherMarks.filter(
+      (row) => row.status === AttendanceStatus.PRESENT || row.status === AttendanceStatus.LATE,
+    ).length;
     const teacherAttScore = teacherMarks.length ? clampScore((teacherPresent / teacherMarks.length) * 100) : null;
 
     const scores: Record<ScoreKey, number | null> = {

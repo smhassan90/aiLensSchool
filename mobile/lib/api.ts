@@ -26,6 +26,14 @@ type RequestOptions = RequestInit & {
 
 let refreshPromise: Promise<string | null> | null = null;
 
+function readErrorMessage(value: unknown, fallback: string): string {
+  if (typeof value === 'string' && value.trim()) return value;
+  if (Array.isArray(value) && value.length) {
+    return value.map((item) => (typeof item === 'string' ? item : String(item))).join(', ');
+  }
+  return fallback;
+}
+
 async function parseError(response: Response): Promise<ApiError> {
   let body: ApiErrorBody = {};
   try {
@@ -33,12 +41,27 @@ async function parseError(response: Response): Promise<ApiError> {
   } catch {
     // ignore parse errors
   }
-  const message =
-    body.message ??
-    (typeof body === 'object' && body !== null && 'error' in body
-      ? String((body as { error?: string }).error)
-      : `Request failed (${response.status})`);
-  return new ApiError(message, response.status, body.code);
+
+  const nested = body.error;
+  const fallback = `Request failed (${response.status})`;
+
+  if (nested && typeof nested === 'object') {
+    const fromDetails =
+      Array.isArray(nested.details) && nested.details.length
+        ? nested.details.map(String).join(', ')
+        : undefined;
+    return new ApiError(
+      readErrorMessage(nested.message, fromDetails ?? fallback),
+      response.status,
+      typeof nested.code === 'string' ? nested.code : body.code,
+    );
+  }
+
+  return new ApiError(
+    readErrorMessage(typeof nested === 'string' ? nested : body.message, fallback),
+    response.status,
+    body.code,
+  );
 }
 
 async function refreshAccessToken(): Promise<string | null> {

@@ -20,6 +20,7 @@ import { academicsService } from "@/services/academics.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { formatPkr, whatsappUrl } from "@/lib/money";
+import { feeBelongsToThisMonth, dueDateIsoForPeriod, currentMonthLabel, monthPeriodOptions } from "@/lib/fees-month";
 import { cn } from "@/lib/utils";
 import type { FeeReceipt } from "@/lib/types";
 import { Search, Wallet, MessageCircle, Printer } from "lucide-react";
@@ -46,11 +47,17 @@ export default function FeesPage() {
   const [debounced, setDebounced] = useState("");
   const [selectedFeeId, setSelectedFeeId] = useState<string>("");
   const [collected, setCollected] = useState("");
+  const [collectedTouched, setCollectedTouched] = useState(false);
   const [discount, setDiscount] = useState("0");
   const [notes, setNotes] = useState("");
   const [receipt, setReceipt] = useState<FeeReceipt | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [structureOpen, setStructureOpen] = useState(false);
+  const [policyOpen, setPolicyOpen] = useState(false);
+  const [waiveLateFee, setWaiveLateFee] = useState(false);
+  const [dueDateTouched, setDueDateTouched] = useState(false);
+  const [lateFeeAmount, setLateFeeAmount] = useState("0");
+  const [feeDueDay, setFeeDueDay] = useState("10");
   const [feeName, setFeeName] = useState("Monthly Tuition");
   const [feeAmount, setFeeAmount] = useState("5000");
   const [feeGradeId, setFeeGradeId] = useState("");
@@ -112,6 +119,7 @@ export default function FeesPage() {
     enabled: Boolean(studentId),
   });
   const structures = useQuery({ queryKey: ["fee-structures"], queryFn: () => feesService.listStructures() });
+  const policy = useQuery({ queryKey: ["fee-policy"], queryFn: () => feesService.getPolicy() });
   const brackets = useQuery({ queryKey: ["fee-brackets"], queryFn: () => feesService.listBrackets() });
   const years = useQuery({ queryKey: ["academic-years"], queryFn: () => academicsService.listYears({ limit: 20 }) });
   const grades = useQuery({ queryKey: ["grades"], queryFn: () => academicsService.listGrades({ limit: 100 }) });
@@ -122,16 +130,33 @@ export default function FeesPage() {
     return Array.from(set).sort((a, b) => a - b);
   }, [brackets.data, localBrackets]);
 
+  const selectedYear = years.data?.items.find((y) => y.id === yearId);
+  const periodOptions = useMemo(
+    () => monthPeriodOptions(selectedYear?.startDate, selectedYear?.endDate),
+    [selectedYear?.startDate, selectedYear?.endDate],
+  );
+
   useEffect(() => {
     const current = years.data?.items.find((y) => y.isCurrent) ?? years.data?.items[0];
     if (current && !yearId) setYearId(current.id);
   }, [years.data, yearId]);
 
   useEffect(() => {
-    if (!period) {
-      setPeriod(new Date().toLocaleString("en-US", { month: "long", year: "numeric" }));
+    if (!periodOptions.length) return;
+    if (!period || !periodOptions.includes(period)) {
+      const current = currentMonthLabel();
+      setPeriod(periodOptions.includes(current) ? current : periodOptions[0]);
     }
-  }, [period]);
+  }, [periodOptions, period]);
+
+  useEffect(() => {
+    if (!policy.data) return;
+    setLateFeeAmount(String(policy.data.lateFeeAmount ?? 0));
+    setFeeDueDay(String(policy.data.feeDueDay ?? 10));
+    if (!dueDateTouched) {
+      setDueDate(dueDateIsoForPeriod(period || new Date().toLocaleString("en-US", { month: "long", year: "numeric" }), policy.data.feeDueDay));
+    }
+  }, [policy.data, period, dueDateTouched]);
 
   useEffect(() => {
     if (!feeBracket && bracketAmounts.length) {
@@ -157,8 +182,15 @@ export default function FeesPage() {
   }, [targetKey, stages.data, grades.data]);
 
   const dueRows = account.data?.fees.filter((fee) => fee.balance > 0) ?? [];
+  const thisMonthDue = dueRows.filter((fee) => feeBelongsToThisMonth(fee));
+  const thisMonthSettled = (account.data?.fees ?? []).some(
+    (fee) => feeBelongsToThisMonth(fee) && fee.balance <= 0.009,
+  );
+  const alreadyPaidThisMonth =
+    Boolean(account.data?.suggested.alreadyPaid) || (thisMonthSettled && thisMonthDue.length === 0);
   const selectedFee = dueRows.find((fee) => fee.id === selectedFeeId);
-  const billedDue = selectedFee?.balance ?? account.data?.suggested.amount ?? 0;
+  const lateFeeDue = waiveLateFee ? 0 : Number(selectedFee?.lateFee?.amount ?? 0);
+  const billedDue = round2((selectedFee?.balance ?? account.data?.suggested.amount ?? 0) + lateFeeDue);
   const collectedNum = Number(collected || 0);
   const discountNum = Number(discount || 0);
   const remaining = round2(Math.max(0, billedDue - collectedNum - discountNum));
@@ -167,10 +199,20 @@ export default function FeesPage() {
     if (!account.data) return;
     const firstDue = account.data.fees.find((fee) => fee.balance > 0);
     setSelectedFeeId(firstDue?.id ?? "");
-    setCollected(String(firstDue?.balance ?? account.data.suggested.amount ?? 0));
     setDiscount("0");
     setNotes("");
+    setWaiveLateFee(false);
+    setCollectedTouched(false);
   }, [account.data]);
+
+  useEffect(() => {
+    if (!account.data || collectedTouched) return;
+    const fee =
+      account.data.fees.find((row) => row.id === selectedFeeId) ??
+      account.data.fees.find((row) => row.balance > 0);
+    const extra = waiveLateFee ? 0 : Number(fee?.lateFee?.amount ?? 0);
+    setCollected(String(round2((fee?.balance ?? account.data.suggested.amount ?? 0) + extra)));
+  }, [account.data, selectedFeeId, waiveLateFee, collectedTouched]);
 
   const collect = useMutation({
     mutationFn: () => {
@@ -185,6 +227,7 @@ export default function FeesPage() {
         discountAmount: discountNum,
         method: "CASH",
         notes: notes.trim() || undefined,
+        waiveLateFee: lateFeeDue > 0 || waiveLateFee ? waiveLateFee : undefined,
       });
     },
     onSuccess: (res) => {
@@ -268,6 +311,26 @@ export default function FeesPage() {
       }),
   });
 
+  const savePolicy = useMutation({
+    mutationFn: () =>
+      feesService.updatePolicy({
+        lateFeeAmount: Math.max(0, Number(lateFeeAmount) || 0),
+        feeDueDay: Math.min(28, Math.max(1, Number(feeDueDay) || 10)),
+      }),
+    onSuccess: (res) => {
+      toast({ title: `Late fee ${formatPkr(res.lateFeeAmount)} · due on the ${res.feeDueDay}`, variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["fee-policy"] });
+      queryClient.invalidateQueries({ queryKey: ["fee-account"] });
+      setPolicyOpen(false);
+    },
+    onError: (err) =>
+      toast({
+        title: "Could not save fee rules",
+        description: err instanceof ApiClientError ? err.message : err instanceof Error ? err.message : "",
+        variant: "error",
+      }),
+  });
+
   const canAssign = Boolean(yearId && period && feeBracket && targetKey && Number(feeBracket) > 0);
 
   const addBracket = () => {
@@ -308,6 +371,7 @@ export default function FeesPage() {
           }
           actions={
             <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setPolicyOpen(true)}>Late fee & due date</Button>
               <Button variant="outline" onClick={() => setStructureOpen(true)}>Fee types</Button>
               <Button variant="outline" onClick={() => setAssignOpen(true)}>Bill students</Button>
             </div>
@@ -415,9 +479,21 @@ export default function FeesPage() {
                 <p className="text-sm">
                   Default monthly tuition: <span className="font-medium">{formatPkr(account.data.tuitionDefault)}</span>
                 </p>
+                {alreadyPaidThisMonth ? (
+                  <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
+                    <p className="font-medium">{account.data.suggested.periodLabel} is already paid</p>
+                    <p className="mt-1 text-emerald-900/80">
+                      {formatPkr(account.data.suggested.paidAmount ?? account.data.suggested.billedAmount)} received
+                      {account.data.suggested.billedAmount
+                        ? ` of ${formatPkr(account.data.suggested.billedAmount)}`
+                        : ""}
+                      . This month will not be billed again.
+                    </p>
+                  </div>
+                ) : null}
                 {dueRows.length > 0 ? (
                   <div className="space-y-2">
-                    <Label>Bill to collect</Label>
+                    <Label>{alreadyPaidThisMonth ? "Older unpaid bills" : "Bill to collect"}</Label>
                     {dueRows.map((fee) => (
                       <label key={fee.id} className="flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-sm">
                         <span className="flex items-center gap-2">
@@ -427,11 +503,15 @@ export default function FeesPage() {
                             checked={selectedFeeId === fee.id}
                             onChange={() => {
                               setSelectedFeeId(fee.id);
-                              setCollected(String(fee.balance));
                               setDiscount("0");
+                              setWaiveLateFee(false);
+                              setCollectedTouched(false);
                             }}
                           />
                           {fee.name} · {fee.periodLabel}
+                          {fee.lateFee?.overdue ? (
+                            <span className="block text-xs text-amber-700">Due {String(fee.dueDate).slice(0, 10)}</span>
+                          ) : null}
                         </span>
                         <span>
                           {formatPkr(fee.balance)} <Badge variant={fee.status === "PARTIAL" ? "warning" : "destructive"}>{fee.status}</Badge>
@@ -439,56 +519,124 @@ export default function FeesPage() {
                       </label>
                     ))}
                   </div>
-                ) : (
+                ) : alreadyPaidThisMonth ? null : (
                   <p className="rounded-md border px-3 py-2 text-sm">
                     No open bill yet. Collecting will create {account.data.suggested.label} for {account.data.suggested.periodLabel} at {formatPkr(account.data.suggested.billedAmount)}.
                   </p>
                 )}
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <Label>Amount collected</Label>
-                    <Input type="number" min={0} value={collected} onChange={(e) => setCollected(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label>Discount</Label>
-                    <Input type="number" min={0} value={discount} onChange={(e) => setDiscount(e.target.value)} />
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setDiscount(String(round2(Math.max(0, billedDue - collectedNum))));
-                    }}
-                  >
-                    Give rest as discount
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDiscount("0")}
-                  >
-                    Keep rest as balance
-                  </Button>
-                </div>
-                <p className="text-sm">
-                  Due {formatPkr(billedDue)} · Collected {formatPkr(collectedNum)} · Discount {formatPkr(discountNum)} ·{" "}
-                  <span className="font-medium">Balance {formatPkr(remaining)}</span>
-                </p>
-                <div>
-                  <Label>Note (optional)</Label>
-                  <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Cash / bank / late fee waived" />
-                </div>
-                <Button
-                  disabled={collect.isPending || (billedDue <= 0 && collectedNum <= 0)}
-                  onClick={() => collect.mutate()}
-                >
-                  {collect.isPending ? "Saving…" : "Collect and make receipt"}
-                </Button>
+                {dueRows.length > 0 || !alreadyPaidThisMonth ? (
+                  <>
+                    {selectedFee?.lateFee?.amount || selectedFee?.lateFee?.waived || selectedFee?.lateFee?.charged ? (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                        {selectedFee.lateFee.waived ? (
+                          <p>Late fee waived for this bill.</p>
+                        ) : selectedFee.lateFee.charged ? (
+                          <p>Late fee of {formatPkr(policy.data?.lateFeeAmount ?? 0)} is already on this bill.</p>
+                        ) : (
+                          <>
+                            <p>
+                              This bill was due {String(selectedFee.dueDate).slice(0, 10)}. Late fee{" "}
+                              {formatPkr(selectedFee.lateFee.amount)}.
+                            </p>
+                            <label className="mt-2 flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={waiveLateFee}
+                                onChange={(e) => {
+                                  setWaiveLateFee(e.target.checked);
+                                  setCollectedTouched(false);
+                                }}
+                              />
+                              Waive late fee for this collection
+                            </label>
+                          </>
+                        )}
+                      </div>
+                    ) : null}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="amount-collected">Amount collected</Label>
+                        <Input
+                          id="amount-collected"
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          inputMode="decimal"
+                          className="h-11 text-base font-medium"
+                          value={collected}
+                          onChange={(e) => {
+                            setCollectedTouched(true);
+                            setCollected(e.target.value);
+                          }}
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">You can type any amount up to the due balance.</p>
+                      </div>
+                      <div>
+                        <Label htmlFor="fee-discount">Discount</Label>
+                        <Input
+                          id="fee-discount"
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          inputMode="decimal"
+                          className="h-11 text-base"
+                          value={discount}
+                          onChange={(e) => setDiscount(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          setCollectedTouched(true);
+                          setCollected(String(billedDue));
+                          setDiscount("0");
+                        }}
+                      >
+                        Collect full due
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          setDiscount(String(round2(Math.max(0, billedDue - collectedNum))));
+                        }}
+                      >
+                        Give rest as discount
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setDiscount("0")}
+                      >
+                        Keep rest as balance
+                      </Button>
+                    </div>
+                    <p className="rounded-md bg-muted/60 px-3 py-2 text-sm">
+                      Due {formatPkr(billedDue)} · Collected {formatPkr(collectedNum)} · Discount {formatPkr(discountNum)} ·{" "}
+                      <span className="font-semibold">Balance {formatPkr(remaining)}</span>
+                    </p>
+                    <div>
+                      <Label>Note (optional)</Label>
+                      <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Cash / bank / late fee waived" />
+                    </div>
+                    <Button
+                      type="button"
+                      size="lg"
+                      className="h-12 w-full text-base font-semibold shadow-md"
+                      disabled={collect.isPending || billedDue <= 0 || (collectedNum <= 0 && discountNum <= 0)}
+                      onClick={() => collect.mutate()}
+                    >
+                      {collect.isPending ? "Saving…" : "Collect and make receipt"}
+                    </Button>
+                  </>
+                ) : null}
               </CardContent>
             </Card>
 
@@ -649,15 +797,72 @@ export default function FeesPage() {
 
             <div>
               <Label>Period</Label>
-              <Input value={period} onChange={(e) => setPeriod(e.target.value)} placeholder="September 2026" />
+              <Select id="bill-period" value={period} onChange={(e) => setPeriod(e.target.value)}>
+                <option value="">Select month</option>
+                {periodOptions.map((label) => (
+                  <option key={label} value={label}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
             </div>
             <div>
               <Label>Due date</Label>
-              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              <Input
+                type="date"
+                value={dueDate}
+                onChange={(e) => {
+                  setDueDateTouched(true);
+                  setDueDate(e.target.value);
+                }}
+              />
+              {policy.data ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Default is the {policy.data.feeDueDay} of the month. After that day, collect can charge a late fee of{" "}
+                  {formatPkr(policy.data.lateFeeAmount)}.
+                </p>
+              ) : null}
             </div>
 
             <Button onClick={() => assign.mutate()} disabled={assign.isPending || !canAssign}>
               {assign.isPending ? "Billing…" : "Apply fee and create bills"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={policyOpen} onOpenChange={setPolicyOpen}>
+        <DialogContent onClose={() => setPolicyOpen(false)}>
+          <DialogHeader>
+            <DialogTitle>Late fee & due date</DialogTitle>
+            <DialogDescription>
+              New monthly bills use this due day. After that day, collect adds the late fee unless you waive it for that student.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Fee due day each month</Label>
+              <Input
+                type="number"
+                min={1}
+                max={28}
+                value={feeDueDay}
+                onChange={(e) => setFeeDueDay(e.target.value)}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">Use 1–28 so every month has that date.</p>
+            </div>
+            <div>
+              <Label>Late fee amount</Label>
+              <Input
+                type="number"
+                min={0}
+                value={lateFeeAmount}
+                onChange={(e) => setLateFeeAmount(e.target.value)}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">Set 0 if the school does not charge a late fee.</p>
+            </div>
+            <Button onClick={() => savePolicy.mutate()} disabled={savePolicy.isPending}>
+              {savePolicy.isPending ? "Saving…" : "Save fee rules"}
             </Button>
           </div>
         </DialogContent>

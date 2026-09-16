@@ -301,25 +301,12 @@ export class StudentsService {
       if (!teacher) {
         return paginate([], 0, page, limit);
       }
-      const [assignments, homerooms] = await Promise.all([
-        this.prisma.classSubject.findMany({
-          where: {
-            OR: [{ teacherId: teacher.id }, { assistantTeacherId: teacher.id }],
-            section: { schoolId },
-          },
-          select: { sectionId: true },
-        }),
-        this.prisma.section.findMany({
-          where: { schoolId, classTeacherId: teacher.id },
-          select: { id: true },
-        }),
-      ]);
-      teacherSectionIds = [
-        ...new Set([
-          ...assignments.map((row) => row.sectionId),
-          ...homerooms.map((row) => row.id),
-        ]),
-      ];
+      // Students roster filters by class teacher (homeroom), not subject assignments.
+      const homerooms = await this.prisma.section.findMany({
+        where: { schoolId, classTeacherId: teacher.id },
+        select: { id: true },
+      });
+      teacherSectionIds = homerooms.map((row) => row.id);
       if (!teacherSectionIds.length) {
         return paginate([], 0, page, limit);
       }

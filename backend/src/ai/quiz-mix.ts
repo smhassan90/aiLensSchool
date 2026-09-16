@@ -1,19 +1,36 @@
 import type { QuizOutput, QuizQuestionOutput } from './schemas/quiz-output.schema';
 
+export function difficultyInstruction(level?: number) {
+  if (!level) return '';
+  if (level <= 3) {
+    return `Difficulty: ${level}/10 (easy — direct recall, simple wording, obvious distractors).`;
+  }
+  if (level <= 6) {
+    return `Difficulty: ${level}/10 (medium — application and clear reasoning).`;
+  }
+  if (level <= 8) {
+    return `Difficulty: ${level}/10 (challenging — analysis, multi-step thinking).`;
+  }
+  return `Difficulty: ${level}/10 (hard — synthesis, subtle distractors, higher-order thinking).`;
+}
+
 export type QuizMixRequest = {
   quickGenerate?: boolean;
   examPaper?: boolean;
+  difficulty?: number;
   mcqCount?: number;
   fillBlankCount?: number;
-  /** Open-ended questions on exam papers. Also accepted as shortAnswerCount. */
+  /** Open-ended questions on exam papers (legacy — use shortAnswerCount + longAnswerCount). */
   openEndedCount?: number;
-  /** @deprecated Use trueFalseCount for quizzes, openEndedCount for exam papers. */
   shortAnswerCount?: number;
+  longAnswerCount?: number;
   trueFalseCount?: number;
   questionCount?: number;
   mcqMarks?: number;
   trueFalseMarks?: number;
   openEndedMarks?: number;
+  shortAnswerMarks?: number;
+  longAnswerMarks?: number;
   fillBlankMarks?: number;
 };
 
@@ -31,11 +48,15 @@ export type ResolvedQuizMix =
       mcqCount: number;
       fillBlankCount: number;
       trueFalseCount: number;
+      shortAnswerCount: number;
+      longAnswerCount: number;
       openEndedCount: number;
       questionCount: number;
       mcqMarks: number;
       trueFalseMarks: number;
       openEndedMarks: number;
+      shortAnswerMarks: number;
+      longAnswerMarks: number;
       fillBlankMarks: number;
     };
 
@@ -55,20 +76,26 @@ export function resolveQuizMix(input: QuizMixRequest): ResolvedQuizMix {
   const mcqCount = countOf(input.mcqCount);
   const fillBlankCount = countOf(input.fillBlankCount);
   const trueFalseCount = countOf(input.trueFalseCount);
-  const openEndedCount = countOf(input.openEndedCount ?? (input.examPaper ? input.shortAnswerCount : 0));
+  const shortAnswerCount = countOf(
+    input.shortAnswerCount ?? (input.examPaper ? input.openEndedCount : 0),
+  );
+  const longAnswerCount = countOf(input.longAnswerCount);
+  const openEndedCount = shortAnswerCount + longAnswerCount;
 
   if (input.examPaper) {
     const questionCount = mcqCount + fillBlankCount + trueFalseCount + openEndedCount;
     const mix =
       questionCount > 0
-        ? { mcqCount, fillBlankCount, trueFalseCount, openEndedCount, questionCount }
-        : { mcqCount: 8, fillBlankCount: 0, trueFalseCount: 5, openEndedCount: 4, questionCount: 17 };
+        ? { mcqCount, fillBlankCount, trueFalseCount, shortAnswerCount, longAnswerCount, openEndedCount, questionCount }
+        : { mcqCount: 8, fillBlankCount: 0, trueFalseCount: 5, shortAnswerCount: 3, longAnswerCount: 1, openEndedCount: 4, questionCount: 17 };
     return {
       mode: 'exam',
       ...mix,
       mcqMarks: marksOf(input.mcqMarks, mix.mcqCount),
       trueFalseMarks: marksOf(input.trueFalseMarks, mix.trueFalseCount),
       openEndedMarks: marksOf(input.openEndedMarks, mix.openEndedCount * 5 || 0),
+      shortAnswerMarks: marksOf(input.shortAnswerMarks ?? input.openEndedMarks, mix.shortAnswerCount * 3 || 0),
+      longAnswerMarks: marksOf(input.longAnswerMarks, mix.longAnswerCount * 8 || 0),
       fillBlankMarks: marksOf(input.fillBlankMarks, mix.fillBlankCount),
     };
   }
@@ -106,13 +133,14 @@ Every question MUST include correctAnswer.`;
   if (mix.mode === 'exam') {
     return `This is a formal written exam paper for printout, not an app quiz.
 Cover ALL provided lectures. Do not invent unrelated chapters.
-Generate EXACTLY ${mix.questionCount} questions, in this order:
-- ${mix.mcqCount} MCQ questions (type MCQ). Each MUST have 4 options, exactly one isCorrect, and correctAnswer set. Section total ${mix.mcqMarks} marks.
-- ${mix.trueFalseCount} true/false questions (type TRUE_FALSE). correctAnswer must be TRUE or FALSE. Section total ${mix.trueFalseMarks} marks.
-- ${mix.openEndedCount} open-ended questions (type SHORT_ANSWER). These are marked by the teacher. Ask students to explain, define, or write a short answer. Include a model correctAnswer for the answer key. Section total ${mix.openEndedMarks} marks.
-${mix.fillBlankCount ? `- ${mix.fillBlankCount} fill-in-the-blank questions (type FILL_IN_THE_BLANK). Section total ${mix.fillBlankMarks} marks.` : 'Skip FILL_IN_THE_BLANK unless listed above.'}
+Generate EXACTLY ${mix.questionCount} questions, in this order (each group is a section: Section A, Section B, etc.):
+- ${mix.mcqCount} MCQ questions (type MCQ). Section A. Each MUST have 4 options, exactly one isCorrect, and correctAnswer set. Section total ${mix.mcqMarks} marks.
+- ${mix.trueFalseCount} true/false questions (type TRUE_FALSE). Section B. correctAnswer must be TRUE or FALSE. Section total ${mix.trueFalseMarks} marks.
+${mix.fillBlankCount ? `- ${mix.fillBlankCount} fill-in-the-blank questions (type FILL_IN_THE_BLANK). Section C. Section total ${mix.fillBlankMarks} marks.` : ''}
+- ${mix.shortAnswerCount} short-answer questions (type SHORT_ANSWER). Brief answers (2-4 lines). Include model correctAnswer. Section total ${mix.shortAnswerMarks} marks.
+- ${mix.longAnswerCount} long-answer questions (type LONG_ANSWER). Extended answers (paragraph). Include model correctAnswer. Section total ${mix.longAnswerMarks} marks.
 Skip a type if its count is 0.
-Set each question's marks so the section totals match.`;
+Set each question's marks so the section totals match exactly.`;
   }
 
   return `Generate EXACTLY ${mix.questionCount} AUTO-GRADABLE questions, in this order:
@@ -271,10 +299,23 @@ function distributeMarks(questions: QuizQuestionOutput[], totalMarks: number): Q
   });
 }
 
+export function sectionLabelForQuestionType(
+  type: string,
+  presentTypes: string[],
+): string {
+  const order = ['MCQ', 'TRUE_FALSE', 'FILL_IN_THE_BLANK', 'SHORT_ANSWER', 'LONG_ANSWER'];
+  const active = order.filter((item) => presentTypes.includes(item));
+  const index = active.indexOf(type);
+  if (index < 0) return 'Section A';
+  return `Section ${String.fromCharCode(65 + index)}`;
+}
+
 export function sanitizeGeneratedExam(quiz: QuizOutput, mix: Extract<ResolvedQuizMix, { mode: 'exam' }>): QuizOutput {
   const questions = quiz.questions
     .map(normalizeGeneratedQuestion)
-    .filter((question) => ['MCQ', 'TRUE_FALSE', 'SHORT_ANSWER', 'FILL_IN_THE_BLANK'].includes(question.type));
+    .filter((question) =>
+      ['MCQ', 'TRUE_FALSE', 'SHORT_ANSWER', 'LONG_ANSWER', 'FILL_IN_THE_BLANK'].includes(question.type),
+    );
 
   const mcqs = distributeMarks(
     questions.filter((question) => question.type === 'MCQ'),
@@ -284,16 +325,20 @@ export function sanitizeGeneratedExam(quiz: QuizOutput, mix: Extract<ResolvedQui
     questions.filter((question) => question.type === 'TRUE_FALSE'),
     mix.trueFalseMarks,
   );
-  const openEnded = distributeMarks(
-    questions.filter((question) => question.type === 'SHORT_ANSWER'),
-    mix.openEndedMarks,
-  );
   const fillBlanks = distributeMarks(
     questions.filter((question) => question.type === 'FILL_IN_THE_BLANK'),
     mix.fillBlankMarks,
   );
+  const shortAnswers = distributeMarks(
+    questions.filter((question) => question.type === 'SHORT_ANSWER'),
+    mix.shortAnswerMarks || mix.openEndedMarks,
+  );
+  const longAnswers = distributeMarks(
+    questions.filter((question) => question.type === 'LONG_ANSWER'),
+    mix.longAnswerMarks,
+  );
 
-  const ordered = [...mcqs, ...trueFalse, ...fillBlanks, ...openEnded];
+  const ordered = [...mcqs, ...trueFalse, ...fillBlanks, ...shortAnswers, ...longAnswers];
   if (!ordered.length) {
     throw new Error('Exam generation produced no questions. Please try again.');
   }

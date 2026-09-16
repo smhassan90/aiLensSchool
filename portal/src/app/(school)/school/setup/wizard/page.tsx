@@ -523,7 +523,19 @@ export default function SetupWizardPage() {
               {draft.classes.length ? (
                 <div className="space-y-2">
                   {draft.classes.map((item) => (
-                    <div key={item.key} className="flex items-start justify-between gap-3 rounded-md border p-3">
+                    <div
+                      key={item.key}
+                      role="button"
+                      tabIndex={0}
+                      className="flex cursor-pointer items-start justify-between gap-3 rounded-md border p-3 transition-colors hover:bg-muted/40"
+                      onClick={() => editClass(item)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          editClass(item);
+                        }
+                      }}
+                    >
                       <div>
                         <p className="font-medium">{item.name}</p>
                         <p className="text-sm text-muted-foreground">
@@ -534,14 +546,14 @@ export default function SetupWizardPage() {
                         </p>
                       </div>
                       <div className="flex gap-1">
-                        <Button type="button" size="sm" variant="outline" onClick={() => editClass(item)}>
-                          Edit
-                        </Button>
                         <Button
                           type="button"
                           size="sm"
                           variant="ghost"
-                          onClick={() => patch({ classes: draft.classes.filter((row) => row.key !== item.key) })}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            patch({ classes: draft.classes.filter((row) => row.key !== item.key) });
+                          }}
                         >
                           Remove
                         </Button>

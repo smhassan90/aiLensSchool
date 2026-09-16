@@ -23,9 +23,16 @@ import { StudentAnalysisService } from './services/student-analysis.service';
     },
     {
       provide: FAST_AI_PROVIDER,
-      inject: [CursorProvider, OpenAiProvider],
-      useFactory: (cursor: CursorProvider, openai: OpenAiProvider) =>
-        openai.hasJson() ? openai : cursor,
+      inject: [ConfigService, CursorProvider, OpenAiProvider],
+      useFactory: (
+        config: ConfigService,
+        cursor: CursorProvider,
+        openai: OpenAiProvider,
+      ) => {
+        const provider = config.get<string>('AI_PROVIDER') ?? 'cursor';
+        if (provider === 'openai' && openai.hasJson()) return openai;
+        return cursor;
+      },
     },
     LessonProcessingService,
     QuizGenerationService,

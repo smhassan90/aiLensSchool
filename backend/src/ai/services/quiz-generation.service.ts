@@ -24,11 +24,15 @@ export class QuizGenerationService {
     fillBlankCount?: number;
     trueFalseCount?: number;
     shortAnswerCount?: number;
+    longAnswerCount?: number;
     openEndedCount?: number;
     mcqMarks?: number;
     trueFalseMarks?: number;
     openEndedMarks?: number;
+    shortAnswerMarks?: number;
+    longAnswerMarks?: number;
     fillBlankMarks?: number;
+    difficulty?: number;
   }): Promise<QuizOutput> {
     const request = await this.prisma.aIRequest.create({
       data: {
@@ -50,19 +54,20 @@ export class QuizGenerationService {
         examPaper: input.examPaper,
         mcqCount: input.mcqCount,
         fillBlankCount: input.fillBlankCount,
-        trueFalseCount: input.trueFalseCount ?? (input.examPaper ? undefined : input.shortAnswerCount),
-        openEndedCount: input.openEndedCount ?? (input.examPaper ? input.shortAnswerCount : undefined),
+        trueFalseCount: input.trueFalseCount,
+        openEndedCount: input.openEndedCount,
+        shortAnswerCount: input.shortAnswerCount,
+        longAnswerCount: input.longAnswerCount,
         mcqMarks: input.mcqMarks,
         trueFalseMarks: input.trueFalseMarks,
         openEndedMarks: input.openEndedMarks,
+        shortAnswerMarks: input.shortAnswerMarks,
+        longAnswerMarks: input.longAnswerMarks,
         fillBlankMarks: input.fillBlankMarks,
+        difficulty: input.difficulty,
       });
 
-      const mix = resolveQuizMix({
-        ...input,
-        trueFalseCount: input.trueFalseCount ?? (input.examPaper ? undefined : input.shortAnswerCount),
-        openEndedCount: input.openEndedCount ?? (input.examPaper ? input.shortAnswerCount : undefined),
-      });
+      const mix = resolveQuizMix(input);
       const data = mix.mode === 'exam' ? sanitizeGeneratedExam(result.data, mix) : sanitizeGeneratedQuiz(result.data);
 
       await this.prisma.aIRequest.update({

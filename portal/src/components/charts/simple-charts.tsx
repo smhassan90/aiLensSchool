@@ -72,7 +72,7 @@ export function GroupedBarChart({
                 );
               })}
             </div>
-            <p className="truncate text-[10px] text-muted-foreground">{String(item.label)}</p>
+            <p className="truncate text-xs text-muted-foreground">{String(item.label)}</p>
           </div>
         ))}
       </div>
@@ -103,7 +103,7 @@ export function CombinedFinanceChart({
   }
   return (
     <div>
-      <div className="mb-3 flex flex-wrap gap-2 text-[11px]">
+      <div className="mb-3 flex flex-wrap gap-2 text-xs">
         <span className="inline-flex items-center gap-1">
           <span className="h-2 w-2 rounded-sm bg-teal-600" />
           Fees in
@@ -143,7 +143,7 @@ export function CombinedFinanceChart({
                   })}
                 </div>
               </div>
-              <p className="mt-1 truncate text-[10px] text-muted-foreground">{item.label}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{item.label}</p>
             </div>
           );
         })}
@@ -166,7 +166,7 @@ export function StackedExpenseChart({
   }
   return (
     <div>
-      <div className="mb-3 flex flex-wrap gap-2 text-[11px]">
+      <div className="mb-3 flex flex-wrap gap-2 text-xs">
         {categories.map((cat) => (
           <span key={cat} className="inline-flex items-center gap-1">
             <span className="h-2 w-2 rounded-sm" style={{ background: colors[cat] ?? "#94a3b8" }} />
@@ -188,7 +188,7 @@ export function StackedExpenseChart({
                   );
                 })}
               </div>
-              <p className="mt-1 truncate text-[10px] text-muted-foreground">{item.label}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{item.label}</p>
             </div>
           );
         })}
@@ -216,7 +216,7 @@ export function StackedAttendanceChart({
               <div className="bg-amber-400" style={{ height: `${(item.late / total) * 100}%` }} />
               <div className="bg-rose-400" style={{ height: `${(item.absent / total) * 100}%` }} />
             </div>
-            <p className="mt-1 truncate text-[10px] text-muted-foreground">{item.date.slice(5)}</p>
+            <p className="mt-1 truncate text-xs text-muted-foreground">{item.date.slice(5)}</p>
           </div>
         );
       })}

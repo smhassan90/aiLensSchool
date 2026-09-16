@@ -1,11 +1,26 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AttendanceStatus, EnrollmentStatus, ExpenseCategory, StudentFeeStatus, StudentStatus } from '@prisma/client';
+import {
+  AttendanceStatus,
+  EnrollmentStatus,
+  ExamPaperReviewStatus,
+  ExpenseCategory,
+  QuizStatus,
+  StudentFeeStatus,
+  StudentStatus,
+  TeacherStatus,
+} from '@prisma/client';
+import { EXAM_PAPER_KINDS } from '../quizzes/exam-paper';
 import { PrismaService } from '../database/prisma.service';
 import { TenantService } from '../common/services/tenant.service';
 import { MemoryCacheService } from '../common/services/memory-cache.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { FAST_AI_PROVIDER, AiProvider } from '../ai/providers/ai.provider';
 import { teacherDisplayName } from '../common/utils/person-name';
+import {
+  dateFromIso,
+  finalizeTeacherAbsences,
+  zonedDateIso,
+} from '../teachers/teacher-checkin';
 
 function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -42,6 +57,13 @@ export class DashboardService {
     const months = lastNMonthKeys(6);
     const rangeStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
+    const setup = await this.prisma.schoolSettings.findUnique({
+      where: { schoolId },
+      select: { setupCompleted: true, timezone: true, examSubmissionDaysBefore: true },
+    });
+    const todayIso = zonedDateIso(now, setup?.timezone || 'Asia/Karachi');
+    await finalizeTeacherAbsences(this.prisma, schoolId, todayIso, now);
+    const today = dateFromIso(todayIso);
     const [
       studentCount,
       teacherCount,
@@ -51,10 +73,11 @@ export class DashboardService {
       payments,
       expenses,
       classTeachers,
-      setup,
+      attendanceTodayRows,
+      teacherAttendanceTodayRows,
     ] = await Promise.all([
       this.prisma.student.count({ where: { schoolId, status: StudentStatus.ACTIVE } }),
-      this.prisma.teacherProfile.count({ where: { schoolId } }),
+      this.prisma.teacherProfile.count({ where: { schoolId, status: TeacherStatus.ACTIVE } }),
       this.prisma.grade.count({ where: { schoolId } }),
       this.prisma.feePayment.aggregate({
         where: { paidAt: { gte: monthStart, lt: nextMonth }, studentFee: { schoolId } },
@@ -87,7 +110,7 @@ export class DashboardService {
           classTeacher: {
             select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } },
           },
-          _count: { select: { enrollments: true } },
+          _count: { select: { enrollments: { where: { status: EnrollmentStatus.ACTIVE } } } },
           classSubjects: {
             take: 8,
             select: {
@@ -99,8 +122,40 @@ export class DashboardService {
           },
         },
       }),
-      this.prisma.schoolSettings.findUnique({ where: { schoolId }, select: { setupCompleted: true } }),
+      this.prisma.attendance.groupBy({
+        by: ['status'],
+        where: { schoolId, date: today },
+        _count: { _all: true },
+      }),
+      this.prisma.teacherAttendance.groupBy({
+        by: ['status'],
+        where: { schoolId, date: today },
+        _count: { _all: true },
+      }),
     ]);
+
+    const attendanceToday = { marked: 0, present: 0, absent: 0, late: 0, rate: 0 };
+    for (const row of attendanceTodayRows) {
+      const count = row._count._all;
+      attendanceToday.marked += count;
+      if (row.status === AttendanceStatus.PRESENT) attendanceToday.present = count;
+      if (row.status === AttendanceStatus.ABSENT) attendanceToday.absent = count;
+      if (row.status === AttendanceStatus.LATE) attendanceToday.late = count;
+    }
+    const presentLike = attendanceToday.present + attendanceToday.late;
+    attendanceToday.rate = attendanceToday.marked
+      ? Number(((presentLike / attendanceToday.marked) * 100).toFixed(1))
+      : 0;
+
+    const teacherAttendanceToday = { marked: 0, present: 0, absent: 0 };
+    for (const row of teacherAttendanceTodayRows) {
+      const count = row._count._all;
+      teacherAttendanceToday.marked += count;
+      if (row.status === AttendanceStatus.PRESENT || row.status === AttendanceStatus.LATE) {
+        teacherAttendanceToday.present += count;
+      }
+      if (row.status === AttendanceStatus.ABSENT) teacherAttendanceToday.absent = count;
+    }
 
     const remainingThisMonth = Math.max(
       0,
@@ -139,6 +194,11 @@ export class DashboardService {
       };
     });
 
+    const examPaperSubmissions = await this.buildExamPaperSubmissions(
+      schoolId,
+      setup?.examSubmissionDaysBefore ?? 5,
+    );
+
     return {
       studentCount,
       teacherCount,
@@ -147,8 +207,11 @@ export class DashboardService {
       feesRemainingThisMonth: Number(remainingThisMonth.toFixed(2)),
       feesOutstanding: Number(remainingThisMonth.toFixed(2)),
       setupCompleted: setup?.setupCompleted ?? false,
+      attendanceToday,
+      teacherAttendanceToday,
       financeMonths,
       expenseCategories: Object.keys(expenseTotals) as ExpenseCategory[],
+      examPaperSubmissions,
       classTeachers: classTeachers.map((section) => ({
         sectionId: section.id,
         gradeId: section.grade.id,
@@ -169,6 +232,129 @@ export class DashboardService {
             : 'Unassigned',
         })),
       })),
+    };
+  }
+
+  private async buildExamPaperSubmissions(schoolId: string, submissionDaysBefore: number) {
+    const year = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      orderBy: { startDate: 'desc' },
+      select: { id: true },
+    });
+    if (!year) {
+      return {
+        submissionDaysBefore,
+        focusExam: null,
+        submitted: 0,
+        expected: 0,
+        pendingTeachers: [] as Array<{
+          teacherName: string;
+          subject: string;
+          className: string;
+          examName: string;
+          deadline: string | null;
+        }>,
+      };
+    }
+
+    const configs = await this.prisma.examConfig.findMany({
+      where: { schoolId, academicYearId: year.id, startDate: { not: null } },
+      orderBy: { startDate: 'asc' },
+      select: { id: true, name: true, startDate: true },
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const focusExam =
+      configs.find((cfg) => cfg.startDate && cfg.startDate >= today) ??
+      configs.filter((cfg) => cfg.startDate).at(-1) ??
+      null;
+
+    if (!focusExam?.startDate) {
+      return {
+        submissionDaysBefore,
+        focusExam: null,
+        submitted: 0,
+        expected: 0,
+        pendingTeachers: [],
+      };
+    }
+
+    const deadline = new Date(focusExam.startDate);
+    deadline.setDate(deadline.getDate() - submissionDaysBefore);
+
+    const assignments = await this.prisma.classSubject.findMany({
+      where: {
+        section: { schoolId },
+        academicYearId: year.id,
+        teacherId: { not: null },
+      },
+      select: {
+        sectionId: true,
+        subjectId: true,
+        section: { select: { name: true, grade: { select: { name: true } } } },
+        subject: { select: { name: true } },
+        teacher: {
+          select: {
+            userId: true,
+            gender: true,
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+    });
+
+    const submittedPapers = await this.prisma.quiz.findMany({
+      where: {
+        schoolId,
+        academicYearId: year.id,
+        examConfigId: focusExam.id,
+        status: QuizStatus.CLOSED,
+        paperKind: { in: [...EXAM_PAPER_KINDS] },
+      },
+      select: { createdById: true, sectionId: true, subjectId: true },
+    });
+
+    const submittedKeys = new Set(
+      submittedPapers.map((row) => `${row.createdById}:${row.sectionId}:${row.subjectId}`),
+    );
+
+    const pendingTeachers: Array<{
+      teacherName: string;
+      subject: string;
+      className: string;
+      examName: string;
+      deadline: string | null;
+    }> = [];
+
+    for (const row of assignments) {
+      if (!row.teacher?.userId) continue;
+      const key = `${row.teacher.userId}:${row.sectionId}:${row.subjectId}`;
+      if (submittedKeys.has(key)) continue;
+      pendingTeachers.push({
+        teacherName: teacherDisplayName(
+          row.teacher.user.firstName,
+          row.teacher.user.lastName,
+          row.teacher.gender,
+        ),
+        subject: row.subject.name,
+        className: `${row.section.grade.name} ${row.section.name}`,
+        examName: focusExam.name,
+        deadline: deadline.toISOString().slice(0, 10),
+      });
+    }
+
+    return {
+      submissionDaysBefore,
+      focusExam: {
+        id: focusExam.id,
+        name: focusExam.name,
+        examDate: focusExam.startDate.toISOString().slice(0, 10),
+        deadline: deadline.toISOString().slice(0, 10),
+      },
+      submitted: submittedKeys.size,
+      expected: assignments.length,
+      pendingTeachers,
     };
   }
 
@@ -345,6 +531,69 @@ export class DashboardService {
 
     const isClassTeacher = uniqueSections.length > 0;
 
+    const teacherProfile = await this.prisma.teacherProfile.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    let examPaperPendingCount = 0;
+    const examPaperPending: Array<{
+      assignmentId: string;
+      examName: string;
+      className: string;
+      subjectName: string;
+      submissionDueAt: string;
+      maxMarks: number;
+    }> = [];
+    if (teacherProfile) {
+      const year = await this.prisma.academicYear.findFirst({
+        where: { schoolId, isCurrent: true },
+        orderBy: { startDate: 'desc' },
+        select: { id: true },
+      });
+      if (year) {
+        const teachKeys = new Set(
+          classSubjects.map((row) => `${row.sectionId}:${row.subjectId}`),
+        );
+        const pendingAssignments = await this.prisma.examPaperAssignment.findMany({
+          where: {
+            schoolId,
+            releasedAt: { not: null },
+            examConfig: { academicYearId: year.id },
+            OR: [{ teacherId: teacherProfile.id }, { teacherId: null }],
+          },
+          include: {
+            examConfig: { select: { name: true } },
+            section: { select: { name: true, grade: { select: { name: true } } } },
+            subject: { select: { name: true } },
+            quizzes: {
+              where: { createdById: user.id, paperKind: { in: [...EXAM_PAPER_KINDS] } },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: { status: true, reviewStatus: true },
+            },
+          },
+        });
+        for (const row of pendingAssignments) {
+          if (!teachKeys.has(`${row.sectionId}:${row.subjectId}`)) continue;
+          if (row.teacherId && row.teacherId !== teacherProfile.id) continue;
+          const latest = row.quizzes[0];
+          const submitted =
+            latest?.status === QuizStatus.CLOSED &&
+            latest.reviewStatus !== ExamPaperReviewStatus.REJECTED;
+          if (submitted) continue;
+          examPaperPendingCount += 1;
+          examPaperPending.push({
+            assignmentId: row.id,
+            examName: row.examConfig.name,
+            className: `${row.section.grade.name} ${row.section.name}`,
+            subjectName: row.subject.name,
+            submissionDueAt: row.submissionDueAt.toISOString(),
+            maxMarks: row.maxMarks,
+          });
+        }
+      }
+    }
+
     return {
       classCount: classes.length,
       quizCount,
@@ -365,7 +614,12 @@ export class DashboardService {
       watchQuizzes: lowQuizzes.map((quiz) => quiz.title),
       classes,
       latestResults,
+      examPaperPendingCount,
+      examPaperPending,
       nextActions: [
+        examPaperPendingCount > 0
+          ? `${examPaperPendingCount} exam paper${examPaperPendingCount === 1 ? '' : 's'} still to generate and submit`
+          : null,
         missingLessonDays > 0
           ? `Add ${missingLessonDays} missing lesson${missingLessonDays === 1 ? '' : 's'} from the last 2 weeks`
           : 'Lessons look up to date',
@@ -377,7 +631,7 @@ export class DashboardService {
         quizTarget && quizCount < quizTarget
           ? `Quizzes ${quizCount}/${quizTarget} of your minimum`
           : 'Quiz count is on track',
-      ],
+      ].filter(Boolean) as string[],
     };
   }
 

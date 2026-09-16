@@ -8,6 +8,11 @@ export interface ApiErrorBody {
   message?: string;
   code?: string;
   statusCode?: number;
+  error?: string | {
+    code?: string;
+    message?: string | string[];
+    details?: unknown;
+  };
 }
 
 export interface PaginatedResult<T> {

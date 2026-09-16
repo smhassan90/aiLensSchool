@@ -18,11 +18,18 @@ export interface GenerateQuizPayload {
   shortAnswerCount?: number;
   trueFalseCount?: number;
   openEndedCount?: number;
+  longAnswerCount?: number;
   mcqMarks?: number;
   trueFalseMarks?: number;
+  fillBlankMarks?: number;
   openEndedMarks?: number;
+  shortAnswerMarks?: number;
+  longAnswerMarks?: number;
   paperKind?: string;
   title?: string;
+  difficulty?: number;
+  examConfigId?: string;
+  examPaperAssignmentId?: string;
 }
 
 export interface UpdateQuizQuestionPayload {
@@ -32,6 +39,15 @@ export interface UpdateQuizQuestionPayload {
   marks?: number;
   correctAnswer?: string;
   type?: string;
+  order?: number;
+}
+
+export interface AddQuizQuestionPayload {
+  type: string;
+  questionText: string;
+  marks: number;
+  correctAnswer?: string;
+  options?: Array<{ optionText: string; isCorrect?: boolean }>;
 }
 
 export const quizzesService = {
@@ -57,6 +73,13 @@ export const quizzesService = {
     });
   },
 
+  addQuestion(id: string, payload: AddQuizQuestionPayload) {
+    return apiClient<Quiz>(`/quizzes/${id}/questions`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
   publish(id: string, payload?: { dueAt?: string; immediate?: boolean }) {
     return apiClient<Quiz>(`/quizzes/${id}/publish`, {
       method: "POST",
@@ -64,7 +87,21 @@ export const quizzesService = {
     });
   },
 
-  submitPaper(id: string) {
-    return apiClient<Quiz>(`/quizzes/${id}/submit-paper`, { method: "POST" });
+  submitPaper(id: string, questions?: UpdateQuizQuestionPayload[]) {
+    return apiClient<Quiz>(`/quizzes/${id}/submit-paper`, {
+      method: "POST",
+      body: JSON.stringify(questions?.length ? { questions } : {}),
+    });
+  },
+
+  approvePaper(id: string) {
+    return apiClient<Quiz>(`/quizzes/${id}/approve-paper`, { method: "POST" });
+  },
+
+  rejectPaper(id: string, reason: string) {
+    return apiClient<Quiz>(`/quizzes/${id}/reject-paper`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    });
   },
 };

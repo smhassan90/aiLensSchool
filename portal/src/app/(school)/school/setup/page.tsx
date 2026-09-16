@@ -91,9 +91,9 @@ const setupSections: SetupSection[] = [
         permission: "MANAGE_EXAMS",
       },
       {
-        href: "/school/exam-papers",
-        title: "Exam printouts",
-        description: "Papers teachers generated from lectures — print for the class",
+        href: "/school/submitted-exam-papers",
+        title: "Exam papers",
+        description: "Papers teachers submitted for printout — open to print for the class",
         icon: FileText,
       },
     ],
@@ -111,7 +111,7 @@ const setupSections: SetupSection[] = [
       {
         href: "/school/teachers/attendance",
         title: "Teacher attendance",
-        description: "Admin marks present or absent — used in teacher ranking",
+        description: "Check a teacher in with a timestamp. Late and absent times are set here.",
         icon: ClipboardCheck,
         permission: "MANAGE_TEACHERS",
       },

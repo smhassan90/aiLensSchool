@@ -103,7 +103,7 @@ function ClassBars({
         const pct = item.expected <= 0 ? 100 : Math.min(100, (item.done / item.expected) * 100);
         return (
           <div key={item.label} className="flex items-center gap-2">
-            <p className="w-28 shrink-0 truncate text-[11px] text-muted-foreground">{item.label}</p>
+            <p className="w-28 shrink-0 truncate text-xs text-muted-foreground">{item.label}</p>
             <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-rose-100">
               <div className="h-full rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
             </div>
@@ -213,7 +213,7 @@ export function TeacherPaceBoard({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" />
           Done
@@ -242,7 +242,7 @@ export function TeacherPaceBoard({
                     </span>
                     <h2 className="font-semibold">{card.title}</h2>
                   </div>
-                  <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-semibold", style.badge)}>
+                  <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", style.badge)}>
                     {style.word}
                   </span>
                 </div>

@@ -4,10 +4,12 @@ import { PageLoader } from "@/components/layout/page-loader";
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -40,14 +42,16 @@ type ResetResult = {
 };
 
 export default function TeachersPage() {
+  const router = useRouter();
   const { can } = useAuth();
   const { toast } = useToast();
   const [confirmTeacher, setConfirmTeacher] = useState<Teacher | null>(null);
   const [resetResult, setResetResult] = useState<ResetResult | null>(null);
+  const [status, setStatus] = useState("");
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["teachers"],
-    queryFn: () => teachersService.list({ limit: 50 }),
+    queryKey: ["teachers", status],
+    queryFn: () => teachersService.list({ limit: 100, status: status || undefined }),
   });
 
   const reset = useMutation({
@@ -73,7 +77,7 @@ export default function TeachersPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Teachers"
-        description="Add a teacher from this page. Usernames are used for portal login."
+        description="Add, update, or mark a teacher inactive. Open a row to see full details."
         actions={
           can("MANAGE_TEACHERS") ? (
             <div className="flex gap-2">
@@ -96,6 +100,15 @@ export default function TeachersPage() {
           {(error as Error).message}
         </div>
       )}
+
+      <div className="mb-4 max-w-xs">
+        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          <option value="ACTIVE">Active</option>
+          <option value="INACTIVE">Inactive</option>
+          <option value="ON_LEAVE">On leave</option>
+        </Select>
+      </div>
 
       <div className="rounded-lg border bg-card">
         {isLoading ? (
@@ -128,11 +141,20 @@ export default function TeachersPage() {
             </TableHeader>
             <TableBody>
               {data.items.map((teacher) => (
-                <TableRow key={teacher.id}>
+                <TableRow
+                  key={teacher.id}
+                  className="cursor-pointer"
+                  tabIndex={0}
+                  onClick={() => router.push(`/school/teachers/${teacher.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      router.push(`/school/teachers/${teacher.id}`);
+                    }
+                  }}
+                >
                   <TableCell className="font-medium">
-                    <Link href={`/school/teachers/${teacher.id}`} className="hover:underline">
-                      {teacherDisplayNameFromUser(teacher.user, teacher.gender)}
-                    </Link>
+                    {teacherDisplayNameFromUser(teacher.user, teacher.gender)}
                   </TableCell>
                   <TableCell className="font-mono text-sm">
                     {teacher.user.username ?? "—"}
@@ -147,13 +169,18 @@ export default function TeachersPage() {
                   </TableCell>
                   {can("MANAGE_TEACHERS") ? (
                     <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setConfirmTeacher(teacher)}
-                      >
-                        Reset password
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setConfirmTeacher(teacher);
+                          }}
+                        >
+                          Reset password
+                        </Button>
+                      </div>
                     </TableCell>
                   ) : null}
                 </TableRow>

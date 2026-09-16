@@ -1,10 +1,15 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName, TeacherStatus } from '@prisma/client';
 import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
 import { TeachersService } from './teachers.service';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
-import { MarkTeacherAttendanceDto } from './dto/teacher-attendance.dto';
+import { UpdateTeacherDto } from './dto/update-teacher.dto';
+import {
+  CheckInTeacherDto,
+  SyncTeacherAttendanceDto,
+  UpdateTeacherAttendancePolicyDto,
+} from './dto/teacher-attendance.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RequirePermission } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -61,17 +66,31 @@ export class TeachersController {
   @RequirePermission('MANAGE_TEACHERS')
   @Get('attendance')
   listAttendance(@Query() query: TeacherAttendanceQueryDto, @CurrentUser() user: AuthUser) {
-    return this.teachersService.listTeacherAttendance(
-      user,
-      query.date ?? new Date().toISOString().slice(0, 10),
-    );
+    return this.teachersService.listTeacherAttendance(user, query.date);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN)
   @RequirePermission('MANAGE_TEACHERS')
-  @Post('attendance')
-  markAttendance(@Body() dto: MarkTeacherAttendanceDto, @CurrentUser() user: AuthUser) {
-    return this.teachersService.markTeacherAttendance(user, dto);
+  @Patch('attendance/policy')
+  updateAttendancePolicy(
+    @Body() dto: UpdateTeacherAttendancePolicyDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.teachersService.updateTeacherAttendancePolicy(user, dto);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_TEACHERS')
+  @Post('attendance/check-in')
+  checkIn(@Body() dto: CheckInTeacherDto, @CurrentUser() user: AuthUser) {
+    return this.teachersService.checkInTeacher(user, dto);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_TEACHERS')
+  @Post('attendance/sync')
+  syncMachine(@Body() dto: SyncTeacherAttendanceDto, @CurrentUser() user: AuthUser) {
+    return this.teachersService.syncTeacherCheckIn(user, dto);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN)
@@ -112,5 +131,12 @@ export class TeachersController {
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.teachersService.findOne(id, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_TEACHERS')
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateTeacherDto, @CurrentUser() user: AuthUser) {
+    return this.teachersService.update(id, dto, user);
   }
 }

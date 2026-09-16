@@ -29,6 +29,7 @@ const schema = z.object({
   branchId: z.string().min(1, "Select a branch"),
   employeeCode: z.string().min(1, "Required"),
   hireDate: z.string().optional(),
+  status: z.enum(["ACTIVE", "INACTIVE", "ON_LEAVE"]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -48,6 +49,7 @@ export default function NewTeacherPage() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    defaultValues: { status: "ACTIVE" },
   });
 
   const mutation = useMutation({
@@ -132,9 +134,17 @@ export default function NewTeacherPage() {
                 </Select>
                 {errors.branchId && <p className="text-sm text-destructive">{errors.branchId.message}</p>}
               </div>
-              <div className="space-y-2 sm:col-span-2">
+              <div className="space-y-2">
                 <Label htmlFor="hireDate">Hire Date</Label>
                 <Input id="hireDate" type="date" {...register("hireDate")} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select id="status" {...register("status")}>
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                  <option value="ON_LEAVE">On leave</option>
+                </Select>
               </div>
             </CardContent>
           </Card>

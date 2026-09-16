@@ -8,6 +8,18 @@ export interface SchoolDashboardSummary {
   feesRemainingThisMonth: number;
   feesOutstanding: number;
   setupCompleted: boolean;
+  attendanceToday: {
+    marked: number;
+    present: number;
+    absent: number;
+    late: number;
+    rate: number;
+  };
+  teacherAttendanceToday: {
+    marked: number;
+    present: number;
+    absent: number;
+  };
   financeMonths: Array<{
     key: string;
     label: string;
@@ -25,6 +37,24 @@ export interface SchoolDashboardSummary {
     classTeacher: string | null;
     subjects: Array<{ subject: string; teacher: string }>;
   }>;
+  examPaperSubmissions?: {
+    submissionDaysBefore: number;
+    focusExam: {
+      id: string;
+      name: string;
+      examDate: string;
+      deadline: string;
+    } | null;
+    submitted: number;
+    expected: number;
+    pendingTeachers: Array<{
+      teacherName: string;
+      subject: string;
+      className: string;
+      examName: string;
+      deadline: string | null;
+    }>;
+  };
 }
 
 export interface TeacherDashboardSummary {
@@ -44,6 +74,15 @@ export interface TeacherDashboardSummary {
   lessonByClass?: Array<{ label: string; done: number; expected: number; days?: boolean[] }>;
   attendanceByClass?: Array<{ label: string; done: number; expected: number; days?: boolean[] }>;
   watchQuizzes: string[];
+  examPaperPendingCount?: number;
+  examPaperPending?: Array<{
+    assignmentId: string;
+    examName: string;
+    className: string;
+    subjectName: string;
+    submissionDueAt: string;
+    maxMarks: number;
+  }>;
   nextActions: string[];
   classes: Array<{
     sectionId: string;

@@ -45,7 +45,7 @@ export function SidebarFrame({
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-white">{userName}</p>
-            <p className="text-[11px] text-white/45">{subtitle}</p>
+            <p className="text-xs text-white/45">{subtitle}</p>
           </div>
         </div>
         <button
@@ -80,7 +80,7 @@ export function SidebarNavItem({
       onMouseEnter={() => onPrefetch?.(href)}
       onFocus={() => onPrefetch?.(href)}
       className={cn(
-        "group relative flex items-center gap-3 rounded-xl px-2 py-1.5 text-[13px] font-medium tracking-wide transition-all duration-200",
+        "group relative flex items-center gap-3 rounded-xl px-2 py-1.5 text-sm font-medium tracking-wide transition-all duration-200",
         active
           ? "bg-white/10 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
           : "text-white/60 hover:bg-white/[0.06] hover:text-white",

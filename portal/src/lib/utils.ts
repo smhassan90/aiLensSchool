@@ -43,6 +43,8 @@ export function quizQuestionTypeLabel(type?: string): string {
       return "True / False";
     case "FILL_IN_THE_BLANK":
       return "Fill in the blank";
+    case "LONG_ANSWER":
+      return "Long answer";
     case "SHORT_ANSWER":
       return "Short answer";
     default:
@@ -69,6 +71,50 @@ export function isQuizOptionCorrect(
   if (typeof opt !== "string" && opt.isCorrect) return true;
   const label = quizOptionLabel(opt).trim();
   return Boolean(label && correctAnswer && label.toLowerCase() === correctAnswer.toLowerCase());
+}
+
+type SectionLike = {
+  name?: string | null;
+  grade?: { name?: string | null; level?: number | null } | null;
+} | null;
+
+export function parseClassNumber(value?: string | null): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  const match = trimmed.match(/(?:class|grade|level)\s*(\d+)/i);
+  if (match) {
+    const num = Number(match[1]);
+    return Number.isFinite(num) ? num : null;
+  }
+  if (/^\d+$/.test(trimmed)) {
+    const num = Number(trimmed);
+    return Number.isFinite(num) ? num : null;
+  }
+  return null;
+}
+
+export function gradeClassNumber(section?: SectionLike): number | null {
+  if (!section?.grade) return null;
+  return parseClassNumber(section.grade.name);
+}
+
+/** Grade / class only, e.g. "Class 8". Section letter is excluded. */
+export function gradeClassLabel(section?: SectionLike): string {
+  if (!section) return "—";
+  const classNumber = gradeClassNumber(section);
+  if (classNumber != null) return `Class ${classNumber}`;
+  const gradeName = section.grade?.name?.trim() ?? "";
+  if (gradeName) return gradeName;
+  return "—";
+}
+
+/** Full label including section, e.g. "Class 4 A". */
+export function sectionClassLabel(section?: SectionLike): string {
+  if (!section) return "—";
+  const grade = gradeClassLabel(section);
+  const name = section.name?.trim() ?? "";
+  if (grade !== "—" && name) return `${grade} ${name}`;
+  return grade !== "—" ? grade : name || "—";
 }
 
 export function formatDateTime(value?: string | Date | null): string {

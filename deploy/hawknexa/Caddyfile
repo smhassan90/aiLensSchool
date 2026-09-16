@@ -1,0 +1,21 @@
+# Hostinger VPS hostname — Caddy obtains a Let's Encrypt certificate automatically.
+srv1984496.hstgr.cloud {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy backend:3001
+	}
+
+	handle /uploads/* {
+		reverse_proxy backend:3001
+	}
+
+	handle {
+		reverse_proxy portal:3000
+	}
+}
+
+# Redirect bare IP HTTP visitors to the HTTPS hostname.
+http://187.53.141.109 {
+	redir https://srv1984496.hstgr.cloud{uri} permanent
+}

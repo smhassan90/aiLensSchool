@@ -5,9 +5,53 @@ import type {
   Enrollment,
   Grade,
   Paginated,
+  Quiz,
   Section,
   Subject,
 } from "@/lib/types";
+
+export type ExamPaperSubmissionPaper = Quiz & {
+  teacherName?: string;
+  teacherGender?: string | null;
+  reviewStatus?: string;
+  rejectionReason?: string | null;
+};
+
+export interface ExamPaperSubmissionOverview {
+  academicYear: { id: string; name: string } | null;
+  submissionDaysBefore: number;
+  selectedExam: {
+    id: string;
+    name: string;
+    examDate: string | null;
+    deadline: string | null;
+  } | null;
+  submitted: number;
+  expected: number;
+  exams: Array<{ id: string; name: string; startDate?: string | null; sequence: number }>;
+  filters: {
+    sections: Array<{ id: string; name: string }>;
+    subjects: Array<{ id: string; name: string }>;
+    teachers: Array<{ id: string; name: string }>;
+  };
+  teachers: Array<{
+    teacherId: string;
+    teacherName: string;
+    gender: string | null;
+    submittedCount: number;
+    expectedCount: number;
+    assignments: Array<{
+      sectionId: string;
+      subjectId: string;
+      className: string;
+      subjectName: string;
+      status: "SUBMITTED" | "DRAFT" | "MISSING" | "REJECTED";
+      paperId: string | null;
+      submittedAt: string | null;
+    }>;
+  }>;
+  papers: ExamPaperSubmissionPaper[];
+}
 
 export interface CreateYearPayload {
   name: string;
@@ -215,9 +259,14 @@ export const academicsService = {
   saveExamPattern(payload: {
     academicYearId: string;
     pattern: string;
+    examSubmissionDaysBefore?: number;
     exams?: Array<{ name: string; maxMarks: number; sequence: number; startDate?: string; endDate?: string }>;
   }) {
     return apiClient("/academics/exam-configs", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  getExamSettings() {
+    return apiClient<{ examSubmissionDaysBefore: number }>("/academics/exam-settings");
   },
 
   listExamConfigs(academicYearId?: string) {
@@ -230,6 +279,81 @@ export const academicsService = {
       startDate?: string | null;
       endDate?: string | null;
     }>>(`/academics/exam-configs${buildQuery({ academicYearId })}`);
+  },
+
+  listExamPaperAssignments(examConfigId: string) {
+    return apiClient<{
+      exam: { id: string; name: string; maxMarks: number; academicYearId: string; startDate?: string | null };
+      defaultDueAt: string | null;
+      rows: Array<{
+        sectionId: string;
+        subjectId: string;
+        className: string;
+        subjectName: string;
+        defaultTeacherId: string | null;
+        defaultTeacherUserId: string | null;
+        defaultTeacherName: string;
+        assignment: {
+          id: string;
+          teacherId: string | null;
+          maxMarks: number;
+          submissionDueAt: string;
+          releasedAt: string | null;
+        } | null;
+      }>;
+    }>(`/academics/exam-paper-assignments${buildQuery({ examConfigId })}`);
+  },
+
+  saveExamPaperAssignments(payload: {
+    examConfigId: string;
+    release?: boolean;
+    rows: Array<{
+      sectionId: string;
+      subjectId: string;
+      teacherId?: string | null;
+      maxMarks: number;
+      submissionDueAt: string;
+      enabled?: boolean;
+    }>;
+  }) {
+    return apiClient<{ saved: number; released: boolean }>("/academics/exam-paper-assignments", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  listMyExamPaperAssignments() {
+    return apiClient<{
+      pendingCount: number;
+      assignments: Array<{
+        id: string;
+        examConfigId: string;
+        examName: string;
+        examDate: string | null;
+        sectionId: string;
+        subjectId: string;
+        className: string;
+        subjectName: string;
+        maxMarks: number;
+        submissionDueAt: string;
+        releasedAt: string | null;
+        status: string;
+        quizId: string | null;
+        rejectionReason: string | null;
+        pendingGeneration: boolean;
+      }>;
+    }>("/academics/my-exam-paper-assignments");
+  },
+
+  getExamPaperSubmissions(params?: {
+    examConfigId?: string;
+    sectionId?: string;
+    subjectId?: string;
+    teacherId?: string;
+  }) {
+    return apiClient<ExamPaperSubmissionOverview>(
+      `/academics/exam-paper-submissions${buildQuery(params ?? {})}`,
+    );
   },
 
   listTimetable(gradeId?: string) {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName, StudentFeeStatus } from '@prisma/client';
 import { Transform } from 'class-transformer';
@@ -10,6 +10,7 @@ import {
   CreateFeeStructureDto,
   MarkPaidDto,
   RecordPaymentDto,
+  UpdateFeePolicyDto,
 } from './dto/fees.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -105,6 +106,18 @@ export class FeesController {
   @Post('assign')
   assign(@Body() dto: AssignFeesDto, @CurrentUser() user: AuthUser) {
     return this.feesService.assign(dto, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @Get('policy')
+  getPolicy(@CurrentUser() user: AuthUser) {
+    return this.feesService.getPolicy(user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @Patch('policy')
+  updatePolicy(@Body() dto: UpdateFeePolicyDto, @CurrentUser() user: AuthUser) {
+    return this.feesService.updatePolicy(dto, user);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)

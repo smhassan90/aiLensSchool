@@ -127,6 +127,7 @@ export interface Teacher {
   id: string;
   employeeCode: string;
   status: string;
+  hireDate?: string | null;
   gender?: "MALE" | "FEMALE" | "OTHER" | null;
   user: {
     id: string;
@@ -137,6 +138,26 @@ export interface Teacher {
     phone?: string;
   };
   branch?: { id: string; name: string };
+  classSubjects?: Array<{
+    id: string;
+    subject?: { name: string };
+    section?: { id: string; name: string; grade?: { name: string; level?: number } };
+  }>;
+  assistantClassSubjects?: Array<{
+    id: string;
+    subject?: { name: string };
+    section?: { id: string; name: string; grade?: { name: string; level?: number } };
+  }>;
+  classSections?: Array<{ id: string; name: string; grade?: { name: string; level?: number } }>;
+  assignments?: Array<{
+    id: string;
+    sectionId: string | null;
+    className: string;
+    classNumber?: number | null;
+    sectionName?: string | null;
+    subject: string | null;
+    role: "Class teacher" | "Subject teacher" | "Assistant";
+  }>;
 }
 
 export interface TeacherClassAssignment {
@@ -292,6 +313,8 @@ export interface QuizQuestion {
   questionText: string;
   type: string;
   marks: number | string;
+  order?: number;
+  source?: string;
   options?: QuizOption[];
   correctAnswer?: string;
   included: boolean;
@@ -302,12 +325,16 @@ export interface Quiz {
   title: string;
   status: string;
   paperKind?: string;
+  difficulty?: number | null;
+  examConfigId?: string | null;
   submittedAt?: string | null;
   totalMarks?: number | string;
   dueAt?: string;
   createdAt: string;
   description?: string | null;
   questions?: QuizQuestion[];
+  school?: { id: string; name: string } | null;
+  examConfig?: { id: string; name: string; startDate?: string | null; endDate?: string | null } | null;
   section?: { id: string; name: string; grade?: { id: string; name: string } | null };
   subject?: { id: string; name: string };
   createdBy?: { firstName: string; lastName: string } | null;
@@ -516,7 +543,14 @@ export interface FeeAccount {
     periodLabel: string;
     amount: number;
     billedAmount: number;
+    paidAmount?: number;
+    alreadyPaid?: boolean;
     label: string;
+    lateFee?: { amount: number; overdue: boolean; waived: boolean; charged: boolean };
+  };
+  policy?: {
+    lateFeeAmount: number;
+    feeDueDay: number;
   };
   fees: Array<{
     id: string;
@@ -528,6 +562,7 @@ export interface FeeAccount {
     balance: number;
     status: string;
     dueDate: string;
+    lateFee?: { amount: number; overdue: boolean; waived: boolean; charged: boolean };
   }>;
 }
 
@@ -558,6 +593,8 @@ export interface FeeReceipt {
   };
   collected: number;
   discount: number;
+  lateFee?: number;
+  lateFeeWaived?: boolean;
   balance: number;
   receivedBy: string;
 }

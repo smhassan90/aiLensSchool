@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ExamPaperReviewStatus,
   LessonStatus,
   NotificationType,
   Prisma,
@@ -20,13 +21,16 @@ import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto
 import { QuizGenerationService } from '../ai/services/quiz-generation.service';
 import { ParentsService } from '../parents/parents.service';
 import {
+  AddQuizQuestionDto,
   GenerateQuizDto,
   PublishQuizDto,
+  SubmitExamPaperDto,
   SubmitQuizDto,
   UpdateQuizQuestionsDto,
 } from './dto/quiz.dto';
 import { examPaperLabel, EXAM_PAPER_KINDS, isExamPaperKind } from './exam-paper';
-import { normalizeGeneratedQuestion } from '../ai/quiz-mix';
+import { paperKindFromExamName } from './exam-config-map';
+import { normalizeGeneratedQuestion, sectionLabelForQuestionType } from '../ai/quiz-mix';
 
 @Injectable()
 export class QuizzesService {
@@ -51,8 +55,19 @@ export class QuizzesService {
       });
     }
 
+    let examPaperAssignment: {
+      id: string;
+      maxMarks: number;
+      submissionDueAt: Date;
+      examConfigId: string;
+      sectionId: string;
+      subjectId: string;
+      releasedAt: Date | null;
+      teacherId: string | null;
+    } | null = null;
+
     if (teacher && !isAdmin) {
-      const assignment = await this.prisma.classSubject.findFirst({
+      const classAssignment = await this.prisma.classSubject.findFirst({
         where: {
           sectionId: dto.sectionId,
           subjectId: dto.subjectId,
@@ -60,10 +75,72 @@ export class QuizzesService {
           OR: [{ teacherId: teacher.id }, { assistantTeacherId: teacher.id }],
         },
       });
-      if (!assignment) {
+      if (!classAssignment) {
         throw new ForbiddenException({
           code: 'CLASS_SUBJECT_NOT_ASSIGNED',
           message: 'Teacher is not assigned to this class/subject',
+        });
+      }
+    }
+
+    const examPaperRequested = isExamPaperKind(dto.paperKind) || Boolean(dto.examConfigId || dto.examPaperAssignmentId);
+    if (examPaperRequested && teacher && !isAdmin) {
+      if (!dto.examPaperAssignmentId) {
+        throw new ForbiddenException({
+          code: 'EXAM_ASSIGNMENT_REQUIRED',
+          message: 'The office must assign this exam before you can generate a paper',
+        });
+      }
+      examPaperAssignment = await this.prisma.examPaperAssignment.findFirst({
+        where: {
+          id: dto.examPaperAssignmentId,
+          schoolId,
+          releasedAt: { not: null },
+        },
+        select: {
+          id: true,
+          maxMarks: true,
+          submissionDueAt: true,
+          examConfigId: true,
+          sectionId: true,
+          subjectId: true,
+          releasedAt: true,
+          teacherId: true,
+        },
+      });
+      if (!examPaperAssignment) {
+        throw new ForbiddenException({
+          code: 'EXAM_ASSIGNMENT_NOT_FOUND',
+          message: 'This exam assignment is not available yet. Wait for the office to release it.',
+        });
+      }
+      if (
+        examPaperAssignment.teacherId &&
+        teacher &&
+        examPaperAssignment.teacherId !== teacher.id
+      ) {
+        throw new ForbiddenException({
+          code: 'EXAM_ASSIGNMENT_NOT_YOURS',
+          message: 'This exam was not assigned to you',
+        });
+      }
+      dto.sectionId = examPaperAssignment.sectionId;
+      dto.subjectId = examPaperAssignment.subjectId;
+      dto.examConfigId = examPaperAssignment.examConfigId;
+
+      const existingSubmitted = await this.prisma.quiz.findFirst({
+        where: {
+          examPaperAssignmentId: examPaperAssignment.id,
+          createdById: user.id,
+          status: QuizStatus.CLOSED,
+          reviewStatus: { not: ExamPaperReviewStatus.REJECTED },
+        },
+        select: { id: true },
+      });
+      if (existingSubmitted) {
+        throw new BadRequestException({
+          code: 'EXAM_ALREADY_SUBMITTED',
+          message: 'You have already submitted this exam paper',
         });
       }
     }
@@ -190,12 +267,13 @@ export class QuizzesService {
       });
     }
 
-    const examPaper = isExamPaperKind(dto.paperKind);
+    const examPaper = isExamPaperKind(dto.paperKind) || Boolean(dto.examConfigId || dto.examPaperAssignmentId);
     const customTotal =
       (dto.mcqCount ?? 0) +
       (dto.fillBlankCount ?? 0) +
       (dto.trueFalseCount ?? 0) +
-      (dto.openEndedCount ?? (examPaper ? dto.shortAnswerCount ?? 0 : 0)) +
+      (dto.shortAnswerCount ?? dto.openEndedCount ?? 0) +
+      (dto.longAnswerCount ?? 0) +
       (examPaper ? 0 : dto.shortAnswerCount ?? 0);
     if (dto.quickGenerate === false && customTotal < 1) {
       throw new BadRequestException({
@@ -205,6 +283,22 @@ export class QuizzesService {
     }
 
     const subject = await this.prisma.subject.findUnique({ where: { id: dto.subjectId } });
+    let examConfig: { id: string; name: string; startDate: Date | null } | null = null;
+    if (examPaper && dto.examConfigId) {
+      examConfig = await this.prisma.examConfig.findFirst({
+        where: { id: dto.examConfigId, schoolId, academicYearId: dto.academicYearId },
+        select: { id: true, name: true, startDate: true },
+      });
+      if (!examConfig) {
+        throw new BadRequestException({
+          code: 'EXAM_CONFIG_NOT_FOUND',
+          message: 'Selected exam paper was not found for this year',
+        });
+      }
+    }
+
+    const difficulty = dto.difficulty ?? (examPaper ? 5 : undefined);
+
     const aiQuiz = await this.quizGeneration.generate({
       schoolId,
       userId: user.id,
@@ -213,21 +307,33 @@ export class QuizzesService {
       questionCount: dto.questionCount,
       quickGenerate: examPaper ? false : dto.quickGenerate,
       examPaper,
+      difficulty,
       mcqCount: dto.mcqCount,
       fillBlankCount: dto.fillBlankCount,
-      trueFalseCount: dto.trueFalseCount ?? (examPaper ? undefined : dto.shortAnswerCount),
-      openEndedCount: dto.openEndedCount ?? (examPaper ? dto.shortAnswerCount : undefined),
+      trueFalseCount: dto.trueFalseCount,
+      openEndedCount: dto.openEndedCount,
+      shortAnswerCount: dto.shortAnswerCount ?? dto.openEndedCount,
+      longAnswerCount: dto.longAnswerCount,
       mcqMarks: dto.mcqMarks,
       trueFalseMarks: dto.trueFalseMarks,
+      fillBlankMarks: dto.fillBlankMarks,
       openEndedMarks: dto.openEndedMarks,
+      shortAnswerMarks: dto.shortAnswerMarks,
+      longAnswerMarks: dto.longAnswerMarks,
     });
 
     const totalMarks = aiQuiz.questions.reduce((sum, q) => sum + q.marks, 0);
 
-    const paperKind = examPaper ? dto.paperKind! : 'QUIZ';
+    const paperKind = examPaper
+      ? examConfig
+        ? paperKindFromExamName(examConfig.name)
+        : dto.paperKind!
+      : 'QUIZ';
     const paperTitle =
       dto.title?.trim() ||
-      (examPaper ? `${examPaperLabel(paperKind)} — ${subject?.name ?? 'Subject'}` : aiQuiz.title.trim() || `${subject?.name ?? 'Class'} quiz`);
+      (examPaper
+        ? `${examConfig?.name ?? examPaperLabel(paperKind)} — ${subject?.name ?? 'Subject'}`
+        : aiQuiz.title.trim() || `${subject?.name ?? 'Class'} quiz`);
 
     const quiz = await this.prisma.$transaction(
       async (tx) => {
@@ -246,14 +352,19 @@ export class QuizzesService {
           lessonDateTo: rangeTo,
           totalMarks,
           paperKind,
+          difficulty: difficulty ?? null,
+          examConfigId: examConfig?.id ?? null,
+          examPaperAssignmentId: examPaperAssignment?.id ?? null,
+          dueAt: examPaperAssignment?.submissionDueAt ?? examConfig?.startDate ?? null,
         },
       });
 
+      const presentTypes = aiQuiz.questions.map((item) => String(item.type));
       for (let i = 0; i < aiQuiz.questions.length; i++) {
         const q = normalizeGeneratedQuestion(aiQuiz.questions[i]);
         const isChoice = q.type === 'MCQ' || q.type === 'TRUE_FALSE';
         const isFillBlank = q.type === 'FILL_IN_THE_BLANK';
-        const isOpenEnded = q.type === 'SHORT_ANSWER';
+        const isOpenEnded = q.type === 'SHORT_ANSWER' || q.type === 'LONG_ANSWER';
         const hasMarkedOption = Boolean(q.options?.some((opt) => opt.isCorrect));
         if (!examPaper) {
           if (!q.correctAnswer?.trim() || (!isChoice && !isFillBlank) || (isChoice && !hasMarkedOption)) {
@@ -280,6 +391,9 @@ export class QuizzesService {
             questionText: q.questionText,
             marks: Number(q.marks) || 1,
             correctAnswer: (q.correctAnswer ?? '').trim() || (examPaper ? 'See answer key after marking.' : ''),
+            sectionLabel: examPaper
+              ? sectionLabelForQuestionType(String(q.type), presentTypes)
+              : null,
             order: i,
             source: QuestionSource.AI,
             included: true,
@@ -347,28 +461,7 @@ export class QuizzesService {
       });
     }
 
-    await Promise.all(
-      dto.questions.map((q) =>
-        this.prisma.quizQuestion.update({
-          where: { id: q.id },
-          data: {
-            included: q.included,
-            questionText: q.questionText,
-            marks: q.marks,
-            correctAnswer: q.correctAnswer,
-            type: q.type,
-          },
-        }),
-      ),
-    );
-
-    const totalMarks = dto.questions.reduce((sum, q) => {
-      const current = owned.get(q.id);
-      const included = q.included ?? current?.included ?? false;
-      if (!included) return sum;
-      return sum + Number(q.marks ?? current?.marks ?? 0);
-    }, 0);
-
+    const totalMarks = this.totalMarksFromUpdates(dto.questions, owned);
     const title = dto.title?.trim();
     if (dto.title !== undefined && !title) {
       throw new BadRequestException({
@@ -377,15 +470,96 @@ export class QuizzesService {
       });
     }
 
-    await this.prisma.quiz.update({
+    await this.prisma.$transaction(async (tx) => {
+      await this.applyQuestionUpdates(tx, dto.questions);
+      await tx.quiz.update({
+        where: { id },
+        data: {
+          totalMarks,
+          ...(title ? { title } : {}),
+        },
+      });
+    });
+
+    return this.findQuizForEdit(id, user);
+  }
+
+  async addQuestion(id: string, dto: AddQuizQuestionDto, user: AuthUser) {
+    const quiz = await this.prisma.quiz.findUnique({
       where: { id },
+      select: {
+        id: true,
+        schoolId: true,
+        status: true,
+        questions: { select: { order: true }, orderBy: { order: 'desc' }, take: 1 },
+      },
+    });
+    if (!quiz) {
+      throw new NotFoundException({ code: 'QUIZ_NOT_FOUND', message: 'Quiz not found' });
+    }
+    this.tenant.assertSchoolAccess(user, quiz.schoolId);
+    if (quiz.status !== QuizStatus.DRAFT) {
+      throw new BadRequestException({
+        code: 'QUIZ_NOT_DRAFT',
+        message: 'Only draft papers can be edited',
+      });
+    }
+
+    const text = dto.questionText.trim();
+    if (!text) {
+      throw new BadRequestException({
+        code: 'QUESTION_TEXT_REQUIRED',
+        message: 'Enter the question text',
+      });
+    }
+
+    const nextOrder = (quiz.questions[0]?.order ?? -1) + 1;
+    const isChoice = dto.type === QuestionType.MCQ || dto.type === QuestionType.TRUE_FALSE;
+    const options =
+      dto.type === QuestionType.TRUE_FALSE
+        ? [
+            { optionText: 'TRUE', isCorrect: dto.correctAnswer?.toUpperCase() === 'TRUE' },
+            { optionText: 'FALSE', isCorrect: dto.correctAnswer?.toUpperCase() === 'FALSE' },
+          ]
+        : dto.options ?? [];
+
+    const question = await this.prisma.quizQuestion.create({
       data: {
-        totalMarks,
-        ...(title ? { title } : {}),
+        quizId: id,
+        type: dto.type,
+        questionText: text,
+        marks: dto.marks,
+        correctAnswer: dto.correctAnswer?.trim() || null,
+        order: nextOrder,
+        source: QuestionSource.MANUAL,
+        included: true,
       },
     });
 
-    return this.findOne(id, user);
+    if (isChoice && options.length) {
+      await this.prisma.quizOption.createMany({
+        data: options
+          .map((opt, idx) => ({
+            questionId: question.id,
+            optionText: opt.optionText.trim(),
+            isCorrect: Boolean(opt.isCorrect),
+            order: idx,
+          }))
+          .filter((opt) => opt.optionText),
+      });
+    }
+
+    await this.recalculateQuizMarks(id);
+    return this.findQuizForEdit(id, user);
+  }
+
+  private async recalculateQuizMarks(quizId: string) {
+    const questions = await this.prisma.quizQuestion.findMany({
+      where: { quizId, included: true },
+      select: { marks: true },
+    });
+    const totalMarks = questions.reduce((sum, q) => sum + Number(q.marks), 0);
+    await this.prisma.quiz.update({ where: { id: quizId }, data: { totalMarks } });
   }
 
   async publish(id: string, dto: PublishQuizDto, user: AuthUser) {
@@ -475,8 +649,24 @@ export class QuizzesService {
     return updated;
   }
 
-  async submitForPrint(id: string, user: AuthUser) {
-    const quiz = await this.findOne(id, user);
+  async submitForPrint(id: string, user: AuthUser, dto: SubmitExamPaperDto = {}) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        schoolId: true,
+        branchId: true,
+        status: true,
+        paperKind: true,
+        examPaperAssignmentId: true,
+        examPaperAssignment: { select: { maxMarks: true } },
+        questions: { select: { id: true, included: true, marks: true } },
+      },
+    });
+    if (!quiz) {
+      throw new NotFoundException({ code: 'QUIZ_NOT_FOUND', message: 'Quiz not found' });
+    }
+    this.tenant.assertSchoolAccess(user, quiz.schoolId);
     if (!isExamPaperKind(quiz.paperKind)) {
       throw new BadRequestException({
         code: 'NOT_AN_EXAM_PAPER',
@@ -489,7 +679,23 @@ export class QuizzesService {
         message: 'This paper is already submitted',
       });
     }
-    const includedCount = quiz.questions.filter((q) => q.included).length;
+
+    const owned = new Map(quiz.questions.map((item) => [item.id, item]));
+    if (dto.questions?.length) {
+      const unknown = dto.questions.find((item) => !owned.has(item.id));
+      if (unknown) {
+        throw new BadRequestException({
+          code: 'QUESTION_NOT_IN_QUIZ',
+          message: 'One or more questions do not belong to this quiz',
+        });
+      }
+    }
+
+    const includedCount = (dto.questions ?? quiz.questions).reduce((count, q) => {
+      const current = owned.get(q.id);
+      const included = q.included ?? current?.included ?? false;
+      return count + (included ? 1 : 0);
+    }, 0);
     if (includedCount === 0) {
       throw new BadRequestException({
         code: 'NO_QUESTIONS_INCLUDED',
@@ -497,12 +703,36 @@ export class QuizzesService {
       });
     }
 
-    const updated = await this.prisma.quiz.update({
-      where: { id },
-      data: {
-        status: QuizStatus.CLOSED,
-        submittedAt: new Date(),
-      },
+    const totalMarks =
+      dto.questions?.length
+        ? this.totalMarksFromUpdates(dto.questions, owned)
+        : quiz.questions.reduce(
+            (sum, q) => sum + (q.included ? Number(q.marks) : 0),
+            0,
+          );
+    const requiredMarks = quiz.examPaperAssignment?.maxMarks;
+    if (requiredMarks != null && Math.round(totalMarks * 100) !== requiredMarks * 100) {
+      throw new BadRequestException({
+        code: 'EXAM_MARKS_MISMATCH',
+        message: `Total marks must be exactly ${requiredMarks}. Your paper is ${totalMarks}. Adjust question marks before submitting.`,
+      });
+    }
+    const submittedAt = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      if (dto.questions?.length) {
+        await this.applyQuestionUpdates(tx, dto.questions);
+      }
+      await tx.quiz.update({
+        where: { id },
+        data: {
+          status: QuizStatus.CLOSED,
+          reviewStatus: ExamPaperReviewStatus.PENDING_REVIEW,
+          submittedAt,
+          rejectionReason: null,
+          totalMarks,
+        },
+      });
     });
 
     await this.audit.log({
@@ -513,7 +743,155 @@ export class QuizzesService {
       entityId: id,
     });
 
-    return this.findOne(updated.id, user);
+    return this.findQuizForEdit(id, user);
+  }
+
+  async approvePaper(id: string, user: AuthUser) {
+    if (!this.tenant.isSchoolAdmin(user)) {
+      throw new ForbiddenException({
+        code: 'ADMIN_REQUIRED',
+        message: 'Only the office can approve exam papers',
+      });
+    }
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id },
+      select: { id: true, schoolId: true, paperKind: true, reviewStatus: true, status: true },
+    });
+    if (!quiz) {
+      throw new NotFoundException({ code: 'QUIZ_NOT_FOUND', message: 'Quiz not found' });
+    }
+    this.tenant.assertSchoolAccess(user, quiz.schoolId);
+    if (!isExamPaperKind(quiz.paperKind)) {
+      throw new BadRequestException({ code: 'NOT_AN_EXAM_PAPER', message: 'Not an exam paper' });
+    }
+    if (quiz.reviewStatus !== ExamPaperReviewStatus.PENDING_REVIEW) {
+      throw new BadRequestException({
+        code: 'EXAM_NOT_PENDING',
+        message: 'This paper is not waiting for approval',
+      });
+    }
+    await this.prisma.quiz.update({
+      where: { id },
+      data: {
+        reviewStatus: ExamPaperReviewStatus.APPROVED,
+        reviewedById: user.id,
+        reviewedAt: new Date(),
+        rejectionReason: null,
+      },
+    });
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId: quiz.schoolId,
+      action: 'EXAM_PAPER_APPROVED',
+      entityType: 'Quiz',
+      entityId: id,
+    });
+    return this.findQuizForEdit(id, user);
+  }
+
+  async rejectPaper(id: string, reason: string, user: AuthUser) {
+    if (!this.tenant.isSchoolAdmin(user)) {
+      throw new ForbiddenException({
+        code: 'ADMIN_REQUIRED',
+        message: 'Only the office can reject exam papers',
+      });
+    }
+    const trimmed = reason.trim();
+    if (!trimmed) {
+      throw new BadRequestException({
+        code: 'REJECTION_REASON_REQUIRED',
+        message: 'Enter a reason when rejecting a paper',
+      });
+    }
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id },
+      select: { id: true, schoolId: true, paperKind: true, reviewStatus: true },
+    });
+    if (!quiz) {
+      throw new NotFoundException({ code: 'QUIZ_NOT_FOUND', message: 'Quiz not found' });
+    }
+    this.tenant.assertSchoolAccess(user, quiz.schoolId);
+    if (!isExamPaperKind(quiz.paperKind)) {
+      throw new BadRequestException({ code: 'NOT_AN_EXAM_PAPER', message: 'Not an exam paper' });
+    }
+    if (quiz.reviewStatus !== ExamPaperReviewStatus.PENDING_REVIEW) {
+      throw new BadRequestException({
+        code: 'EXAM_NOT_PENDING',
+        message: 'This paper is not waiting for approval',
+      });
+    }
+    await this.prisma.quiz.update({
+      where: { id },
+      data: {
+        status: QuizStatus.DRAFT,
+        reviewStatus: ExamPaperReviewStatus.REJECTED,
+        reviewedById: user.id,
+        reviewedAt: new Date(),
+        rejectionReason: trimmed,
+        submittedAt: null,
+      },
+    });
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId: quiz.schoolId,
+      action: 'EXAM_PAPER_REJECTED',
+      entityType: 'Quiz',
+      entityId: id,
+      metadata: { reason: trimmed },
+    });
+    return this.findQuizForEdit(id, user);
+  }
+
+  private totalMarksFromUpdates(
+    questions: UpdateQuizQuestionsDto['questions'],
+    owned: Map<string, { included: boolean; marks: Prisma.Decimal }>,
+  ) {
+    return questions.reduce((sum, q) => {
+      const current = owned.get(q.id);
+      const included = q.included ?? current?.included ?? false;
+      if (!included) return sum;
+      return sum + Number(q.marks ?? current?.marks ?? 0);
+    }, 0);
+  }
+
+  private async applyQuestionUpdates(
+    tx: Prisma.TransactionClient,
+    questions: UpdateQuizQuestionsDto['questions'],
+  ) {
+    await Promise.all(
+      questions.map((q) =>
+        tx.quizQuestion.update({
+          where: { id: q.id },
+          data: {
+            ...(q.included !== undefined ? { included: q.included } : {}),
+            ...(q.questionText !== undefined ? { questionText: q.questionText } : {}),
+            ...(q.marks !== undefined ? { marks: q.marks } : {}),
+            ...(q.correctAnswer !== undefined ? { correctAnswer: q.correctAnswer } : {}),
+            ...(q.type !== undefined ? { type: q.type } : {}),
+            ...(q.order !== undefined ? { order: q.order } : {}),
+          },
+        }),
+      ),
+    );
+  }
+
+  private async findQuizForEdit(id: string, user: AuthUser) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id },
+      include: {
+        questions: { include: { options: true }, orderBy: { order: 'asc' } },
+        subject: true,
+        section: { include: { grade: { select: { id: true, name: true } } } },
+        school: { select: { id: true, name: true } },
+        examConfig: { select: { id: true, name: true, startDate: true, endDate: true } },
+        createdBy: { select: { firstName: true, lastName: true } },
+      },
+    });
+    if (!quiz) {
+      throw new NotFoundException({ code: 'QUIZ_NOT_FOUND', message: 'Quiz not found' });
+    }
+    this.tenant.assertSchoolAccess(user, quiz.schoolId);
+    return quiz;
   }
 
   async findAll(
@@ -598,15 +976,20 @@ export class QuizzesService {
             title: true,
             status: true,
             paperKind: true,
+            difficulty: true,
             submittedAt: true,
             totalMarks: true,
             createdAt: true,
             publishedAt: true,
+            dueAt: true,
             sectionId: true,
             subjectId: true,
             createdById: true,
+            examConfigId: true,
             subject: { select: { id: true, name: true } },
-            section: { select: { id: true, name: true } },
+            section: { select: { id: true, name: true, grade: { select: { id: true, name: true } } } },
+            examConfig: { select: { id: true, name: true, startDate: true } },
+            createdBy: { select: { firstName: true, lastName: true } },
             _count: { select: { questions: true, assignments: true } },
           },
         }),
@@ -624,6 +1007,8 @@ export class QuizzesService {
         questions: { include: { options: true }, orderBy: { order: 'asc' } },
         subject: true,
         section: { include: { grade: { select: { id: true, name: true } } } },
+        school: { select: { id: true, name: true } },
+        examConfig: { select: { id: true, name: true, startDate: true, endDate: true } },
         assignments: true,
         createdBy: { select: { firstName: true, lastName: true } },
       },

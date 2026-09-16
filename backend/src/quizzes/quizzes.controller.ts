@@ -4,8 +4,11 @@ import { QuizStatus, RoleName } from '@prisma/client';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { QuizzesService } from './quizzes.service';
 import {
+  AddQuizQuestionDto,
   GenerateQuizDto,
   PublishQuizDto,
+  RejectExamPaperDto,
+  SubmitExamPaperDto,
   SubmitQuizDto,
   UpdateQuizQuestionsDto,
 } from './dto/quiz.dto';
@@ -62,6 +65,16 @@ export class QuizzesController {
   }
 
   @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)
+  @Post(':id/questions')
+  addQuestion(
+    @Param('id') id: string,
+    @Body() dto: AddQuizQuestionDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.quizzesService.addQuestion(id, dto, user);
+  }
+
+  @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)
   @Patch(':id/questions')
   updateQuestions(
     @Param('id') id: string,
@@ -83,8 +96,28 @@ export class QuizzesController {
 
   @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)
   @Post(':id/submit-paper')
-  submitPaper(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.quizzesService.submitForPrint(id, user);
+  submitPaper(
+    @Param('id') id: string,
+    @Body() dto: SubmitExamPaperDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.quizzesService.submitForPrint(id, user, dto);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @Post(':id/approve-paper')
+  approvePaper(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.quizzesService.approvePaper(id, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @Post(':id/reject-paper')
+  rejectPaper(
+    @Param('id') id: string,
+    @Body() dto: RejectExamPaperDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.quizzesService.rejectPaper(id, dto.reason, user);
   }
 
   @Roles(RoleName.PARENT)

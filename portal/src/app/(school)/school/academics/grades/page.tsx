@@ -2,8 +2,8 @@
 
 import { PageLoader } from "@/components/layout/page-loader";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -58,6 +58,7 @@ const schema = z
 type FormValues = z.infer<typeof schema>;
 
 export default function ClassesPage() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -183,12 +184,19 @@ export default function ClassesPage() {
             </TableHeader>
             <TableBody>
               {classes.data.items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">
-                    <Link href={`/school/academics/grades/${item.id}`} className="hover:underline">
-                      {item.name}
-                    </Link>
-                  </TableCell>
+                <TableRow
+                  key={item.id}
+                  className="cursor-pointer"
+                  tabIndex={0}
+                  onClick={() => router.push(`/school/academics/grades/${item.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      router.push(`/school/academics/grades/${item.id}`);
+                    }
+                  }}
+                >
+                  <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell>{item.stage?.name ?? "—"}</TableCell>
                   <TableCell>
                     {item.sections?.length ? (
