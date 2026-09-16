@@ -41,6 +41,10 @@ Optional variable: `HAWKNEXA_DEPLOY_URL` (default `https://hawknexabackend.fynal
 
 Vercel auto-deploy is disabled; production deploys go through this workflow only.
 
+**How auto-deploy works:** push to `main` → GitHub Actions POSTs to `/internal/deploy` → VPS runs `deploy.sh` (git pull + docker rebuild) → Actions polls `/internal/deploy/status` until the new commit is live.
+
+You should **not** need to SSH and run `deploy.sh` manually after this is set up. If deploys stop updating production, check **Actions → Deploy HawkNexa VPS** and `/tmp/hawknexa-deploy.log` on the VPS.
+
 Manual deploy on the server:
 
 ```bash

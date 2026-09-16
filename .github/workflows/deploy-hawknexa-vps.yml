@@ -46,8 +46,6 @@ jobs:
             echo "::error::Deploy webhook is not healthy (HTTP ${webhook_code})."
             echo "On the VPS (Hostinger browser terminal) run:"
             echo "  bash /opt/apps/hawknexa/deploy/recover-deploy-webhook.sh"
-            echo "Or if that script is missing:"
-            echo "  cd /opt/apps/hawknexa/deploy && docker compose -f docker-compose.prod.yml up -d --build deploy-webhook caddy"
             exit 1
           fi
 
@@ -55,7 +53,6 @@ jobs:
         env:
           DEPLOY_URL: ${{ vars.HAWKNEXA_DEPLOY_URL || 'https://hawknexabackend.fynals.com/internal/deploy' }}
           DEPLOY_SECRET: ${{ env.DEPLOY_SECRET }}
-          HEALTH_URL: ${{ vars.HAWKNEXA_HEALTH_URL || 'https://hawknexabackend.fynals.com/api/v1/health' }}
         run: |
           set -euo pipefail
           echo "POST ${DEPLOY_URL}"
@@ -67,7 +64,7 @@ jobs:
           echo "HTTP ${http_code}"
           cat deploy-response.txt
           if [ "${http_code}" = "502" ] || [ "${http_code}" = "503" ]; then
-            echo "::error::Deploy webhook returned ${http_code}. SSH/Hostinger console: cd /opt/apps/hawknexa/deploy && docker compose -f docker-compose.prod.yml up -d --build deploy-webhook"
+            echo "::error::Deploy webhook returned ${http_code}."
             exit 1
           fi
           if [ "${http_code}" != "202" ] && [ "${http_code}" != "200" ]; then
@@ -76,27 +73,37 @@ jobs:
 
       - name: Wait for VPS deploy to finish
         env:
+          STATUS_URL: ${{ vars.HAWKNEXA_DEPLOY_STATUS_URL || 'https://hawknexabackend.fynals.com/internal/deploy/status' }}
           HEALTH_URL: ${{ vars.HAWKNEXA_HEALTH_URL || 'https://hawknexabackend.fynals.com/api/v1/health' }}
+          DEPLOY_SECRET: ${{ env.DEPLOY_SECRET }}
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           short_sha="$(echo "${EXPECTED_SHA}" | cut -c1-7)"
           echo "Waiting for VPS deploy (commit ${short_sha})..."
           for i in $(seq 1 60); do
-            body="$(curl -fsS "${HEALTH_URL}" 2>/dev/null || true)"
-            if [ -n "${body}" ]; then
-              echo "${body}"
-              if echo "${body}" | grep -q "\"commit\":\"${short_sha}\""; then
-                echo "OK: deployed ${short_sha}"
+            status_body="$(curl -fsS -H "Authorization: Bearer ${DEPLOY_SECRET}" "${STATUS_URL}" 2>/dev/null || true)"
+            if [ -n "${status_body}" ]; then
+              echo "${status_body}"
+              if echo "${status_body}" | grep -q '"status":"success"' \
+                && echo "${status_body}" | grep -q "\"commit\":\"${short_sha}\""; then
+                echo "OK: deploy status success for ${short_sha}"
                 exit 0
               fi
-              if echo "${body}" | grep -q '"status":"ok"' && [ "${i}" -ge 42 ]; then
-                echo "::warning::API is up but commit ${short_sha} not reported yet (older backend image may still be running)."
-                exit 0
+              if echo "${status_body}" | grep -q '"status":"failed"'; then
+                echo "::error::VPS deploy failed. Check /tmp/hawknexa-deploy.log on the server."
+                exit 1
               fi
             fi
+
+            health_body="$(curl -fsS "${HEALTH_URL}" 2>/dev/null || true)"
+            if [ -n "${health_body}" ] && echo "${health_body}" | grep -q "\"commit\":\"${short_sha}\""; then
+              echo "OK: API health reports ${short_sha}"
+              exit 0
+            fi
+
             echo "Waiting for deploy... (${i}/60)"
             sleep 10
           done
-          echo "::error::Deploy did not complete within 10 minutes: ${HEALTH_URL}"
+          echo "::error::Deploy did not complete within 10 minutes."
           exit 1

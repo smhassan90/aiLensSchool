@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """HTTPS deploy webhook — triggered by GitHub Actions over port 443 (no inbound SSH)."""
 import hmac
+import json
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 SECRET = os.environ.get("DEPLOY_WEBHOOK_SECRET", "")
@@ -14,18 +16,43 @@ LISTEN_HOST = os.environ.get("DEPLOY_WEBHOOK_HOST", "0.0.0.0")
 LISTEN_PORT = int(os.environ.get("DEPLOY_WEBHOOK_PORT", "9000"))
 PID_FILE = "/tmp/hawknexa-deploy.pid"
 LOG_FILE = "/tmp/hawknexa-deploy.log"
+STATUS_FILE = f"{DEPLOY_DIR}/.last-deploy.json"
 DEPLOY_CONTAINER = "hawknexa-deploy-run"
 
 
-def deploy_running() -> bool:
-    if os.path.exists(PID_FILE):
-        try:
-            pid = int(open(PID_FILE, encoding="utf-8").read().strip())
-            os.kill(pid, 0)
-            return True
-        except (OSError, ValueError):
-            pass
+def utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
+
+def write_status(payload: dict) -> None:
+    payload.setdefault("updatedAt", utc_now())
+    with open(STATUS_FILE, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle)
+        handle.write("\n")
+
+
+def read_status() -> dict:
+    if not os.path.isfile(STATUS_FILE):
+        return {"status": "idle"}
+    try:
+        with open(STATUS_FILE, encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return {"status": "unknown"}
+
+
+def log_tail(max_lines: int = 40) -> str:
+    if not os.path.isfile(LOG_FILE):
+        return ""
+    try:
+        with open(LOG_FILE, encoding="utf-8", errors="replace") as handle:
+            lines = handle.readlines()
+        return "".join(lines[-max_lines:])
+    except OSError:
+        return ""
+
+
+def deploy_running() -> bool:
     inspect = subprocess.run(
         ["docker", "inspect", "-f", "{{.State.Running}}", DEPLOY_CONTAINER],
         capture_output=True,
@@ -34,10 +61,18 @@ def deploy_running() -> bool:
     return inspect.returncode == 0 and inspect.stdout.strip() == "true"
 
 
-def start_deploy():
+def start_deploy() -> subprocess.Popen:
     """Run deploy.sh in a separate container so restarting deploy-webhook does not kill it."""
+    subprocess.run(
+        ["docker", "rm", "-f", DEPLOY_CONTAINER],
+        capture_output=True,
+        text=True,
+    )
+
+    write_status({"status": "running", "startedAt": utc_now()})
+
     log = open(LOG_FILE, "a", encoding="utf-8")
-    log.write("\n=== Deploy triggered ===\n")
+    log.write(f"\n=== Deploy triggered at {utc_now()} ===\n")
     log.flush()
 
     env_file = f"{DEPLOY_DIR}/.env"
@@ -80,6 +115,21 @@ class DeployHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         sys.stderr.write("%s - - [%s] %s\n" % (self.address_string(), self.log_date_time_string(), fmt % args))
 
+    def _authorized(self) -> bool:
+        if not SECRET:
+            return False
+        auth = self.headers.get("Authorization", "")
+        token = auth[7:].strip() if auth.startswith("Bearer ") else ""
+        return bool(token) and hmac.compare_digest(token, SECRET)
+
+    def _send_json(self, code: int, payload: dict) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         if self.path in ("/internal/deploy/health", "/health"):
             self.send_response(200)
@@ -87,6 +137,27 @@ class DeployHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"ok")
             return
+
+        if self.path == "/internal/deploy/status":
+            if not self._authorized():
+                self.send_error(401)
+                return
+            status = read_status()
+            running = deploy_running()
+            if running and status.get("status") != "running":
+                status = {**status, "status": "running"}
+            if not running and status.get("status") == "running":
+                status = {**status, "status": "failed", "message": "Deploy container stopped unexpectedly"}
+            self._send_json(
+                200,
+                {
+                    **status,
+                    "running": running,
+                    "logTail": log_tail(),
+                },
+            )
+            return
+
         self.send_error(404)
 
     def do_POST(self):
@@ -98,9 +169,7 @@ class DeployHandler(BaseHTTPRequestHandler):
             self.send_error(500, "DEPLOY_WEBHOOK_SECRET not configured")
             return
 
-        auth = self.headers.get("Authorization", "")
-        token = auth[7:].strip() if auth.startswith("Bearer ") else ""
-        if not token or not hmac.compare_digest(token, SECRET):
+        if not self._authorized():
             self.send_error(401)
             return
 
@@ -111,9 +180,6 @@ class DeployHandler(BaseHTTPRequestHandler):
             return
 
         proc = start_deploy()
-        if proc is None:
-            self.send_error(500, "Could not start deploy")
-            return
 
         with open(PID_FILE, "w", encoding="utf-8") as pid_file:
             pid_file.write(str(proc.pid))
