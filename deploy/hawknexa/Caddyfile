@@ -1,21 +1,21 @@
-# Hostinger VPS hostname — Caddy obtains a Let's Encrypt certificate automatically.
-srv1984496.hstgr.cloud {
+# Portal (school admin, teacher, super admin)
+hawknexa.fynals.com {
 	encode gzip
-
-	handle /api/* {
-		reverse_proxy backend:3001
-	}
-
-	handle /uploads/* {
-		reverse_proxy backend:3001
-	}
-
-	handle {
-		reverse_proxy portal:3000
-	}
+	reverse_proxy portal:3000
 }
 
-# Redirect bare IP HTTP visitors to the HTTPS hostname.
+# API (NestJS — /api/v1, /uploads, /api/docs)
+hawknexabackend.fynals.com {
+	encode gzip
+	reverse_proxy backend:3001
+}
+
+# Legacy Hostinger hostname → new portal domain
+srv1984496.hstgr.cloud {
+	redir https://hawknexa.fynals.com{uri} permanent
+}
+
+# Bare IP → portal
 http://187.53.141.109 {
-	redir https://srv1984496.hstgr.cloud{uri} permanent
+	redir https://hawknexa.fynals.com{uri} permanent
 }

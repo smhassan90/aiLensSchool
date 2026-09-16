@@ -6,7 +6,7 @@ REPO_DIR="/opt/apps/hawknexa/repo"
 DEPLOY_DIR="/opt/apps/hawknexa/deploy"
 COMPOSE_FILE="${DEPLOY_DIR}/docker-compose.prod.yml"
 BRANCH="${DEPLOY_BRANCH:-main}"
-HEALTH_URL="${DEPLOY_HEALTH_URL:-https://srv1984496.hstgr.cloud/api/v1/health}"
+HEALTH_URL="${DEPLOY_HEALTH_URL:-https://hawknexabackend.fynals.com/api/v1/health}"
 
 if [[ ! -d "${REPO_DIR}/.git" ]]; then
   echo "ERROR: git repo not found at ${REPO_DIR}" >&2

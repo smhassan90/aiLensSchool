@@ -20,6 +20,18 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     steps:
+      - name: Check required secrets
+        env:
+          HAWKNEXA_VPS_HOST: ${{ secrets.HAWKNEXA_VPS_HOST }}
+          HAWKNEXA_VPS_USER: ${{ secrets.HAWKNEXA_VPS_USER }}
+          HAWKNEXA_VPS_SSH_KEY: ${{ secrets.HAWKNEXA_VPS_SSH_KEY }}
+        run: |
+          missing=0
+          [ -n "$HAWKNEXA_VPS_HOST" ] || { echo "::error::Missing repository secret: HAWKNEXA_VPS_HOST"; missing=1; }
+          [ -n "$HAWKNEXA_VPS_USER" ] || { echo "::error::Missing repository secret: HAWKNEXA_VPS_USER"; missing=1; }
+          [ -n "$HAWKNEXA_VPS_SSH_KEY" ] || { echo "::error::Missing repository secret: HAWKNEXA_VPS_SSH_KEY"; missing=1; }
+          [ "$missing" -eq 0 ] || exit 1
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
         with:

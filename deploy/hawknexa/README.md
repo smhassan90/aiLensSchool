@@ -21,15 +21,29 @@ Script: `stage1-2-server-prep.sh`
 
 ## GitHub Actions auto-deploy (push to `main`)
 
-Add these **repository secrets** in GitHub → Settings → Secrets and variables → Actions:
+Workflow: `.github/workflows/deploy-hawknexa-vps.yml`
+
+**Triggers:** push to `main` when `backend/`, `portal/`, or `deploy/hawknexa/` changes. You can also run it manually from **Actions → Deploy HawkNexa VPS → Run workflow**.
+
+### One-time: add repository secrets
+
+GitHub → **Settings → Secrets and variables → Actions → New repository secret**
 
 | Secret | Value |
 |--------|--------|
-| `HAWKNEXA_VPS_HOST` | VPS IP or hostname, e.g. `187.53.141.109` |
+| `HAWKNEXA_VPS_HOST` | `187.53.141.109` |
 | `HAWKNEXA_VPS_USER` | `root` |
-| `HAWKNEXA_VPS_SSH_KEY` | Private SSH key (read-only deploy key for Actions) |
+| `HAWKNEXA_VPS_SSH_KEY` | Full private key file (created during setup as `hawknexa_github_actions` on your PC). Copy **every line** including `-----BEGIN OPENSSH PRIVATE KEY-----` and `-----END OPENSSH PRIVATE KEY-----`. |
 
-Workflow: `.github/workflows/deploy-hawknexa-vps.yml` — runs on push to `main` when `backend/`, `portal/`, or `deploy/hawknexa/` changes.
+On Windows, open the key in Notepad:
+
+```powershell
+notepad $env:USERPROFILE\.ssh\hawknexa_github_actions
+```
+
+The matching public key must be in `/root/.ssh/authorized_keys` on the VPS (label: `hawknexa-github-actions`).
+
+Vercel auto-deploy is disabled; production deploys go through this workflow only.
 
 Manual deploy on the server:
 
