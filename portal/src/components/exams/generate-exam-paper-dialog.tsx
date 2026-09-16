@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils";
+import type { ExamPaperQuestionSpec } from "@/lib/exam-paper-question-spec";
 
 export type GenerateExamPaperFormValues = {
   examConfigId?: string;
@@ -64,6 +65,7 @@ function QuestionMixRow({
   marks,
   onCount,
   onMarks,
+  locked = false,
 }: {
   label: string;
   countId: string;
@@ -72,6 +74,7 @@ function QuestionMixRow({
   marks: number;
   onCount: (value: number) => void;
   onMarks: (value: number) => void;
+  locked?: boolean;
 }) {
   return (
     <div className="grid grid-cols-[1fr_5.5rem_5.5rem] items-end gap-3 border-b border-border/70 py-3 last:border-0 last:pb-0">
@@ -86,6 +89,7 @@ function QuestionMixRow({
           min={0}
           max={40}
           value={count}
+          disabled={locked}
           onChange={(e) => onCount(Math.max(0, Number(e.target.value) || 0))}
           className="h-9"
         />
@@ -98,6 +102,7 @@ function QuestionMixRow({
           min={0}
           max={200}
           value={marks}
+          disabled={locked}
           onChange={(e) => onMarks(Math.max(0, Number(e.target.value) || 0))}
           className="h-9"
         />
@@ -113,6 +118,7 @@ type AssignmentInfo = {
   subjectName: string;
   maxMarks: number;
   submissionDueAt: string;
+  questionSpec?: ExamPaperQuestionSpec | null;
 };
 
 type GenerateExamPaperDialogProps = {
@@ -161,6 +167,7 @@ export function GenerateExamPaperDialog({
   const shortAnswerMarks = watch("shortAnswerMarks");
   const longAnswerMarks = watch("longAnswerMarks");
   const requiredMarks = assignment?.maxMarks;
+  const specLocked = Boolean(assignment?.questionSpec);
   const totals = {
     questions:
       Number(mcqCount) + Number(fillBlankCount) + Number(trueFalseCount) + Number(shortAnswerCount) + Number(longAnswerCount),
@@ -208,6 +215,11 @@ export function GenerateExamPaperDialog({
                       <p className="mt-1 text-muted-foreground">
                         Submit by {formatDate(assignment.submissionDueAt)} · {assignment.maxMarks} marks required
                       </p>
+                      {assignment.questionSpec ? (
+                        <p className="mt-2 text-xs text-amber-900">
+                          Office requirements: {assignment.questionSpec.mcqCount} MCQ · {assignment.questionSpec.fillBlankCount} fill-in · {assignment.questionSpec.trueFalseCount} T/F · {assignment.questionSpec.shortAnswerCount} short · {assignment.questionSpec.longAnswerCount} long
+                        </p>
+                      ) : null}
                     </div>
                   ) : (
                     <>
@@ -324,7 +336,14 @@ export function GenerateExamPaperDialog({
               </section>
 
               <section className="space-y-3 rounded-xl border bg-card p-4">
-                <h3 className="text-sm font-semibold text-foreground">Question mix</h3>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Question mix</h3>
+                  {specLocked ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Counts and section marks are set by the office and cannot be changed.
+                    </p>
+                  ) : null}
+                </div>
                 <div className="hidden grid-cols-[1fr_5.5rem_5.5rem] gap-3 px-0 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground sm:grid">
                   <span>Type</span>
                   <span>Questions</span>
@@ -336,6 +355,7 @@ export function GenerateExamPaperDialog({
                   marksId="mcqMarks"
                   count={mcqCount}
                   marks={mcqMarks}
+                  locked={specLocked}
                   onCount={(value) => setValue("mcqCount", value, { shouldValidate: true })}
                   onMarks={(value) => setValue("mcqMarks", value, { shouldValidate: true })}
                 />
@@ -345,6 +365,7 @@ export function GenerateExamPaperDialog({
                   marksId="fillBlankMarks"
                   count={fillBlankCount}
                   marks={fillBlankMarks}
+                  locked={specLocked}
                   onCount={(value) => setValue("fillBlankCount", value, { shouldValidate: true })}
                   onMarks={(value) => setValue("fillBlankMarks", value, { shouldValidate: true })}
                 />
@@ -354,6 +375,7 @@ export function GenerateExamPaperDialog({
                   marksId="trueFalseMarks"
                   count={trueFalseCount}
                   marks={trueFalseMarks}
+                  locked={specLocked}
                   onCount={(value) => setValue("trueFalseCount", value, { shouldValidate: true })}
                   onMarks={(value) => setValue("trueFalseMarks", value, { shouldValidate: true })}
                 />
@@ -363,6 +385,7 @@ export function GenerateExamPaperDialog({
                   marksId="shortAnswerMarks"
                   count={shortAnswerCount}
                   marks={shortAnswerMarks}
+                  locked={specLocked}
                   onCount={(value) => setValue("shortAnswerCount", value, { shouldValidate: true })}
                   onMarks={(value) => setValue("shortAnswerMarks", value, { shouldValidate: true })}
                 />
@@ -372,6 +395,7 @@ export function GenerateExamPaperDialog({
                   marksId="longAnswerMarks"
                   count={longAnswerCount}
                   marks={longAnswerMarks}
+                  locked={specLocked}
                   onCount={(value) => setValue("longAnswerCount", value, { shouldValidate: true })}
                   onMarks={(value) => setValue("longAnswerMarks", value, { shouldValidate: true })}
                 />

@@ -1,4 +1,5 @@
 import { apiClient, buildQuery } from "@/lib/api-client";
+import type { ExamPaperQuestionSpec } from "@/lib/exam-paper-question-spec";
 import type {
   AcademicYear,
   ClassSubject,
@@ -298,6 +299,7 @@ export const academicsService = {
           teacherId: string | null;
           maxMarks: number;
           submissionDueAt: string;
+          questionSpec: ExamPaperQuestionSpec | null;
           releasedAt: string | null;
         } | null;
       }>;
@@ -307,6 +309,7 @@ export const academicsService = {
   saveExamPaperAssignments(payload: {
     examConfigId: string;
     release?: boolean;
+    questionSpec?: ExamPaperQuestionSpec | null;
     rows: Array<{
       sectionId: string;
       subjectId: string;
@@ -336,6 +339,7 @@ export const academicsService = {
         subjectName: string;
         maxMarks: number;
         submissionDueAt: string;
+        questionSpec: ExamPaperQuestionSpec | null;
         releasedAt: string | null;
         status: string;
         quizId: string | null;
@@ -400,8 +404,11 @@ export const academicsService = {
     }>>("/academics/quiz-targets");
   },
 
-  saveQuizTarget(payload: { gradeId: string; subjectId: string; minQuizzes: number }) {
-    return apiClient("/academics/quiz-targets", { method: "POST", body: JSON.stringify(payload) });
+  saveQuizTarget(payload: { gradeId?: string; subjectId?: string; minQuizzes: number }) {
+    return apiClient<{ minQuizzes: number; gradeCount: number; subjectCount: number; savedCount: number }>(
+      "/academics/quiz-targets",
+      { method: "POST", body: JSON.stringify(payload) },
+    );
   },
 
   addAssessment(payload: {

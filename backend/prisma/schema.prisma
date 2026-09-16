@@ -168,6 +168,7 @@ enum NotificationType {
   QUIZ_PUBLISHED
   QUIZ_REMINDER
   QUIZ_RESULT
+  EXAM_PAPER_ASSIGNED
   ANNOUNCEMENT
   EVENT
   FEE_REMINDER
@@ -2130,6 +2131,7 @@ model ExamPaperAssignment {
   teacherId       String?   @map("teacher_id")
   maxMarks        Int       @map("max_marks")
   submissionDueAt DateTime  @map("submission_due_at")
+  questionSpec    Json?     @map("question_spec")
   releasedAt      DateTime? @map("released_at")
   assignedById    String    @map("assigned_by_id")
   createdAt       DateTime  @default(now()) @map("created_at")

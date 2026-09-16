@@ -45,4 +45,27 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleDestroy() {
     await this.$disconnect();
   }
+
+  /** Retry once after reconnecting when MySQL drops an idle connection. */
+  async withReconnect<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (!this.isConnectionError(error)) throw error;
+      await this.$disconnect();
+      await this.$connect();
+      return await operation();
+    }
+  }
+
+  private isConnectionError(error: unknown): boolean {
+    if (!(error instanceof Error)) return false;
+    const message = error.message.toLowerCase();
+    return (
+      message.includes('server has closed the connection') ||
+      message.includes('connection lost') ||
+      message.includes('econnreset') ||
+      message.includes("can't reach database server")
+    );
+  }
 }

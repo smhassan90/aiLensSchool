@@ -64,7 +64,7 @@ export default function TeacherDashboardPage() {
               {data?.examPaperPendingCount} exam paper{(data?.examPaperPendingCount ?? 0) === 1 ? "" : "s"} still to generate and submit
             </p>
             <p className="mt-0.5 text-sm text-amber-900/80">
-              Open exam papers to see what the office assigned and prepare them before the due date.
+              Open exam papers to generate your paper with the required question mix and submit it before the due date.
             </p>
           </div>
         </Link>

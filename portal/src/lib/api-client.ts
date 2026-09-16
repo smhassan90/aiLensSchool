@@ -1,9 +1,9 @@
 import type { ApiErrorBody, ApiResponse } from "./types";
 import { clearAuthSession } from "./auth";
 
-const PRODUCTION_API_URL = "https://ai-school-lens-backend.vercel.app/api/v1";
+const PRODUCTION_API_URL = "https://hawknexabackend.fynals.com/api/v1";
 const LOCAL_API_URL = "http://localhost:3001/api/v1";
-const PRODUCTION_ORIGIN = "https://ai-school-lens-backend.vercel.app";
+const PRODUCTION_ORIGIN = "https://hawknexabackend.fynals.com";
 
 /**
  * Call the hosted API (or local Nest when NEXT_PUBLIC_USE_LOCAL_API=true).
@@ -23,10 +23,7 @@ export function getApiOrigin(): string {
 
 /** Long jobs (photo extract) call the Nest host directly so the portal rewrite cannot 504. */
 function getDirectApiUrl(): string {
-  if (process.env.NEXT_PUBLIC_USE_LOCAL_API === "true") {
-    return (process.env.NEXT_PUBLIC_API_URL || LOCAL_API_URL).replace(/\/$/, "");
-  }
-  return PRODUCTION_API_URL;
+  return getApiUrl();
 }
 
 export function assetUrl(path?: string | null): string | null {

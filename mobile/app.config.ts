@@ -43,6 +43,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     typedRoutes: true,
   },
   extra: {
-    apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'https://ai-school-lens-backend.vercel.app/api/v1',
+    apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'https://hawknexabackend.fynals.com/api/v1',
   },
 });

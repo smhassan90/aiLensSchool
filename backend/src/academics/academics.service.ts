@@ -4,7 +4,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EnrollmentStatus, ExamPaperReviewStatus, Prisma, QuizStatus } from '@prisma/client';
+import {
+  EnrollmentStatus,
+  ExamPaperReviewStatus,
+  NotificationType,
+  Prisma,
+  QuizStatus,
+} from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
@@ -25,6 +31,11 @@ import { examsForPattern, normalizeExamPapers } from './exam-patterns';
 import { positiveAmount, syncClassFeeStructures } from '../fees/class-fees';
 import { EXAM_PAPER_KINDS } from '../quizzes/exam-paper';
 import { teacherDisplayName } from '../common/utils/person-name';
+import {
+  ExamPaperQuestionSpec,
+  parseQuestionSpec,
+  validateQuestionSpec,
+} from './exam-paper-question-spec';
 
 @Injectable()
 export class AcademicsService {
@@ -905,13 +916,82 @@ export class AcademicsService {
     });
   }
 
-  async upsertQuizTarget(user: AuthUser, dto: { gradeId: string; subjectId: string; minQuizzes: number }) {
+  async upsertQuizTarget(
+    user: AuthUser,
+    dto: { gradeId?: string; subjectId?: string; minQuizzes: number },
+  ) {
+    return this.prisma.withReconnect(() => this.upsertQuizTargetInternal(user, dto));
+  }
+
+  private async upsertQuizTargetInternal(
+    user: AuthUser,
+    dto: { gradeId?: string; subjectId?: string; minQuizzes: number },
+  ) {
     const schoolId = this.tenant.requireSchoolId(user);
-    return this.prisma.quizTarget.upsert({
-      where: { gradeId_subjectId: { gradeId: dto.gradeId, subjectId: dto.subjectId } },
-      create: { schoolId, ...dto },
-      update: { minQuizzes: dto.minQuizzes },
-    });
+    if (!dto.minQuizzes || dto.minQuizzes < 1) {
+      throw new BadRequestException({
+        code: 'INVALID_QUIZ_TARGET',
+        message: 'Weekly quiz target must be at least 1',
+      });
+    }
+
+    const grades = dto.gradeId
+      ? await this.prisma.grade.findMany({
+          where: { id: dto.gradeId, schoolId },
+          select: { id: true },
+        })
+      : await this.prisma.grade.findMany({
+          where: { schoolId },
+          select: { id: true },
+        });
+    if (!grades.length) {
+      throw new BadRequestException({
+        code: 'NO_GRADES',
+        message: 'Add grades before setting a weekly quiz target',
+      });
+    }
+
+    const subjects = dto.subjectId
+      ? await this.prisma.subject.findMany({
+          where: { id: dto.subjectId, schoolId },
+          select: { id: true },
+        })
+      : await this.prisma.subject.findMany({
+          where: { schoolId },
+          select: { id: true },
+        });
+    if (!subjects.length) {
+      throw new BadRequestException({
+        code: 'NO_SUBJECTS',
+        message: 'Add subjects before setting a weekly quiz target',
+      });
+    }
+
+    const pairs = grades.flatMap((grade) =>
+      subjects.map((subject) => ({ gradeId: grade.id, subjectId: subject.id })),
+    );
+
+    const saved = await this.prisma.$transaction(
+      pairs.map(({ gradeId, subjectId }) =>
+        this.prisma.quizTarget.upsert({
+          where: { gradeId_subjectId: { gradeId, subjectId } },
+          create: {
+            schoolId,
+            gradeId,
+            subjectId,
+            minQuizzes: dto.minQuizzes,
+          },
+          update: { minQuizzes: dto.minQuizzes },
+        }),
+      ),
+    );
+
+    return {
+      minQuizzes: dto.minQuizzes,
+      gradeCount: grades.length,
+      subjectCount: subjects.length,
+      savedCount: saved.length,
+    };
   }
 
   listQuizTargets(user: AuthUser) {
@@ -1578,6 +1658,7 @@ export class AcademicsService {
                 teacherId: assignment.teacherId,
                 maxMarks: assignment.maxMarks,
                 submissionDueAt: assignment.submissionDueAt.toISOString(),
+                questionSpec: parseQuestionSpec(assignment.questionSpec),
                 releasedAt: assignment.releasedAt?.toISOString() ?? null,
               }
             : null,
@@ -1591,12 +1672,34 @@ export class AcademicsService {
     body: {
       examConfigId: string;
       release?: boolean;
+      questionSpec?: ExamPaperQuestionSpec | null;
       rows: Array<{
         sectionId: string;
         subjectId: string;
         teacherId?: string | null;
         maxMarks: number;
         submissionDueAt: string;
+        questionSpec?: ExamPaperQuestionSpec | null;
+        enabled?: boolean;
+      }>;
+    },
+  ) {
+    return this.prisma.withReconnect(() => this.saveExamPaperAssignmentsInternal(user, body));
+  }
+
+  private async saveExamPaperAssignmentsInternal(
+    user: AuthUser,
+    body: {
+      examConfigId: string;
+      release?: boolean;
+      questionSpec?: ExamPaperQuestionSpec | null;
+      rows: Array<{
+        sectionId: string;
+        subjectId: string;
+        teacherId?: string | null;
+        maxMarks: number;
+        submissionDueAt: string;
+        questionSpec?: ExamPaperQuestionSpec | null;
         enabled?: boolean;
       }>;
     },
@@ -1604,7 +1707,7 @@ export class AcademicsService {
     const schoolId = this.tenant.requireSchoolId(user);
     const exam = await this.prisma.examConfig.findFirst({
       where: { id: body.examConfigId, schoolId },
-      select: { id: true, academicYearId: true },
+      select: { id: true, name: true, academicYearId: true },
     });
     if (!exam) {
       throw new NotFoundException({ code: 'EXAM_NOT_FOUND', message: 'Exam not found' });
@@ -1614,89 +1717,169 @@ export class AcademicsService {
     if (!enabledRows.length) {
       throw new BadRequestException({
         code: 'NO_ASSIGNMENTS',
-        message: 'Select at least one class and subject to assign',
+        message: 'No class-subject rows to assign. Make sure teachers are assigned to classes first.',
       });
     }
 
     const releasedAt = body.release ? new Date() : null;
-    const results = await this.prisma.$transaction(async (tx) => {
-      const saved: string[] = [];
-      for (const row of enabledRows) {
-        if (!row.maxMarks || row.maxMarks < 1) {
-          throw new BadRequestException({
-            code: 'INVALID_MAX_MARKS',
-            message: 'Each assignment needs total marks of at least 1',
-          });
-        }
-        const due = new Date(row.submissionDueAt);
-        if (Number.isNaN(due.getTime())) {
-          throw new BadRequestException({
-            code: 'INVALID_DUE_DATE',
-            message: 'Enter a valid submission due date for each assignment',
-          });
-        }
+    const notifyRows: Array<{
+      teacherUserId: string;
+      className: string;
+      subjectName: string;
+      maxMarks: number;
+      submissionDueAt: Date;
+      assignmentId: string;
+    }> = [];
 
-        const classSubject = await tx.classSubject.findFirst({
-          where: {
-            sectionId: row.sectionId,
-            subjectId: row.subjectId,
-            academicYearId: exam.academicYearId,
-            section: { schoolId },
-          },
-          select: { teacherId: true },
-        });
-        if (!classSubject) {
-          throw new BadRequestException({
-            code: 'CLASS_SUBJECT_NOT_FOUND',
-            message: 'Class and subject combination was not found',
-          });
-        }
-
-        const teacherId = row.teacherId ?? classSubject.teacherId;
-        const existing = await tx.examPaperAssignment.findUnique({
-          where: {
-            examConfigId_sectionId_subjectId: {
-              examConfigId: body.examConfigId,
-              sectionId: row.sectionId,
-              subjectId: row.subjectId,
-            },
-          },
-        });
-
-        const data = {
-          schoolId,
-          examConfigId: body.examConfigId,
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        academicYearId: exam.academicYearId,
+        section: { schoolId },
+        OR: enabledRows.map((row) => ({
           sectionId: row.sectionId,
           subjectId: row.subjectId,
-          teacherId,
-          maxMarks: row.maxMarks,
-          submissionDueAt: due,
-          assignedById: user.id,
-          ...(releasedAt && !existing?.releasedAt ? { releasedAt } : {}),
-          ...(releasedAt && existing && !existing.releasedAt ? { releasedAt } : {}),
-        };
-
-        const record = existing
-          ? await tx.examPaperAssignment.update({
-              where: { id: existing.id },
-              data: {
-                teacherId: data.teacherId,
-                maxMarks: data.maxMarks,
-                submissionDueAt: data.submissionDueAt,
-                assignedById: data.assignedById,
-                ...(data.releasedAt ? { releasedAt: data.releasedAt } : {}),
-              },
-            })
-          : await tx.examPaperAssignment.create({
-              data: {
-                ...data,
-                releasedAt: releasedAt,
-              },
-            });
-        saved.push(record.id);
-      }
-      return saved;
+        })),
+      },
+      select: {
+        sectionId: true,
+        subjectId: true,
+        teacherId: true,
+        section: { select: { name: true, grade: { select: { name: true } } } },
+        subject: { select: { name: true } },
+        teacher: { select: { userId: true } },
+      },
     });
+    const classSubjectByKey = new Map(
+      classSubjects.map((row) => [`${row.sectionId}:${row.subjectId}`, row]),
+    );
+
+    const existingAssignments = await this.prisma.examPaperAssignment.findMany({
+      where: { examConfigId: body.examConfigId, schoolId },
+      select: { id: true, sectionId: true, subjectId: true, releasedAt: true },
+    });
+    const existingByKey = new Map(
+      existingAssignments.map((row) => [`${row.sectionId}:${row.subjectId}`, row]),
+    );
+
+    const results = await this.prisma.$transaction(
+      async (tx) => {
+        const saved: string[] = [];
+        for (const row of enabledRows) {
+          if (!row.maxMarks || row.maxMarks < 1) {
+            throw new BadRequestException({
+              code: 'INVALID_MAX_MARKS',
+              message: 'Each assignment needs total marks of at least 1',
+            });
+          }
+          const due = new Date(row.submissionDueAt);
+          if (Number.isNaN(due.getTime())) {
+            throw new BadRequestException({
+              code: 'INVALID_DUE_DATE',
+              message: 'Enter a valid submission due date for each assignment',
+            });
+          }
+
+          const questionSpec = row.questionSpec ?? body.questionSpec ?? null;
+          if (body.release && !questionSpec) {
+            throw new BadRequestException({
+              code: 'QUESTION_SPEC_REQUIRED',
+              message: 'Set question requirements before releasing to teachers',
+            });
+          }
+          if (questionSpec) {
+            const specError = validateQuestionSpec(questionSpec, row.maxMarks);
+            if (specError) {
+              throw new BadRequestException({
+                code: 'INVALID_QUESTION_SPEC',
+                message: specError,
+              });
+            }
+          }
+
+          const key = `${row.sectionId}:${row.subjectId}`;
+          const classSubject = classSubjectByKey.get(key);
+          if (!classSubject) {
+            throw new BadRequestException({
+              code: 'CLASS_SUBJECT_NOT_FOUND',
+              message: 'Class and subject combination was not found',
+            });
+          }
+
+          const teacherId = row.teacherId ?? classSubject.teacherId;
+          const existing = existingByKey.get(key);
+
+          const data = {
+            schoolId,
+            examConfigId: body.examConfigId,
+            sectionId: row.sectionId,
+            subjectId: row.subjectId,
+            teacherId,
+            maxMarks: row.maxMarks,
+            submissionDueAt: due,
+            questionSpec: questionSpec ? (questionSpec as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+            assignedById: user.id,
+            ...(releasedAt && !existing?.releasedAt ? { releasedAt } : {}),
+          };
+
+          const record = existing
+            ? await tx.examPaperAssignment.update({
+                where: { id: existing.id },
+                data: {
+                  teacherId: data.teacherId,
+                  maxMarks: data.maxMarks,
+                  submissionDueAt: data.submissionDueAt,
+                  questionSpec: data.questionSpec,
+                  assignedById: data.assignedById,
+                  ...(data.releasedAt ? { releasedAt: data.releasedAt } : {}),
+                },
+              })
+            : await tx.examPaperAssignment.create({
+                data: {
+                  ...data,
+                  releasedAt: releasedAt,
+                },
+              });
+          saved.push(record.id);
+
+          if (releasedAt && classSubject.teacher?.userId) {
+            notifyRows.push({
+              teacherUserId: classSubject.teacher.userId,
+              className: `${classSubject.section.grade.name} ${classSubject.section.name}`,
+              subjectName: classSubject.subject.name,
+              maxMarks: row.maxMarks,
+              submissionDueAt: due,
+              assignmentId: record.id,
+            });
+          }
+        }
+        return saved;
+      },
+      { timeout: 120_000 },
+    );
+
+    if (notifyRows.length) {
+      const dueFormatter = new Intl.DateTimeFormat('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+      const now = new Date();
+      await this.prisma.notification.createMany({
+        data: notifyRows.map((row) => ({
+          schoolId,
+          userId: row.teacherUserId,
+          type: NotificationType.EXAM_PAPER_ASSIGNED,
+          title: `${exam.name} paper assigned`,
+          body: `${row.className} · ${row.subjectName} · ${row.maxMarks} marks · submit by ${dueFormatter.format(row.submissionDueAt)}`,
+          deepLink: '/teacher/exams',
+          data: {
+            examPaperAssignmentId: row.assignmentId,
+            examName: exam.name,
+          } as Prisma.InputJsonValue,
+          sentAt: now,
+        })),
+      });
+    }
 
     await this.audit.log({
       actorUserId: user.id,
@@ -1806,6 +1989,7 @@ export class AcademicsService {
             subjectName: row.subject.name,
             maxMarks: row.maxMarks,
             submissionDueAt: row.submissionDueAt.toISOString(),
+            questionSpec: parseQuestionSpec(row.questionSpec),
             releasedAt: row.releasedAt?.toISOString() ?? null,
             status: !latestQuiz
               ? 'NOT_STARTED'

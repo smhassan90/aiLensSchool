@@ -4,6 +4,6 @@
   "installCommand": "npm install --include=dev",
   "buildCommand": "npm run build",
   "env": {
-    "NEXT_PUBLIC_API_URL": "https://ai-school-lens-backend.vercel.app/api/v1"
+    "NEXT_PUBLIC_API_URL": "https://hawknexabackend.fynals.com/api/v1"
   }
 }

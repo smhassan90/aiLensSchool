@@ -23,9 +23,8 @@ export default function ExamsPage() {
   const [submissionDaysBefore, setSubmissionDaysBefore] = useState(5);
   const [assignExamId, setAssignExamId] = useState("");
   const years = useQuery({ queryKey: ["years"], queryFn: () => academicsService.listYears({ limit: 20 }) });
-  const grades = useQuery({ queryKey: ["grades"], queryFn: () => academicsService.listGrades({ limit: 50 }) });
-  const subjects = useQuery({ queryKey: ["subjects"], queryFn: () => academicsService.listSubjects({ limit: 100 }) });
   const targets = useQuery({ queryKey: ["quiz-targets"], queryFn: () => academicsService.listQuizTargets() });
+  const [weeklyQuizTarget, setWeeklyQuizTarget] = useState(2);
   const configs = useQuery({
     queryKey: ["exam-configs", yearId],
     queryFn: () => academicsService.listExamConfigs(yearId),
@@ -48,6 +47,15 @@ export default function ExamsPage() {
       setSubmissionDaysBefore(examSettings.data.examSubmissionDaysBefore);
     }
   }, [examSettings.data?.examSubmissionDaysBefore]);
+
+  useEffect(() => {
+    const values = (targets.data ?? []).map((row) => row.minQuizzes);
+    if (!values.length) return;
+    const first = values[0];
+    if (values.every((value) => value === first)) {
+      setWeeklyQuizTarget(first);
+    }
+  }, [targets.data]);
 
   useEffect(() => {
     if (!yearId || configs.isFetching) return;
@@ -80,16 +88,16 @@ export default function ExamsPage() {
   });
 
   const saveTarget = useMutation({
-    mutationFn: (form: HTMLFormElement) => {
-      const data = new FormData(form);
-      return academicsService.saveQuizTarget({
-        gradeId: String(data.get("gradeId")),
-        subjectId: String(data.get("subjectId")),
-        minQuizzes: Number(data.get("minQuizzes") || 4),
-      });
-    },
+    mutationFn: () =>
+      academicsService.saveQuizTarget({
+        minQuizzes: weeklyQuizTarget,
+      }),
     onSuccess: () => {
-      toast({ title: "Quiz minimum saved", variant: "success" });
+      toast({
+        title: "Weekly quiz target saved",
+        description: `${weeklyQuizTarget} quiz${weeklyQuizTarget === 1 ? "" : "zes"} per week for all classes.`,
+        variant: "success",
+      });
       queryClient.invalidateQueries({ queryKey: ["quiz-targets"] });
     },
     onError: (err: Error) => toast({ title: "Could not save", description: err.message, variant: "error" }),
@@ -149,18 +157,30 @@ export default function ExamsPage() {
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardHeader><CardTitle>Assign exam papers to teachers</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              value={assignExamId}
-              onChange={(e) => setAssignExamId(e.target.value)}
-            >
-              <option value="">Choose exam to assign</option>
-              {(configs.data ?? []).map((exam) => (
-                <option key={exam.id} value={exam.id}>{exam.name}</option>
-              ))}
-            </select>
+          <CardHeader className="space-y-1">
+            <CardTitle>Apply exam</CardTitle>
+            <p className="text-sm font-normal text-muted-foreground">
+              Choose an exam and set the due date for exam paper submission. It applies to all classes and all subjects.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="assignExamId">Exam to apply</Label>
+              <select
+                id="assignExamId"
+                className="h-10 w-full max-w-md rounded-md border bg-background px-3 text-sm"
+                value={assignExamId}
+                onChange={(e) => setAssignExamId(e.target.value)}
+              >
+                <option value="">Choose an exam</option>
+                {(configs.data ?? []).map((exam) => (
+                  <option key={exam.id} value={exam.id}>
+                    {exam.name} · {exam.maxMarks} marks
+                    {exam.startDate ? ` · ${exam.startDate.slice(0, 10)}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
             <ExamPaperAssignmentsEditor
               examConfigId={assignExamId}
               examName={(configs.data ?? []).find((exam) => exam.id === assignExamId)?.name ?? "Exam"}
@@ -171,37 +191,41 @@ export default function ExamsPage() {
 
         {can("SET_QUIZ_TARGETS") && (
           <Card>
-            <CardHeader><CardTitle>Minimum quizzes</CardTitle></CardHeader>
+            <CardHeader className="space-y-1">
+              <CardTitle>Weekly quiz target</CardTitle>
+              <p className="text-sm font-normal text-muted-foreground">
+                Set how many quizzes teachers should publish each week.
+              </p>
+            </CardHeader>
             <CardContent>
               <form
                 onSubmit={(e: FormEvent<HTMLFormElement>) => {
                   e.preventDefault();
-                  saveTarget.mutate(e.currentTarget);
+                  saveTarget.mutate();
                 }}
                 className="space-y-3"
               >
-                <select name="gradeId" required className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                  <option value="">Class</option>
-                  {(grades.data?.items ?? []).map((grade) => (
-                    <option key={grade.id} value={grade.id}>{grade.name}</option>
-                  ))}
-                </select>
-                <select name="subjectId" required className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                  <option value="">Subject</option>
-                  {(subjects.data?.items ?? []).map((subject) => (
-                    <option key={subject.id} value={subject.id}>{subject.name}</option>
-                  ))}
-                </select>
-                <label className="text-sm">At least how many?<input name="minQuizzes" type="number" min={1} defaultValue={4} className="mt-1 h-10 w-full rounded-md border px-3" /></label>
-                <Button type="submit">Save minimum</Button>
+                <div className="space-y-2">
+                  <Label htmlFor="minQuizzes">Quizzes per week</Label>
+                  <p className="text-xs text-muted-foreground">Applies to all classes.</p>
+                  <Input
+                    id="minQuizzes"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={weeklyQuizTarget}
+                    onChange={(e) => setWeeklyQuizTarget(Math.max(1, Number(e.target.value) || 1))}
+                  />
+                </div>
+                <Button type="submit" disabled={saveTarget.isPending}>
+                  {saveTarget.isPending ? "Saving…" : "Save target"}
+                </Button>
               </form>
-              <div className="mt-4 space-y-2 text-sm">
-                {(targets.data ?? []).map((row) => (
-                  <p key={row.id} className="rounded-md border px-3 py-2">
-                    {row.grade?.name} · {row.subject?.name} · {row.minQuizzes} quizzes
-                  </p>
-                ))}
-              </div>
+              {(targets.data ?? []).length ? (
+                <p className="mt-4 rounded-md border px-3 py-2 text-sm">
+                  All classes: {weeklyQuizTarget} {weeklyQuizTarget === 1 ? "quiz" : "quizzes"}/week
+                </p>
+              ) : null}
             </CardContent>
           </Card>
         )}

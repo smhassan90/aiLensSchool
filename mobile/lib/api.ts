@@ -5,7 +5,7 @@ import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/lib/s
 export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ??
   (Constants.expoConfig?.extra?.apiUrl as string | undefined) ??
-  'https://ai-school-lens-backend.vercel.app/api/v1';
+  'https://hawknexabackend.fynals.com/api/v1';
 
 export class ApiError extends Error {
   status: number;

@@ -31,6 +31,10 @@ import {
 import { examPaperLabel, EXAM_PAPER_KINDS, isExamPaperKind } from './exam-paper';
 import { paperKindFromExamName } from './exam-config-map';
 import { normalizeGeneratedQuestion, sectionLabelForQuestionType } from '../ai/quiz-mix';
+import {
+  parseQuestionSpec,
+  validatePaperAgainstSpec,
+} from '../academics/exam-paper-question-spec';
 
 @Injectable()
 export class QuizzesService {
@@ -659,8 +663,8 @@ export class QuizzesService {
         status: true,
         paperKind: true,
         examPaperAssignmentId: true,
-        examPaperAssignment: { select: { maxMarks: true } },
-        questions: { select: { id: true, included: true, marks: true } },
+        examPaperAssignment: { select: { maxMarks: true, questionSpec: true } },
+        questions: { select: { id: true, included: true, marks: true, type: true } },
       },
     });
     if (!quiz) {
@@ -717,6 +721,27 @@ export class QuizzesService {
         message: `Total marks must be exactly ${requiredMarks}. Your paper is ${totalMarks}. Adjust question marks before submitting.`,
       });
     }
+
+    const questionSpec = parseQuestionSpec(quiz.examPaperAssignment?.questionSpec);
+    if (questionSpec) {
+      const includedQuestions = (dto.questions ?? quiz.questions).map((q) => {
+        const current = owned.get(q.id);
+        const marks = q.marks ?? current?.marks ?? 0;
+        return {
+          type: current!.type,
+          marks: typeof marks === 'number' ? marks : Number(marks),
+          included: q.included ?? current?.included ?? false,
+        };
+      });
+      const specError = validatePaperAgainstSpec(includedQuestions, questionSpec);
+      if (specError) {
+        throw new BadRequestException({
+          code: 'EXAM_SPEC_MISMATCH',
+          message: specError,
+        });
+      }
+    }
+
     const submittedAt = new Date();
 
     await this.prisma.$transaction(async (tx) => {

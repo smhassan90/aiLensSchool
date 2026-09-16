@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Receipt,
   Settings2,
+  Trophy,
   UserSquare2,
   Wallet,
 } from "lucide-react";
@@ -52,6 +53,7 @@ const mainNav: Array<{
   { href: "/school/dashboard", label: "Dashboard", icon: LayoutDashboard, permission: "VIEW_DASHBOARD" },
   { href: "/school/students", label: "Students", icon: GraduationCap },
   { href: "/school/teachers", label: "Teachers", icon: UserSquare2 },
+  { href: "/school/exams", label: "Exams", icon: Trophy, permission: "MANAGE_EXAMS" },
   { href: "/school/submitted-exam-papers", label: "Exam papers", icon: FileText },
   { href: "/school/fees", label: "Collect fees", icon: Wallet, permission: "VIEW_FINANCE" },
   { href: "/school/expenses", label: "Salaries & bills", icon: Receipt, permission: "MANAGE_EXPENSES" },

@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS exam_paper_assignments (
   teacher_id CHAR(36) NULL,
   max_marks INT NOT NULL,
   submission_due_at DATETIME(3) NOT NULL,
+  question_spec JSON NULL,
   released_at DATETIME(3) NULL,
   assigned_by_id CHAR(36) NOT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

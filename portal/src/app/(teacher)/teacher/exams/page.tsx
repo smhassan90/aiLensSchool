@@ -29,6 +29,7 @@ import { ApiClientError } from "@/lib/api-client";
 import { examPaperLabel, examStatusLabel } from "@/lib/exam-paper";
 import { difficultyColorClass, difficultyLabel } from "@/lib/difficulty";
 import { formatDate } from "@/lib/utils";
+import { defaultQuestionSpec } from "@/lib/exam-paper-question-spec";
 import { AlertTriangle, FileText, Plus } from "lucide-react";
 
 const schema = z
@@ -198,11 +199,22 @@ export default function TeacherExamsPage() {
   const openForAssignment = (assignmentId: string) => {
     const row = assignments.data?.assignments.find((item) => item.id === assignmentId);
     if (!row) return;
+    const spec = row.questionSpec ?? defaultQuestionSpec;
     setActiveAssignmentId(assignmentId);
     form.reset({
       ...defaultValues,
       classKey: `${row.sectionId}:${row.subjectId}`,
       examConfigId: row.examConfigId,
+      mcqCount: spec.mcqCount,
+      fillBlankCount: spec.fillBlankCount,
+      trueFalseCount: spec.trueFalseCount,
+      shortAnswerCount: spec.shortAnswerCount,
+      longAnswerCount: spec.longAnswerCount,
+      mcqMarks: spec.mcqMarks,
+      fillBlankMarks: spec.fillBlankMarks,
+      trueFalseMarks: spec.trueFalseMarks,
+      shortAnswerMarks: spec.shortAnswerMarks,
+      longAnswerMarks: spec.longAnswerMarks,
     });
     setOpen(true);
   };
@@ -248,6 +260,9 @@ export default function TeacherExamsPage() {
                   <p className="font-medium">{row.examName}</p>
                   <p className="text-sm text-muted-foreground">
                     {row.className} · {row.subjectName} · {row.maxMarks} marks · submit by {formatDate(row.submissionDueAt)}
+                    {row.questionSpec
+                      ? ` · ${row.questionSpec.mcqCount} MCQ, ${row.questionSpec.fillBlankCount} fill-in, ${row.questionSpec.trueFalseCount} T/F, ${row.questionSpec.shortAnswerCount} short, ${row.questionSpec.longAnswerCount} long`
+                      : ""}
                   </p>
                   {row.status === "REJECTED" && row.rejectionReason ? (
                     <p className="mt-1 text-sm text-amber-800">Office note: {row.rejectionReason}</p>
@@ -400,6 +415,7 @@ export default function TeacherExamsPage() {
                 subjectName: activeAssignment.subjectName,
                 maxMarks: activeAssignment.maxMarks,
                 submissionDueAt: activeAssignment.submissionDueAt,
+                questionSpec: activeAssignment.questionSpec,
               }
             : null
         }

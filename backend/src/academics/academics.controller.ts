@@ -209,7 +209,7 @@ export class AcademicsController {
   @RequirePermission('SET_QUIZ_TARGETS')
   @Post('quiz-targets')
   upsertQuizTarget(
-    @Body() body: { gradeId: string; subjectId: string; minQuizzes: number },
+    @Body() body: { gradeId?: string; subjectId?: string; minQuizzes: number },
     @CurrentUser() user: AuthUser,
   ) {
     return this.academicsService.upsertQuizTarget(user, body);
@@ -266,6 +266,18 @@ export class AcademicsController {
     body: {
       examConfigId: string;
       release?: boolean;
+      questionSpec?: {
+        mcqCount: number;
+        fillBlankCount: number;
+        trueFalseCount: number;
+        shortAnswerCount: number;
+        longAnswerCount: number;
+        mcqMarks: number;
+        fillBlankMarks: number;
+        trueFalseMarks: number;
+        shortAnswerMarks: number;
+        longAnswerMarks: number;
+      } | null;
       rows: Array<{
         sectionId: string;
         subjectId: string;
