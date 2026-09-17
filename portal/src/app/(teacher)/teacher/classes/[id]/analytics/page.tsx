@@ -61,7 +61,7 @@ export default function TeacherClassAnalyticsPage() {
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Card><CardHeader><CardTitle className="text-sm">Students</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data.enrollment.total}</CardContent></Card>
         <Card><CardHeader><CardTitle className="text-sm">Attendance</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data.attendance.rate}%</CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm">Quiz average</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data.quizzes.average}%</CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-sm">Quiz & assessment average</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{data.quizzes.average}%</CardContent></Card>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -78,7 +78,7 @@ export default function TeacherClassAnalyticsPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle>Quizzes</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Quizzes & assessments</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             {data.quizzes.items.map((quiz) => (
               <div key={quiz.id} className="flex justify-between">

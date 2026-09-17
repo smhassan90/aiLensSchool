@@ -326,7 +326,7 @@ export class InsightsService {
     });
     const studentIds = enrollments.map((e) => e.studentId);
 
-    const [attendance, results, fees, quizzes] = await Promise.all([
+    const [attendance, results, fees, quizzes, assessmentMarks] = await Promise.all([
       this.prisma.attendance.findMany({
         where: { schoolId, ...(sectionIds.length ? { sectionId: { in: sectionIds } } : {}) },
         orderBy: { date: 'asc' },
@@ -346,6 +346,18 @@ export class InsightsService {
         include: { subject: true, results: true },
         orderBy: { createdAt: 'desc' },
         take: 12,
+      }),
+      this.prisma.assessmentMark.findMany({
+        where: {
+          schoolId,
+          sectionId: { in: sectionIds.length ? sectionIds : ['none'] },
+          examConfigId: { not: null },
+        },
+        include: {
+          examConfig: { select: { id: true, name: true } },
+          subject: { select: { name: true } },
+        },
+        orderBy: { assessedAt: 'desc' },
       }),
     ]);
 
@@ -374,6 +386,50 @@ export class InsightsService {
 
     const billed = fees.reduce((sum, f) => sum + Number(f.amount), 0);
     const collected = fees.reduce((sum, f) => sum + Number(f.paidAmount), 0);
+    const assessmentItems = new Map<
+      string,
+      { id: string; title: string; subject: string; scores: number[] }
+    >();
+    for (const mark of assessmentMarks) {
+      if (!mark.examConfig) continue;
+      const key = `${mark.examConfig.id}:${mark.subjectId}`;
+      const item = assessmentItems.get(key) ?? {
+        id: `assessment-${key}`,
+        title: mark.examConfig.name,
+        subject: mark.subject.name,
+        scores: [],
+      };
+      item.scores.push((Number(mark.marks) / Number(mark.maxMarks)) * 100);
+      assessmentItems.set(key, item);
+    }
+    const assessmentQuizItems = [...assessmentItems.values()].map((item) => ({
+      id: item.id,
+      title: item.title,
+      subject: item.subject,
+      status: 'ASSESSMENT',
+      attempted: item.scores.length,
+      average: Number((item.scores.reduce((a, b) => a + b, 0) / item.scores.length).toFixed(1)),
+      highest: Number(Math.max(...item.scores).toFixed(1)),
+      lowest: Number(Math.min(...item.scores).toFixed(1)),
+    }));
+    const quizItems = [
+      ...quizzes.map((quiz) => {
+        const scores = quiz.results.map((r) => Number(r.percentage));
+        return {
+          id: quiz.id,
+          title: quiz.title,
+          subject: quiz.subject.name,
+          status: quiz.status,
+          attempted: scores.length,
+          average: scores.length
+            ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1))
+            : 0,
+          highest: scores.length ? Math.max(...scores) : 0,
+          lowest: scores.length ? Math.min(...scores) : 0,
+        };
+      }),
+      ...assessmentQuizItems,
+    ];
 
     const sectionStats = sections.map((section) => {
       const sectionStudents = enrollments.filter((e) => e.sectionId === section.id);
@@ -406,22 +462,19 @@ export class InsightsService {
         trend: [...attendanceByDate.entries()].map(([date, value]) => ({ date, ...value })),
       },
       quizzes: {
-        average: results.length
-          ? Number((results.reduce((sum, r) => sum + Number(r.percentage), 0) / results.length).toFixed(1))
+        average: results.length + assessmentMarks.length
+          ? Number(
+              (
+                (results.reduce((sum, r) => sum + Number(r.percentage), 0) +
+                  assessmentMarks.reduce(
+                    (sum, mark) => sum + (Number(mark.marks) / Number(mark.maxMarks)) * 100,
+                    0,
+                  )) /
+                (results.length + assessmentMarks.length)
+              ).toFixed(1),
+            )
           : 0,
-        items: quizzes.map((quiz) => {
-          const scores = quiz.results.map((r) => Number(r.percentage));
-          return {
-            id: quiz.id,
-            title: quiz.title,
-            subject: quiz.subject.name,
-            status: quiz.status,
-            attempted: scores.length,
-            average: scores.length ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)) : 0,
-            highest: scores.length ? Math.max(...scores) : 0,
-            lowest: scores.length ? Math.min(...scores) : 0,
-          };
-        }),
+        items: quizItems,
       },
       subjects: [...subjectAverages.entries()].map(([name, value]) => ({
         name,
