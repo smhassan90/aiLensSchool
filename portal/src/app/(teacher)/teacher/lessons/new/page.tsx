@@ -30,19 +30,12 @@ function isImageFile(file: File) {
   return IMAGE_EXT.test(file.name);
 }
 
-function optionalPage(value: string) {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
-
 export default function NewLessonPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [photos, setPhotos] = useState<File[]>([]);
   const [classKey, setClassKey] = useState("");
   const [date, setDate] = useState(() => localDateISO());
-  const [pageFrom, setPageFrom] = useState("");
-  const [pageTo, setPageTo] = useState("");
   const [formError, setFormError] = useState("");
 
   const previews = useMemo(
@@ -87,8 +80,6 @@ export default function NewLessonPage() {
         subjectId: selectedClass.subjectId,
         branchId: selectedClass.branchId,
         date,
-        pageFrom: optionalPage(pageFrom),
-        pageTo: optionalPage(pageTo),
         pageText: pageText || undefined,
         pages,
       });
@@ -207,17 +198,6 @@ export default function NewLessonPage() {
             <div className="space-y-2">
               <Label htmlFor="date">Date</Label>
               <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="pageFrom">Page from (optional)</Label>
-                <Input id="pageFrom" type="number" min={1} value={pageFrom} onChange={(e) => setPageFrom(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pageTo">Page to (optional)</Label>
-                <Input id="pageTo" type="number" min={1} value={pageTo} onChange={(e) => setPageTo(e.target.value)} />
-              </div>
             </div>
 
             <div className="space-y-2">
