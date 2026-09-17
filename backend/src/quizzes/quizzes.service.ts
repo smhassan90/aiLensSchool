@@ -31,10 +31,7 @@ import {
 import { examPaperLabel, EXAM_PAPER_KINDS, isExamPaperKind } from './exam-paper';
 import { paperKindFromExamName } from './exam-config-map';
 import { normalizeGeneratedQuestion, sectionLabelForQuestionType } from '../ai/quiz-mix';
-import {
-  parseQuestionSpec,
-  validatePaperAgainstSpec,
-} from '../academics/exam-paper-question-spec';
+import { deadlineBlockedMessage, isDeadlineOpen } from '../academics/exam-deadlines';
 
 @Injectable()
 export class QuizzesService {
@@ -63,6 +60,7 @@ export class QuizzesService {
       id: string;
       maxMarks: number;
       submissionDueAt: Date;
+      paperSubmissionUnlockedUntil: Date | null;
       examConfigId: string;
       sectionId: string;
       subjectId: string;
@@ -105,6 +103,7 @@ export class QuizzesService {
           id: true,
           maxMarks: true,
           submissionDueAt: true,
+          paperSubmissionUnlockedUntil: true,
           examConfigId: true,
           sectionId: true,
           subjectId: true,
@@ -126,6 +125,17 @@ export class QuizzesService {
         throw new ForbiddenException({
           code: 'EXAM_ASSIGNMENT_NOT_YOURS',
           message: 'This exam was not assigned to you',
+        });
+      }
+      if (
+        !isDeadlineOpen(
+          examPaperAssignment.submissionDueAt,
+          examPaperAssignment.paperSubmissionUnlockedUntil,
+        )
+      ) {
+        throw new BadRequestException({
+          code: 'EXAM_PAPER_DEADLINE_PASSED',
+          message: deadlineBlockedMessage('paper'),
         });
       }
       dto.sectionId = examPaperAssignment.sectionId;
@@ -663,7 +673,7 @@ export class QuizzesService {
         status: true,
         paperKind: true,
         examPaperAssignmentId: true,
-        examPaperAssignment: { select: { maxMarks: true, questionSpec: true } },
+        examPaperAssignment: { select: { maxMarks: true } },
         questions: { select: { id: true, included: true, marks: true, type: true } },
       },
     });
@@ -720,26 +730,6 @@ export class QuizzesService {
         code: 'EXAM_MARKS_MISMATCH',
         message: `Total marks must be exactly ${requiredMarks}. Your paper is ${totalMarks}. Adjust question marks before submitting.`,
       });
-    }
-
-    const questionSpec = parseQuestionSpec(quiz.examPaperAssignment?.questionSpec);
-    if (questionSpec) {
-      const includedQuestions = (dto.questions ?? quiz.questions).map((q) => {
-        const current = owned.get(q.id);
-        const marks = q.marks ?? current?.marks ?? 0;
-        return {
-          type: current!.type,
-          marks: typeof marks === 'number' ? marks : Number(marks),
-          included: q.included ?? current?.included ?? false,
-        };
-      });
-      const specError = validatePaperAgainstSpec(includedQuestions, questionSpec);
-      if (specError) {
-        throw new BadRequestException({
-          code: 'EXAM_SPEC_MISMATCH',
-          message: specError,
-        });
-      }
     }
 
     const submittedAt = new Date();
@@ -1001,6 +991,8 @@ export class QuizzesService {
             title: true,
             status: true,
             paperKind: true,
+            reviewStatus: true,
+            rejectionReason: true,
             difficulty: true,
             submittedAt: true,
             totalMarks: true,
@@ -1034,6 +1026,7 @@ export class QuizzesService {
         section: { include: { grade: { select: { id: true, name: true } } } },
         school: { select: { id: true, name: true } },
         examConfig: { select: { id: true, name: true, startDate: true, endDate: true } },
+        examPaperAssignment: { select: { maxMarks: true } },
         assignments: true,
         createdBy: { select: { firstName: true, lastName: true } },
       },

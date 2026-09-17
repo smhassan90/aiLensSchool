@@ -61,7 +61,7 @@ def deploy_running() -> bool:
     return inspect.returncode == 0 and inspect.stdout.strip() == "true"
 
 
-def start_deploy() -> subprocess.Popen:
+def start_deploy(deploy_targets: str = "") -> subprocess.Popen:
     """Run deploy.sh in a separate container so restarting deploy-webhook does not kill it."""
     subprocess.run(
         ["docker", "rm", "-f", DEPLOY_CONTAINER],
@@ -85,6 +85,8 @@ def start_deploy() -> subprocess.Popen:
     ]
     if os.path.isfile(env_file):
         cmd += ["--env-file", env_file]
+    if deploy_targets:
+        cmd += ["-e", f"DEPLOY_TARGETS={deploy_targets}"]
     cmd += [
         "-v",
         "/opt/apps/hawknexa:/opt/apps/hawknexa",
@@ -179,7 +181,21 @@ class DeployHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"Deploy already in progress")
             return
 
-        proc = start_deploy()
+        deploy_targets = ""
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        if length > 0:
+            raw = self.rfile.read(length)
+            try:
+                payload = json.loads(raw.decode("utf-8"))
+                targets = payload.get("targets")
+                if isinstance(targets, list):
+                    deploy_targets = ",".join(str(t) for t in targets if t)
+                elif isinstance(targets, str) and targets.strip():
+                    deploy_targets = targets.strip()
+            except (UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+                pass
+
+        proc = start_deploy(deploy_targets)
 
         with open(PID_FILE, "w", encoding="utf-8") as pid_file:
             pid_file.write(str(proc.pid))

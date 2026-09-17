@@ -19,6 +19,14 @@ export function localDateISOPlusDays(days: number, from = new Date()): string {
   return localDateISO(date);
 }
 
+/** Format marks with at most one decimal place (fixes float display like 17.000000000000004). */
+export function formatMarks(value?: number | string | null): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0";
+  const rounded = Math.round(n * 10) / 10;
+  return rounded % 1 === 0 ? String(Math.round(rounded)) : rounded.toFixed(1);
+}
+
 export function formatDate(value?: string | Date | null): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;

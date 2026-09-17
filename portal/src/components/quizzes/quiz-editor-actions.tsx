@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiClientError } from "@/lib/api-client";
+import { formatMarks } from "@/lib/utils";
 import type { Quiz } from "@/lib/types";
 import { isExamPaper } from "@/lib/exam-paper";
 import { useToast } from "@/providers/toast-provider";
@@ -60,6 +61,11 @@ export function QuizEditorActions({
   const examPaper = isExamPaper(quiz.paperKind);
 
   const includedCount = quiz.questions?.filter((q) => q.included).length ?? 0;
+  const includedMarks =
+    quiz.questions?.reduce((sum, q) => sum + (q.included ? Number(q.marks) : 0), 0) ?? 0;
+  const requiredMarks = examPaper ? quiz.examPaperAssignment?.maxMarks : undefined;
+  const marksReady =
+    requiredMarks == null || Math.round(includedMarks * 100) === requiredMarks * 100;
 
   const saveDraft = useMutation({
     mutationFn: () => quizzesService.updateQuestions(quizId, questionPayload(quiz)),
@@ -123,6 +129,7 @@ export function QuizEditorActions({
       toast({ title: "Submitted to office", description: "The office will review and approve your paper.", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["teacher-dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["my-exam-paper-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["teacher-exam-papers"] });
       queryClient.invalidateQueries({ queryKey: ["quiz", quizId] });
       queryClient.invalidateQueries({ queryKey: listQueryKey });
       router.push(listHref);
@@ -142,6 +149,22 @@ export function QuizEditorActions({
 
   return (
     <>
+      {examPaper && requiredMarks != null ? (
+        <div
+          className={`mt-6 rounded-lg border px-4 py-3 text-sm ${
+            marksReady ? "border-border bg-muted/30" : "border-amber-300 bg-amber-50 text-amber-950"
+          }`}
+        >
+          <p className="font-medium">
+            Paper total: {formatMarks(includedMarks)} / {formatMarks(requiredMarks)} marks
+          </p>
+          {!marksReady ? (
+            <p className="mt-1">
+              Adjust included question marks until the total is exactly {requiredMarks} before submitting.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="mt-6 flex flex-wrap justify-end gap-3">
         <Button
           type="button"
@@ -154,7 +177,7 @@ export function QuizEditorActions({
         </Button>
         <Button
           type="button"
-          disabled={busy || includedCount === 0}
+          disabled={busy || includedCount === 0 || (examPaper && !marksReady)}
           onClick={() => {
             if (examPaper) {
               submitPaper.mutate();

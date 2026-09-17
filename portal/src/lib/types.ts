@@ -325,6 +325,8 @@ export interface Quiz {
   title: string;
   status: string;
   paperKind?: string;
+  reviewStatus?: string | null;
+  rejectionReason?: string | null;
   difficulty?: number | null;
   examConfigId?: string | null;
   submittedAt?: string | null;
@@ -335,6 +337,7 @@ export interface Quiz {
   questions?: QuizQuestion[];
   school?: { id: string; name: string } | null;
   examConfig?: { id: string; name: string; startDate?: string | null; endDate?: string | null } | null;
+  examPaperAssignment?: { maxMarks: number } | null;
   section?: { id: string; name: string; grade?: { id: string; name: string } | null };
   subject?: { id: string; name: string };
   createdBy?: { firstName: string; lastName: string } | null;

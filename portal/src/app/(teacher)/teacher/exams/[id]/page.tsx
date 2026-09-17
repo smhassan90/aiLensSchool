@@ -9,7 +9,8 @@ export default function TeacherExamDetailPage() {
     <QuizDetailView
       quizId={params.id}
       listHref="/teacher/exams"
-      listQueryKey={["teacher-exam-papers"]}
+      listQueryKey={["my-exam-paper-assignments"]}
+      variant="teacher"
     />
   );
 }

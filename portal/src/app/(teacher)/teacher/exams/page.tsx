@@ -1,36 +1,22 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
+import { ExamDeadlineRequestDialog } from "@/components/exams/exam-deadline-request-dialog";
+import type { TeacherExamAssignment } from "@/components/exams/teacher-exam-assignments";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
-import { PageLoader } from "@/components/layout/page-loader";
-import { EmptyState } from "@/components/layout/empty-state";
 import { GenerateExamPaperDialog } from "@/components/exams/generate-exam-paper-dialog";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { quizzesService } from "@/services/quizzes.service";
+import { TeacherExamAssignments } from "@/components/exams/teacher-exam-assignments";
 import { lessonsService } from "@/services/lessons.service";
 import { teachersService } from "@/services/teachers.service";
 import { academicsService } from "@/services/academics.service";
+import { quizzesService } from "@/services/quizzes.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
-import { examPaperLabel, examStatusLabel } from "@/lib/exam-paper";
-import { difficultyColorClass, difficultyLabel } from "@/lib/difficulty";
-import { formatDate } from "@/lib/utils";
-import { defaultQuestionSpec } from "@/lib/exam-paper-question-spec";
-import { AlertTriangle, FileText, Plus } from "lucide-react";
+import { buildQuestionSpecForMarks } from "@/lib/exam-paper-question-spec";
 
 const schema = z
   .object({
@@ -76,25 +62,15 @@ const defaultValues: FormValues = {
   longAnswerMarks: 8,
 };
 
-function assignmentStatusLabel(status: string) {
-  if (status === "NOT_STARTED") return "Not started";
-  if (status === "DRAFT") return "Draft";
-  if (status === "REJECTED") return "Rejected — revise";
-  if (status === "PENDING_REVIEW") return "Submitted";
-  if (status === "APPROVED") return "Approved";
-  return status;
-}
-
 export default function TeacherExamsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
+  const [extensionOpen, setExtensionOpen] = useState(false);
+  const [extensionAssignment, setExtensionAssignment] = useState<TeacherExamAssignment | null>(null);
+  const [extensionDays, setExtensionDays] = useState<"1" | "2" | "3">("1");
 
-  const papers = useQuery({
-    queryKey: ["teacher-exam-papers"],
-    queryFn: () => quizzesService.list({ limit: 50, paperKind: "EXAM" }),
-  });
   const assignments = useQuery({
     queryKey: ["my-exam-paper-assignments"],
     queryFn: () => academicsService.listMyExamPaperAssignments(),
@@ -179,7 +155,6 @@ export default function TeacherExamsPage() {
     },
     onSuccess: (paper) => {
       toast({ title: "Paper generated", description: "Review it, then submit for approval.", variant: "success" });
-      queryClient.invalidateQueries({ queryKey: ["teacher-exam-papers"] });
       queryClient.invalidateQueries({ queryKey: ["my-exam-paper-assignments"] });
       queryClient.invalidateQueries({ queryKey: ["teacher-dashboard"] });
       setOpen(false);
@@ -196,25 +171,63 @@ export default function TeacherExamsPage() {
     },
   });
 
+  const requestExtension = useMutation({
+    mutationFn: () => {
+      if (!extensionAssignment) throw new Error("No assignment selected");
+      return academicsService.requestExamDeadlineExtension({
+        assignmentId: extensionAssignment.id,
+        kind: "paper",
+        days: Number(extensionDays) as 1 | 2 | 3,
+      });
+    },
+    onSuccess: (res) => {
+      toast({
+        title: "Request sent to office",
+        description: `You asked for ${res.days} day${res.days === 1 ? "" : "s"} for ${res.examName} · ${res.className}.`,
+        variant: "success",
+      });
+      setExtensionOpen(false);
+      setExtensionAssignment(null);
+      queryClient.invalidateQueries({ queryKey: ["my-exam-paper-assignments"] });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not send request",
+        description: err instanceof ApiClientError ? err.message : (err as Error).message,
+        variant: "error",
+      });
+    },
+  });
+
   const openForAssignment = (assignmentId: string) => {
     const row = assignments.data?.assignments.find((item) => item.id === assignmentId);
     if (!row) return;
-    const spec = row.questionSpec ?? defaultQuestionSpec;
+    if (!row.paperSubmissionOpen && (row.status === "NOT_STARTED" || row.status === "DRAFT")) {
+      setExtensionAssignment(row);
+      setExtensionDays("1");
+      setExtensionOpen(true);
+      return;
+    }
+    if (row.quizId && row.status !== "NOT_STARTED") {
+      window.location.assign(`/teacher/exams/${row.quizId}`);
+      return;
+    }
+    const suggested = buildQuestionSpecForMarks(row.maxMarks);
     setActiveAssignmentId(assignmentId);
     form.reset({
       ...defaultValues,
       classKey: `${row.sectionId}:${row.subjectId}`,
       examConfigId: row.examConfigId,
-      mcqCount: spec.mcqCount,
-      fillBlankCount: spec.fillBlankCount,
-      trueFalseCount: spec.trueFalseCount,
-      shortAnswerCount: spec.shortAnswerCount,
-      longAnswerCount: spec.longAnswerCount,
-      mcqMarks: spec.mcqMarks,
-      fillBlankMarks: spec.fillBlankMarks,
-      trueFalseMarks: spec.trueFalseMarks,
-      shortAnswerMarks: spec.shortAnswerMarks,
-      longAnswerMarks: spec.longAnswerMarks,
+      mcqCount: suggested.mcqCount,
+      fillBlankCount: suggested.fillBlankCount,
+      trueFalseCount: suggested.trueFalseCount,
+      shortAnswerCount: suggested.shortAnswerCount,
+      longAnswerCount: suggested.longAnswerCount,
+      mcqMarks: suggested.mcqMarks,
+      fillBlankMarks: suggested.fillBlankMarks,
+      trueFalseMarks: suggested.trueFalseMarks,
+      shortAnswerMarks: suggested.shortAnswerMarks,
+      longAnswerMarks: suggested.longAnswerMarks,
     });
     setOpen(true);
   };
@@ -234,163 +247,35 @@ export default function TeacherExamsPage() {
     }
   };
 
-  const pendingAssignments = (assignments.data?.assignments ?? []).filter((row) => row.pendingGeneration);
-
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Exam papers"
-        description="The office assigns exams with marks and due dates. Generate only when an assignment appears below."
+        description="Papers are grouped by exam and sorted by class. Draft papers stay with you; after submit they go to the office for approval."
       />
 
-      {assignments.isLoading ? (
-        <PageLoader variant="panel" task="exams" />
-      ) : pendingAssignments.length ? (
-        <div className="mb-6 space-y-3">
-          <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
-            <AlertTriangle className="h-5 w-5 shrink-0" />
-            <p className="text-sm font-medium">
-              {pendingAssignments.length} exam paper{pendingAssignments.length === 1 ? "" : "s"} still to generate and submit
-            </p>
-          </div>
-          <div className="grid gap-3">
-            {pendingAssignments.map((row) => (
-              <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
-                <div>
-                  <p className="font-medium">{row.examName}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {row.className} · {row.subjectName} · {row.maxMarks} marks · submit by {formatDate(row.submissionDueAt)}
-                    {row.questionSpec
-                      ? ` · ${row.questionSpec.mcqCount} MCQ, ${row.questionSpec.fillBlankCount} fill-in, ${row.questionSpec.trueFalseCount} T/F, ${row.questionSpec.shortAnswerCount} short, ${row.questionSpec.longAnswerCount} long`
-                      : ""}
-                  </p>
-                  {row.status === "REJECTED" && row.rejectionReason ? (
-                    <p className="mt-1 text-sm text-amber-800">Office note: {row.rejectionReason}</p>
-                  ) : null}
-                </div>
-                <Button onClick={() => (row.quizId ? window.location.assign(`/teacher/exams/${row.quizId}`) : openForAssignment(row.id))}>
-                  {row.status === "DRAFT" || row.status === "REJECTED" ? "Continue draft" : "Generate paper"}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <p className="mb-6 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
-          No pending exam assignments right now. The office will release papers when it is time to prepare them.
-        </p>
-      )}
+      <TeacherExamAssignments
+        assignments={assignments.data?.assignments ?? []}
+        isLoading={assignments.isLoading}
+        onGenerate={openForAssignment}
+      />
 
-      <section className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">All assignments</h2>
-        <div className="rounded-lg border bg-card">
-          {!assignments.data?.assignments.length ? (
-            <EmptyState
-              icon={<FileText className="h-10 w-10" />}
-              title="No assignments yet"
-              description="When the office releases an exam for your class, it will show up here."
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Exam</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Due</TableHead>
-                  <TableHead>Marks</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {assignments.data.assignments.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium">{row.examName}</TableCell>
-                    <TableCell>{row.className} · {row.subjectName}</TableCell>
-                    <TableCell>{formatDate(row.submissionDueAt)}</TableCell>
-                    <TableCell>{row.maxMarks}</TableCell>
-                    <TableCell>
-                      <Badge variant={row.pendingGeneration ? "warning" : "success"}>
-                        {assignmentStatusLabel(row.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {row.quizId ? (
-                        <Link href={`/teacher/exams/${row.quizId}`}>
-                          <Button size="sm" variant="outline">Open</Button>
-                        </Link>
-                      ) : row.pendingGeneration ? (
-                        <Button size="sm" onClick={() => openForAssignment(row.id)}>Generate</Button>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Your papers</h2>
-        <div className="rounded-lg border bg-card">
-          {papers.isLoading ? (
-            <PageLoader variant="panel" task="exams" />
-          ) : !papers.data?.items.length ? (
-            <EmptyState
-              icon={<FileText className="h-10 w-10" />}
-              title="No exam papers yet"
-              description="Generate a paper from an assignment above when the office releases it."
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Paper</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Difficulty</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Marks</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {papers.data.items.map((paper) => (
-                  <TableRow key={paper.id}>
-                    <TableCell className="font-medium">
-                      {paper.title}
-                      <p className="text-xs text-muted-foreground">{examPaperLabel(paper.paperKind)}</p>
-                    </TableCell>
-                    <TableCell>
-                      {paper.subject?.name ?? "—"} {paper.section?.name ?? ""}
-                    </TableCell>
-                    <TableCell>
-                      {paper.difficulty ? (
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${difficultyColorClass(paper.difficulty)}`}>
-                          {difficultyLabel(paper.difficulty)}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={paper.status === "CLOSED" ? "success" : "warning"}>
-                        {examStatusLabel(paper.status, paper.paperKind)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{paper.totalMarks ?? "—"}</TableCell>
-                    <TableCell>
-                      <Link href={`/teacher/exams/${paper.id}`}>
-                        <Button size="sm" variant="outline">Open</Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-      </section>
+      <ExamDeadlineRequestDialog
+        open={extensionOpen}
+        onOpenChange={(next) => {
+          setExtensionOpen(next);
+          if (!next) setExtensionAssignment(null);
+        }}
+        title="Paper submission deadline has passed"
+        description={`${extensionAssignment?.examName ?? "Exam"} · ${extensionAssignment?.className ?? ""} · ${extensionAssignment?.subjectName ?? ""}`}
+        dueDate={extensionAssignment?.submissionDueAt}
+        days={extensionDays}
+        onDaysChange={setExtensionDays}
+        onConfirm={() => requestExtension.mutate()}
+        isPending={requestExtension.isPending}
+        pendingRequest={extensionAssignment?.paperExtensionRequest}
+        kind="paper"
+      />
 
       <GenerateExamPaperDialog
         open={open}
@@ -415,7 +300,6 @@ export default function TeacherExamsPage() {
                 subjectName: activeAssignment.subjectName,
                 maxMarks: activeAssignment.maxMarks,
                 submissionDueAt: activeAssignment.submissionDueAt,
-                questionSpec: activeAssignment.questionSpec,
               }
             : null
         }

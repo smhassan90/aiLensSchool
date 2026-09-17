@@ -34,7 +34,15 @@ import { ExamSolutionSheet } from "@/components/exams/exam-solution-sheet";
 
 import { quizzesService } from "@/services/quizzes.service";
 
-import { examPaperLabel, examStatusLabel, isExamPaper } from "@/lib/exam-paper";
+import {
+  canPrintTeacherExamPaper,
+  examPaperLabel,
+  examStatusLabel,
+  isExamPaper,
+  teacherExamPaperStatus,
+  teacherExamPaperStatusLabel,
+  teacherExamPaperStatusVariant,
+} from "@/lib/exam-paper";
 
 import { difficultyColorClass, difficultyDescription, difficultyLabel } from "@/lib/difficulty";
 
@@ -43,18 +51,13 @@ import { personFullName } from "@/lib/person-name";
 
 
 interface QuizDetailViewProps {
-
   quizId: string;
-
   listHref: string;
-
   listQueryKey: unknown[];
-
+  variant?: "teacher" | "admin";
 }
 
-
-
-export function QuizDetailView({ quizId, listHref, listQueryKey }: QuizDetailViewProps) {
+export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admin" }: QuizDetailViewProps) {
 
   const queryClient = useQueryClient();
 
@@ -155,8 +158,10 @@ export function QuizDetailView({ quizId, listHref, listQueryKey }: QuizDetailVie
   const includedCount = quiz.questions?.filter((q) => q.included).length ?? 0;
 
   const examPaper = isExamPaper(quiz.paperKind);
-
   const isDraft = quiz.status === "DRAFT";
+  const paperStatus = examPaper ? teacherExamPaperStatus(quiz) : null;
+  const canPrint = examPaper ? canPrintTeacherExamPaper(quiz) : false;
+  const isPending = paperStatus === "PENDING";
 
 
 
@@ -232,28 +237,17 @@ export function QuizDetailView({ quizId, listHref, listQueryKey }: QuizDetailVie
 
             <div className="flex flex-wrap gap-2">
 
-              {examPaper ? (
-
+              {examPaper && canPrint ? (
                 <>
-
                   <Button variant="outline" onClick={() => print(false)}>
-
                     <Printer className="h-4 w-4" />
-
                     Print paper
-
                   </Button>
-
                   <Button variant="outline" onClick={() => print(true)}>
-
                     <Printer className="h-4 w-4" />
-
                     Print answer key
-
                   </Button>
-
                 </>
-
               ) : null}
 
               <Link href={listHref}>
@@ -278,10 +272,20 @@ export function QuizDetailView({ quizId, listHref, listQueryKey }: QuizDetailVie
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
 
-          <Badge variant={quiz.status === "PUBLISHED" || quiz.status === "CLOSED" ? "success" : "warning"}>
-
-            {examPaper ? examStatusLabel(quiz.status, quiz.paperKind) : quiz.status}
-
+          <Badge
+            variant={
+              examPaper && paperStatus
+                ? teacherExamPaperStatusVariant(paperStatus)
+                : quiz.status === "PUBLISHED" || quiz.status === "CLOSED"
+                  ? "success"
+                  : "warning"
+            }
+          >
+            {examPaper && paperStatus
+              ? teacherExamPaperStatusLabel(paperStatus)
+              : examPaper
+                ? examStatusLabel(quiz.status, quiz.paperKind, quiz.reviewStatus)
+                : quiz.status}
           </Badge>
 
           {examPaper && quiz.difficulty ? (
@@ -309,13 +313,37 @@ export function QuizDetailView({ quizId, listHref, listQueryKey }: QuizDetailVie
           ) : null}
 
           <span className="text-sm text-muted-foreground">
-
             {includedCount} of {quiz.questions?.length ?? 0} questions included
-
           </span>
-
         </div>
 
+        {examPaper && paperStatus ? (
+          <div
+            className={`mt-4 rounded-lg border px-4 py-3 text-sm ${
+              paperStatus === "APPROVED"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+                : paperStatus === "PENDING"
+                  ? "border-amber-200 bg-amber-50 text-amber-950"
+                  : paperStatus === "DRAFT" && quiz.rejectionReason
+                    ? "border-amber-200 bg-amber-50 text-amber-950"
+                    : "border-border bg-muted/30 text-muted-foreground"
+            }`}
+          >
+            {paperStatus === "DRAFT" && (
+              <p>
+                {quiz.rejectionReason
+                  ? `Returned to draft. Office feedback: ${quiz.rejectionReason}`
+                  : "Draft — make changes and submit when the paper is ready."}
+              </p>
+            )}
+            {paperStatus === "PENDING" && (
+              <p>Pending approval — the office is reviewing this paper. You cannot edit it now.</p>
+            )}
+            {paperStatus === "APPROVED" && (
+              <p>Approved — you can print this paper for your class.</p>
+            )}
+          </div>
+        ) : null}
       </div>
 
 
@@ -348,7 +376,7 @@ export function QuizDetailView({ quizId, listHref, listQueryKey }: QuizDetailVie
 
             ) : null}
 
-            <div className={isDraft ? "hidden print:block" : "mt-6"}>
+            <div className={isDraft ? "hidden print:block" : isPending ? "mt-6 print:hidden" : "mt-6"}>
 
               {printSolution ? (
 

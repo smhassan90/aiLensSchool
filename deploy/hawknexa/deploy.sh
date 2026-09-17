@@ -92,16 +92,74 @@ echo "=== Build and start containers ==="
 cd "${DEPLOY_DIR}"
 export BUILD_SHA="$(cd "${REPO_DIR}" && git rev-parse --short HEAD)"
 echo "BUILD_SHA=${BUILD_SHA}"
-docker compose -f "${COMPOSE_FILE}" build --pull backend portal
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+
+BUILD_BACKEND=true
+BUILD_PORTAL=true
+RESTART_CADDY=false
+CHANGED=""
+LAST_SUCCESS_COMMIT=""
+if [[ -f "${STATUS_FILE}" ]]; then
+  LAST_SUCCESS_COMMIT="$(python3 -c "import json; d=json.load(open('${STATUS_FILE}')); print(d.get('commit') or '')" 2>/dev/null || true)"
+fi
+
+if [[ "${FORCE_FULL_BUILD:-false}" != "true" && -n "${LAST_SUCCESS_COMMIT}" ]]; then
+  if git -C "${REPO_DIR}" cat-file -e "${LAST_SUCCESS_COMMIT}^{commit}" 2>/dev/null; then
+    CHANGED="$(git -C "${REPO_DIR}" diff --name-only "${LAST_SUCCESS_COMMIT}" HEAD)"
+    BUILD_BACKEND=false
+    BUILD_PORTAL=false
+    if echo "${CHANGED}" | grep -qE '^backend/'; then BUILD_BACKEND=true; fi
+    if echo "${CHANGED}" | grep -qE '^portal/'; then BUILD_PORTAL=true; fi
+    if [[ "${BUILD_BACKEND}" == "false" && "${BUILD_PORTAL}" == "false" ]]; then
+      echo "No backend/portal changes since ${LAST_SUCCESS_COMMIT}; skipping image rebuild"
+    fi
+    if echo "${CHANGED}" | grep -qE '^deploy/hawknexa/'; then RESTART_CADDY=true; fi
+  fi
+fi
+
+if [[ -n "${DEPLOY_TARGETS:-}" ]]; then
+  BUILD_BACKEND=false
+  BUILD_PORTAL=false
+  if echo ",${DEPLOY_TARGETS}," | grep -q ',backend,'; then BUILD_BACKEND=true; fi
+  if echo ",${DEPLOY_TARGETS}," | grep -q ',portal,'; then BUILD_PORTAL=true; fi
+  echo "DEPLOY_TARGETS=${DEPLOY_TARGETS}"
+fi
+
+BUILD_SERVICES=()
+if [[ "${BUILD_BACKEND}" == "true" ]]; then BUILD_SERVICES+=(backend); fi
+if [[ "${BUILD_PORTAL}" == "true" ]]; then BUILD_SERVICES+=(portal); fi
+if ((${#BUILD_SERVICES[@]} > 0)); then
+  echo "Building: ${BUILD_SERVICES[*]}"
+  docker compose -f "${COMPOSE_FILE}" build --parallel "${BUILD_SERVICES[@]}"
+else
+  echo "Skipping docker build"
+fi
 
 compose_up() {
   local attempt="$1"
   echo "=== Start app containers (attempt ${attempt}) ==="
-  if [[ "${SKIP_WEBHOOK_RESTART}" == "true" ]]; then
-    docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans mysql redis backend portal caddy
-  else
+  docker compose -f "${COMPOSE_FILE}" up -d mysql redis
+  if [[ "${BUILD_BACKEND}" == "true" && "${BUILD_PORTAL}" == "true" ]]; then
+    if [[ "${SKIP_WEBHOOK_RESTART}" == "true" ]]; then
+      docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans backend portal caddy
+    else
+      docker compose -f "${COMPOSE_FILE}" build deploy-webhook
+      docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans backend portal caddy deploy-webhook
+    fi
+  elif [[ "${BUILD_BACKEND}" == "true" ]]; then
+    docker compose -f "${COMPOSE_FILE}" up -d --no-deps backend
+  elif [[ "${BUILD_PORTAL}" == "true" ]]; then
+    docker compose -f "${COMPOSE_FILE}" up -d --no-deps portal
+  elif [[ "${RESTART_CADDY}" == "true" ]]; then
+    docker compose -f "${COMPOSE_FILE}" up -d --no-deps caddy
+    if [[ "${SKIP_WEBHOOK_RESTART}" != "true" ]]; then
+      docker compose -f "${COMPOSE_FILE}" build deploy-webhook
+      docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook
+    fi
+  elif [[ "${SKIP_WEBHOOK_RESTART}" != "true" ]]; then
     docker compose -f "${COMPOSE_FILE}" build deploy-webhook
-    docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans mysql redis backend portal caddy deploy-webhook
+    docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook caddy
   fi
 }
 
@@ -122,7 +180,7 @@ for i in 1 2 3 4 5 6; do
     exit 0
   fi
   echo "Waiting for API... (${i}/6)"
-  sleep 10
+  sleep 5
 done
 
 echo "ERROR: health check failed: ${HEALTH_URL}" >&2

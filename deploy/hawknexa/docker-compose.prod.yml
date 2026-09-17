@@ -47,6 +47,9 @@ services:
       - .env
     environment:
       RUN_SEED: ${RUN_SEED:-false}
+      # Always use in-stack MySQL/Redis — never a remote database host.
+      DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}?connection_limit=10&pool_timeout=30&connect_timeout=15
+      REDIS_URL: redis://redis:6379
     volumes:
       - hawknexa_uploads:/app/uploads
     depends_on:
@@ -63,7 +66,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
-        NEXT_PUBLIC_USE_LOCAL_API: "true"
+        NEXT_PUBLIC_USE_LOCAL_API: "false"
     restart: unless-stopped
     depends_on:
       - backend

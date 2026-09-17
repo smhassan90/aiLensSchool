@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CalendarClock,
   FileText,
   GraduationCap,
   LayoutDashboard,
@@ -38,6 +39,7 @@ const setupPathPrefixes = [
   "/school/quizzes",
   "/school/exam-papers",
   "/school/submitted-exam-papers",
+  "/school/exam-deadline-extensions",
   "/school/results",
   "/school/attendance",
   "/school/report-cards",
@@ -55,6 +57,7 @@ const mainNav: Array<{
   { href: "/school/teachers", label: "Teachers", icon: UserSquare2 },
   { href: "/school/exams", label: "Exams", icon: Trophy, permission: "MANAGE_EXAMS" },
   { href: "/school/submitted-exam-papers", label: "Exam papers", icon: FileText },
+  { href: "/school/exam-deadline-extensions", label: "Deadline extensions", icon: CalendarClock, permission: "MANAGE_EXAMS" },
   { href: "/school/fees", label: "Collect fees", icon: Wallet, permission: "VIEW_FINANCE" },
   { href: "/school/expenses", label: "Salaries & bills", icon: Receipt, permission: "MANAGE_EXPENSES" },
   { href: "/school/setup", label: "Setup", icon: Settings2, matchSetup: true },

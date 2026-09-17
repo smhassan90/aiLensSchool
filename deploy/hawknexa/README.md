@@ -93,3 +93,29 @@ docker info | grep -i 'Logging Driver'
 ufw status verbose
 ls -la /opt/apps/hawknexa
 ```
+
+## Database (Docker MySQL on VPS)
+
+Production uses **MySQL inside Docker Compose** (`mysql` service). `docker-compose.prod.yml` sets `DATABASE_URL` and `REDIS_URL` on the backend container so it always talks to in-stack services — not a remote database host.
+
+One-time on the VPS:
+
+```bash
+cp /opt/apps/hawknexa/deploy/.env.example /opt/apps/hawknexa/deploy/.env
+# Edit passwords and DEPLOY_WEBHOOK_SECRET, then:
+cd /opt/apps/hawknexa/deploy
+docker compose -f docker-compose.prod.yml up -d mysql redis
+docker compose -f docker-compose.prod.yml up -d --build backend portal caddy deploy-webhook
+```
+
+Migrating from the old remote `sms` database (one-time): `bash /opt/apps/hawknexa/deploy/import-remote-sms-db.sh`
+
+## Local development (portal on laptop → API on VPS)
+
+```bash
+cd portal
+cp .env.example .env.local
+npm run dev
+```
+
+Use `.env.local` with `NEXT_PUBLIC_API_URL=https://hawknexabackend.fynals.com/api/v1` and **do not** set `NEXT_PUBLIC_USE_LOCAL_API=true`.

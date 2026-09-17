@@ -63,6 +63,18 @@ enum AssessmentType {
   OTHER
 }
 
+enum ExamDeadlineExtensionKind {
+  PAPER
+  SCORE
+  BOTH
+}
+
+enum ExamDeadlineExtensionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum Weekday {
   MONDAY
   TUESDAY
@@ -311,6 +323,7 @@ model User {
   createdQuizzes          Quiz[]                   @relation("QuizCreatedBy")
   reviewedQuizzes         Quiz[]                   @relation("QuizReviewedBy")
   examPaperAssignments    ExamPaperAssignment[]    @relation("ExamPaperAssignedBy")
+  reviewedDeadlineExtensions ExamDeadlineExtensionRequest[] @relation("DeadlineExtensionReviewedBy")
   createdHomework         Homework[]               @relation("HomeworkCreatedBy")
   createdAnnouncements    Announcement[]           @relation("AnnouncementCreatedBy")
   createdEvents           Event[]                  @relation("EventCreatedBy")
@@ -457,6 +470,7 @@ model School {
   quizTargets             QuizTarget[]
   examConfigs             ExamConfig[]
   examPaperAssignments    ExamPaperAssignment[]
+  examDeadlineExtensionRequests ExamDeadlineExtensionRequest[]
   assessmentMarks         AssessmentMark[]
   timetableSlots          TimetableSlot[]
   reportCardTemplates     ReportCardTemplate[]
@@ -669,6 +683,7 @@ model TeacherProfile {
   attendances            TeacherAttendance[]
   timetableSlots         TimetableSlot[]
   examPaperAssignments   ExamPaperAssignment[]
+  deadlineExtensionRequests ExamDeadlineExtensionRequest[]
 
   @@unique([schoolId, employeeCode])
   @@index([schoolId])
@@ -2131,6 +2146,9 @@ model ExamPaperAssignment {
   teacherId       String?   @map("teacher_id")
   maxMarks        Int       @map("max_marks")
   submissionDueAt DateTime  @map("submission_due_at")
+  scoreEntryDueAt DateTime? @map("score_entry_due_at")
+  paperSubmissionUnlockedUntil DateTime? @map("paper_submission_unlocked_until")
+  scoreEntryUnlockedUntil      DateTime? @map("score_entry_unlocked_until")
   questionSpec    Json?     @map("question_spec")
   releasedAt      DateTime? @map("released_at")
   assignedById    String    @map("assigned_by_id")
@@ -2144,11 +2162,35 @@ model ExamPaperAssignment {
   teacher    TeacherProfile? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
   assignedBy User           @relation("ExamPaperAssignedBy", fields: [assignedById], references: [id])
   quizzes    Quiz[]
+  deadlineExtensionRequests ExamDeadlineExtensionRequest[]
 
   @@unique([examConfigId, sectionId, subjectId])
   @@index([schoolId])
   @@index([releasedAt])
   @@map("exam_paper_assignments")
+}
+
+model ExamDeadlineExtensionRequest {
+  id           String                      @id @default(uuid())
+  schoolId     String                      @map("school_id")
+  assignmentId String                      @map("assignment_id")
+  teacherId    String                      @map("teacher_id")
+  kind         ExamDeadlineExtensionKind
+  days         Int
+  status       ExamDeadlineExtensionStatus @default(PENDING)
+  requestedAt  DateTime                    @default(now()) @map("requested_at")
+  reviewedAt   DateTime?                   @map("reviewed_at")
+  reviewedById String?                     @map("reviewed_by_id")
+
+  school     School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  assignment ExamPaperAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  teacher    TeacherProfile      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  reviewedBy User?               @relation("DeadlineExtensionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, status])
+  @@index([assignmentId])
+  @@index([teacherId])
+  @@map("exam_deadline_extension_requests")
 }
 
 model AssessmentMark {

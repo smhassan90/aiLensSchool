@@ -4,6 +4,8 @@ import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { academicsService } from "@/services/academics.service";
+import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,11 +23,26 @@ export default function TeacherDashboardPage() {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
+  const examAssignments = useQuery({
+    queryKey: ["my-exam-paper-assignments"],
+    queryFn: () => academicsService.listMyExamPaperAssignments(),
+    staleTime: 60_000,
+  });
   const suggest = useMutation({
     mutationFn: () => dashboardService.teacherCoach(),
     onSuccess: setCoach,
   });
   const data = dashboard.data;
+  const assignments = examAssignments.data?.assignments ?? [];
+  const paperDueSoon = assignments.filter(
+    (row) =>
+      row.paperSubmissionOpen &&
+      (row.status === "NOT_STARTED" || row.status === "DRAFT") &&
+      row.submissionDueAt,
+  );
+  const scoreDueSoon = assignments.filter(
+    (row) => row.status === "APPROVED" && row.scoreEntryOpen && row.scoreEntryDueAt,
+  );
 
   if (dashboard.isLoading) {
     return (
@@ -66,6 +83,28 @@ export default function TeacherDashboardPage() {
             <p className="mt-0.5 text-sm text-amber-900/80">
               Open exam papers to generate your paper with the required question mix and submit it before the due date.
             </p>
+            {paperDueSoon.slice(0, 2).map((row) => (
+              <p key={row.id} className="mt-1 text-sm font-medium text-amber-900">
+                {row.className} · {row.subjectName} — submit by {formatDate(row.submissionDueAt)}
+              </p>
+            ))}
+          </div>
+        </Link>
+      ) : null}
+
+      {scoreDueSoon.length > 0 ? (
+        <Link
+          href="/teacher/marks/exam"
+          className="mb-6 flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-950 transition-colors hover:bg-sky-100"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="font-medium">Enter exam scores before the deadline</p>
+            {scoreDueSoon.slice(0, 2).map((row) => (
+              <p key={row.id} className="mt-1 text-sm text-sky-900/90">
+                {row.examName} · {row.className} — enter by {formatDate(row.scoreEntryDueAt!)}
+              </p>
+            ))}
           </div>
         </Link>
       ) : null}

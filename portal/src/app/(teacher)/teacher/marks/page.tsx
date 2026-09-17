@@ -131,6 +131,9 @@ export default function TeacherMarksPage() {
         description="Enter exam marks on the school paper. Generate the class progress report when the paper is complete."
         actions={
           <div className="flex flex-wrap gap-2">
+            <Link href="/teacher/marks/exam">
+              <Button>Enter exam scores (all students)</Button>
+            </Link>
             <Link href="/teacher/results">
               <Button variant="outline">Quiz scores</Button>
             </Link>

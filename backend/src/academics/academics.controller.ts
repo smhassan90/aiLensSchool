@@ -269,6 +269,8 @@ export class AcademicsController {
       applyToAll?: boolean;
       maxMarks?: number;
       submissionDueAt?: string;
+      scoreEntryDueAt?: string;
+      examDate?: string;
       questionSpec?: {
         mcqCount: number;
         fillBlankCount: number;
@@ -346,6 +348,93 @@ export class AcademicsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.academicsService.addAssessment(user, body);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Post('exam-deadline-extension-requests')
+  requestExamDeadlineExtension(
+    @Body()
+    body: { assignmentId: string; kind: 'paper' | 'score'; days: 1 | 2 | 3 },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.academicsService.requestExamDeadlineExtension(user, body);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_EXAMS')
+  @Get('exam-deadline-extension-requests')
+  listExamDeadlineExtensionRequests(@CurrentUser() user: AuthUser) {
+    return this.academicsService.listExamDeadlineExtensionRequests(user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_EXAMS')
+  @Post('exam-deadline-extension-requests/:id/approve')
+  approveExamDeadlineExtensionRequest(
+    @Param('id') id: string,
+    @Body() body: { days?: 1 | 2 | 3 },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.academicsService.approveExamDeadlineExtensionRequest(user, id, body.days);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_EXAMS')
+  @Post('exam-deadline-extensions')
+  extendExamDeadlines(
+    @Body()
+    body: {
+      teacherUserId: string;
+      examConfigId: string;
+      sectionId: string;
+      subjectId: string;
+      kind: 'paper' | 'score' | 'both';
+      days: 1 | 2 | 3;
+    },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.academicsService.extendExamDeadlines(user, body);
+  }
+
+  @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)
+  @Get('exam-score-sheet')
+  getExamScoreSheet(
+    @Query('examConfigId') examConfigId: string,
+    @Query('sectionId') sectionId: string,
+    @Query('subjectId') subjectId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.academicsService.getExamScoreSheet(user, {
+      examConfigId,
+      sectionId,
+      subjectId,
+    });
+  }
+
+  @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)
+  @Post('exam-scores')
+  saveExamScores(
+    @Body()
+    body: {
+      examConfigId: string;
+      sectionId: string;
+      subjectId: string;
+      scores: Array<{ studentId: string; marks: number }>;
+    },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.academicsService.saveExamScores(user, body);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_EXAMS')
+  @Patch('exam-configs/:id/date')
+  setExamDate(
+    @Param('id') id: string,
+    @Body() body: { examDate: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.academicsService.setExamConfigDate(user, id, body.examDate);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)

@@ -20,6 +20,19 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            portal:
+              - 'portal/**'
+
       - name: Check required secrets
         env:
           SECRET_PRIMARY: ${{ secrets.HAWKNEXA_DEPLOY_WEBHOOK_SECRET }}
@@ -53,12 +66,28 @@ jobs:
         env:
           DEPLOY_URL: ${{ vars.HAWKNEXA_DEPLOY_URL || 'https://hawknexabackend.fynals.com/internal/deploy' }}
           DEPLOY_SECRET: ${{ env.DEPLOY_SECRET }}
+          BUILD_BACKEND: ${{ steps.changes.outputs.backend }}
+          BUILD_PORTAL: ${{ steps.changes.outputs.portal }}
         run: |
           set -euo pipefail
+          TARGETS=""
+          if [ "${BUILD_BACKEND}" = "true" ]; then TARGETS="backend"; fi
+          if [ "${BUILD_PORTAL}" = "true" ]; then
+            if [ -n "${TARGETS}" ]; then TARGETS="${TARGETS},portal"; else TARGETS="portal"; fi
+          fi
+          BODY="{}"
+          if [ -n "${TARGETS}" ]; then
+            BODY="{\"targets\":\"${TARGETS}\"}"
+            echo "Deploy targets: ${TARGETS}"
+          else
+            echo "No backend/portal file changes in this push; VPS will skip image rebuild if unchanged."
+          fi
           echo "POST ${DEPLOY_URL}"
           http_code=$(curl -sS -o deploy-response.txt -w "%{http_code}" \
             -X POST \
             -H "Authorization: Bearer ${DEPLOY_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d "${BODY}" \
             --max-time 60 \
             "${DEPLOY_URL}")
           echo "HTTP ${http_code}"
@@ -77,11 +106,12 @@ jobs:
           HEALTH_URL: ${{ vars.HAWKNEXA_HEALTH_URL || 'https://hawknexabackend.fynals.com/api/v1/health' }}
           DEPLOY_SECRET: ${{ env.DEPLOY_SECRET }}
           EXPECTED_SHA: ${{ github.sha }}
+          BUILD_BACKEND: ${{ steps.changes.outputs.backend }}
         run: |
           set -euo pipefail
           short_sha="$(echo "${EXPECTED_SHA}" | cut -c1-7)"
           echo "Waiting for VPS deploy (commit ${short_sha})..."
-          for i in $(seq 1 60); do
+          for i in $(seq 1 72); do
             status_body="$(curl -fsS -H "Authorization: Bearer ${DEPLOY_SECRET}" "${STATUS_URL}" 2>/dev/null || true)"
             if [ -n "${status_body}" ]; then
               echo "${status_body}"
@@ -96,14 +126,16 @@ jobs:
               fi
             fi
 
-            health_body="$(curl -fsS "${HEALTH_URL}" 2>/dev/null || true)"
-            if [ -n "${health_body}" ] && echo "${health_body}" | grep -q "\"commit\":\"${short_sha}\""; then
-              echo "OK: API health reports ${short_sha}"
-              exit 0
+            if [ "${BUILD_BACKEND}" = "true" ]; then
+              health_body="$(curl -fsS "${HEALTH_URL}" 2>/dev/null || true)"
+              if [ -n "${health_body}" ] && echo "${health_body}" | grep -q "\"commit\":\"${short_sha}\""; then
+                echo "OK: API health reports ${short_sha}"
+                exit 0
+              fi
             fi
 
-            echo "Waiting for deploy... (${i}/60)"
-            sleep 10
+            echo "Waiting for deploy... (${i}/72)"
+            sleep 5
           done
-          echo "::error::Deploy did not complete within 10 minutes."
+          echo "::error::Deploy did not complete within 6 minutes."
           exit 1

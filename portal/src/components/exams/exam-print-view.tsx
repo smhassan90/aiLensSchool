@@ -2,7 +2,7 @@
 
 import { examPaperLabel } from "@/lib/exam-paper";
 import type { Quiz, QuizQuestion } from "@/lib/types";
-import { quizOptionLabel, quizQuestionTypeLabel } from "@/lib/utils";
+import { formatMarks, quizOptionLabel, quizQuestionTypeLabel } from "@/lib/utils";
 import { personFullName } from "@/lib/person-name";
 
 function sectionTitle(type: string) {
@@ -25,7 +25,7 @@ function groupedQuestions(questions: QuizQuestion[]) {
 }
 
 function formatExamDate(quiz: Quiz) {
-  const raw = quiz.dueAt || quiz.submittedAt || quiz.createdAt;
+  const raw = quiz.examConfig?.startDate || quiz.dueAt || quiz.submittedAt || quiz.createdAt;
   if (!raw) return null;
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return null;
@@ -44,7 +44,7 @@ export function ExamPrintView({
   showAnswers?: boolean;
 }) {
   const groups = groupedQuestions(quiz.questions ?? []);
-  const totalMarks = Number(quiz.totalMarks ?? 0);
+  const totalMarks = formatMarks(quiz.totalMarks ?? 0);
   const classLabel = [quiz.section?.grade?.name, quiz.section?.name].filter(Boolean).join(" ");
   const schoolName = quiz.school?.name?.trim() || "School";
   const examDate = formatExamDate(quiz);
@@ -84,7 +84,9 @@ export function ExamPrintView({
       </div>
 
       {groups.map((group) => {
-        const sectionMarks = group.items.reduce((sum, item) => sum + Number(item.marks ?? 0), 0);
+        const sectionMarks = formatMarks(
+          group.items.reduce((sum, item) => sum + Number(item.marks ?? 0), 0),
+        );
         return (
           <section key={group.type} className="mt-8">
             <h2 className="mb-3 border-b border-neutral-400 pb-1 text-base font-semibold">
@@ -98,7 +100,7 @@ export function ExamPrintView({
                   <li key={question.id} className="text-sm">
                     <p className="font-medium">
                       {n}. {question.questionText}{" "}
-                      <span className="font-normal text-neutral-600">[{Number(question.marks)}]</span>
+                      <span className="font-normal text-neutral-600">[{formatMarks(question.marks)}]</span>
                     </p>
                     {options.length ? (
                       <ul className="mt-2 grid gap-1 sm:grid-cols-2">

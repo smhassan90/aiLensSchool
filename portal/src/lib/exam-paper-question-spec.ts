@@ -44,7 +44,7 @@ export function totalQuestionsFromSpec(spec: ExamPaperQuestionSpec): number {
   );
 }
 
-/** Default question mix scaled to the exam's total marks (used when admin only sets due dates). */
+/** Suggested starting question mix for teachers, scaled to the office-assigned total marks. */
 export function buildQuestionSpecForMarks(maxMarks: number): ExamPaperQuestionSpec {
   const base = defaultQuestionSpec;
   const baseTotal = totalMarksFromSpec(base);

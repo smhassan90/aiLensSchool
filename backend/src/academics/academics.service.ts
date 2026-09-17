@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -34,8 +35,8 @@ import { teacherDisplayName } from '../common/utils/person-name';
 import {
   ExamPaperQuestionSpec,
   parseQuestionSpec,
-  validateQuestionSpec,
 } from './exam-paper-question-spec';
+import { deadlineBlockedMessage, isDeadlineOpen } from './exam-deadlines';
 
 @Injectable()
 export class AcademicsService {
@@ -1130,7 +1131,29 @@ export class AcademicsService {
         where: { id: examConfigId, schoolId },
         select: { id: true },
       });
-      if (!exam) examConfigId = undefined;
+      if (!exam) {
+        examConfigId = undefined;
+      } else {
+        const assignment = await this.prisma.examPaperAssignment.findFirst({
+          where: {
+            schoolId,
+            examConfigId,
+            sectionId: section.id,
+            subjectId: subject.id,
+            releasedAt: { not: null },
+          },
+          select: { scoreEntryDueAt: true, scoreEntryUnlockedUntil: true },
+        });
+        if (
+          assignment &&
+          !isDeadlineOpen(assignment.scoreEntryDueAt, assignment.scoreEntryUnlockedUntil)
+        ) {
+          throw new BadRequestException({
+            code: 'SCORE_ENTRY_DEADLINE_PASSED',
+            message: deadlineBlockedMessage('score'),
+          });
+        }
+      }
     }
 
     return this.prisma.assessmentMark.create({
@@ -1574,7 +1597,74 @@ export class AcademicsService {
   }
 
   private async examPaperAssignmentTargets(schoolId: string, academicYearId: string) {
-    const [sections, subjects, classSubjects] = await Promise.all([
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: { academicYearId, section: { schoolId } },
+      select: {
+        sectionId: true,
+        subjectId: true,
+        teacherId: true,
+        assistantTeacherId: true,
+        section: {
+          select: {
+            id: true,
+            name: true,
+            branchId: true,
+            gradeId: true,
+            classTeacherId: true,
+            grade: { select: { name: true, level: true } },
+          },
+        },
+        subject: { select: { id: true, name: true } },
+        teacher: {
+          select: {
+            id: true,
+            userId: true,
+            gender: true,
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+      orderBy: [
+        { section: { grade: { level: 'asc' } } },
+        { section: { name: 'asc' } },
+        { subject: { name: 'asc' } },
+      ],
+    });
+
+    if (classSubjects.length) {
+      const seen = new Set<string>();
+      const targets: Array<{
+        sectionId: string;
+        subjectId: string;
+        branchId: string;
+        classTeacherId: string | null;
+        className: string;
+        subjectName: string;
+        teacherId: string | null;
+        assistantTeacherId: string | null;
+        teacher: (typeof classSubjects)[number]['teacher'];
+      }> = [];
+
+      for (const row of classSubjects) {
+        const key = `${row.sectionId}:${row.subjectId}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        targets.push({
+          sectionId: row.sectionId,
+          subjectId: row.subjectId,
+          branchId: row.section.branchId,
+          classTeacherId: row.section.classTeacherId,
+          className: `${row.section.grade.name} ${row.section.name}`,
+          subjectName: row.subject.name,
+          teacherId: row.teacherId,
+          assistantTeacherId: row.assistantTeacherId,
+          teacher: row.teacher,
+        });
+      }
+      return targets;
+    }
+
+    const [sections, subjects] = await Promise.all([
       this.prisma.section.findMany({
         where: { schoolId },
         select: {
@@ -1592,28 +1682,7 @@ export class AcademicsService {
         select: { id: true, name: true, gradeId: true },
         orderBy: { name: 'asc' },
       }),
-      this.prisma.classSubject.findMany({
-        where: { academicYearId, section: { schoolId } },
-        select: {
-          sectionId: true,
-          subjectId: true,
-          teacherId: true,
-          assistantTeacherId: true,
-          teacher: {
-            select: {
-              id: true,
-              userId: true,
-              gender: true,
-              user: { select: { firstName: true, lastName: true } },
-            },
-          },
-        },
-      }),
     ]);
-
-    const classSubjectByKey = new Map(
-      classSubjects.map((row) => [`${row.sectionId}:${row.subjectId}`, row]),
-    );
 
     const targets: Array<{
       sectionId: string;
@@ -1624,7 +1693,7 @@ export class AcademicsService {
       subjectName: string;
       teacherId: string | null;
       assistantTeacherId: string | null;
-      teacher: (typeof classSubjects)[number]['teacher'];
+      teacher: null;
     }> = [];
 
     for (const section of sections) {
@@ -1632,7 +1701,6 @@ export class AcademicsService {
         (subject) => !subject.gradeId || subject.gradeId === section.gradeId,
       );
       for (const subject of gradeSubjects) {
-        const classSubject = classSubjectByKey.get(`${section.id}:${subject.id}`);
         targets.push({
           sectionId: section.id,
           subjectId: subject.id,
@@ -1640,9 +1708,9 @@ export class AcademicsService {
           classTeacherId: section.classTeacherId,
           className: `${section.grade.name} ${section.name}`,
           subjectName: subject.name,
-          teacherId: classSubject?.teacherId ?? null,
-          assistantTeacherId: classSubject?.assistantTeacherId ?? null,
-          teacher: classSubject?.teacher ?? null,
+          teacherId: null,
+          assistantTeacherId: null,
+          teacher: null,
         });
       }
     }
@@ -1782,6 +1850,8 @@ export class AcademicsService {
       applyToAll?: boolean;
       maxMarks?: number;
       submissionDueAt?: string;
+      scoreEntryDueAt?: string;
+      examDate?: string;
       questionSpec?: ExamPaperQuestionSpec | null;
       rows?: Array<{
         sectionId: string;
@@ -1805,6 +1875,8 @@ export class AcademicsService {
       applyToAll?: boolean;
       maxMarks?: number;
       submissionDueAt?: string;
+      scoreEntryDueAt?: string;
+      examDate?: string;
       questionSpec?: ExamPaperQuestionSpec | null;
       rows?: Array<{
         sectionId: string;
@@ -1830,12 +1902,37 @@ export class AcademicsService {
     if (!targets.length) {
       throw new BadRequestException({
         code: 'NO_ASSIGNMENTS',
-        message: 'Add classes and subjects under Setup before applying an exam.',
+        message:
+          'No classes found for this school year. Add classes under Setup and assign teachers to subjects first.',
+      });
+    }
+
+    if (body.examDate) {
+      const examDate = new Date(body.examDate);
+      if (Number.isNaN(examDate.getTime())) {
+        throw new BadRequestException({
+          code: 'INVALID_EXAM_DATE',
+          message: 'Enter a valid exam date',
+        });
+      }
+      await this.prisma.examConfig.update({
+        where: { id: exam.id },
+        data: { startDate: examDate },
       });
     }
 
     const maxMarks = body.maxMarks ?? exam.maxMarks;
     const submissionDueAt = body.submissionDueAt;
+    let scoreEntryDue: Date | null = null;
+    if (body.scoreEntryDueAt) {
+      scoreEntryDue = new Date(body.scoreEntryDueAt);
+      if (Number.isNaN(scoreEntryDue.getTime())) {
+        throw new BadRequestException({
+          code: 'INVALID_SCORE_DUE_DATE',
+          message: 'Enter a valid score entry due date',
+        });
+      }
+    }
     const shouldApplyToAll =
       body.applyToAll === true ||
       body.rows === undefined ||
@@ -1847,6 +1944,12 @@ export class AcademicsService {
         message: 'Choose a paper submission due date',
       });
     }
+    if (shouldApplyToAll && !scoreEntryDue) {
+      throw new BadRequestException({
+        code: 'INVALID_SCORE_DUE_DATE',
+        message: 'Choose a score entry due date',
+      });
+    }
 
     const enabledRows = shouldApplyToAll
       ? targets.map((target) => ({
@@ -1855,7 +1958,6 @@ export class AcademicsService {
           teacherId: null as string | null,
           maxMarks,
           submissionDueAt: submissionDueAt!,
-          questionSpec: body.questionSpec ?? null,
           enabled: true,
         }))
       : (body.rows ?? []).filter((row) => row.enabled !== false);
@@ -1934,23 +2036,6 @@ export class AcademicsService {
             });
           }
 
-          const questionSpec = row.questionSpec ?? body.questionSpec ?? null;
-          if (body.release && !questionSpec) {
-            throw new BadRequestException({
-              code: 'QUESTION_SPEC_REQUIRED',
-              message: 'Set question requirements before releasing to teachers',
-            });
-          }
-          if (questionSpec) {
-            const specError = validateQuestionSpec(questionSpec, row.maxMarks);
-            if (specError) {
-              throw new BadRequestException({
-                code: 'INVALID_QUESTION_SPEC',
-                message: specError,
-              });
-            }
-          }
-
           const key = `${row.sectionId}:${row.subjectId}`;
           const target = targetByKey.get(key);
           if (!target) {
@@ -2000,7 +2085,8 @@ export class AcademicsService {
             teacherId,
             maxMarks: row.maxMarks,
             submissionDueAt: due,
-            questionSpec: questionSpec ? (questionSpec as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+            scoreEntryDueAt: scoreEntryDue,
+            questionSpec: Prisma.JsonNull,
             assignedById: user.id,
             ...(releasedAt && !existing?.releasedAt ? { releasedAt } : {}),
           };
@@ -2012,6 +2098,7 @@ export class AcademicsService {
                   teacherId: data.teacherId,
                   maxMarks: data.maxMarks,
                   submissionDueAt: data.submissionDueAt,
+                  scoreEntryDueAt: data.scoreEntryDueAt,
                   questionSpec: data.questionSpec,
                   assignedById: data.assignedById,
                   ...(data.releasedAt ? { releasedAt: data.releasedAt } : {}),
@@ -2079,6 +2166,66 @@ export class AcademicsService {
     return { saved: results.length, released: Boolean(body.release) };
   }
 
+  private async syncTeacherExamAssignments(
+    schoolId: string,
+    academicYearId: string,
+    teacherId: string,
+    classSubjects: Array<{ sectionId: string; subjectId: string }>,
+    assignedById: string,
+  ) {
+    const releasedTemplates = await this.prisma.examPaperAssignment.findMany({
+      where: {
+        schoolId,
+        releasedAt: { not: null },
+        examConfig: { academicYearId },
+      },
+      distinct: ['examConfigId'],
+      select: {
+        examConfigId: true,
+        maxMarks: true,
+        submissionDueAt: true,
+        scoreEntryDueAt: true,
+        releasedAt: true,
+      },
+    });
+
+    for (const template of releasedTemplates) {
+      for (const row of classSubjects) {
+        const existing = await this.prisma.examPaperAssignment.findFirst({
+          where: {
+            examConfigId: template.examConfigId,
+            sectionId: row.sectionId,
+            subjectId: row.subjectId,
+          },
+          select: { id: true },
+        });
+        if (existing) continue;
+
+        const target = (
+          await this.examPaperAssignmentTargets(schoolId, academicYearId)
+        ).find(
+          (item) => item.sectionId === row.sectionId && item.subjectId === row.subjectId,
+        );
+        if (!target) continue;
+
+        await this.prisma.examPaperAssignment.create({
+          data: {
+            schoolId,
+            examConfigId: template.examConfigId,
+            sectionId: row.sectionId,
+            subjectId: row.subjectId,
+            teacherId,
+            maxMarks: template.maxMarks,
+            submissionDueAt: template.submissionDueAt,
+            scoreEntryDueAt: template.scoreEntryDueAt,
+            releasedAt: template.releasedAt,
+            assignedById,
+          },
+        });
+      }
+    }
+  }
+
   async listMyExamPaperAssignments(user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
     const teacher = await this.prisma.teacherProfile.findUnique({
@@ -2097,6 +2244,28 @@ export class AcademicsService {
     if (!year) {
       return { assignments: [] };
     }
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        academicYearId: year.id,
+        OR: [{ teacherId: teacher.id }, { assistantTeacherId: teacher.id }],
+      },
+      select: { sectionId: true, subjectId: true },
+    });
+    const teachKeys = new Set(classSubjects.map((r) => `${r.sectionId}:${r.subjectId}`));
+
+    const assigner = await this.prisma.examPaperAssignment.findFirst({
+      where: { schoolId, releasedAt: { not: null } },
+      select: { assignedById: true },
+      orderBy: { releasedAt: 'desc' },
+    });
+    await this.syncTeacherExamAssignments(
+      schoolId,
+      year.id,
+      teacher.id,
+      classSubjects,
+      assigner?.assignedById ?? user.id,
+    );
 
     const assignments = await this.prisma.examPaperAssignment.findMany({
       where: {
@@ -2120,7 +2289,7 @@ export class AcademicsService {
       },
       include: {
         examConfig: { select: { id: true, name: true, startDate: true } },
-        section: { select: { id: true, name: true, grade: { select: { name: true } } } },
+        section: { select: { id: true, name: true, grade: { select: { name: true, level: true } } } },
         subject: { select: { id: true, name: true } },
         quizzes: {
           where: { createdById: user.id, paperKind: { in: [...EXAM_PAPER_KINDS] } },
@@ -2135,7 +2304,12 @@ export class AcademicsService {
           },
         },
       },
-      orderBy: { submissionDueAt: 'asc' },
+      orderBy: [
+        { examConfig: { sequence: 'asc' } },
+        { section: { grade: { level: 'asc' } } },
+        { section: { name: 'asc' } },
+        { subject: { name: 'asc' } },
+      ],
     });
 
     const filtered = assignments.filter((row) => {
@@ -2146,19 +2320,26 @@ export class AcademicsService {
       return true;
     });
 
-    const classSubjects = await this.prisma.classSubject.findMany({
+    const visibleAssignments = filtered.filter((row) =>
+      teachKeys.has(`${row.sectionId}:${row.subjectId}`),
+    );
+    const pendingExtensions = await this.prisma.examDeadlineExtensionRequest.findMany({
       where: {
-        academicYearId: year.id,
-        OR: [{ teacherId: teacher.id }, { assistantTeacherId: teacher.id }],
+        teacherId: teacher.id,
+        assignmentId: { in: visibleAssignments.map((row) => row.id) },
+        status: 'PENDING',
       },
-      select: { sectionId: true, subjectId: true },
+      select: { id: true, assignmentId: true, kind: true, days: true },
     });
-    const teachKeys = new Set(classSubjects.map((r) => `${r.sectionId}:${r.subjectId}`));
+    const pendingByAssignmentKind = new Map(
+      pendingExtensions.map((row) => [`${row.assignmentId}:${row.kind}`, row]),
+    );
 
     return {
-      assignments: filtered
-        .filter((row) => teachKeys.has(`${row.sectionId}:${row.subjectId}`))
-        .map((row) => {
+      assignments: visibleAssignments.map((row) => {
+          const paperPending = pendingByAssignmentKind.get(`${row.id}:PAPER`);
+          const scorePending = pendingByAssignmentKind.get(`${row.id}:SCORE`);
+          const bothPending = pendingByAssignmentKind.get(`${row.id}:BOTH`);
           const latestQuiz = row.quizzes[0] ?? null;
           const submitted =
             latestQuiz?.status === QuizStatus.CLOSED &&
@@ -2172,25 +2353,45 @@ export class AcademicsService {
             sectionId: row.sectionId,
             subjectId: row.subjectId,
             className: `${row.section.grade.name} ${row.section.name}`,
+            sectionName: row.section.name,
+            gradeLevel: row.section.grade.level,
             subjectName: row.subject.name,
             maxMarks: row.maxMarks,
             submissionDueAt: row.submissionDueAt.toISOString(),
+            scoreEntryDueAt: row.scoreEntryDueAt?.toISOString() ?? null,
+            paperSubmissionOpen: isDeadlineOpen(
+              row.submissionDueAt,
+              row.paperSubmissionUnlockedUntil,
+            ),
+            scoreEntryOpen: isDeadlineOpen(row.scoreEntryDueAt, row.scoreEntryUnlockedUntil),
             questionSpec: parseQuestionSpec(row.questionSpec),
             releasedAt: row.releasedAt?.toISOString() ?? null,
             status: !latestQuiz
               ? 'NOT_STARTED'
-              : latestQuiz.reviewStatus === ExamPaperReviewStatus.REJECTED
-                ? 'REJECTED'
+              : latestQuiz.reviewStatus === ExamPaperReviewStatus.APPROVED
+                ? 'APPROVED'
                 : latestQuiz.reviewStatus === ExamPaperReviewStatus.PENDING_REVIEW
-                  ? 'PENDING_REVIEW'
-                  : latestQuiz.reviewStatus === ExamPaperReviewStatus.APPROVED
-                    ? 'APPROVED'
-                    : latestQuiz.status === QuizStatus.CLOSED
-                      ? 'SUBMITTED'
-                      : 'DRAFT',
+                  ? 'PENDING'
+                  : 'DRAFT',
             quizId: latestQuiz?.id ?? null,
             rejectionReason: latestQuiz?.rejectionReason ?? null,
             pendingGeneration,
+            paperExtensionRequest:
+              paperPending || bothPending
+                ? {
+                    id: (paperPending ?? bothPending)!.id,
+                    days: (paperPending ?? bothPending)!.days,
+                    status: 'PENDING' as const,
+                  }
+                : null,
+            scoreExtensionRequest:
+              scorePending || bothPending
+                ? {
+                    id: (scorePending ?? bothPending)!.id,
+                    days: (scorePending ?? bothPending)!.days,
+                    status: 'PENDING' as const,
+                  }
+                : null,
           };
         }),
       pendingCount: filtered.filter((row) => {
@@ -2203,5 +2404,457 @@ export class AcademicsService {
         return !submitted;
       }).length,
     };
+  }
+
+  async setExamConfigDate(user: AuthUser, examConfigId: string, examDate: string) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const date = new Date(examDate);
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException({
+        code: 'INVALID_EXAM_DATE',
+        message: 'Enter a valid exam date',
+      });
+    }
+    const exam = await this.prisma.examConfig.findFirst({
+      where: { id: examConfigId, schoolId },
+      select: { id: true },
+    });
+    if (!exam) {
+      throw new NotFoundException({ code: 'EXAM_NOT_FOUND', message: 'Exam not found' });
+    }
+    return this.prisma.examConfig.update({
+      where: { id: exam.id },
+      data: { startDate: date },
+      select: { id: true, name: true, startDate: true },
+    });
+  }
+
+  private applyDeadlineExtension(
+    assignmentId: string,
+    kind: 'paper' | 'score' | 'both',
+    days: 1 | 2 | 3,
+  ) {
+    const until = new Date();
+    until.setDate(until.getDate() + days);
+    until.setHours(23, 59, 59, 999);
+    const data: Prisma.ExamPaperAssignmentUpdateInput = {};
+    if (kind === 'paper' || kind === 'both') {
+      data.paperSubmissionUnlockedUntil = until;
+    }
+    if (kind === 'score' || kind === 'both') {
+      data.scoreEntryUnlockedUntil = until;
+    }
+    return this.prisma.examPaperAssignment.update({
+      where: { id: assignmentId },
+      data,
+      select: { id: true },
+    }).then(() => until);
+  }
+
+  async requestExamDeadlineExtension(
+    user: AuthUser,
+    body: { assignmentId: string; kind: 'paper' | 'score'; days: 1 | 2 | 3 },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.prisma.teacherProfile.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    if (!teacher) {
+      throw new ForbiddenException({ code: 'TEACHER_REQUIRED', message: 'Teacher profile not found' });
+    }
+
+    const assignment = await this.prisma.examPaperAssignment.findFirst({
+      where: { id: body.assignmentId, schoolId, releasedAt: { not: null } },
+      include: {
+        examConfig: { select: { name: true } },
+        section: { select: { name: true, grade: { select: { name: true } } } },
+        subject: { select: { name: true } },
+      },
+    });
+    if (!assignment) {
+      throw new NotFoundException({ code: 'ASSIGNMENT_NOT_FOUND', message: 'Exam assignment not found' });
+    }
+
+    const teaches = await this.prisma.classSubject.findFirst({
+      where: {
+        sectionId: assignment.sectionId,
+        subjectId: assignment.subjectId,
+        OR: [{ teacherId: teacher.id }, { assistantTeacherId: teacher.id }],
+      },
+      select: { id: true },
+    });
+    if (!teaches && assignment.teacherId && assignment.teacherId !== teacher.id) {
+      throw new ForbiddenException({
+        code: 'NOT_YOUR_ASSIGNMENT',
+        message: 'This exam is not assigned to your class',
+      });
+    }
+
+    const deadlinePassed =
+      body.kind === 'paper'
+        ? !isDeadlineOpen(assignment.submissionDueAt, assignment.paperSubmissionUnlockedUntil)
+        : !isDeadlineOpen(assignment.scoreEntryDueAt, assignment.scoreEntryUnlockedUntil);
+    if (!deadlinePassed) {
+      throw new BadRequestException({
+        code: 'DEADLINE_NOT_PASSED',
+        message: 'The deadline has not passed yet — you can continue without requesting an extension.',
+      });
+    }
+
+    const kindEnum = body.kind === 'paper' ? 'PAPER' : 'SCORE';
+    const existing = await this.prisma.examDeadlineExtensionRequest.findFirst({
+      where: {
+        assignmentId: assignment.id,
+        teacherId: teacher.id,
+        kind: kindEnum,
+        status: 'PENDING',
+      },
+    });
+    if (existing) {
+      throw new BadRequestException({
+        code: 'REQUEST_ALREADY_PENDING',
+        message: 'You already have a pending request for this exam. The office will review it soon.',
+      });
+    }
+
+    const request = await this.prisma.examDeadlineExtensionRequest.create({
+      data: {
+        schoolId,
+        assignmentId: assignment.id,
+        teacherId: teacher.id,
+        kind: kindEnum,
+        days: body.days,
+      },
+    });
+
+    return {
+      id: request.id,
+      status: request.status,
+      days: request.days,
+      examName: assignment.examConfig.name,
+      className: `${assignment.section.grade.name} ${assignment.section.name}`,
+      subjectName: assignment.subject.name,
+    };
+  }
+
+  async listExamDeadlineExtensionRequests(user: AuthUser) {
+    if (!this.tenant.isSchoolAdmin(user)) {
+      throw new ForbiddenException({
+        code: 'ADMIN_REQUIRED',
+        message: 'Only the office can view extension requests',
+      });
+    }
+    const schoolId = this.tenant.requireSchoolId(user);
+    const rows = await this.prisma.examDeadlineExtensionRequest.findMany({
+      where: { schoolId, status: 'PENDING' },
+      orderBy: { requestedAt: 'asc' },
+      include: {
+        teacher: {
+          select: {
+            id: true,
+            userId: true,
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
+        assignment: {
+          include: {
+            examConfig: { select: { id: true, name: true } },
+            section: { select: { id: true, name: true, grade: { select: { name: true } } },
+            subject: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      days: row.days,
+      requestedAt: row.requestedAt.toISOString(),
+      teacherUserId: row.teacher.userId,
+      teacherName: `${row.teacher.user.firstName} ${row.teacher.user.lastName}`.trim(),
+      examConfigId: row.assignment.examConfigId,
+      examName: row.assignment.examConfig.name,
+      sectionId: row.assignment.sectionId,
+      subjectId: row.assignment.subjectId,
+      className: `${row.assignment.section.grade.name} ${row.assignment.section.name}`,
+      subjectName: row.assignment.subject.name,
+      assignmentId: row.assignmentId,
+    }));
+  }
+
+  async approveExamDeadlineExtensionRequest(
+    user: AuthUser,
+    requestId: string,
+    days?: 1 | 2 | 3,
+  ) {
+    if (!this.tenant.isSchoolAdmin(user)) {
+      throw new ForbiddenException({
+        code: 'ADMIN_REQUIRED',
+        message: 'Only the office can approve extension requests',
+      });
+    }
+    const schoolId = this.tenant.requireSchoolId(user);
+    const request = await this.prisma.examDeadlineExtensionRequest.findFirst({
+      where: { id: requestId, schoolId, status: 'PENDING' },
+      include: {
+        teacher: { select: { user: { select: { firstName: true, lastName: true } } } },
+        assignment: true,
+      },
+    });
+    if (!request) {
+      throw new NotFoundException({ code: 'REQUEST_NOT_FOUND', message: 'Request not found or already handled' });
+    }
+
+    const grantDays = (days ?? request.days) as 1 | 2 | 3;
+    const kind =
+      request.kind === 'PAPER' ? 'paper' : request.kind === 'SCORE' ? 'score' : 'both';
+    const until = await this.applyDeadlineExtension(request.assignmentId, kind, grantDays);
+
+    await this.prisma.examDeadlineExtensionRequest.update({
+      where: { id: request.id },
+      data: {
+        status: 'APPROVED',
+        days: grantDays,
+        reviewedAt: new Date(),
+        reviewedById: user.id,
+      },
+    });
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'EXAM_DEADLINE_EXTENSION_APPROVED',
+      entityType: 'ExamDeadlineExtensionRequest',
+      entityId: request.id,
+      metadata: { kind, days: grantDays, assignmentId: request.assignmentId },
+    });
+
+    return {
+      ok: true,
+      unlockedUntil: until.toISOString(),
+      teacherName: `${request.teacher.user.firstName} ${request.teacher.user.lastName}`.trim(),
+    };
+  }
+
+  async extendExamDeadlines(
+    user: AuthUser,
+    body: {
+      teacherUserId: string;
+      examConfigId: string;
+      sectionId: string;
+      subjectId: string;
+      kind: 'paper' | 'score' | 'both';
+      days: 1 | 2 | 3;
+    },
+  ) {
+    if (!this.tenant.isSchoolAdmin(user)) {
+      throw new ForbiddenException({
+        code: 'ADMIN_REQUIRED',
+        message: 'Only the office can extend exam deadlines',
+      });
+    }
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.prisma.teacherProfile.findFirst({
+      where: { userId: body.teacherUserId, schoolId },
+      select: { id: true, user: { select: { firstName: true, lastName: true } } },
+    });
+    if (!teacher) {
+      throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
+    }
+    const assignment = await this.prisma.examPaperAssignment.findFirst({
+      where: {
+        schoolId,
+        examConfigId: body.examConfigId,
+        sectionId: body.sectionId,
+        subjectId: body.subjectId,
+      },
+    });
+    if (!assignment) {
+      throw new NotFoundException({
+        code: 'ASSIGNMENT_NOT_FOUND',
+        message: 'Exam assignment not found for this class and subject',
+      });
+    }
+    const until = await this.applyDeadlineExtension(assignment.id, body.kind, body.days);
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'EXAM_DEADLINE_EXTENDED',
+      entityType: 'ExamPaperAssignment',
+      entityId: assignment.id,
+      metadata: { kind: body.kind, days: body.days, teacherUserId: body.teacherUserId },
+    });
+    return {
+      ok: true,
+      unlockedUntil: until.toISOString(),
+      teacherName: `${teacher.user.firstName} ${teacher.user.lastName}`.trim(),
+    };
+  }
+
+  async getExamScoreSheet(
+    user: AuthUser,
+    query: { examConfigId: string; sectionId: string; subjectId: string },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const assignment = await this.prisma.examPaperAssignment.findFirst({
+      where: {
+        schoolId,
+        examConfigId: query.examConfigId,
+        sectionId: query.sectionId,
+        subjectId: query.subjectId,
+        releasedAt: { not: null },
+      },
+      include: {
+        examConfig: { select: { id: true, name: true, maxMarks: true, startDate: true } },
+        section: { select: { name: true, grade: { select: { name: true } } } },
+        subject: { select: { name: true } },
+      },
+    });
+    if (!assignment) {
+      throw new NotFoundException({
+        code: 'ASSIGNMENT_NOT_FOUND',
+        message: 'No exam assignment found for this class and subject',
+      });
+    }
+    const canEnterScores = isDeadlineOpen(
+      assignment.scoreEntryDueAt,
+      assignment.scoreEntryUnlockedUntil,
+    );
+    const enrollments = await this.prisma.studentEnrollment.findMany({
+      where: {
+        sectionId: query.sectionId,
+        status: EnrollmentStatus.ACTIVE,
+      },
+      orderBy: [{ student: { firstName: 'asc' } }, { student: { lastName: 'asc' } }],
+      select: {
+        studentId: true,
+        student: {
+          select: { id: true, firstName: true, lastName: true, studentCode: true },
+        },
+      },
+    });
+    const existing = await this.prisma.assessmentMark.findMany({
+      where: {
+        schoolId,
+        examConfigId: query.examConfigId,
+        sectionId: query.sectionId,
+        subjectId: query.subjectId,
+      },
+      select: { id: true, studentId: true, marks: true },
+    });
+    const marksByStudent = new Map(existing.map((row) => [row.studentId, row]));
+    return {
+      exam: {
+        id: assignment.examConfig.id,
+        name: assignment.examConfig.name,
+        maxMarks: assignment.maxMarks,
+        examDate: assignment.examConfig.startDate?.toISOString().slice(0, 10) ?? null,
+      },
+      className: `${assignment.section.grade.name} ${assignment.section.name}`,
+      subjectName: assignment.subject.name,
+      scoreEntryDueAt: assignment.scoreEntryDueAt?.toISOString() ?? null,
+      canEnterScores,
+      students: enrollments.map((row) => ({
+        studentId: row.studentId,
+        firstName: row.student.firstName,
+        lastName: row.student.lastName,
+        studentCode: row.student.studentCode,
+        marks: marksByStudent.get(row.studentId)?.marks
+          ? Number(marksByStudent.get(row.studentId)!.marks)
+          : null,
+        assessmentId: marksByStudent.get(row.studentId)?.id ?? null,
+      })),
+    };
+  }
+
+  async saveExamScores(
+    user: AuthUser,
+    body: {
+      examConfigId: string;
+      sectionId: string;
+      subjectId: string;
+      scores: Array<{ studentId: string; marks: number }>;
+    },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const assignment = await this.prisma.examPaperAssignment.findFirst({
+      where: {
+        schoolId,
+        examConfigId: body.examConfigId,
+        sectionId: body.sectionId,
+        subjectId: body.subjectId,
+        releasedAt: { not: null },
+      },
+      include: { examConfig: { select: { name: true } } },
+    });
+    if (!assignment) {
+      throw new NotFoundException({
+        code: 'ASSIGNMENT_NOT_FOUND',
+        message: 'No exam assignment found',
+      });
+    }
+    if (
+      !isDeadlineOpen(assignment.scoreEntryDueAt, assignment.scoreEntryUnlockedUntil)
+    ) {
+      throw new BadRequestException({
+        code: 'SCORE_ENTRY_DEADLINE_PASSED',
+        message: deadlineBlockedMessage('score'),
+      });
+    }
+    const year = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      orderBy: { startDate: 'desc' },
+      select: { id: true },
+    });
+    if (!year) {
+      throw new BadRequestException({ code: 'NO_YEAR', message: 'No active academic year' });
+    }
+    const maxMarks = assignment.maxMarks;
+    for (const row of body.scores) {
+      if (row.marks < 0 || row.marks > maxMarks) {
+        throw new BadRequestException({
+          code: 'INVALID_MARKS',
+          message: `Marks must be between 0 and ${maxMarks}`,
+        });
+      }
+    }
+    await this.prisma.$transaction(async (tx) => {
+      for (const row of body.scores) {
+        const existing = await tx.assessmentMark.findFirst({
+          where: {
+            schoolId,
+            studentId: row.studentId,
+            examConfigId: body.examConfigId,
+            sectionId: body.sectionId,
+            subjectId: body.subjectId,
+          },
+        });
+        if (existing) {
+          await tx.assessmentMark.update({
+            where: { id: existing.id },
+            data: { marks: row.marks, maxMarks, recordedById: user.id },
+          });
+        } else {
+          await tx.assessmentMark.create({
+            data: {
+              schoolId,
+              studentId: row.studentId,
+              subjectId: body.subjectId,
+              sectionId: body.sectionId,
+              academicYearId: year.id,
+              examConfigId: body.examConfigId,
+              type: 'TERM_EXAM',
+              title: assignment.examConfig.name,
+              maxMarks,
+              marks: row.marks,
+              recordedById: user.id,
+            },
+          });
+        }
+      }
+    });
+    return { saved: body.scores.length };
   }
 }

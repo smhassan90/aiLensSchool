@@ -313,6 +313,8 @@ export const academicsService = {
     applyToAll?: boolean;
     maxMarks?: number;
     submissionDueAt?: string;
+    scoreEntryDueAt?: string;
+    examDate?: string;
     questionSpec?: ExamPaperQuestionSpec | null;
     rows?: Array<{
       sectionId: string;
@@ -340,17 +342,120 @@ export const academicsService = {
         sectionId: string;
         subjectId: string;
         className: string;
+        sectionName: string;
+        gradeLevel: number;
         subjectName: string;
         maxMarks: number;
         submissionDueAt: string;
+        scoreEntryDueAt: string | null;
+        paperSubmissionOpen: boolean;
+        scoreEntryOpen: boolean;
         questionSpec: ExamPaperQuestionSpec | null;
         releasedAt: string | null;
-        status: string;
+        status: "NOT_STARTED" | "DRAFT" | "PENDING" | "APPROVED";
         quizId: string | null;
         rejectionReason: string | null;
         pendingGeneration: boolean;
+        paperExtensionRequest: { id: string; days: number; status: "PENDING" } | null;
+        scoreExtensionRequest: { id: string; days: number; status: "PENDING" } | null;
       }>;
     }>("/academics/my-exam-paper-assignments");
+  },
+
+  requestExamDeadlineExtension(payload: {
+    assignmentId: string;
+    kind: "paper" | "score";
+    days: 1 | 2 | 3;
+  }) {
+    return apiClient<{
+      id: string;
+      status: string;
+      days: number;
+      examName: string;
+      className: string;
+      subjectName: string;
+    }>("/academics/exam-deadline-extension-requests", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  listExamDeadlineExtensionRequests() {
+    return apiClient<
+      Array<{
+        id: string;
+        kind: "PAPER" | "SCORE" | "BOTH";
+        days: number;
+        requestedAt: string;
+        teacherUserId: string;
+        teacherName: string;
+        examConfigId: string;
+        examName: string;
+        sectionId: string;
+        subjectId: string;
+        className: string;
+        subjectName: string;
+        assignmentId: string;
+      }>
+    >("/academics/exam-deadline-extension-requests");
+  },
+
+  approveExamDeadlineExtensionRequest(id: string, days?: 1 | 2 | 3) {
+    return apiClient<{ ok: boolean; unlockedUntil: string; teacherName: string }>(
+      `/academics/exam-deadline-extension-requests/${id}/approve`,
+      { method: "POST", body: JSON.stringify(days ? { days } : {}) },
+    );
+  },
+
+  setExamConfigDate(examConfigId: string, examDate: string) {
+    return apiClient<{ id: string; name: string; startDate: string | null }>(
+      `/academics/exam-configs/${examConfigId}/date`,
+      { method: "PATCH", body: JSON.stringify({ examDate }) },
+    );
+  },
+
+  extendExamDeadlines(payload: {
+    teacherUserId: string;
+    examConfigId: string;
+    sectionId: string;
+    subjectId: string;
+    kind: "paper" | "score" | "both";
+    days: 1 | 2 | 3;
+  }) {
+    return apiClient<{ ok: boolean; unlockedUntil: string; teacherName: string }>(
+      "/academics/exam-deadline-extensions",
+      { method: "POST", body: JSON.stringify(payload) },
+    );
+  },
+
+  getExamScoreSheet(params: { examConfigId: string; sectionId: string; subjectId: string }) {
+    return apiClient<{
+      exam: { id: string; name: string; maxMarks: number; examDate: string | null };
+      className: string;
+      subjectName: string;
+      scoreEntryDueAt: string | null;
+      canEnterScores: boolean;
+      students: Array<{
+        studentId: string;
+        firstName: string;
+        lastName: string;
+        studentCode: string;
+        marks: number | null;
+        assessmentId: string | null;
+      }>;
+    }>(`/academics/exam-score-sheet${buildQuery(params)}`);
+  },
+
+  saveExamScores(payload: {
+    examConfigId: string;
+    sectionId: string;
+    subjectId: string;
+    scores: Array<{ studentId: string; marks: number }>;
+  }) {
+    return apiClient<{ saved: number }>("/academics/exam-scores", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   getExamPaperSubmissions(params?: {

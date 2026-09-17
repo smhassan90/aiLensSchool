@@ -15,8 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatDate } from "@/lib/utils";
-import type { ExamPaperQuestionSpec } from "@/lib/exam-paper-question-spec";
+import { formatDate, formatMarks } from "@/lib/utils";
 
 export type GenerateExamPaperFormValues = {
   examConfigId?: string;
@@ -118,7 +117,6 @@ type AssignmentInfo = {
   subjectName: string;
   maxMarks: number;
   submissionDueAt: string;
-  questionSpec?: ExamPaperQuestionSpec | null;
 };
 
 type GenerateExamPaperDialogProps = {
@@ -167,14 +165,14 @@ export function GenerateExamPaperDialog({
   const shortAnswerMarks = watch("shortAnswerMarks");
   const longAnswerMarks = watch("longAnswerMarks");
   const requiredMarks = assignment?.maxMarks;
-  const specLocked = Boolean(assignment?.questionSpec);
   const totals = {
     questions:
       Number(mcqCount) + Number(fillBlankCount) + Number(trueFalseCount) + Number(shortAnswerCount) + Number(longAnswerCount),
     marks:
       Number(mcqMarks) + Number(fillBlankMarks) + Number(trueFalseMarks) + Number(shortAnswerMarks) + Number(longAnswerMarks),
   };
-  const marksMismatch = requiredMarks != null && totals.marks !== requiredMarks;
+  const marksMismatch =
+    requiredMarks != null && Math.round(totals.marks * 10) !== Math.round(requiredMarks * 10);
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isGenerating && onOpenChange(next)}>
@@ -215,11 +213,9 @@ export function GenerateExamPaperDialog({
                       <p className="mt-1 text-muted-foreground">
                         Submit by {formatDate(assignment.submissionDueAt)} · {assignment.maxMarks} marks required
                       </p>
-                      {assignment.questionSpec ? (
-                        <p className="mt-2 text-xs text-amber-900">
-                          Office requirements: {assignment.questionSpec.mcqCount} MCQ · {assignment.questionSpec.fillBlankCount} fill-in · {assignment.questionSpec.trueFalseCount} T/F · {assignment.questionSpec.shortAnswerCount} short · {assignment.questionSpec.longAnswerCount} long
-                        </p>
-                      ) : null}
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        You choose the question types and counts. Section marks must add up to {assignment.maxMarks}.
+                      </p>
                     </div>
                   ) : (
                     <>
@@ -338,11 +334,9 @@ export function GenerateExamPaperDialog({
               <section className="space-y-3 rounded-xl border bg-card p-4">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Question mix</h3>
-                  {specLocked ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Counts and section marks are set by the office and cannot be changed.
-                    </p>
-                  ) : null}
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Choose how many questions of each type to include and set marks per section.
+                  </p>
                 </div>
                 <div className="hidden grid-cols-[1fr_5.5rem_5.5rem] gap-3 px-0 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground sm:grid">
                   <span>Type</span>
@@ -355,7 +349,6 @@ export function GenerateExamPaperDialog({
                   marksId="mcqMarks"
                   count={mcqCount}
                   marks={mcqMarks}
-                  locked={specLocked}
                   onCount={(value) => setValue("mcqCount", value, { shouldValidate: true })}
                   onMarks={(value) => setValue("mcqMarks", value, { shouldValidate: true })}
                 />
@@ -365,7 +358,6 @@ export function GenerateExamPaperDialog({
                   marksId="fillBlankMarks"
                   count={fillBlankCount}
                   marks={fillBlankMarks}
-                  locked={specLocked}
                   onCount={(value) => setValue("fillBlankCount", value, { shouldValidate: true })}
                   onMarks={(value) => setValue("fillBlankMarks", value, { shouldValidate: true })}
                 />
@@ -375,7 +367,6 @@ export function GenerateExamPaperDialog({
                   marksId="trueFalseMarks"
                   count={trueFalseCount}
                   marks={trueFalseMarks}
-                  locked={specLocked}
                   onCount={(value) => setValue("trueFalseCount", value, { shouldValidate: true })}
                   onMarks={(value) => setValue("trueFalseMarks", value, { shouldValidate: true })}
                 />
@@ -385,7 +376,6 @@ export function GenerateExamPaperDialog({
                   marksId="shortAnswerMarks"
                   count={shortAnswerCount}
                   marks={shortAnswerMarks}
-                  locked={specLocked}
                   onCount={(value) => setValue("shortAnswerCount", value, { shouldValidate: true })}
                   onMarks={(value) => setValue("shortAnswerMarks", value, { shouldValidate: true })}
                 />
@@ -395,7 +385,6 @@ export function GenerateExamPaperDialog({
                   marksId="longAnswerMarks"
                   count={longAnswerCount}
                   marks={longAnswerMarks}
-                  locked={specLocked}
                   onCount={(value) => setValue("longAnswerCount", value, { shouldValidate: true })}
                   onMarks={(value) => setValue("longAnswerMarks", value, { shouldValidate: true })}
                 />
@@ -409,13 +398,13 @@ export function GenerateExamPaperDialog({
               <div className={`mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-sm ${marksMismatch ? "border-amber-300 bg-amber-50" : "bg-background"}`}>
                 <span className="text-muted-foreground">Paper total</span>
                 <span className={`font-semibold ${marksMismatch ? "text-amber-900" : "text-foreground"}`}>
-                  {totals.questions} questions · {totals.marks} marks
+                  {totals.questions} questions · {formatMarks(totals.marks)} marks
                   {requiredMarks != null ? ` (required ${requiredMarks})` : ""}
                 </span>
               </div>
               {marksMismatch ? (
                 <p className="mb-3 text-sm text-amber-800">
-                  Section marks must add up to exactly {requiredMarks} before you generate.
+                  Section marks must add up to exactly {requiredMarks} before you can generate the paper.
                 </p>
               ) : null}
               <div className="flex justify-end gap-2">
