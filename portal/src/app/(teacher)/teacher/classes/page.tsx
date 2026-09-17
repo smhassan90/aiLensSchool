@@ -38,7 +38,13 @@ export default function TeacherClassesPage() {
     queryFn: () => teachersService.myClasses(),
   });
 
-  const classes = useMemo(() => [...(data ?? [])].sort(compareClasses), [data]);
+  const classes = useMemo(
+    () =>
+      [...new Map(
+        (data ?? []).map((cls) => [`${cls.sectionId}:${cls.subjectId}`, cls] as const),
+      ).values()].sort(compareClasses),
+    [data],
+  );
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">

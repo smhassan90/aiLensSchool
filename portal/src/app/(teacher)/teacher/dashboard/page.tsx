@@ -43,7 +43,9 @@ export default function TeacherDashboardPage() {
   const scoreDueSoon = assignments.filter(
     (row) => row.status === "APPROVED" && row.scoreEntryOpen && row.scoreEntryDueAt,
   );
-  const sortedClasses = [...(data?.classes ?? [])].sort((a, b) => {
+  const sortedClasses = [...new Map(
+    (data?.classes ?? []).map((cls) => [`${cls.sectionId}:${cls.subjectId}`, cls] as const),
+  ).values()].sort((a, b) => {
     const grade = a.gradeName.localeCompare(b.gradeName, undefined, { numeric: true, sensitivity: "base" });
     if (grade !== 0) return grade;
     const section = a.sectionName.localeCompare(b.sectionName, undefined, { numeric: true, sensitivity: "base" });
