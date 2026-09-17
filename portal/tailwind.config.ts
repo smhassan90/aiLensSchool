@@ -62,8 +62,8 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["var(--font-dm-sans)", "system-ui", "sans-serif"],
-        display: ["var(--font-fraunces)", "Georgia", "serif"],
+        sans: ["Times New Roman", "Times", "serif"],
+        display: ["Times New Roman", "Times", "serif"],
       },
     },
   },
