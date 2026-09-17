@@ -406,6 +406,7 @@ export class InsightsService {
       id: item.id,
       title: item.title,
       subject: item.subject,
+      kind: 'ASSESSMENT',
       status: 'ASSESSMENT',
       attempted: item.scores.length,
       average: Number((item.scores.reduce((a, b) => a + b, 0) / item.scores.length).toFixed(1)),
@@ -419,6 +420,7 @@ export class InsightsService {
           id: quiz.id,
           title: quiz.title,
           subject: quiz.subject.name,
+          kind: 'QUIZ',
           status: quiz.status,
           attempted: scores.length,
           average: scores.length

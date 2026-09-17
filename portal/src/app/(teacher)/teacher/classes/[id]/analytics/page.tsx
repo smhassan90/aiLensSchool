@@ -18,7 +18,19 @@ type ClassOverview = {
   class: { id: string; name: string; level: number };
   enrollment: { total: number; bySection: Array<{ id: string; name: string; studentCount: number; attendanceRate: number; quizAverage: number }> };
   attendance: { rate: number; trend: Array<{ date: string; present: number; absent: number; late: number }> };
-  quizzes: { average: number; items: Array<{ id: string; title: string; subject: string; average: number; highest: number; lowest: number; attempted: number }> };
+  quizzes: {
+    average: number;
+    items: Array<{
+      id: string;
+      title: string;
+      subject: string;
+      kind: "QUIZ" | "ASSESSMENT";
+      average: number;
+      highest: number;
+      lowest: number;
+      attempted: number;
+    }>;
+  };
   subjects: Array<{ name: string; average: number }>;
   fees: { billed: number; collected: number; outstanding: number; collectionRate: number };
 };
@@ -81,9 +93,24 @@ export default function TeacherClassAnalyticsPage() {
           <CardHeader><CardTitle>Quizzes & assessments</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             {data.quizzes.items.map((quiz) => (
-              <div key={quiz.id} className="flex justify-between">
-                <span>{quiz.title}</span>
-                <span>avg {quiz.average}% · {quiz.attempted} attempted</span>
+              <div key={quiz.id} className="rounded-md border px-3 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{quiz.title}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    quiz.kind === "ASSESSMENT"
+                      ? "bg-amber-100 text-amber-900"
+                      : "bg-sky-100 text-sky-900"
+                  }`}>
+                    {quiz.kind === "ASSESSMENT" ? "Manual assessment" : "Quiz (auto-scored)"}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap justify-between gap-2 text-muted-foreground">
+                  <span>Subject: {quiz.subject}</span>
+                  <span>
+                    {quiz.kind === "ASSESSMENT" ? "Assessment average" : "Quiz average"}: {quiz.average}% ·{" "}
+                    {quiz.attempted} {quiz.kind === "ASSESSMENT" ? "students scored" : "attempted"}
+                  </span>
+                </div>
               </div>
             ))}
             {!data.quizzes.items.length && <p className="text-muted-foreground">No quizzes yet.</p>}
