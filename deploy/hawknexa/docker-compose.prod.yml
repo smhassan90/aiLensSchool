@@ -102,9 +102,8 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - hawknexa_caddy_data:/data
       - hawknexa_caddy_config:/config
+    # Do not depend on backend/portal — Caddy must stay up for /internal/deploy even when app containers fail.
     depends_on:
-      - portal
-      - backend
       - deploy-webhook
     networks:
       - hawknexa_internal

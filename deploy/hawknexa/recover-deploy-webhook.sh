@@ -34,6 +34,10 @@ fi
 
 cd "${DEPLOY_DIR}"
 
+if ! systemctl is-active --quiet docker 2>/dev/null; then
+  systemctl start docker || service docker start
+fi
+
 echo "=== Build and start deploy-webhook + reload Caddy ==="
 docker compose -f "${COMPOSE_FILE}" build deploy-webhook
 docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook
