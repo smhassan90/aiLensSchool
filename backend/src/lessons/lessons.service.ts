@@ -948,13 +948,6 @@ export class LessonsService {
       });
     }
 
-    if (lesson.status === LessonStatus.CONFIRMED) {
-      throw new BadRequestException({
-        code: 'LESSON_ALREADY_CONFIRMED',
-        message: 'Confirmed lessons cannot be deleted',
-      });
-    }
-
     await this.prisma.$transaction(async (tx) => {
       await tx.homework.updateMany({ where: { lessonId: id }, data: { lessonId: null } });
       await tx.aIJob.updateMany({ where: { lessonId: id }, data: { lessonId: null } });
@@ -965,7 +958,7 @@ export class LessonsService {
       actorUserId: user.id,
       schoolId: lesson.schoolId,
       branchId: lesson.branchId,
-      action: 'LESSON_DRAFT_DELETED',
+      action: 'LESSON_DELETED',
       entityType: 'DailyLesson',
       entityId: id,
     });

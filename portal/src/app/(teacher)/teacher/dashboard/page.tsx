@@ -43,6 +43,13 @@ export default function TeacherDashboardPage() {
   const scoreDueSoon = assignments.filter(
     (row) => row.status === "APPROVED" && row.scoreEntryOpen && row.scoreEntryDueAt,
   );
+  const sortedClasses = [...(data?.classes ?? [])].sort((a, b) => {
+    const grade = a.gradeName.localeCompare(b.gradeName, undefined, { numeric: true, sensitivity: "base" });
+    if (grade !== 0) return grade;
+    const section = a.sectionName.localeCompare(b.sectionName, undefined, { numeric: true, sensitivity: "base" });
+    if (section !== 0) return section;
+    return a.subjectName.localeCompare(b.subjectName, undefined, { sensitivity: "base" });
+  });
 
   if (dashboard.isLoading) {
     return (
@@ -177,7 +184,7 @@ export default function TeacherDashboardPage() {
             <CardTitle>My classes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {(data?.classes ?? []).map((cls) => (
+            {sortedClasses.map((cls) => (
               <Link
                 key={`${cls.sectionId}-${cls.subjectId}`}
                 href="/teacher/lessons/new"

@@ -42,8 +42,8 @@ function canReview(status: string) {
   return status === "READY_FOR_REVIEW" || status === "PENDING_REVIEW" || status === "DRAFT" || status === "CONFIRMED";
 }
 
-function canDeleteDraft(status: string) {
-  return status !== "CONFIRMED";
+function canDeleteLesson(status: string) {
+  return Boolean(status);
 }
 
 export default function TeacherLessonsPage() {
@@ -135,7 +135,7 @@ export default function TeacherLessonsPage() {
                           </Button>
                         </Link>
                       )}
-                      {canDeleteDraft(lesson.status) && (
+                      {canDeleteLesson(lesson.status) && (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -144,7 +144,7 @@ export default function TeacherLessonsPage() {
                           onClick={() => {
                             if (
                               !window.confirm(
-                                "Delete this draft lesson? This cannot be undone.",
+                                "Delete this lecture? This cannot be undone.",
                               )
                             ) {
                               return;
@@ -153,7 +153,7 @@ export default function TeacherLessonsPage() {
                           }}
                         >
                           <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Delete draft</span>
+                          <span className="sr-only">Delete lecture</span>
                         </Button>
                       )}
                     </div>
