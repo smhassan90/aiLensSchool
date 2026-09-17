@@ -168,23 +168,23 @@ export default function TeacherExamScoresPage() {
           </div>
 
           <div className="overflow-hidden rounded-xl border bg-card">
-            <div className="grid grid-cols-[2.5rem_minmax(8rem,1fr)_6rem_7rem] gap-3 border-b bg-muted/40 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="grid grid-cols-[2.5rem_6rem_minmax(8rem,1fr)_7rem] gap-3 border-b bg-muted/40 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <span>Sr. No.</span>
-              <span>Name of student</span>
               <span>Roll number</span>
+              <span>Name of student</span>
               <span>Marks obtained</span>
             </div>
             <div className="divide-y">
               {sheet.data.students.map((student, index) => (
                 <div
                   key={student.studentId}
-                  className="grid grid-cols-[2.5rem_minmax(8rem,1fr)_6rem_7rem] items-center gap-3 px-4 py-3"
+                  className="grid grid-cols-[2.5rem_6rem_minmax(8rem,1fr)_7rem] items-center gap-3 px-4 py-3"
                 >
                   <span className="text-sm text-muted-foreground">{index + 1}</span>
+                  <p className="text-sm text-muted-foreground">{student.studentCode}</p>
                   <div>
                     <p className="font-medium">{student.firstName} {student.lastName}</p>
                   </div>
-                  <p className="text-sm text-muted-foreground">{student.studentCode}</p>
                   <Input
                     type="number"
                     min={0}
