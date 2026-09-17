@@ -40,6 +40,14 @@ export default function TeacherDashboardPage() {
       (row.status === "NOT_STARTED" || row.status === "DRAFT") &&
       row.submissionDueAt,
   );
+  const paperOverdue = assignments.filter(
+    (row) =>
+      !row.paperSubmissionOpen &&
+      (row.status === "NOT_STARTED" || row.status === "DRAFT"),
+  );
+  const papersGenerated = assignments.filter(
+    (row) => row.status !== "NOT_STARTED",
+  );
   const scoreDueSoon = assignments.filter(
     (row) => row.status === "APPROVED" && row.scoreEntryOpen && row.scoreEntryDueAt,
   );
@@ -79,16 +87,34 @@ export default function TeacherDashboardPage() {
         }
       />
 
-      {(data?.examPaperPendingCount ?? 0) > 0 ? (
+      {paperOverdue.length > 0 ? (
+        <Link
+          href="/teacher/exams"
+          className="mb-6 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-950 transition-colors hover:bg-rose-100"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="font-medium">
+              {paperOverdue.length} exam paper{paperOverdue.length === 1 ? "" : "s"} not generated — deadline passed
+            </p>
+            <p className="mt-0.5 text-sm text-rose-900/80">
+              Request a 1–3 day extension from the Exam Papers screen to generate and submit these papers.
+            </p>
+            {paperOverdue.slice(0, 2).map((row) => (
+              <p key={row.id} className="mt-1 text-sm font-medium text-rose-900">
+                {row.className} · {row.subjectName} — due {formatDate(row.submissionDueAt)}
+              </p>
+            ))}
+          </div>
+        </Link>
+      ) : paperDueSoon.length > 0 ? (
         <Link
           href="/teacher/exams"
           className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 transition-colors hover:bg-amber-100"
         >
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
-            <p className="font-medium">
-              {data?.examPaperPendingCount} exam paper{(data?.examPaperPendingCount ?? 0) === 1 ? "" : "s"} still to generate and submit
-            </p>
+            <p className="font-medium">{paperDueSoon.length} exam paper{paperDueSoon.length === 1 ? "" : "s"} still need your attention</p>
             <p className="mt-0.5 text-sm text-amber-900/80">
               Open exam papers to generate your paper with the required question mix and submit it before the due date.
             </p>
@@ -99,6 +125,28 @@ export default function TeacherDashboardPage() {
             ))}
           </div>
         </Link>
+      ) : null}
+
+      {papersGenerated.length > 0 ? (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-950">
+          <div>
+            <p className="font-medium">
+              {papersGenerated.length} exam paper{papersGenerated.length === 1 ? "" : "s"} generated successfully
+            </p>
+            <div className="mt-1 space-y-0.5 text-sm text-emerald-900/90">
+              {papersGenerated.slice(0, 3).map((row) => (
+                <p key={row.id}>
+                  {row.className} · {row.subjectName} —{" "}
+                  {row.status === "APPROVED"
+                    ? "approved"
+                    : row.status === "PENDING"
+                      ? "submitted for review"
+                      : "draft generated"}
+                </p>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {scoreDueSoon.length > 0 ? (
