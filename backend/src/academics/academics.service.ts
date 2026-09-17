@@ -1833,6 +1833,7 @@ export class AcademicsService {
                 teacherId: assignment.teacherId,
                 maxMarks: assignment.maxMarks,
                 submissionDueAt: assignment.submissionDueAt.toISOString(),
+                scoreEntryDueAt: assignment.scoreEntryDueAt?.toISOString() ?? null,
                 questionSpec: parseQuestionSpec(assignment.questionSpec),
                 releasedAt: assignment.releasedAt?.toISOString() ?? null,
               }

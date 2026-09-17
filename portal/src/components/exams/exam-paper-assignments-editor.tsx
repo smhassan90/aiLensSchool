@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,22 @@ export function ExamPaperAssignmentsEditor({
   const queryClient = useQueryClient();
   const [dueDate, setDueDate] = useState("");
   const [scoreDueDate, setScoreDueDate] = useState("");
+  const assignments = useQuery({
+    queryKey: ["exam-paper-assignments", examConfigId],
+    queryFn: () => academicsService.listExamPaperAssignments(examConfigId),
+    enabled: Boolean(examConfigId),
+  });
+
+  const firstApplied = assignments.data?.rows.find((row) => row.assignment)?.assignment ?? null;
+  useEffect(() => {
+    if (!firstApplied) {
+      setDueDate("");
+      setScoreDueDate("");
+      return;
+    }
+    setDueDate(firstApplied.submissionDueAt.slice(0, 10));
+    setScoreDueDate(firstApplied.scoreEntryDueAt?.slice(0, 10) ?? "");
+  }, [firstApplied?.submissionDueAt, firstApplied?.scoreEntryDueAt]);
 
   const apply = useMutation({
     mutationFn: (release: boolean) => {

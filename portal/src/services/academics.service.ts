@@ -300,6 +300,7 @@ export const academicsService = {
           teacherId: string | null;
           maxMarks: number;
           submissionDueAt: string;
+          scoreEntryDueAt: string | null;
           questionSpec: ExamPaperQuestionSpec | null;
           releasedAt: string | null;
         } | null;

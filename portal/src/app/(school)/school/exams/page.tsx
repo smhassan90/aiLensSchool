@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +30,16 @@ export default function ExamsPage() {
     queryFn: () => academicsService.listExamConfigs(yearId),
     enabled: Boolean(yearId),
   });
+  const appliedExamQueries = useQueries({
+    queries: (configs.data ?? []).map((exam) => ({
+      queryKey: ["exam-paper-assignments", exam.id],
+      queryFn: () => academicsService.listExamPaperAssignments(exam.id),
+      enabled: Boolean(exam.id),
+    })),
+  });
+  const appliedExams = (configs.data ?? []).filter((exam, index) =>
+    appliedExamQueries[index]?.data?.rows.some((row) => row.assignment),
+  );
   const examSettings = useQuery({
     queryKey: ["exam-settings"],
     queryFn: () => academicsService.getExamSettings(),
@@ -164,6 +174,38 @@ export default function ExamsPage() {
             </p>
           </CardHeader>
           <CardContent className="space-y-5">
+            {appliedExams.length ? (
+              <div className="overflow-hidden rounded-lg border">
+                <div className="border-b bg-muted/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Applied exams
+                </div>
+                <div className="divide-y">
+                  {appliedExams.map((exam) => {
+                    const result = appliedExamQueries[(configs.data ?? []).findIndex((row) => row.id === exam.id)]?.data;
+                    const assignment = result?.rows.find((row) => row.assignment)?.assignment;
+                    return (
+                      <button
+                        key={exam.id}
+                        type="button"
+                        className="grid w-full gap-2 px-4 py-3 text-left text-sm hover:bg-muted/30 sm:grid-cols-[1.4fr_1fr_1fr_auto] sm:items-center"
+                        onClick={() => setAssignExamId(exam.id)}
+                      >
+                        <span>
+                          <span className="block font-medium">{exam.name}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {result?.rows.length ?? 0} class-subject assignments ·{" "}
+                            {assignment?.releasedAt ? "Released" : "Saved"}
+                          </span>
+                        </span>
+                        <span>Paper due: <strong>{assignment?.submissionDueAt.slice(0, 10) ?? "—"}</strong></span>
+                        <span>Scores due: <strong>{assignment?.scoreEntryDueAt?.slice(0, 10) ?? "—"}</strong></span>
+                        <span className="text-xs text-muted-foreground">Edit</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <Label htmlFor="assignExamId">Exam to apply</Label>
               <select
