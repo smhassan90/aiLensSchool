@@ -2429,26 +2429,77 @@ export class AcademicsService {
     });
   }
 
-  private applyDeadlineExtension(
-    assignmentId: string,
-    kind: 'paper' | 'score' | 'both',
-    days: 1 | 2 | 3,
-  ) {
+  private extensionUntil(days: 1 | 2 | 3) {
     const until = new Date();
     until.setDate(until.getDate() + days);
     until.setHours(23, 59, 59, 999);
-    const data: Prisma.ExamPaperAssignmentUpdateInput = {};
+    return until;
+  }
+
+  private async teacherAssignmentIdsForExam(
+    schoolId: string,
+    teacherId: string,
+    examConfigId: string,
+  ) {
+    const exam = await this.prisma.examConfig.findFirst({
+      where: { id: examConfigId, schoolId },
+      select: { academicYearId: true },
+    });
+    if (!exam) {
+      return [];
+    }
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        academicYearId: exam.academicYearId,
+        OR: [{ teacherId }, { assistantTeacherId: teacherId }],
+      },
+      select: { sectionId: true, subjectId: true },
+    });
+    const teachKeys = new Set(classSubjects.map((row) => `${row.sectionId}:${row.subjectId}`));
+
+    const assignments = await this.prisma.examPaperAssignment.findMany({
+      where: {
+        schoolId,
+        examConfigId,
+        releasedAt: { not: null },
+      },
+      select: { id: true, sectionId: true, subjectId: true, teacherId: true },
+    });
+
+    return assignments
+      .filter((row) => {
+        if (row.teacherId === teacherId) return true;
+        if (row.teacherId && row.teacherId !== teacherId) return false;
+        return teachKeys.has(`${row.sectionId}:${row.subjectId}`);
+      })
+      .map((row) => row.id);
+  }
+
+  private async applyDeadlineExtensionToAssignments(
+    assignmentIds: string[],
+    kind: 'paper' | 'score' | 'both',
+    days: 1 | 2 | 3,
+  ) {
+    if (!assignmentIds.length) {
+      throw new NotFoundException({
+        code: 'ASSIGNMENT_NOT_FOUND',
+        message: 'No exam assignments found for this teacher',
+      });
+    }
+    const until = this.extensionUntil(days);
+    const data: Prisma.ExamPaperAssignmentUpdateManyMutationInput = {};
     if (kind === 'paper' || kind === 'both') {
       data.paperSubmissionUnlockedUntil = until;
     }
     if (kind === 'score' || kind === 'both') {
       data.scoreEntryUnlockedUntil = until;
     }
-    return this.prisma.examPaperAssignment.update({
-      where: { id: assignmentId },
+    await this.prisma.examPaperAssignment.updateMany({
+      where: { id: { in: assignmentIds } },
       data,
-      select: { id: true },
-    }).then(() => until);
+    });
+    return { until, assignmentCount: assignmentIds.length };
   }
 
   async requestExamDeadlineExtension(
@@ -2612,10 +2663,25 @@ export class AcademicsService {
     const grantDays = (days ?? request.days) as 1 | 2 | 3;
     const kind =
       request.kind === 'PAPER' ? 'paper' : request.kind === 'SCORE' ? 'score' : 'both';
-    const until = await this.applyDeadlineExtension(request.assignmentId, kind, grantDays);
+    const assignmentIds = await this.teacherAssignmentIdsForExam(
+      schoolId,
+      request.teacherId,
+      request.assignment.examConfigId,
+    );
+    const { until, assignmentCount } = await this.applyDeadlineExtensionToAssignments(
+      assignmentIds,
+      kind,
+      grantDays,
+    );
 
-    await this.prisma.examDeadlineExtensionRequest.update({
-      where: { id: request.id },
+    await this.prisma.examDeadlineExtensionRequest.updateMany({
+      where: {
+        schoolId,
+        teacherId: request.teacherId,
+        status: 'PENDING',
+        kind: request.kind,
+        assignment: { examConfigId: request.assignment.examConfigId },
+      },
       data: {
         status: 'APPROVED',
         days: grantDays,
@@ -2630,12 +2696,18 @@ export class AcademicsService {
       action: 'EXAM_DEADLINE_EXTENSION_APPROVED',
       entityType: 'ExamDeadlineExtensionRequest',
       entityId: request.id,
-      metadata: { kind, days: grantDays, assignmentId: request.assignmentId },
+      metadata: {
+        kind,
+        days: grantDays,
+        examConfigId: request.assignment.examConfigId,
+        assignmentCount,
+      },
     });
 
     return {
       ok: true,
       unlockedUntil: until.toISOString(),
+      assignmentCount,
       teacherName: `${request.teacher.user.firstName} ${request.teacher.user.lastName}`.trim(),
     };
   }
@@ -2645,8 +2717,6 @@ export class AcademicsService {
     body: {
       teacherUserId: string;
       examConfigId: string;
-      sectionId: string;
-      subjectId: string;
       kind: 'paper' | 'score' | 'both';
       days: 1 | 2 | 3;
     },
@@ -2665,32 +2735,34 @@ export class AcademicsService {
     if (!teacher) {
       throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
     }
-    const assignment = await this.prisma.examPaperAssignment.findFirst({
-      where: {
-        schoolId,
-        examConfigId: body.examConfigId,
-        sectionId: body.sectionId,
-        subjectId: body.subjectId,
-      },
-    });
-    if (!assignment) {
-      throw new NotFoundException({
-        code: 'ASSIGNMENT_NOT_FOUND',
-        message: 'Exam assignment not found for this class and subject',
-      });
-    }
-    const until = await this.applyDeadlineExtension(assignment.id, body.kind, body.days);
+    const assignmentIds = await this.teacherAssignmentIdsForExam(
+      schoolId,
+      teacher.id,
+      body.examConfigId,
+    );
+    const { until, assignmentCount } = await this.applyDeadlineExtensionToAssignments(
+      assignmentIds,
+      body.kind,
+      body.days,
+    );
     await this.audit.log({
       actorUserId: user.id,
       schoolId,
       action: 'EXAM_DEADLINE_EXTENDED',
       entityType: 'ExamPaperAssignment',
-      entityId: assignment.id,
-      metadata: { kind: body.kind, days: body.days, teacherUserId: body.teacherUserId },
+      entityId: assignmentIds[0],
+      metadata: {
+        kind: body.kind,
+        days: body.days,
+        teacherUserId: body.teacherUserId,
+        examConfigId: body.examConfigId,
+        assignmentCount,
+      },
     });
     return {
       ok: true,
       unlockedUntil: until.toISOString(),
+      assignmentCount,
       teacherName: `${teacher.user.firstName} ${teacher.user.lastName}`.trim(),
     };
   }

@@ -386,8 +386,6 @@ export class AcademicsController {
     body: {
       teacherUserId: string;
       examConfigId: string;
-      sectionId: string;
-      subjectId: string;
       kind: 'paper' | 'score' | 'both';
       days: 1 | 2 | 3;
     },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, Check, Search, Unlock } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -27,7 +27,6 @@ export default function ExamDeadlineExtensionsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [teacherId, setTeacherId] = useState("");
-  const [classKey, setClassKey] = useState("");
   const [examConfigId, setExamConfigId] = useState("");
   const [kind, setKind] = useState<"paper" | "score" | "both">("paper");
   const [days, setDays] = useState<"1" | "2" | "3">("1");
@@ -49,27 +48,6 @@ export default function ExamDeadlineExtensionsPage() {
     enabled: Boolean(teacherId),
   });
 
-  const classOptions = useMemo(() => {
-    const rows = teacher.data?.classSubjects ?? [];
-    return rows
-      .map((row) => {
-        const sectionId = row.section?.id;
-        const subjectId =
-          (row as { subjectId?: string }).subjectId ??
-          (row.subject as { id?: string } | undefined)?.id;
-        if (!sectionId || !subjectId) return null;
-        return {
-          key: `${sectionId}:${subjectId}`,
-          label: `${row.section?.grade?.name ?? ""} ${row.section?.name ?? ""} · ${row.subject?.name ?? ""}`.trim(),
-          sectionId,
-          subjectId,
-        };
-      })
-      .filter((row): row is NonNullable<typeof row> => row != null);
-  }, [teacher.data]);
-
-  const selectedClass = classOptions.find((row) => row.key === classKey);
-
   const examConfigs = useQuery({
     queryKey: ["exam-configs-extensions"],
     queryFn: () => academicsService.listExamConfigs(),
@@ -80,7 +58,7 @@ export default function ExamDeadlineExtensionsPage() {
     onSuccess: (res) => {
       toast({
         title: `Approved for ${res.teacherName}`,
-        description: `Access restored until ${formatDate(res.unlockedUntil)}.`,
+        description: `All classes and subjects reopened until ${formatDate(res.unlockedUntil)} (${res.assignmentCount} assignment${res.assignmentCount === 1 ? "" : "s"}).`,
         variant: "success",
       });
       queryClient.invalidateQueries({ queryKey: ["exam-deadline-extension-requests"] });
@@ -91,14 +69,12 @@ export default function ExamDeadlineExtensionsPage() {
 
   const extend = useMutation({
     mutationFn: () => {
-      if (!teacher.data?.user.id || !examConfigId || !selectedClass) {
-        throw new Error("Select teacher, class, and exam");
+      if (!teacher.data?.user.id || !examConfigId) {
+        throw new Error("Select teacher and exam");
       }
       return academicsService.extendExamDeadlines({
         teacherUserId: teacher.data.user.id,
         examConfigId,
-        sectionId: selectedClass.sectionId,
-        subjectId: selectedClass.subjectId,
         kind,
         days: Number(days) as 1 | 2 | 3,
       });
@@ -106,16 +82,16 @@ export default function ExamDeadlineExtensionsPage() {
     onSuccess: (res) => {
       toast({
         title: `Reopened for ${res.teacherName}`,
-        description: `Access restored until ${formatDate(res.unlockedUntil)}.`,
+        description: `All classes and subjects reopened until ${formatDate(res.unlockedUntil)} (${res.assignmentCount} assignment${res.assignmentCount === 1 ? "" : "s"}).`,
         variant: "success",
       });
+      queryClient.invalidateQueries({ queryKey: ["my-exam-paper-assignments"] });
     },
     onError: (err: Error) => toast({ title: "Could not extend", description: err.message, variant: "error" }),
   });
 
   const pickTeacher = (id: string) => {
     setTeacherId(id);
-    setClassKey("");
     setExamConfigId("");
     setSearch("");
   };
@@ -126,7 +102,7 @@ export default function ExamDeadlineExtensionsPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Exam deadline extensions"
-        description="Approve teacher requests or manually reopen paper submission or score entry."
+        description="Approving or manually allowing access reopens all of that teacher's classes and subjects for the selected exam."
       />
 
       <section className="mb-8 space-y-4">
@@ -152,11 +128,11 @@ export default function ExamDeadlineExtensionsPage() {
                 <div className="space-y-1">
                   <p className="font-medium">{row.teacherName}</p>
                   <p className="text-sm text-muted-foreground">
-                    {row.examName} · {row.className} · {row.subjectName}
+                    {row.examName} · requested from {row.className} · {row.subjectName}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {kindLabel(row.kind)} · requested {row.days} day{row.days === 1 ? "" : "s"} ·{" "}
-                    {formatDate(row.requestedAt)}
+                    {kindLabel(row.kind)} · {row.days} day{row.days === 1 ? "" : "s"} ·{" "}
+                    {formatDate(row.requestedAt)} · applies to all classes & subjects
                   </p>
                 </div>
                 <Button
@@ -177,7 +153,7 @@ export default function ExamDeadlineExtensionsPage() {
         <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <CalendarClock className="mt-0.5 h-5 w-5 shrink-0" />
           <p>
-            Extensions last 1–3 days from today (until 11:59 PM). After that, access closes again unless you extend again.
+            Extensions last 1–3 days from today (until 11:59 PM) and apply to every class and subject that teacher handles for that exam.
           </p>
         </div>
       </div>
@@ -240,16 +216,6 @@ export default function ExamDeadlineExtensionsPage() {
           ) : (
             <>
               <div className="space-y-2">
-                <Label>Class & subject</Label>
-                <Select value={classKey} onChange={(e) => setClassKey(e.target.value)}>
-                  <option value="">Select class</option>
-                  {classOptions.map((row) => (
-                    <option key={row.key} value={row.key}>{row.label}</option>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="space-y-2">
                 <Label>Exam</Label>
                 <Select value={examConfigId} onChange={(e) => setExamConfigId(e.target.value)}>
                   <option value="">Select exam</option>
@@ -283,7 +249,7 @@ export default function ExamDeadlineExtensionsPage() {
               <Button
                 className="w-full sm:w-auto"
                 onClick={() => extend.mutate()}
-                disabled={extend.isPending || !classKey || !examConfigId}
+                disabled={extend.isPending || !examConfigId}
               >
                 <Unlock className="h-4 w-4" />
                 {extend.isPending ? "Allowing…" : "Allow access"}

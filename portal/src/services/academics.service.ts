@@ -401,7 +401,7 @@ export const academicsService = {
   },
 
   approveExamDeadlineExtensionRequest(id: string, days?: 1 | 2 | 3) {
-    return apiClient<{ ok: boolean; unlockedUntil: string; teacherName: string }>(
+    return apiClient<{ ok: boolean; unlockedUntil: string; assignmentCount: number; teacherName: string }>(
       `/academics/exam-deadline-extension-requests/${id}/approve`,
       { method: "POST", body: JSON.stringify(days ? { days } : {}) },
     );
@@ -417,12 +417,10 @@ export const academicsService = {
   extendExamDeadlines(payload: {
     teacherUserId: string;
     examConfigId: string;
-    sectionId: string;
-    subjectId: string;
     kind: "paper" | "score" | "both";
     days: 1 | 2 | 3;
   }) {
-    return apiClient<{ ok: boolean; unlockedUntil: string; teacherName: string }>(
+    return apiClient<{ ok: boolean; unlockedUntil: string; assignmentCount: number; teacherName: string }>(
       "/academics/exam-deadline-extensions",
       { method: "POST", body: JSON.stringify(payload) },
     );
