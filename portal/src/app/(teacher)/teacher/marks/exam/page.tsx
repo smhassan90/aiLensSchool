@@ -140,7 +140,18 @@ export default function TeacherExamScoresPage() {
 
       {sheet.isLoading && examConfigId ? <PageLoader variant="panel" task="exams" /> : null}
 
-      {sheet.data && !sheet.data.canEnterScores ? (
+      {sheet.data?.scoresSubmitted ? (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-950">
+          <div>
+            <p className="font-medium">Exam scores submitted</p>
+            <p className="mt-1 text-sm">
+              This score sheet is locked. Ask the school admin to reopen score entry if corrections are needed.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {sheet.data && !sheet.data.canEnterScores && !sheet.data.scoresSubmitted ? (
         <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
@@ -151,6 +162,12 @@ export default function TeacherExamScoresPage() {
                 : "Please contact the school admin."}
             </p>
           </div>
+        </div>
+      ) : null}
+
+      {sheet.data?.scoresSubmitted && sheet.data.canEnterScores ? (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          The school admin reopened this submitted score sheet. You may correct the marks until the extension expires.
         </div>
       ) : null}
 
@@ -220,7 +237,10 @@ export default function TeacherExamScoresPage() {
           ) : null}
 
           <div className="mt-6 flex justify-end">
-            <Button onClick={() => save.mutate()} disabled={save.isPending || filledCount === 0}>
+            <Button
+              onClick={() => save.mutate()}
+              disabled={save.isPending || filledCount !== sheet.data.students.length}
+            >
               <Save className="h-4 w-4" />
               {save.isPending ? "Saving…" : "Save all marks"}
             </Button>

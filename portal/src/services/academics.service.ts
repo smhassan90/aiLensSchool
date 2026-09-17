@@ -433,6 +433,7 @@ export const academicsService = {
       className: string;
       subjectName: string;
       scoreEntryDueAt: string | null;
+      scoresSubmitted: boolean;
       canEnterScores: boolean;
       students: Array<{
         studentId: string;

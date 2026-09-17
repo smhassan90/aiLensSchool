@@ -2820,6 +2820,12 @@ export class AcademicsService {
       select: { id: true, studentId: true, marks: true },
     });
     const marksByStudent = new Map(existing.map((row) => [row.studentId, row]));
+    const scoresSubmitted =
+      enrollments.length > 0 &&
+      enrollments.every((row) => marksByStudent.get(row.studentId)?.marks != null);
+    const scoreEntryReopened =
+      assignment.scoreEntryUnlockedUntil != null &&
+      assignment.scoreEntryUnlockedUntil.getTime() > Date.now();
     return {
       exam: {
         id: assignment.examConfig.id,
@@ -2830,13 +2836,14 @@ export class AcademicsService {
       className: `${assignment.section.grade.name} ${assignment.section.name}`,
       subjectName: assignment.subject.name,
       scoreEntryDueAt: assignment.scoreEntryDueAt?.toISOString() ?? null,
-      canEnterScores,
+      scoresSubmitted,
+      canEnterScores: canEnterScores && (!scoresSubmitted || scoreEntryReopened),
       students: enrollments.map((row) => ({
         studentId: row.studentId,
         firstName: row.student.firstName,
         lastName: row.student.lastName,
         studentCode: row.student.studentCode,
-        marks: marksByStudent.get(row.studentId)?.marks
+        marks: marksByStudent.get(row.studentId)?.marks != null
           ? Number(marksByStudent.get(row.studentId)!.marks)
           : null,
         assessmentId: marksByStudent.get(row.studentId)?.id ?? null,
@@ -2887,6 +2894,44 @@ export class AcademicsService {
       throw new BadRequestException({ code: 'NO_YEAR', message: 'No active academic year' });
     }
     const maxMarks = assignment.maxMarks;
+    const enrollments = await this.prisma.studentEnrollment.findMany({
+      where: {
+        sectionId: body.sectionId,
+        status: EnrollmentStatus.ACTIVE,
+      },
+      select: { studentId: true },
+    });
+    const enrolledStudentIds = new Set(enrollments.map((row) => row.studentId));
+    const existing = await this.prisma.assessmentMark.findMany({
+      where: {
+        schoolId,
+        examConfigId: body.examConfigId,
+        sectionId: body.sectionId,
+        subjectId: body.subjectId,
+      },
+      select: { studentId: true, marks: true },
+    });
+    const allScoresAlreadySubmitted =
+      enrollments.length > 0 &&
+      enrollments.every((row) => existing.some((mark) => mark.studentId === row.studentId && mark.marks != null));
+    const scoreEntryReopened =
+      assignment.scoreEntryUnlockedUntil != null &&
+      assignment.scoreEntryUnlockedUntil.getTime() > Date.now();
+    if (allScoresAlreadySubmitted && !scoreEntryReopened) {
+      throw new BadRequestException({
+        code: 'SCORES_ALREADY_SUBMITTED',
+        message: 'Exam scores are already submitted. Ask the school admin to reopen score entry before editing.',
+      });
+    }
+    if (
+      body.scores.length !== enrolledStudentIds.size ||
+      body.scores.some((row) => !enrolledStudentIds.has(row.studentId))
+    ) {
+      throw new BadRequestException({
+        code: 'ALL_SCORES_REQUIRED',
+        message: 'Enter marks for every enrolled student before submitting.',
+      });
+    }
     for (const row of body.scores) {
       if (row.marks < 0 || row.marks > maxMarks) {
         throw new BadRequestException({
