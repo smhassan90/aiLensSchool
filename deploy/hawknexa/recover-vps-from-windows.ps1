@@ -11,25 +11,28 @@ $user = if ($env:HAWKNEXA_VPS_USER) { $env:HAWKNEXA_VPS_USER } else { "root" }
 $remote = "${user}@${hostName}"
 
 $script = @'
-set -euo pipefail
-REPO_DIR="/opt/apps/hawknexa/repo"
-DEPLOY_DIR="/opt/apps/hawknexa/deploy"
-COMPOSE_FILE="${DEPLOY_DIR}/docker-compose.prod.yml"
-if [ -d "${REPO_DIR}/.git" ]; then
-  cd "${REPO_DIR}"
-  git fetch origin main
-  git reset --hard origin/main
-  rsync -a --exclude '.env' "${REPO_DIR}/deploy/hawknexa/" "${DEPLOY_DIR}/"
-fi
-cd "${DEPLOY_DIR}"
-docker compose -f "${COMPOSE_FILE}" build deploy-webhook
-docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook caddy
-sleep 3
-docker compose -f "${COMPOSE_FILE}" ps deploy-webhook caddy
-docker compose -f "${COMPOSE_FILE}" logs deploy-webhook --tail 30
-curl -fsS https://hawknexabackend.fynals.com/internal/deploy/health
-echo ""
-echo "Webhook recovered."
+bash /opt/apps/hawknexa/deploy/recover-vps.sh 2>/dev/null || {
+  set -euo pipefail
+  systemctl start docker || service docker start
+  ufw allow 80/tcp >/dev/null 2>&1 || true
+  ufw allow 443/tcp >/dev/null 2>&1 || true
+  REPO_DIR="/opt/apps/hawknexa/repo"
+  DEPLOY_DIR="/opt/apps/hawknexa/deploy"
+  COMPOSE_FILE="${DEPLOY_DIR}/docker-compose.prod.yml"
+  if [ -d "${REPO_DIR}/.git" ]; then
+    cd "${REPO_DIR}"
+    git fetch origin main
+    git reset --hard origin/main
+    rsync -a --exclude '.env' "${REPO_DIR}/deploy/hawknexa/" "${DEPLOY_DIR}/"
+    chmod +x "${DEPLOY_DIR}/"*.sh
+  fi
+  cd "${DEPLOY_DIR}"
+  docker compose -f "${COMPOSE_FILE}" up -d --build --no-deps deploy-webhook caddy
+  sleep 4
+  curl -fsS https://hawknexabackend.fynals.com/internal/deploy/health
+  echo ""
+  echo "Webhook recovered."
+}
 '@
 
 Write-Host "Connecting to $remote ..."

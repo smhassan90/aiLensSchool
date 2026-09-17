@@ -48,12 +48,21 @@ jobs:
               rsync -a --exclude '.env' "${REPO_DIR}/deploy/hawknexa/" "${DEPLOY_DIR}/"
             fi
 
-            cd "${DEPLOY_DIR}"
-            docker compose -f "${COMPOSE_FILE}" build deploy-webhook
-            docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook caddy
-            sleep 3
-            docker compose -f "${COMPOSE_FILE}" ps deploy-webhook caddy
-            docker compose -f "${COMPOSE_FILE}" logs deploy-webhook --tail 30
-            curl -fsS https://hawknexabackend.fynals.com/internal/deploy/health
-            echo ""
-            echo "Webhook recovered."
+            systemctl start docker || service docker start
+            if command -v ufw >/dev/null 2>&1; then
+              ufw allow OpenSSH >/dev/null 2>&1 || true
+              ufw allow 80/tcp >/dev/null 2>&1 || true
+              ufw allow 443/tcp >/dev/null 2>&1 || true
+            fi
+
+            if [ -x "${DEPLOY_DIR}/recover-vps.sh" ]; then
+              bash "${DEPLOY_DIR}/recover-vps.sh"
+            else
+              cd "${DEPLOY_DIR}"
+              docker compose -f "${COMPOSE_FILE}" build deploy-webhook
+              docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook caddy
+              sleep 3
+              curl -fsS https://hawknexabackend.fynals.com/internal/deploy/health
+              echo ""
+              echo "Webhook recovered."
+            fi

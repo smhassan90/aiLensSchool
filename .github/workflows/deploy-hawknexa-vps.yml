@@ -53,11 +53,12 @@ jobs:
         run: |
           set -euo pipefail
           echo "GET ${WEBHOOK_HEALTH_URL}"
-          webhook_code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 "${WEBHOOK_HEALTH_URL}" || echo "000")
+          webhook_code="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 "${WEBHOOK_HEALTH_URL}" 2>/dev/null || true)"
+          webhook_code="${webhook_code:-000}"
           echo "Webhook health HTTP ${webhook_code}"
           if [ "${webhook_code}" != "200" ]; then
             echo "::error::Deploy webhook is not healthy (HTTP ${webhook_code})."
-            if [ "${webhook_code}" = "000" ]; then
+            if [ "${webhook_code}" = "000" ] || [ "${webhook_code}" = "000000" ]; then
               echo "HTTP 000 = VPS ports 80/443 are not reachable (Caddy down or firewall blocking)."
             fi
             echo "On the VPS (Hostinger browser terminal) run:"
