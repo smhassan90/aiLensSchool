@@ -7,9 +7,10 @@ import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { insightsService } from "@/services/insights.service";
+import { academicsService } from "@/services/academics.service";
 import { BarChart, StackedAttendanceChart } from "@/components/charts/simple-charts";
 import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
@@ -25,6 +26,8 @@ type ClassOverview = {
       title: string;
       subject: string;
       kind: "QUIZ" | "ASSESSMENT";
+      subjectId?: string;
+      examConfigId?: string;
       average: number;
       highest: number;
       lowest: number;
@@ -38,6 +41,11 @@ type ClassOverview = {
 export default function TeacherClassAnalyticsPage() {
   const params = useParams<{ id: string }>();
   const [sectionId, setSectionId] = useState("");
+  const [selectedAssessment, setSelectedAssessment] = useState<{
+    examConfigId: string;
+    subjectId: string;
+    title: string;
+  } | null>(null);
   const query = useQuery({
     queryKey: ["class-analytics", params.id, sectionId],
     queryFn: () => insightsService.classOverview(params.id, sectionId || undefined) as Promise<ClassOverview>,
@@ -48,6 +56,22 @@ export default function TeacherClassAnalyticsPage() {
   }
   if (!query.data) return <div className="p-4 sm:p-6 lg:p-8">Class not found.</div>;
   const data = query.data;
+  const assessmentDetails = useQuery({
+    queryKey: [
+      "assessment-details",
+      params.id,
+      sectionId,
+      selectedAssessment?.examConfigId,
+      selectedAssessment?.subjectId,
+    ],
+    queryFn: () =>
+      academicsService.listAssessments({
+        sectionId: sectionId || undefined,
+        subjectId: selectedAssessment!.subjectId,
+        examConfigId: selectedAssessment!.examConfigId,
+      }),
+    enabled: Boolean(selectedAssessment),
+  });
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -106,6 +130,28 @@ export default function TeacherClassAnalyticsPage() {
                 </div>
                 <div className="mt-1 flex flex-wrap justify-between gap-2 text-muted-foreground">
                   <span>Subject: {quiz.subject}</span>
+                  {quiz.kind === "QUIZ" ? (
+                    <Link
+                      href={`/teacher/exams/${quiz.id}`}
+                      className="font-medium text-primary underline-offset-2 hover:underline"
+                    >
+                      Open question analysis
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className="font-medium text-primary underline-offset-2 hover:underline"
+                      onClick={() =>
+                        setSelectedAssessment({
+                          examConfigId: quiz.examConfigId!,
+                          subjectId: quiz.subjectId!,
+                          title: quiz.title,
+                        })
+                      }
+                    >
+                      View student scores
+                    </button>
+                  )}
                   <span>
                     {quiz.kind === "ASSESSMENT" ? "Assessment average" : "Quiz average"}: {quiz.average}% ·{" "}
                     {quiz.attempted} {quiz.kind === "ASSESSMENT" ? "students scored" : "attempted"}
@@ -116,6 +162,42 @@ export default function TeacherClassAnalyticsPage() {
             {!data.quizzes.items.length && <p className="text-muted-foreground">No quizzes yet.</p>}
           </CardContent>
         </Card>
+        {selectedAssessment ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>{selectedAssessment.title} — student scores</CardTitle>
+              <CardDescription>Manual assessment marks; question-level analysis is available only for auto-scored quizzes.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {assessmentDetails.isLoading ? <PageLoader variant="panel" task="exams" /> : (
+                <div className="overflow-x-auto rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40 text-left">
+                      <tr>
+                        <th className="px-3 py-2">Student</th>
+                        <th className="px-3 py-2">Marks</th>
+                        <th className="px-3 py-2">Percentage</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {(assessmentDetails.data ?? []).map((row) => (
+                        <tr key={row.id}>
+                          <td className="px-3 py-2 font-medium">
+                            {row.student ? `${row.student.firstName} ${row.student.lastName}` : "Student"}
+                          </td>
+                          <td className="px-3 py-2">{row.marks} / {row.maxMarks}</td>
+                          <td className="px-3 py-2">
+                            {((Number(row.marks) / Number(row.maxMarks)) * 100).toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </div>
   );

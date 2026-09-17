@@ -388,7 +388,7 @@ export class InsightsService {
     const collected = fees.reduce((sum, f) => sum + Number(f.paidAmount), 0);
     const assessmentItems = new Map<
       string,
-      { id: string; title: string; subject: string; scores: number[] }
+      { id: string; title: string; subject: string; subjectId: string; examConfigId: string; scores: number[] }
     >();
     for (const mark of assessmentMarks) {
       if (!mark.examConfig) continue;
@@ -397,6 +397,8 @@ export class InsightsService {
         id: `assessment-${key}`,
         title: mark.examConfig.name,
         subject: mark.subject.name,
+        subjectId: mark.subjectId,
+        examConfigId: mark.examConfig.id,
         scores: [],
       };
       item.scores.push((Number(mark.marks) / Number(mark.maxMarks)) * 100);
@@ -406,6 +408,8 @@ export class InsightsService {
       id: item.id,
       title: item.title,
       subject: item.subject,
+      subjectId: item.subjectId,
+      examConfigId: item.examConfigId,
       kind: 'ASSESSMENT',
       status: 'ASSESSMENT',
       attempted: item.scores.length,

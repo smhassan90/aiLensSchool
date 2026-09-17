@@ -1173,19 +1173,21 @@ export class AcademicsService {
     });
   }
 
-  listAssessments(user: AuthUser, sectionId?: string, subjectId?: string) {
+  listAssessments(user: AuthUser, sectionId?: string, subjectId?: string, examConfigId?: string) {
     const schoolId = this.tenant.requireSchoolId(user);
     return this.prisma.assessmentMark.findMany({
       where: {
         schoolId,
         ...(sectionId ? { sectionId } : {}),
         ...(subjectId ? { subjectId } : {}),
+        ...(examConfigId ? { examConfigId } : {}),
       },
       orderBy: { assessedAt: 'desc' },
       take: 80,
       include: {
-        student: { select: { firstName: true, lastName: true } },
+        student: { select: { firstName: true, lastName: true, studentCode: true } },
         subject: { select: { name: true } },
+        examConfig: { select: { name: true } },
       },
     });
   }

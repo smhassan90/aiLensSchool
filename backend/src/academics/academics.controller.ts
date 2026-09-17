@@ -325,9 +325,10 @@ export class AcademicsController {
   listAssessments(
     @Query('sectionId') sectionId: string | undefined,
     @Query('subjectId') subjectId: string | undefined,
+    @Query('examConfigId') examConfigId: string | undefined,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.academicsService.listAssessments(user, sectionId, subjectId);
+    return this.academicsService.listAssessments(user, sectionId, subjectId, examConfigId);
   }
 
   @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)

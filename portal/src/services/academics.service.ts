@@ -535,13 +535,15 @@ export const academicsService = {
     return apiClient("/academics/assessments", { method: "POST", body: JSON.stringify(payload) });
   },
 
-  listAssessments(params?: { sectionId?: string; subjectId?: string }) {
+  listAssessments(params?: { sectionId?: string; subjectId?: string; examConfigId?: string }) {
     return apiClient<Array<{
       id: string;
       title: string;
       type: string;
       marks: number;
       maxMarks: number;
+      studentId: string;
+      studentCode?: string;
       student?: { firstName: string; lastName: string };
       subject?: { name: string };
     }>>(`/academics/assessments${buildQuery(params ?? {})}`);
