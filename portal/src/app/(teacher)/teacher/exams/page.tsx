@@ -24,11 +24,11 @@ const schema = z
     classKey: z.string().optional(),
     difficulty: z.coerce.number().min(1).max(10),
     lessonIds: z.array(z.string()).min(1, "Select at least one lecture"),
-    mcqCount: z.coerce.number().min(0).max(40),
-    fillBlankCount: z.coerce.number().min(0).max(40),
-    trueFalseCount: z.coerce.number().min(0).max(40),
-    shortAnswerCount: z.coerce.number().min(0).max(40),
-    longAnswerCount: z.coerce.number().min(0).max(40),
+    mcqCount: z.coerce.number().min(0).max(20),
+    fillBlankCount: z.coerce.number().min(0).max(20),
+    trueFalseCount: z.coerce.number().min(0).max(20),
+    shortAnswerCount: z.coerce.number().min(0).max(20),
+    longAnswerCount: z.coerce.number().min(0).max(20),
     mcqMarks: z.coerce.number().min(0).max(200),
     fillBlankMarks: z.coerce.number().min(0).max(200),
     trueFalseMarks: z.coerce.number().min(0).max(200),
@@ -40,6 +40,13 @@ const schema = z
       value.mcqCount + value.fillBlankCount + value.trueFalseCount + value.shortAnswerCount + value.longAnswerCount;
     if (totalQuestions < 1) {
       ctx.addIssue({ code: "custom", path: ["mcqCount"], message: "Add at least one question" });
+    }
+    if (value.shortAnswerCount + value.longAnswerCount > 20) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["shortAnswerCount"],
+        message: "Short and long questions together cannot exceed 20",
+      });
     }
   });
 

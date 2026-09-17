@@ -289,6 +289,15 @@ export class QuizzesService {
       (dto.shortAnswerCount ?? dto.openEndedCount ?? 0) +
       (dto.longAnswerCount ?? 0) +
       (examPaper ? 0 : dto.shortAnswerCount ?? 0);
+    if (
+      examPaper &&
+      (dto.shortAnswerCount ?? dto.openEndedCount ?? 0) + (dto.longAnswerCount ?? 0) > 20
+    ) {
+      throw new BadRequestException({
+        code: 'OPEN_QUESTION_LIMIT',
+        message: 'Short and long questions together cannot exceed 20 for an exam paper',
+      });
+    }
     if (dto.quickGenerate === false && customTotal < 1) {
       throw new BadRequestException({
         code: 'QUESTION_MIX_REQUIRED',

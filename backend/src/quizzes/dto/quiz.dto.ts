@@ -71,7 +71,7 @@ export class GenerateQuizDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(40)
+  @Max(20)
   mcqCount?: number;
 
   @ApiPropertyOptional({ description: 'Fill-in-the-blank count (short exact answer, auto-marked)' })
@@ -79,7 +79,7 @@ export class GenerateQuizDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(40)
+  @Max(20)
   fillBlankCount?: number;
 
   @ApiPropertyOptional({ description: 'True/False count' })
@@ -87,7 +87,7 @@ export class GenerateQuizDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(40)
+  @Max(20)
   trueFalseCount?: number;
 
   @ApiPropertyOptional({ description: 'Open-ended / short-answer count for printed exam papers' })
@@ -95,7 +95,7 @@ export class GenerateQuizDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(40)
+  @Max(20)
   openEndedCount?: number;
 
   @ApiPropertyOptional({ description: 'Short-answer count for printed exam papers' })
@@ -103,7 +103,7 @@ export class GenerateQuizDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(40)
+  @Max(20)
   shortAnswerCount?: number;
 
   @ApiPropertyOptional({ description: 'Long-answer count for printed exam papers' })
@@ -111,7 +111,7 @@ export class GenerateQuizDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(40)
+  @Max(20)
   longAnswerCount?: number;
 
   @ApiPropertyOptional({ description: 'Total marks for the MCQ section' })

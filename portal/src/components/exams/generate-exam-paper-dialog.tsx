@@ -86,7 +86,7 @@ function QuestionMixRow({
           id={countId}
           type="number"
           min={0}
-          max={40}
+          max={20}
           value={count}
           disabled={locked}
           onChange={(e) => onCount(Math.max(0, Number(e.target.value) || 0))}
@@ -171,6 +171,7 @@ export function GenerateExamPaperDialog({
     marks:
       Number(mcqMarks) + Number(fillBlankMarks) + Number(trueFalseMarks) + Number(shortAnswerMarks) + Number(longAnswerMarks),
   };
+  const openQuestionCount = Number(shortAnswerCount) + Number(longAnswerCount);
   const marksMismatch =
     requiredMarks != null && Math.round(totals.marks * 10) !== Math.round(requiredMarks * 10);
 
@@ -391,6 +392,11 @@ export function GenerateExamPaperDialog({
                 {formState.errors.mcqCount && (
                   <p className="text-sm text-destructive">{formState.errors.mcqCount.message}</p>
                 )}
+                {openQuestionCount > 20 ? (
+                  <p className="text-sm text-destructive">
+                    Short and long questions together cannot exceed 20 open questions.
+                  </p>
+                ) : null}
               </section>
             </div>
 
@@ -407,11 +413,21 @@ export function GenerateExamPaperDialog({
                   Section marks must add up to exactly {requiredMarks} before you can generate the paper.
                 </p>
               ) : null}
+              {!selectedLessonIds.length ? (
+                <p className="mb-3 text-sm text-amber-800">
+                  Select at least one lecture before generating the paper.
+                </p>
+              ) : null}
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={marksMismatch}>Generate paper</Button>
+                <Button
+                  type="submit"
+                  disabled={marksMismatch || openQuestionCount > 20 || selectedLessonIds.length === 0}
+                >
+                  Generate paper
+                </Button>
               </div>
             </div>
           </form>
