@@ -1,3 +1,6 @@
+# Local Docker DB dumps
+deploy/hawknexa/data/*.sql
+
 # =========================
 # Dependencies
 # =========================

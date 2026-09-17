@@ -110,7 +110,44 @@ docker compose -f docker-compose.prod.yml up -d --build backend portal caddy dep
 
 Migrating from the old remote `sms` database (one-time): `bash /opt/apps/hawknexa/deploy/import-remote-sms-db.sh`
 
-## Local development (portal on laptop → API on VPS)
+## Local development (full Docker stack — mirrors VPS)
+
+Run **MySQL, Redis, backend, portal, and Caddy** on your machine with the same layout as production.
+
+### Quick start (Windows PowerShell)
+
+```powershell
+cd deploy\hawknexa
+copy .env.local.example .env.local
+# Edit .env.local if ports 3306/6379/3000/3001 are already in use
+
+# Start stack (first run builds images — ~5–10 min)
+..\..\deploy\hawknexa\up-local.ps1 -Build
+
+# Copy live VPS database into local MySQL (needs SSH to VPS; you will be prompted for password)
+..\..\deploy\hawknexa\up-local.ps1 -SyncDb
+```
+
+### URLs
+
+| Service | Direct | Via Caddy (VPS-like hostnames) |
+|---------|--------|--------------------------------|
+| Portal | http://localhost:3000 | http://hawknexa.localhost:8080 |
+| API | http://localhost:3001/api/v1 | http://hawknexabackend.localhost:8080/api/v1 |
+
+### Manual commands
+
+```bash
+cd deploy/hawknexa
+cp .env.local.example .env.local
+docker compose -f docker-compose.local.yml --env-file .env.local up -d --build
+bash sync-db-from-vps.sh   # replica of VPS MySQL
+docker compose -f docker-compose.local.yml --env-file .env.local logs -f backend
+```
+
+Stop: `docker compose -f docker-compose.local.yml --env-file .env.local down`
+
+### Portal-only dev (no Docker — API still on VPS)
 
 ```bash
 cd portal
@@ -118,4 +155,4 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Use `.env.local` with `NEXT_PUBLIC_API_URL=https://hawknexabackend.fynals.com/api/v1` and **do not** set `NEXT_PUBLIC_USE_LOCAL_API=true`.
+Use `NEXT_PUBLIC_API_URL=https://hawknexabackend.fynals.com/api/v1` and **do not** set `NEXT_PUBLIC_USE_LOCAL_API=true`.

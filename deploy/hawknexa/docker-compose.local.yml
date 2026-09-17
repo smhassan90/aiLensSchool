@@ -1,0 +1,108 @@
+# Local full stack — mirrors VPS services (MySQL, Redis, backend, portal, Caddy).
+# Run from this directory: docker compose -f docker-compose.local.yml --env-file .env.local up -d --build
+
+name: hawknexa-local
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - hawknexa_local_mysql_data:/var/lib/mysql
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - hawknexa_local
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - hawknexa_local_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - hawknexa_local
+
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+      args:
+        BUILD_SHA: local
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      RUN_SEED: ${RUN_SEED:-false}
+      SKIP_DB_PUSH: ${SKIP_DB_PUSH:-false}
+      DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}?connection_limit=10&pool_timeout=30&connect_timeout=15
+      REDIS_URL: redis://redis:6379
+      LOCAL_STORAGE_PATH: /app/uploads
+    volumes:
+      - hawknexa_local_uploads:/app/uploads
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - hawknexa_local
+
+  portal:
+    build:
+      context: ../../portal
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:3001/api/v1}
+        NEXT_PUBLIC_USE_LOCAL_API: "true"
+    restart: unless-stopped
+    ports:
+      - "${PORTAL_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    networks:
+      - hawknexa_local
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "${CADDY_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./Caddyfile.local:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - portal
+      - backend
+    networks:
+      - hawknexa_local
+
+networks:
+  hawknexa_local:
+    driver: bridge
+
+volumes:
+  hawknexa_local_mysql_data:
+  hawknexa_local_redis_data:
+  hawknexa_local_uploads:
