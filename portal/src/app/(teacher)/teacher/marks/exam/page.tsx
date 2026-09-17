@@ -22,6 +22,7 @@ export default function TeacherExamScoresPage() {
   const [classKey, setClassKey] = useState(searchParams.get("class") ?? "");
   const [examConfigId, setExamConfigId] = useState(searchParams.get("exam") ?? "");
   const [scores, setScores] = useState<Record<string, string>>({});
+  const [scoreError, setScoreError] = useState("");
 
   const classes = useQuery({
     queryKey: ["teacher-classes"],
@@ -62,6 +63,12 @@ export default function TeacherExamScoresPage() {
         .filter(([, value]) => value.trim() !== "")
         .map(([studentId, value]) => ({ studentId, marks: Number(value) }));
       if (!payload.length) throw new Error("Enter at least one student's marks");
+      const invalid = payload.find(
+        (row) => !Number.isFinite(row.marks) || row.marks < 0 || row.marks > maxMarks,
+      );
+      if (invalid) {
+        throw new Error(`Marks obtained must be between 0 and ${formatMarks(maxMarks)}.`);
+      }
       return academicsService.saveExamScores({
         examConfigId,
         sectionId: selected.sectionId,
@@ -161,19 +168,19 @@ export default function TeacherExamScoresPage() {
           </div>
 
           <div className="overflow-hidden rounded-xl border bg-card">
-            <div className="grid grid-cols-[1fr_5rem_6rem] gap-3 border-b bg-muted/40 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid-cols-[2rem_1fr_6rem_6rem]">
-              <span className="hidden sm:block">#</span>
-              <span>Student</span>
-              <span>Roll</span>
-              <span>Marks</span>
+            <div className="grid grid-cols-[2.5rem_minmax(8rem,1fr)_6rem_7rem] gap-3 border-b bg-muted/40 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <span>Sr. No.</span>
+              <span>Name of student</span>
+              <span>Roll number</span>
+              <span>Marks obtained</span>
             </div>
             <div className="divide-y">
               {sheet.data.students.map((student, index) => (
                 <div
                   key={student.studentId}
-                  className="grid grid-cols-[1fr_5rem_6rem] items-center gap-3 px-4 py-3 sm:grid-cols-[2rem_1fr_6rem_6rem]"
+                  className="grid grid-cols-[2.5rem_minmax(8rem,1fr)_6rem_7rem] items-center gap-3 px-4 py-3"
                 >
-                  <span className="hidden text-sm text-muted-foreground sm:block">{index + 1}</span>
+                  <span className="text-sm text-muted-foreground">{index + 1}</span>
                   <div>
                     <p className="font-medium">{student.firstName} {student.lastName}</p>
                   </div>
@@ -185,16 +192,32 @@ export default function TeacherExamScoresPage() {
                     step={0.1}
                     inputMode="decimal"
                     value={scores[student.studentId] ?? ""}
-                    onChange={(e) =>
-                      setScores((prev) => ({ ...prev, [student.studentId]: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setScores((prev) => ({ ...prev, [student.studentId]: value }));
+                      if (value.trim() === "") {
+                        setScoreError("");
+                      } else {
+                        const marks = Number(value);
+                        setScoreError(
+                          !Number.isFinite(marks) || marks < 0 || marks > maxMarks
+                            ? `Marks obtained must be between 0 and ${formatMarks(maxMarks)}.`
+                            : "",
+                        );
+                      }
+                    }}
                     className="h-9"
+                    aria-invalid={Boolean(scoreError)}
                     placeholder="—"
                   />
                 </div>
               ))}
             </div>
           </div>
+
+          {scoreError ? (
+            <p className="mt-3 text-sm text-destructive" role="alert">{scoreError}</p>
+          ) : null}
 
           <div className="mt-6 flex justify-end">
             <Button onClick={() => save.mutate()} disabled={save.isPending || filledCount === 0}>
