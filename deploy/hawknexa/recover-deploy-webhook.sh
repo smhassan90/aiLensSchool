@@ -34,8 +34,18 @@ fi
 
 cd "${DEPLOY_DIR}"
 
+echo "=== Ensure Docker is running ==="
 if ! systemctl is-active --quiet docker 2>/dev/null; then
   systemctl start docker || service docker start
+fi
+docker info >/dev/null
+
+echo "=== Firewall (UFW) — allow HTTP/HTTPS ==="
+if command -v ufw >/dev/null 2>&1; then
+  ufw allow OpenSSH >/dev/null 2>&1 || true
+  ufw allow 80/tcp comment 'HTTP' >/dev/null 2>&1 || true
+  ufw allow 443/tcp comment 'HTTPS' >/dev/null 2>&1 || true
+  ufw status verbose 2>/dev/null || true
 fi
 
 echo "=== Build and start deploy-webhook + reload Caddy ==="
@@ -48,6 +58,9 @@ sleep 3
 echo "=== Container status ==="
 docker compose -f "${COMPOSE_FILE}" ps deploy-webhook caddy
 
+echo "=== Listening ports ==="
+ss -tlnp | grep -E ':80|:443' || netstat -tlnp 2>/dev/null | grep -E ':80|:443' || true
+
 echo "=== deploy-webhook logs (last 30 lines) ==="
 docker compose -f "${COMPOSE_FILE}" logs deploy-webhook --tail 30
 
@@ -58,12 +71,26 @@ else
   echo "WARN: could not reach deploy-webhook:9000 from caddy container" >&2
 fi
 
+echo "=== Local health (via Caddy on this server) ==="
+local_ok=0
+if curl -fsS --max-time 5 http://127.0.0.1/internal/deploy/health -H 'Host: hawknexabackend.fynals.com' >/dev/null 2>&1; then
+  echo "OK: webhook reachable locally on :80"
+  local_ok=1
+else
+  echo "WARN: local :80 check failed — Caddy may not be listening" >&2
+  docker compose -f "${COMPOSE_FILE}" logs caddy --tail 30
+fi
+
 echo "=== Public health check ==="
-if curl -fsS https://hawknexabackend.fynals.com/internal/deploy/health; then
+if curl -fsS --max-time 15 https://hawknexabackend.fynals.com/internal/deploy/health; then
   echo ""
   echo "OK: webhook is healthy. Re-run GitHub Actions or: bash ${DEPLOY_DIR}/deploy.sh"
+elif [ "${local_ok}" = "1" ]; then
+  echo "ERROR: webhook works locally but HTTPS from the internet times out (HTTP 000)." >&2
+  echo "Open Hostinger VPS panel → Firewall and allow inbound TCP 80 and 443." >&2
+  exit 1
 else
   echo "ERROR: https://hawknexabackend.fynals.com/internal/deploy/health did not return ok" >&2
-  echo "If you still see 404, Caddy may need the updated Caddyfile (handle /internal/deploy*)." >&2
+  echo "Run: bash ${DEPLOY_DIR}/recover-vps.sh" >&2
   exit 1
 fi

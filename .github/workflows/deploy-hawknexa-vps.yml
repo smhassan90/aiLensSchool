@@ -57,8 +57,12 @@ jobs:
           echo "Webhook health HTTP ${webhook_code}"
           if [ "${webhook_code}" != "200" ]; then
             echo "::error::Deploy webhook is not healthy (HTTP ${webhook_code})."
+            if [ "${webhook_code}" = "000" ]; then
+              echo "HTTP 000 = VPS ports 80/443 are not reachable (Caddy down or firewall blocking)."
+            fi
             echo "On the VPS (Hostinger browser terminal) run:"
-            echo "  bash /opt/apps/hawknexa/deploy/recover-deploy-webhook.sh"
+            echo "  bash /opt/apps/hawknexa/deploy/recover-vps.sh"
+            echo "Or: bash /opt/apps/hawknexa/deploy/recover-deploy-webhook.sh"
             exit 1
           fi
 
