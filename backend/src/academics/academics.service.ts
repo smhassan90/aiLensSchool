@@ -2560,7 +2560,9 @@ export class AcademicsService {
         assignment: {
           include: {
             examConfig: { select: { id: true, name: true } },
-            section: { select: { id: true, name: true, grade: { select: { name: true } } },
+            section: {
+              select: { id: true, name: true, grade: { select: { name: true } } },
+            },
             subject: { select: { id: true, name: true } },
           },
         },
