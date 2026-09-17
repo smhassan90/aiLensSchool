@@ -30,6 +30,12 @@ export class ResultsController {
     return this.resultsService.classStats(quizId, user);
   }
 
+  @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)
+  @Get(':id')
+  detail(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.resultsService.detail(id, user);
+  }
+
   @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN, RoleName.PARENT)
   @Get()
   findAll(@Query() query: ResultsQueryDto, @CurrentUser() user: AuthUser) {

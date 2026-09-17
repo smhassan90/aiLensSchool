@@ -256,4 +256,70 @@ export class ResultsService {
     );
     return paginate(items, total, page, limit);
   }
+
+  async detail(id: string, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const result = await this.prisma.quizResult.findUnique({
+      where: { id },
+      include: {
+        student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
+        quiz: {
+          select: {
+            id: true,
+            title: true,
+            totalMarks: true,
+            schoolId: true,
+            questions: {
+              where: { included: true },
+              orderBy: { order: 'asc' },
+              include: { options: { orderBy: { order: 'asc' } } },
+            },
+          },
+        },
+        attempt: {
+          include: {
+            answers: {
+              include: { question: true },
+            },
+          },
+        },
+      },
+    });
+    if (!result) {
+      throw new NotFoundException({ code: 'RESULT_NOT_FOUND', message: 'Quiz result not found' });
+    }
+    this.tenant.assertSchoolAccess(user, result.quiz.schoolId);
+
+    const answers = new Map(result.attempt.answers.map((answer) => [answer.questionId, answer]));
+    return {
+      id: result.id,
+      quiz: { id: result.quiz.id, title: result.quiz.title, totalMarks: Number(result.quiz.totalMarks) },
+      student: result.student,
+      score: Number(result.score),
+      totalMarks: Number(result.totalMarks),
+      percentage: Number(result.percentage),
+      submittedAt: result.submittedAt,
+      questions: result.quiz.questions.map((question, index) => {
+        const answer = answers.get(question.id);
+        const selectedOption = question.options.find((option) => option.id === answer?.optionId);
+        return {
+          id: question.id,
+          number: index + 1,
+          questionText: question.questionText,
+          type: question.type,
+          marks: Number(question.marks),
+          correctAnswer: question.correctAnswer,
+          options: question.options.map((option) => ({
+            id: option.id,
+            text: option.optionText,
+            isCorrect: option.isCorrect,
+          })),
+          selectedAnswer: answer?.answerText ?? selectedOption?.optionText ?? null,
+          selectedOptionId: answer?.optionId ?? null,
+          isCorrect: answer?.isCorrect ?? null,
+          marksAwarded: answer?.marksAwarded == null ? null : Number(answer.marksAwarded),
+        };
+      }),
+    };
+  }
 }
