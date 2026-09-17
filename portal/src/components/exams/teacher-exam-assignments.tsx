@@ -28,6 +28,7 @@ export type TeacherExamAssignment = {
   scoreEntryDueAt: string | null;
   paperSubmissionOpen: boolean;
   scoreEntryOpen: boolean;
+  scoresSubmitted: boolean;
   status: TeacherExamPaperStatus;
   quizId: string | null;
   rejectionReason: string | null;
@@ -54,12 +55,14 @@ type TeacherExamAssignmentsProps = {
   assignments: TeacherExamAssignment[];
   isLoading?: boolean;
   onGenerate: (assignmentId: string) => void;
+  onScoreEntry: (assignmentId: string) => void;
 };
 
 export function TeacherExamAssignments({
   assignments,
   isLoading,
   onGenerate,
+  onScoreEntry,
 }: TeacherExamAssignmentsProps) {
   if (isLoading) return <PageLoader variant="panel" task="exams" />;
 
@@ -84,7 +87,7 @@ export function TeacherExamAssignments({
     (row) => (row.status === "NOT_STARTED" || row.status === "DRAFT") && row.paperSubmissionOpen,
   ).length;
   const scoreDueSoon = assignments.filter(
-    (row) => row.status === "APPROVED" && row.scoreEntryOpen && row.scoreEntryDueAt,
+    (row) => row.status === "APPROVED" && row.scoreEntryOpen && !row.scoresSubmitted && row.scoreEntryDueAt,
   );
 
   return (
@@ -132,7 +135,8 @@ export function TeacherExamAssignments({
                 const paperClosed =
                   !row.paperSubmissionOpen &&
                   (row.status === "NOT_STARTED" || row.status === "DRAFT");
-                const scoreClosed = row.status === "APPROVED" && !row.scoreEntryOpen;
+                const scoreClosed =
+                  row.status === "APPROVED" && !row.scoreEntryOpen && !row.scoresSubmitted;
 
                 return (
                   <div
@@ -181,22 +185,23 @@ export function TeacherExamAssignments({
                             : ""}
                         </p>
                       ) : null}
+                      {row.status === "APPROVED" && row.scoresSubmitted ? (
+                        <p className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
+                          Scores submitted and locked. Request the admin to reopen score entry to make corrections.
+                        </p>
+                      ) : null}
                       {scoreClosed ? (
                         <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-950">
-                          Score entry deadline has passed. Contact the school admin if you still need to enter marks.
+                          Score entry is closed. Click Enter scores to request the admin to reopen it for 1–3 days.
                         </p>
                       ) : null}
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
-                      {row.status === "APPROVED" && row.scoreEntryOpen ? (
-                        <Link
-                          href={`/teacher/marks/exam?exam=${row.examConfigId}&class=${row.sectionId}:${row.subjectId}`}
-                        >
-                          <Button size="sm" variant="outline">
-                            <Trophy className="h-4 w-4" />
-                            Enter scores
-                          </Button>
-                        </Link>
+                      {row.status === "APPROVED" ? (
+                        <Button size="sm" variant="outline" onClick={() => onScoreEntry(row.id)}>
+                          <Trophy className="h-4 w-4" />
+                          {row.scoresSubmitted ? "View submitted scores" : "Enter scores"}
+                        </Button>
                       ) : null}
                       {row.quizId ? (
                         <Link href={`/teacher/exams/${row.quizId}`}>

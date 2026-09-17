@@ -2335,6 +2335,33 @@ export class AcademicsService {
     const pendingByAssignmentKind = new Map(
       pendingExtensions.map((row) => [`${row.assignmentId}:${row.kind}`, row]),
     );
+    const sectionIds = [...new Set(visibleAssignments.map((row) => row.sectionId))];
+    const examConfigIds = [...new Set(visibleAssignments.map((row) => row.examConfigId))];
+    const [enrollmentCounts, scoreCounts] = await Promise.all([
+      this.prisma.studentEnrollment.groupBy({
+        by: ['sectionId'],
+        where: { sectionId: { in: sectionIds }, status: EnrollmentStatus.ACTIVE },
+        _count: { studentId: true },
+      }),
+      this.prisma.assessmentMark.groupBy({
+        by: ['examConfigId', 'sectionId', 'subjectId'],
+        where: {
+          schoolId,
+          examConfigId: { in: examConfigIds },
+          sectionId: { in: sectionIds },
+        },
+        _count: { studentId: true },
+      }),
+    ]);
+    const enrollmentCountBySection = new Map(
+      enrollmentCounts.map((row) => [row.sectionId, row._count.studentId]),
+    );
+    const scoreCountByAssignment = new Map(
+      scoreCounts.map((row) => [
+        `${row.examConfigId}:${row.sectionId}:${row.subjectId}`,
+        row._count.studentId,
+      ]),
+    );
 
     return {
       assignments: visibleAssignments.map((row) => {
@@ -2345,6 +2372,13 @@ export class AcademicsService {
           const submitted =
             latestQuiz?.status === QuizStatus.CLOSED &&
             latestQuiz.reviewStatus !== ExamPaperReviewStatus.REJECTED;
+          const scoresSubmitted =
+            (enrollmentCountBySection.get(row.sectionId) ?? 0) > 0 &&
+            (scoreCountByAssignment.get(`${row.examConfigId}:${row.sectionId}:${row.subjectId}`) ?? 0) >=
+              (enrollmentCountBySection.get(row.sectionId) ?? 0);
+          const scoreEntryReopened =
+            row.scoreEntryUnlockedUntil != null &&
+            row.scoreEntryUnlockedUntil.getTime() > Date.now();
           const pendingGeneration = !submitted;
           return {
             id: row.id,
@@ -2364,7 +2398,10 @@ export class AcademicsService {
               row.submissionDueAt,
               row.paperSubmissionUnlockedUntil,
             ),
-            scoreEntryOpen: isDeadlineOpen(row.scoreEntryDueAt, row.scoreEntryUnlockedUntil),
+            scoresSubmitted,
+            scoreEntryOpen:
+              isDeadlineOpen(row.scoreEntryDueAt, row.scoreEntryUnlockedUntil) &&
+              (!scoresSubmitted || scoreEntryReopened),
             questionSpec: parseQuestionSpec(row.questionSpec),
             releasedAt: row.releasedAt?.toISOString() ?? null,
             status: !latestQuiz
@@ -2543,10 +2580,32 @@ export class AcademicsService {
       });
     }
 
+    let scoresSubmitted = false;
+    if (body.kind === 'score') {
+      const [enrollments, scores] = await Promise.all([
+        this.prisma.studentEnrollment.findMany({
+          where: { sectionId: assignment.sectionId, status: EnrollmentStatus.ACTIVE },
+          select: { studentId: true },
+        }),
+        this.prisma.assessmentMark.findMany({
+          where: {
+            schoolId,
+            examConfigId: assignment.examConfigId,
+            sectionId: assignment.sectionId,
+            subjectId: assignment.subjectId,
+          },
+          select: { studentId: true, marks: true },
+        }),
+      ]);
+      const scoreByStudent = new Map(scores.map((row) => [row.studentId, row.marks]));
+      scoresSubmitted =
+        enrollments.length > 0 &&
+        enrollments.every((row) => scoreByStudent.get(row.studentId) != null);
+    }
     const deadlinePassed =
       body.kind === 'paper'
         ? !isDeadlineOpen(assignment.submissionDueAt, assignment.paperSubmissionUnlockedUntil)
-        : !isDeadlineOpen(assignment.scoreEntryDueAt, assignment.scoreEntryUnlockedUntil);
+        : !isDeadlineOpen(assignment.scoreEntryDueAt, assignment.scoreEntryUnlockedUntil) || scoresSubmitted;
     if (!deadlinePassed) {
       throw new BadRequestException({
         code: 'DEADLINE_NOT_PASSED',

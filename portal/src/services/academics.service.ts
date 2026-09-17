@@ -349,6 +349,7 @@ export const academicsService = {
         maxMarks: number;
         submissionDueAt: string;
         scoreEntryDueAt: string | null;
+        scoresSubmitted: boolean;
         paperSubmissionOpen: boolean;
         scoreEntryOpen: boolean;
         questionSpec: ExamPaperQuestionSpec | null;

@@ -70,6 +70,9 @@ export default function TeacherExamsPage() {
   const [extensionOpen, setExtensionOpen] = useState(false);
   const [extensionAssignment, setExtensionAssignment] = useState<TeacherExamAssignment | null>(null);
   const [extensionDays, setExtensionDays] = useState<"1" | "2" | "3">("1");
+  const [scoreExtensionOpen, setScoreExtensionOpen] = useState(false);
+  const [scoreExtensionAssignment, setScoreExtensionAssignment] = useState<TeacherExamAssignment | null>(null);
+  const [scoreExtensionDays, setScoreExtensionDays] = useState<"1" | "2" | "3">("1");
 
   const assignments = useQuery({
     queryKey: ["my-exam-paper-assignments"],
@@ -199,6 +202,34 @@ export default function TeacherExamsPage() {
     },
   });
 
+  const requestScoreExtension = useMutation({
+    mutationFn: () => {
+      if (!scoreExtensionAssignment) throw new Error("No assignment selected");
+      return academicsService.requestExamDeadlineExtension({
+        assignmentId: scoreExtensionAssignment.id,
+        kind: "score",
+        days: Number(scoreExtensionDays) as 1 | 2 | 3,
+      });
+    },
+    onSuccess: (res) => {
+      toast({
+        title: "Score entry request sent",
+        description: `You asked for ${res.days} day${res.days === 1 ? "" : "s"} for ${res.examName} · ${res.className}.`,
+        variant: "success",
+      });
+      setScoreExtensionOpen(false);
+      setScoreExtensionAssignment(null);
+      queryClient.invalidateQueries({ queryKey: ["my-exam-paper-assignments"] });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not send request",
+        description: err instanceof ApiClientError ? err.message : (err as Error).message,
+        variant: "error",
+      });
+    },
+  });
+
   const openForAssignment = (assignmentId: string) => {
     const row = assignments.data?.assignments.find((item) => item.id === assignmentId);
     if (!row) return;
@@ -232,6 +263,18 @@ export default function TeacherExamsPage() {
     setOpen(true);
   };
 
+  const openScoreEntry = (assignmentId: string) => {
+    const row = assignments.data?.assignments.find((item) => item.id === assignmentId);
+    if (!row) return;
+    if (row.scoreEntryOpen) {
+      window.location.assign(`/teacher/marks/exam?exam=${row.examConfigId}&class=${row.sectionId}:${row.subjectId}`);
+      return;
+    }
+    setScoreExtensionAssignment(row);
+    setScoreExtensionDays("1");
+    setScoreExtensionOpen(true);
+  };
+
   const toggleLesson = (id: string) => {
     const next = selectedLessonIds.includes(id)
       ? selectedLessonIds.filter((item) => item !== id)
@@ -258,6 +301,7 @@ export default function TeacherExamsPage() {
         assignments={assignments.data?.assignments ?? []}
         isLoading={assignments.isLoading}
         onGenerate={openForAssignment}
+        onScoreEntry={openScoreEntry}
       />
 
       <ExamDeadlineRequestDialog
@@ -275,6 +319,23 @@ export default function TeacherExamsPage() {
         isPending={requestExtension.isPending}
         pendingRequest={extensionAssignment?.paperExtensionRequest}
         kind="paper"
+      />
+
+      <ExamDeadlineRequestDialog
+        open={scoreExtensionOpen}
+        onOpenChange={(next) => {
+          setScoreExtensionOpen(next);
+          if (!next) setScoreExtensionAssignment(null);
+        }}
+        title={scoreExtensionAssignment?.scoresSubmitted ? "Submitted scores are locked" : "Score entry deadline has passed"}
+        description={`${scoreExtensionAssignment?.examName ?? "Exam"} · ${scoreExtensionAssignment?.className ?? ""} · ${scoreExtensionAssignment?.subjectName ?? ""}`}
+        dueDate={scoreExtensionAssignment?.scoreEntryDueAt}
+        days={scoreExtensionDays}
+        onDaysChange={setScoreExtensionDays}
+        onConfirm={() => requestScoreExtension.mutate()}
+        isPending={requestScoreExtension.isPending}
+        pendingRequest={scoreExtensionAssignment?.scoreExtensionRequest}
+        kind="score"
       />
 
       <GenerateExamPaperDialog
