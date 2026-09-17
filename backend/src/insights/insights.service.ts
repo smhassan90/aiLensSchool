@@ -476,7 +476,7 @@ export class InsightsService {
               ).toFixed(1),
             )
           : 0,
-        items: quizItems,
+        items: quizItems.filter((item) => item.attempted > 0),
       },
       subjects: [...subjectAverages.entries()].map(([name, value]) => ({
         name,
