@@ -55,6 +55,12 @@ export default function ProfileScreen() {
           <Pressable style={styles.quick} onPress={() => router.push('/report-cards')}>
             <Text style={styles.quickText}>Report cards</Text>
           </Pressable>
+          <Pressable style={styles.quick} onPress={() => router.push('/day-off')}>
+            <Text style={styles.quickText}>Day off</Text>
+          </Pressable>
+          <Pressable style={styles.quick} onPress={() => router.push('/student-photo')}>
+            <Text style={styles.quickText}>Student photo</Text>
+          </Pressable>
           <Pressable style={styles.quick} onPress={() => router.push('/announcements')}>
             <Text style={styles.quickText}>Announcements</Text>
           </Pressable>

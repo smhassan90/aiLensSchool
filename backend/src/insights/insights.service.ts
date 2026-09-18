@@ -157,7 +157,7 @@ export class InsightsService {
     }
 
     const enrollment = student.enrollments[0];
-    const [attendance, results, homework, diaries, reportCards, fees, idCards] = await Promise.all([
+    const [attendance, results, homework, diaries, reportCards, fees, idCards, photoAssets] = await Promise.all([
       this.prisma.attendance.findMany({
         where: { studentId, schoolId },
         orderBy: { date: 'desc' },
@@ -213,6 +213,15 @@ export class InsightsService {
         where: { studentId, schoolId },
         orderBy: { createdAt: 'desc' },
         take: 1,
+      }),
+      this.prisma.studentPhotoAsset.findMany({
+        where: { studentId, schoolId },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        include: {
+          fileAsset: { select: { id: true, url: true, originalFilename: true } },
+          reviewedBy: { select: { firstName: true, lastName: true } },
+        },
       }),
     ]);
 
@@ -278,6 +287,7 @@ export class InsightsService {
         items: fees,
       },
       idCard: idCards[0] ?? null,
+      photoAssets,
     };
   }
 

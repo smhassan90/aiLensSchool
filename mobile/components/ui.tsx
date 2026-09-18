@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { colors, radii, shadows, spacing, typography } from '@/constants/theme';
 
 export function LoadingState({ message = 'Loading…' }: { message?: string }) {
   return (
@@ -55,11 +55,13 @@ const styles = StyleSheet.create({
   message: {
     color: colors.slate500,
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: typography.family,
+    fontWeight: typography.medium,
   },
   emptyTitle: {
     fontSize: 17,
-    fontWeight: '800',
+    fontFamily: typography.family,
+    fontWeight: typography.semibold,
     color: colors.slate700,
     textAlign: 'center',
   },
@@ -76,7 +78,8 @@ const styles = StyleSheet.create({
   },
   retry: {
     color: colors.primaryDark,
-    fontWeight: '800',
+    fontFamily: typography.family,
+    fontWeight: typography.semibold,
     marginTop: spacing.sm,
   },
 });
@@ -135,7 +138,8 @@ const sectionStyles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: typography.family,
+    fontWeight: typography.semibold,
     color: colors.slate800,
   },
 });
@@ -163,6 +167,7 @@ const badgeStyles = StyleSheet.create({
   },
   text: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: typography.family,
+    fontWeight: typography.medium,
   },
 });

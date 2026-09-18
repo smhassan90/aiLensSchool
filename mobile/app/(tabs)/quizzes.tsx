@@ -44,6 +44,9 @@ export default function QuizzesTabScreen() {
   const average = scored.length
     ? Math.round(scored.reduce((sum, n) => sum + n, 0) / scored.length)
     : null;
+  const visibleQuizzes = (query.data?.items ?? []).filter(
+    (quiz) => !quiz.dueAt || new Date(quiz.dueAt) > new Date() || resultsByQuiz.has(quiz.id),
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -70,7 +73,7 @@ export default function QuizzesTabScreen() {
             ) : null}
           </>
         }
-        data={query.data?.items ?? []}
+        data={visibleQuizzes}
         keyExtractor={(item) => item.id}
         refreshing={query.isRefetching}
         onRefresh={() => {
@@ -84,8 +87,8 @@ export default function QuizzesTabScreen() {
             <ErrorState message="Could not load quizzes" onRetry={() => query.refetch()} />
           ) : (
             <EmptyState
-              title="No published quizzes"
-              subtitle="Quizzes appear here after a teacher publishes them for this class."
+              title="No available quizzes"
+              subtitle="Published quizzes appear here while they are available for this child."
             />
           )
         }

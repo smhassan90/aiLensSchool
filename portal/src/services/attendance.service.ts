@@ -5,7 +5,13 @@ export interface AttendanceRow {
   id: string;
   date: string;
   status: string;
-  student?: { id: string; firstName: string; lastName: string; studentCode: string };
+  student?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    studentCode: string;
+    dayOffRequests?: Array<{ id: string; startDate: string; endDate: string; reason: string }>;
+  };
 }
 
 export const attendanceService = {

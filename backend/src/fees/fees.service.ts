@@ -776,6 +776,16 @@ export class FeesService {
           student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
           feeStructure: { select: { id: true, name: true } },
           section: { select: { id: true, name: true, grade: { select: { name: true } } } },
+          payments: {
+            orderBy: { paidAt: 'desc' },
+            select: {
+              id: true,
+              amount: true,
+              receiptNumber: true,
+              method: true,
+              paidAt: true,
+            },
+          },
         },
       }),
       this.prisma.studentFee.count({ where }),
@@ -789,6 +799,10 @@ export class FeesService {
           paidAmount: money(item.paidAmount),
           discountAmount: money(item.discountAmount),
           balance: outstandingOf(item),
+          payments: item.payments.map((payment) => ({
+            ...payment,
+            amount: money(payment.amount),
+          })),
         })),
         total,
         page,
@@ -1413,6 +1427,9 @@ export class FeesService {
       throw new NotFoundException({ code: 'RECEIPT_NOT_FOUND', message: 'Receipt not found' });
     }
     const fee = payment.studentFee;
+    if (this.tenant.isParent(user)) {
+      await this.parentsService.assertParentOwnsStudent(user.id, fee.student.id);
+    }
     return this.toReceipt({
       payment,
       fee,

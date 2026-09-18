@@ -2,6 +2,7 @@
 
 import {
   CalendarClock,
+  CalendarDays,
   FileText,
   GraduationCap,
   LayoutDashboard,
@@ -43,6 +44,8 @@ const setupPathPrefixes = [
   "/school/exam-deadline-extensions",
   "/school/results",
   "/school/attendance",
+  "/school/day-off-requests",
+  "/school/student-photos",
   "/school/report-cards",
 ];
 
@@ -59,6 +62,8 @@ const mainNav: Array<{
   { href: "/school/exams", label: "Exams", icon: Trophy, permission: "MANAGE_EXAMS" },
   { href: "/school/submitted-exam-papers", label: "Exam papers", icon: FileText },
   { href: "/school/announcements", label: "Notifications", icon: Megaphone },
+  { href: "/school/day-off-requests", label: "Day-off requests", icon: CalendarDays },
+  { href: "/school/student-photos", label: "Student photos", icon: UserSquare2 },
   { href: "/school/exam-deadline-extensions", label: "Deadline extensions", icon: CalendarClock, permission: "MANAGE_EXAMS" },
   { href: "/school/fees", label: "Collect fees", icon: Wallet, permission: "VIEW_FINANCE" },
   { href: "/school/expenses", label: "Salaries & bills", icon: Receipt, permission: "MANAGE_EXPENSES" },

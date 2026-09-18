@@ -17,4 +17,24 @@ export const parentsService = {
       body: JSON.stringify({}),
     });
   },
+
+  listDayOffRequests() {
+    return apiClient<Array<{
+      id: string;
+      startDate: string;
+      endDate: string;
+      reason: string;
+      status: "PENDING" | "APPROVED" | "REJECTED";
+      reviewNote?: string | null;
+      student: { id: string; firstName: string; lastName: string; studentCode: string };
+      parent: { user: { firstName: string; lastName: string; username?: string | null } };
+    }>>("/parents/day-off-requests");
+  },
+
+  reviewDayOffRequest(id: string, status: "APPROVED" | "REJECTED", reviewNote?: string) {
+    return apiClient(`/parents/day-off-requests/${id}/review`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, reviewNote }),
+    });
+  },
 };

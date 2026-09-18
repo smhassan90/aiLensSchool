@@ -47,6 +47,7 @@ export default function QuizDetailScreen() {
   }
 
   const quiz = quizQuery.data;
+  const isExpired = Boolean(quiz.dueAt && new Date(quiz.dueAt) <= new Date() && !resultQuery.data);
   const includedQuestions = quiz.questions?.filter((q: QuizQuestion) => q.included) ?? [];
   const totalMarks =
     quiz.totalMarks ??
@@ -69,6 +70,8 @@ export default function QuizDetailScreen() {
               View result · {Number(resultQuery.data.percentage).toFixed(0)}%
             </Text>
           </Pressable>
+        ) : isExpired ? (
+          <Text style={styles.unavailable}>This quiz is no longer available because its due date has passed.</Text>
         ) : (
           <Pressable style={styles.resultLink} onPress={() => router.push(`/quiz/${id}/attempt`)}>
             <Text style={styles.resultText}>Take quiz</Text>
@@ -100,4 +103,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resultText: { color: colors.white, fontWeight: '700' },
+  unavailable: { color: colors.warning, fontSize: 15, lineHeight: 22 },
 });

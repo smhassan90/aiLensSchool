@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { Prisma, RoleName } from '@prisma/client';
+import { NotificationType, Prisma, RoleName } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -10,6 +10,7 @@ import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
 import { ParentsService } from '../parents/parents.service';
 import { dateFromIso } from '../teachers/teacher-checkin';
+import { NotificationService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AttendanceService {
@@ -19,6 +20,7 @@ export class AttendanceService {
     private readonly tenant: TenantService,
     private readonly parentsService: ParentsService,
     private readonly cache: MemoryCacheService,
+    private readonly notifications: NotificationService,
   ) {}
 
   async mark(dto: MarkAttendanceDto, user: AuthUser) {
@@ -93,6 +95,41 @@ export class AttendanceService {
       },
     });
 
+    const absentStudentIds = entries
+      .filter((entry) => entry.status === 'ABSENT')
+      .map((entry) => entry.studentId);
+    if (absentStudentIds.length) {
+      const approvedDayOffs = await this.prisma.parentDayOffRequest.findMany({
+        where: {
+          schoolId,
+          studentId: { in: absentStudentIds },
+          status: 'APPROVED',
+          startDate: { lte: date },
+          endDate: { gte: date },
+        },
+        select: { studentId: true },
+      });
+      const coveredIds = new Set(approvedDayOffs.map((request) => request.studentId));
+      const unexplainedIds = absentStudentIds.filter((studentId) => !coveredIds.has(studentId));
+      if (unexplainedIds.length) {
+        const links = await this.prisma.studentParent.findMany({
+          where: { studentId: { in: unexplainedIds } },
+          select: { parent: { select: { userId: true } } },
+        });
+        await this.notifications.createForUsers(
+          [...new Set(links.map((link) => link.parent.userId))],
+          {
+            schoolId,
+            type: NotificationType.STUDENT_ABSENCE,
+            title: 'Attendance follow-up',
+            body: 'Your child was marked absent today. Please contact the school if this absence was expected.',
+            data: { studentIds: unexplainedIds, date: dto.date } as Prisma.InputJsonValue,
+            deepLink: '/attendance',
+          },
+        );
+      }
+    }
+
     this.cache.invalidatePrefix(`teacher:summary:`);
     this.cache.invalidatePrefix(`teacher:coach:`);
 
@@ -145,7 +182,22 @@ export class AttendanceService {
           skip,
           take,
           include: {
-            student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
+            student: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                studentCode: true,
+                dayOffRequests: {
+                  where: {
+                    status: 'APPROVED',
+                    startDate: { lte: query.date ? dateFromIso(query.date.slice(0, 10)) : new Date() },
+                    endDate: { gte: query.date ? dateFromIso(query.date.slice(0, 10)) : new Date() },
+                  },
+                  select: { id: true, startDate: true, endDate: true, reason: true },
+                },
+              },
+            },
           },
         }),
       () => this.prisma.attendance.count({ where }),

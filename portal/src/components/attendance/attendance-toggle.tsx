@@ -59,7 +59,7 @@ export function AttendanceRoster({
   rows,
   onToggle,
 }: {
-  rows: Array<{ studentId: string; name: string; status: AttendanceMark }>;
+  rows: Array<{ studentId: string; name: string; status: AttendanceMark; dayOffReason?: string }>;
   onToggle: (studentId: string, status: AttendanceMark) => void;
 }) {
   const presentCount = rows.filter((row) => row.status === "PRESENT").length;
@@ -109,6 +109,11 @@ export function AttendanceRoster({
                 <p className={cn("text-xs font-medium", present ? "text-emerald-700" : "text-rose-700")}>
                   {present ? "In class" : "Not in class"}
                 </p>
+                {row.dayOffReason ? (
+                  <p className="mt-1 text-xs font-medium text-amber-700">
+                    Approved day off: {row.dayOffReason}
+                  </p>
+                ) : null}
               </div>
               <AttendanceToggle value={row.status} onChange={(status) => onToggle(row.studentId, status)} />
             </li>

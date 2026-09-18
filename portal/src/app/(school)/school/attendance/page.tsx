@@ -55,16 +55,17 @@ export default function AttendancePage() {
   const merged = useMemo(() => {
     const students = enrollments.data?.items ?? [];
     const byStudent = new Map(
-      (existing.data?.items ?? []).map((row) => [row.student?.id ?? "", toPresentAbsent(row.status)]),
+      (existing.data?.items ?? []).map((row) => [row.student?.id ?? "", row]),
     );
-    const rows = new Map<string, { studentId: string; name: string; status: AttendanceMark }>();
+    const rows = new Map<string, { studentId: string; name: string; status: AttendanceMark; dayOffReason?: string }>();
     for (const enr of students) {
       const studentId = enr.student?.id ?? enr.studentId;
       if (!studentId || rows.has(studentId)) continue;
       rows.set(studentId, {
         studentId,
         name: enr.student ? `${enr.student.firstName} ${enr.student.lastName}` : studentId,
-        status: marks[studentId] ?? byStudent.get(studentId) ?? "PRESENT",
+        status: marks[studentId] ?? toPresentAbsent(byStudent.get(studentId)?.status) ?? "PRESENT",
+        dayOffReason: byStudent.get(studentId)?.student?.dayOffRequests?.[0]?.reason,
       });
     }
     return Array.from(rows.values());

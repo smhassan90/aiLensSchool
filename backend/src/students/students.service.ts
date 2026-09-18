@@ -10,6 +10,7 @@ import {
   ParentRelationship,
   Prisma,
   RoleName,
+  StudentPhotoStatus,
   StudentStatus,
   UserStatus,
 } from '@prisma/client';
@@ -469,6 +470,86 @@ export class StudentsService {
         parents: { include: { parent: { include: { user: true } } } },
       },
     });
+  }
+
+  async requestPhoto(id: string, file: Express.Multer.File | undefined, user: AuthUser) {
+    await this.assertParentOwnsStudent(user.id, id);
+    const student = await this.prisma.student.findFirst({
+      where: { id, schoolId: this.tenant.requireSchoolId(user) },
+      select: { id: true, schoolId: true },
+    });
+    if (!student) throw new NotFoundException({ code: 'STUDENT_NOT_FOUND', message: 'Student not found' });
+    const asset = await this.files.upload(file, user);
+    return this.prisma.studentPhotoAsset.create({
+      data: {
+        schoolId: student.schoolId,
+        studentId: student.id,
+        fileAssetId: asset.id,
+        uploadedById: user.id,
+      },
+      include: { fileAsset: true },
+    });
+  }
+
+  async listPhotoAssets(user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    return this.prisma.studentPhotoAsset.findMany({
+      where: { schoolId, status: StudentPhotoStatus.PENDING },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        student: { select: { id: true, firstName: true, lastName: true, studentCode: true, photoUrl: true } },
+        fileAsset: true,
+        uploadedBy: { select: { firstName: true, lastName: true, username: true } },
+      },
+    });
+  }
+
+  async listStudentPhotoAssets(id: string, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    if (this.tenant.isParent(user)) await this.assertParentOwnsStudent(user.id, id);
+    const student = await this.prisma.student.findFirst({ where: { id, schoolId }, select: { id: true } });
+    if (!student) throw new NotFoundException({ code: 'STUDENT_NOT_FOUND', message: 'Student not found' });
+    return this.prisma.studentPhotoAsset.findMany({
+      where: { studentId: id, schoolId },
+      orderBy: { createdAt: 'desc' },
+      include: { fileAsset: { select: { id: true, url: true, originalFilename: true } } },
+    });
+  }
+
+  async reviewPhoto(
+    photoId: string,
+    dto: { status: StudentPhotoStatus; reviewNote?: string },
+    user: AuthUser,
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const photo = await this.prisma.studentPhotoAsset.findFirst({
+      where: { id: photoId, schoolId },
+      include: { fileAsset: true },
+    });
+    if (!photo) throw new NotFoundException({ code: 'PHOTO_NOT_FOUND', message: 'Student photo not found' });
+    if (photo.status !== StudentPhotoStatus.PENDING) {
+      throw new BadRequestException({ code: 'PHOTO_ALREADY_REVIEWED', message: 'This photo has already been reviewed' });
+    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const reviewed = await tx.studentPhotoAsset.update({
+        where: { id: photoId },
+        data: {
+          status: dto.status,
+          reviewNote: dto.reviewNote?.trim() || null,
+          reviewedById: user.id,
+          reviewedAt: new Date(),
+        },
+        include: { fileAsset: true },
+      });
+      if (dto.status === StudentPhotoStatus.ACCEPTED) {
+        await tx.student.update({
+          where: { id: photo.studentId },
+          data: { photoUrl: photo.fileAsset.url },
+        });
+      }
+      return reviewed;
+    });
+    return updated;
   }
 
   async assertParentOwnsStudent(parentUserId: string, studentId: string) {

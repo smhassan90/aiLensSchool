@@ -1,11 +1,12 @@
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import { Href, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChildHeader } from '@/components/ChildHeader';
 import { Badge, Card, EmptyState, ErrorState, LoadingState } from '@/components/ui';
 import { ProgressBar } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
-import { colors, spacing } from '@/constants/theme';
+import { colors, spacing, typography } from '@/constants/theme';
 import { formatAmount } from '@/lib/format';
 import { fetchStudentFees } from '@/services/parent-records.service';
 
@@ -77,6 +78,7 @@ export default function FeesScreen() {
         renderItem={({ item }) => {
           const amount = Number(item.amount) || 0;
           const paid = Number(item.paidAmount) || 0;
+          const payment = item.payments?.[0];
           return (
             <Card>
               <Text style={styles.cardTitle}>
@@ -91,6 +93,13 @@ export default function FeesScreen() {
                 label={item.status}
                 tone={item.status === 'PAID' ? 'success' : 'warning'}
               />
+              {payment ? (
+                <Pressable onPress={() => router.push(`/fees/receipt/${payment.id}` as Href)}>
+                  <Text style={styles.receiptLink}>
+                    View paid receipt · {payment.receiptNumber ?? 'Open'}
+                  </Text>
+                </Pressable>
+              ) : null}
             </Card>
           );
         }}
@@ -108,8 +117,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: spacing.sm,
   },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800 },
-  cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4, marginBottom: spacing.sm },
+  cardTitle: { fontFamily: typography.family, fontSize: 16, fontWeight: typography.semibold, color: colors.slate800 },
+  cardMeta: { fontFamily: typography.family, fontSize: 13, color: colors.slate500, marginTop: 4, marginBottom: spacing.sm },
+  receiptLink: { color: colors.primary, fontFamily: typography.family, fontWeight: typography.semibold, marginTop: spacing.sm },
   snapshot: {
     backgroundColor: colors.white,
     borderRadius: 16,
@@ -119,6 +129,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     marginBottom: spacing.sm,
   },
-  snapshotTitle: { fontSize: 14, fontWeight: '700', color: colors.slate700, marginBottom: 8 },
-  snapshotMeta: { marginTop: 8, fontSize: 12, color: colors.slate500 },
+  snapshotTitle: { fontFamily: typography.family, fontSize: 14, fontWeight: typography.semibold, color: colors.slate700, marginBottom: 8 },
+  snapshotMeta: { fontFamily: typography.family, marginTop: 8, fontSize: 12, color: colors.slate500 },
 });

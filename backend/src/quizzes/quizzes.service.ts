@@ -1088,6 +1088,9 @@ export class QuizzesService {
       throw new BadRequestException({ code: 'QUIZ_NOT_AVAILABLE', message: 'Quiz is not available' });
     }
     await this.parentsService.assertParentChildInSection(user.id, dto.studentId, quiz.sectionId);
+    if (quiz.dueAt && quiz.dueAt <= new Date()) {
+      throw new BadRequestException({ code: 'QUIZ_EXPIRED', message: 'This quiz is no longer available' });
+    }
 
     const existing = await this.prisma.quizResult.findFirst({
       where: { quizId: id, studentId: dto.studentId },

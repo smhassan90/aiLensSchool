@@ -3,9 +3,10 @@ import { ParentsService } from './parents.service';
 import { ParentsController } from './parents.controller';
 import { CommonModule } from '../common/common.module';
 import { AuditModule } from '../audit/audit.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [CommonModule, AuditModule],
+  imports: [CommonModule, AuditModule, NotificationsModule],
   providers: [ParentsService],
   controllers: [ParentsController],
   exports: [ParentsService],

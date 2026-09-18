@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UploadedFile, UseInte
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
-import { RoleName, StudentStatus } from '@prisma/client';
+import { RoleName, StudentPhotoStatus, StudentStatus } from '@prisma/client';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
@@ -11,6 +11,15 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
+
+class ReviewStudentPhotoDto {
+  @IsEnum(StudentPhotoStatus)
+  status!: StudentPhotoStatus;
+
+  @IsOptional()
+  @IsString()
+  reviewNote?: string;
+}
 
 class StudentQueryDto extends PaginationDto {
   @IsOptional()
@@ -84,6 +93,51 @@ export class StudentsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.studentsService.updatePhoto(id, file, user);
+  }
+
+  @Roles(RoleName.PARENT)
+  @Post(':id/photo/request')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 8 * 1024 * 1024 },
+    }),
+  )
+  requestPhoto(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.studentsService.requestPhoto(id, file, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @Get('photo-assets')
+  listPhotoAssets(@CurrentUser() user: AuthUser) {
+    return this.studentsService.listPhotoAssets(user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @Patch('photo-assets/:photoId')
+  reviewPhoto(
+    @Param('photoId') photoId: string,
+    @Body() dto: ReviewStudentPhotoDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.studentsService.reviewPhoto(photoId, dto, user);
+  }
+
+  @Roles(RoleName.PARENT, RoleName.SCHOOL_ADMIN)
+  @Get(':id/photo-assets')
+  listStudentPhotoAssets(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.studentsService.listStudentPhotoAssets(id, user);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER, RoleName.PARENT)

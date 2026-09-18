@@ -1,12 +1,12 @@
 export const colors = {
-  primary: '#6d4aff',
-  primaryLight: '#8b72ff',
-  primaryDark: '#4d31c9',
-  accent: '#ffb547',
-  coral: '#ff6b6b',
-  sky: '#4db6ff',
-  mint: '#42d6b2',
-  slate50: '#f7f8fc',
+  primary: '#0f766e',
+  primaryLight: '#14b8a6',
+  primaryDark: '#115e59',
+  accent: '#f59e0b',
+  coral: '#e11d48',
+  sky: '#0284c7',
+  mint: '#2dd4bf',
+  slate50: '#f8fafc',
   slate100: '#f1f5f9',
   slate200: '#e2e8f0',
   slate300: '#cbd5e1',
@@ -20,10 +20,18 @@ export const colors = {
   error: '#dc2626',
   success: '#16a34a',
   warning: '#d97706',
-  surfaceLavender: '#f0edff',
-  surfaceYellow: '#fff7df',
-  surfaceMint: '#e9fbf6',
-  surfaceBlue: '#eaf6ff',
+  surfaceLavender: '#f0fdfa',
+  surfaceYellow: '#fffbeb',
+  surfaceMint: '#ecfdf5',
+  surfaceBlue: '#f0f9ff',
+};
+
+export const typography = {
+  family: 'serif',
+  regular: '400' as const,
+  medium: '500' as const,
+  semibold: '600' as const,
+  bold: '700' as const,
 };
 
 export const spacing = {

@@ -32,6 +32,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-secure-store',
     'expo-notifications',
     [
+      'expo-image-picker',
+      {
+        photosPermission: 'Allow HawkNexa to choose a student photo.',
+        cameraPermission: 'Allow HawkNexa to take a student photo.',
+      },
+    ],
+    [
       'expo-splash-screen',
       {
         image: './assets/splash.png',

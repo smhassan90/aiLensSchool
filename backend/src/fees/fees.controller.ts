@@ -168,7 +168,7 @@ export class FeesController {
     return this.feesService.collect(dto, user);
   }
 
-  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL, RoleName.TEACHER)
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL, RoleName.TEACHER, RoleName.PARENT)
   @Get('receipts/:id')
   getReceipt(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.feesService.getReceipt(id, user);

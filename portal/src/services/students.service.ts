@@ -42,6 +42,24 @@ export interface CreateStudentResult {
 }
 
 export const studentsService = {
+  listPhotoAssets() {
+    return apiClient<Array<{
+      id: string;
+      status: "PENDING" | "ACCEPTED" | "REJECTED";
+      createdAt: string;
+      fileAsset: { url?: string | null; originalFilename: string };
+      student: { id: string; firstName: string; lastName: string; studentCode: string };
+      uploadedBy: { firstName: string; lastName: string; username?: string | null };
+    }>>("/students/photo-assets");
+  },
+
+  reviewPhoto(id: string, status: "ACCEPTED" | "REJECTED", reviewNote?: string) {
+    return apiClient(`/students/photo-assets/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, reviewNote }),
+    });
+  },
+
   list(params?: {
     page?: number;
     limit?: number;

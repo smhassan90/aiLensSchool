@@ -239,6 +239,37 @@ export interface StudentFee {
   periodLabel?: string | null;
   feeStructure?: { id: string; name: string };
   section?: { id: string; name: string };
+  payments?: Array<{
+    id: string;
+    amount: number;
+    receiptNumber?: string | null;
+    method?: string | null;
+    paidAt: string;
+  }>;
+}
+
+export interface FeeReceipt {
+  id: string;
+  receiptNumber?: string | null;
+  amount: number;
+  paidAt: string;
+  method?: string | null;
+  notes?: string | null;
+  periodLabel: string;
+  student: { firstName: string; lastName: string; studentCode: string };
+  school: { name: string; address?: string | null; phone?: string | null };
+  recordedBy?: { firstName: string; lastName: string } | null;
+}
+
+export interface DayOffRequest {
+  id: string;
+  studentId: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewNote?: string | null;
+  student?: { id: string; firstName: string; lastName: string };
 }
 
 export interface ReportCard {
