@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChildHeader } from '@/components/ChildHeader';
 import { Badge, Card, EmptyState, ErrorState, LoadingState, SectionTitle } from '@/components/ui';
@@ -142,34 +143,47 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.greeting}>Hello, {user?.firstName ?? 'Parent'}</Text>
+            <Text style={styles.eyebrow}>YOUR FAMILY HUB</Text>
+            <Text style={styles.greeting}>Hello, {user?.firstName ?? 'Parent'}!</Text>
             <Text style={styles.date}>
               {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
             </Text>
           </View>
-          <Pressable onPress={() => router.push('/profile')}>
-            <Text style={styles.profileLink}>Profile</Text>
+          <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
+            <Ionicons name="person-outline" size={20} color={colors.primary} />
           </Pressable>
         </View>
 
         <ChildHeader />
 
-        <Text style={styles.helpHint}>
-          You are helping {selectedChild.firstName}. Homework and quizzes you submit are recorded for
-          this child.
-        </Text>
+        <View style={styles.contextBanner}>
+          <View style={styles.contextIcon}>
+            <Ionicons name="sparkles-outline" size={20} color={colors.primaryDark} />
+          </View>
+          <Text style={styles.helpHint}>
+            Here’s what {selectedChild.firstName} needs your attention on today.
+          </Text>
+        </View>
 
         <View style={styles.quickRow}>
-          <Pressable style={styles.quickLink} onPress={() => router.push('/fees')}>
+          <Pressable style={[styles.quickLink, styles.quickLinkLavender]} onPress={() => router.push('/fees')}>
+            <Ionicons name="wallet-outline" size={22} color={colors.primary} />
             <Text style={styles.quickLinkText}>Fees</Text>
           </Pressable>
-          <Pressable style={styles.quickLink} onPress={() => router.push('/report-cards')}>
+          <Pressable style={[styles.quickLink, styles.quickLinkYellow]} onPress={() => router.push('/report-cards')}>
+            <Ionicons name="ribbon-outline" size={22} color={colors.warning} />
             <Text style={styles.quickLinkText}>Report cards</Text>
           </Pressable>
         </View>
 
         <View style={styles.snapshot}>
-          <Text style={styles.snapshotTitle}>At a glance</Text>
+          <View style={styles.snapshotHeader}>
+            <View>
+              <Text style={styles.snapshotKicker}>PROGRESS CHECK</Text>
+              <Text style={styles.snapshotTitle}>At a glance</Text>
+            </View>
+            <Ionicons name="trending-up-outline" size={25} color={colors.mint} />
+          </View>
           <View style={styles.rings}>
             <ScoreRing value={snapshot.attendanceRate} label="Attendance" />
             <ScoreRing value={snapshot.quizAvg} label="Quiz average" />
@@ -319,42 +333,77 @@ function StatPill({ label, value }: { label: string; value: number }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.md, paddingBottom: spacing.xl },
+  content: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    paddingTop: spacing.sm,
     marginBottom: spacing.md,
   },
-  greeting: { fontSize: 24, fontWeight: '800', color: colors.slate900 },
-  date: { color: colors.slate500, marginTop: 4 },
-  profileLink: { color: colors.primary, fontWeight: '600' },
+  eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.4, color: colors.primary },
+  greeting: { fontSize: 28, fontWeight: '900', color: colors.slate900, marginTop: 3 },
+  date: { color: colors.slate500, marginTop: 5, fontSize: 13 },
+  profileButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.surfaceLavender,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contextBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceBlue,
+    borderRadius: radii.lg,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  contextIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   helpHint: {
+    flex: 1,
     fontSize: 13,
     lineHeight: 18,
     color: colors.slate600,
-    marginBottom: spacing.sm,
   },
-  quickRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  quickRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   quickLink: {
     flex: 1,
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  quickLinkText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
-  snapshot: {
-    backgroundColor: colors.white,
     borderRadius: radii.lg,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.slate200,
+    gap: spacing.sm,
+  },
+  quickLinkLavender: {
+    backgroundColor: colors.surfaceLavender,
+  },
+  quickLinkYellow: {
+    backgroundColor: colors.surfaceYellow,
+  },
+  quickLinkText: { color: colors.slate800, fontWeight: '800', fontSize: 14 },
+  snapshot: {
+    backgroundColor: colors.white,
+    borderRadius: radii.xl,
+    padding: spacing.md,
+    borderWidth: 0,
     marginBottom: spacing.md,
   },
-  snapshotTitle: { fontSize: 16, fontWeight: '800', color: colors.slate800, marginBottom: spacing.md },
+  snapshotHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  snapshotKicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.2, color: colors.slate400 },
+  snapshotTitle: { fontSize: 20, fontWeight: '900', color: colors.slate800, marginTop: 3 },
   rings: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
   dotsWrap: { marginTop: spacing.md },
   subjects: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.slate100 },
@@ -363,14 +412,12 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   statPill: {
     flex: 1,
-    backgroundColor: colors.white,
-    borderRadius: 12,
+    backgroundColor: colors.surfaceMint,
+    borderRadius: radii.lg,
     padding: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.slate200,
     alignItems: 'center',
   },
-  statValue: { fontSize: 20, fontWeight: '800', color: colors.primary },
+  statValue: { fontSize: 22, fontWeight: '900', color: colors.primaryDark },
   statLabel: { fontSize: 11, color: colors.slate500, marginTop: 2, textAlign: 'center' },
   cardTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800 },
   cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4 },

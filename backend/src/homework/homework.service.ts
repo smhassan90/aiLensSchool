@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
@@ -13,6 +13,7 @@ import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { SubmitHomeworkDto } from './dto/submit-homework.dto';
 import { ParentsService } from '../parents/parents.service';
+import { NotificationService } from '../notifications/notifications.service';
 import {
   answerKeyFromQuestions,
   buildHomeworkQuestions,
@@ -29,6 +30,7 @@ export class HomeworkService {
     private readonly audit: AuditService,
     private readonly tenant: TenantService,
     private readonly parentsService: ParentsService,
+    private readonly notifications: NotificationService,
   ) {}
 
   async create(dto: CreateHomeworkDto, user: AuthUser) {
@@ -81,6 +83,28 @@ export class HomeworkService {
         publishedAt: new Date(),
       },
     });
+
+    const parents = await this.prisma.studentParent.findMany({
+      where: {
+        student: {
+          enrollments: {
+            some: { sectionId: homework.sectionId, status: 'ACTIVE' },
+          },
+        },
+      },
+      select: { parent: { select: { userId: true } } },
+    });
+    const parentUserIds = [...new Set(parents.map((item) => item.parent.userId))];
+    if (parentUserIds.length) {
+      await this.notifications.createForUsers(parentUserIds, {
+        schoolId: homework.schoolId,
+        type: NotificationType.HOMEWORK_CREATED,
+        title: `New homework: ${homework.title}`,
+        body: `New homework has been assigned for your child's class.`,
+        data: { homeworkId: homework.id } as Prisma.InputJsonValue,
+        deepLink: `/homework/${homework.id}`,
+      });
+    }
 
     await this.audit.log({
       actorUserId: user.id,

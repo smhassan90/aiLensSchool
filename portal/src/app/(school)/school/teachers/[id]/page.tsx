@@ -87,7 +87,7 @@ export default function TeacherDetailsPage() {
   });
   const sections = useQuery({
     queryKey: ["sections", "teacher-detail"],
-    queryFn: () => academicsService.listSections({ limit: 200 }),
+    queryFn: () => academicsService.listSections({ limit: 100 }),
   });
   const sectionById = useMemo(() => {
     const map = new Map<string, Section>();

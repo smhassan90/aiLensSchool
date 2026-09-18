@@ -9,9 +9,18 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.slate400,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '700',
+          marginBottom: 3,
+        },
         tabBarStyle: {
           backgroundColor: colors.white,
-          borderTopColor: colors.slate200,
+          borderTopColor: colors.slate100,
+          height: 68,
+          paddingTop: 7,
+          paddingBottom: 7,
+          elevation: 12,
         },
       }}
     >

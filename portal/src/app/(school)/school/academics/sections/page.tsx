@@ -30,7 +30,7 @@ export default function SectionsPage() {
 
   const sections = useQuery({
     queryKey: ["sections"],
-    queryFn: () => academicsService.listSections({ limit: 200 }),
+    queryFn: () => academicsService.listSections({ limit: 100 }),
   });
   const teachers = useQuery({
     queryKey: ["teachers"],

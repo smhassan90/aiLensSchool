@@ -19,6 +19,22 @@ npm start
 
 Point `EXPO_PUBLIC_API_URL` at your API (local or hosted).
 
+### Android FCM push notifications
+
+Push registration uses the native FCM token, so it requires a development/release
+build rather than Expo Go:
+
+1. Create an Android app in Firebase with package `com.sms.parent`.
+2. Download `google-services.json` into `mobile/`.
+3. Set `GOOGLE_SERVICES_JSON=./google-services.json` before running `expo prebuild`
+   or building the Android app.
+4. Configure the backend `FIREBASE_SERVICE_ACCOUNT_JSON` with the Firebase Admin
+   service-account JSON.
+
+When a teacher immediately publishes a quiz or creates homework, the backend
+creates the in-app notification and sends FCM to active devices belonging to
+parents of students enrolled in that section.
+
 ### Login
 
 Parents sign in with the **username the school issued**, usually:

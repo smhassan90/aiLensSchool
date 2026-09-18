@@ -21,6 +21,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     package: 'com.sms.parent',
     versionCode: 3,
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './android/google-services.json',
   },
   web: {
     bundler: 'metro',
@@ -29,6 +30,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     'expo-router',
     'expo-secure-store',
+    'expo-notifications',
     [
       'expo-splash-screen',
       {

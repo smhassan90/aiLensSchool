@@ -1,3 +1,13 @@
+# Firebase Cloud Messaging
+
+Set `FIREBASE_SERVICE_ACCOUNT_JSON` to the Firebase service-account JSON
+(as a single-line environment variable). It is optional: notifications remain
+available in-app when it is unset.
+
+Quiz publish and homework creation send FCM notifications to active device
+tokens for parents whose students have an active enrollment in the target
+section. Parents can disable a notification type through
+`NotificationPreference.pushEnabled`.
 # SMS Backend
 
 NestJS multi-tenant School Management + AI Learning API.

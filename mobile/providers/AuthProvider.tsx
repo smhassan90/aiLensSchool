@@ -3,6 +3,7 @@ import { getAccessToken } from '@/lib/storage';
 import { getCurrentUser, login as authLogin, logout as authLogout } from '@/lib/auth';
 import { AuthUser, MeResponse } from '@/types/api';
 import { queryClient } from '@/providers/QueryProvider';
+import { registerPushNotifications } from '@/hooks/useNotifications';
 
 interface AuthContextValue {
   user: MeResponse | null;
@@ -40,6 +41,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
     })();
   }, [refreshUser]);
+
+  useEffect(() => {
+    if (!user) return;
+    registerPushNotifications().catch(() => {
+      // Push registration is optional until the Android FCM build is installed.
+    });
+  }, [user]);
 
   const login = useCallback(async (username: string, password: string) => {
     const response = await authLogin(username, password);

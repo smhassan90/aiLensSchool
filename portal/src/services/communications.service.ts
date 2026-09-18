@@ -6,6 +6,9 @@ export interface Announcement {
   title: string;
   description: string;
   audience?: string;
+  branchId?: string | null;
+  gradeId?: string | null;
+  sectionId?: string | null;
   status: string;
   publishAt?: string;
   createdAt: string;
@@ -25,8 +28,14 @@ export const communicationsService = {
   listAnnouncements(params?: { status?: string; limit?: number }) {
     return apiClient<Paginated<Announcement>>(`/announcements${buildQuery(params ?? {})}`);
   },
-  createAnnouncement(payload: { title: string; description: string; audience?: string }) {
-    return apiClient<Announcement>("/announcements", {
+  createAnnouncement(payload: {
+    title: string;
+    description: string;
+    audience?: string;
+    sectionId?: string;
+    sectionIds?: string[];
+  }) {
+    return apiClient<Announcement | Announcement[]>("/announcements", {
       method: "POST",
       body: JSON.stringify(payload),
     });

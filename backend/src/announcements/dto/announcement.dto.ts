@@ -1,4 +1,6 @@
 import {
+  ArrayNotEmpty,
+  IsArray,
   IsDateString,
   IsEnum,
   IsOptional,
@@ -35,6 +37,16 @@ export class CreateAnnouncementDto {
   @IsOptional()
   @IsString()
   sectionId?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Send the same announcement to multiple class sections at once.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  sectionIds?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -1,6 +1,7 @@
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChildHeader } from '@/components/ChildHeader';
 import { Badge, Card, EmptyState, ErrorState, LoadingState } from '@/components/ui';
@@ -50,6 +51,7 @@ export default function QuizzesTabScreen() {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <>
+            <Text style={styles.eyebrow}>TEST YOUR KNOWLEDGE</Text>
             <Text style={styles.title}>Quizzes</Text>
             <ChildHeader />
             <Text style={styles.hint}>
@@ -92,6 +94,9 @@ export default function QuizzesTabScreen() {
           return (
             <Card onPress={() => router.push(`/quiz/${item.id}`)}>
               <View style={styles.row}>
+                <View style={styles.iconWrap}>
+                  <Ionicons name="bulb-outline" size={20} color={colors.warning} />
+                </View>
                 <Text style={styles.cardTitle}>{item.title}</Text>
                 {isQuizNew(item, { hasResult: !!result }) ? (
                   <Badge label="New" tone="success" />
@@ -123,7 +128,8 @@ export default function QuizzesTabScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.md, paddingBottom: spacing.xl, flexGrow: 1 },
-  title: { fontSize: 28, fontWeight: '800', color: colors.slate900, marginBottom: spacing.md },
+  eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.3, color: colors.primary },
+  title: { fontSize: 30, fontWeight: '900', color: colors.slate900, marginTop: 3, marginBottom: spacing.md },
   hint: { color: colors.slate500, marginBottom: spacing.md },
   snapshot: {
     backgroundColor: colors.white,
@@ -138,7 +144,15 @@ const styles = StyleSheet.create({
   snapshotValue: { fontSize: 28, fontWeight: '800', width: 72 },
   snapshotBar: { flex: 1 },
   scoreBlock: { gap: 8 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  iconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceYellow,
+  },
   cardTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800, flex: 1 },
   cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4, marginBottom: spacing.sm },
 });

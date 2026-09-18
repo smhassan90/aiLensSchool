@@ -1,6 +1,7 @@
-import { FlatList, StyleSheet, Text } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChildHeader } from '@/components/ChildHeader';
 import { Badge, Card, EmptyState, ErrorState, LoadingState } from '@/components/ui';
@@ -38,6 +39,7 @@ export default function HomeworkTabScreen() {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <>
+            <Text style={styles.eyebrow}>KEEP LEARNING</Text>
             <Text style={styles.title}>Homework</Text>
             <ChildHeader />
           </>
@@ -59,7 +61,12 @@ export default function HomeworkTabScreen() {
           const status = getHomeworkListStatus(item);
           return (
             <Card onPress={() => router.push(`/homework/${item.id}`)}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
+              <View style={styles.cardHeader}>
+                <View style={styles.iconWrap}>
+                  <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+                </View>
+                <Text style={styles.cardTitle}>{item.title}</Text>
+              </View>
               <Text style={styles.cardMeta}>
                 Due {new Date(item.dueDate).toLocaleDateString()} · {item.subject?.name}
                 {item.result
@@ -78,7 +85,17 @@ export default function HomeworkTabScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.md, paddingBottom: spacing.xl, flexGrow: 1 },
-  title: { fontSize: 28, fontWeight: '800', color: colors.slate900, marginBottom: spacing.md },
+  eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.3, color: colors.primary },
+  title: { fontSize: 30, fontWeight: '900', color: colors.slate900, marginTop: 3, marginBottom: spacing.md },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  iconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceLavender,
+  },
   cardTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800 },
   cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4, marginBottom: spacing.sm },
 });

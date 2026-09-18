@@ -3,7 +3,7 @@ import { colors, radii, spacing } from '@/constants/theme';
 
 export function toneColor(value: number | null | undefined) {
   if (value == null) return colors.slate300;
-  if (value >= 75) return colors.primary;
+  if (value >= 75) return colors.mint;
   if (value >= 50) return colors.warning;
   return colors.error;
 }
@@ -18,7 +18,7 @@ export function ScoreRing({
   const color = toneColor(value);
   return (
     <View style={ringStyles.wrap}>
-      <View style={[ringStyles.ring, { borderColor: color }]}>
+      <View style={[ringStyles.ring, { borderColor: color, backgroundColor: `${color}12` }]}>
         <Text style={[ringStyles.value, { color }]}>{value == null ? '—' : Math.round(value)}</Text>
       </View>
       <Text style={ringStyles.label}>{label}</Text>
@@ -29,10 +29,10 @@ export function ScoreRing({
 const ringStyles = StyleSheet.create({
   wrap: { alignItems: 'center', flex: 1 },
   ring: {
-    width: 78,
-    height: 78,
-    borderRadius: 39,
-    borderWidth: 7,
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    borderWidth: 8,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.white,
@@ -147,7 +147,7 @@ export function AttendanceDots({
 
 const dotStyles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  dot: { width: 12, height: 12, borderRadius: 6 },
+  dot: { width: 13, height: 13, borderRadius: 7 },
   legend: { marginTop: 8 },
   legendText: { fontSize: 11, color: colors.slate500 },
 });

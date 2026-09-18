@@ -43,6 +43,7 @@ credentials.json
 **/google-services.json
 **/GoogleService-Info.plist
 service-account*.json
+hawknexa-firebase-adminsdk-*.json
 
 # =========================
 # Build / cache / generated

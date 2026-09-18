@@ -20,6 +20,7 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { QuizGenerationService } from '../ai/services/quiz-generation.service';
 import { ParentsService } from '../parents/parents.service';
+import { NotificationService } from '../notifications/notifications.service';
 import {
   AddQuizQuestionDto,
   GenerateQuizDto,
@@ -41,6 +42,7 @@ export class QuizzesService {
     private readonly tenant: TenantService,
     private readonly quizGeneration: QuizGenerationService,
     private readonly parentsService: ParentsService,
+    private readonly notifications: NotificationService,
   ) {}
 
   async generateFromLessons(dto: GenerateQuizDto, user: AuthUser) {
@@ -644,19 +646,14 @@ export class QuizzesService {
     });
 
     const uniqueUserIds = [...new Set(parents.map((p) => p.parent.userId))];
-    if (uniqueUserIds.length) {
-      const now = new Date();
-      await this.prisma.notification.createMany({
-        data: uniqueUserIds.map((userId) => ({
-          schoolId: quiz.schoolId,
-          userId,
-          type: NotificationType.QUIZ_PUBLISHED,
-          title: `New quiz: ${quiz.title}`,
-          body: `A quiz has been published for your child's class.`,
-          data: { quizId: quiz.id } as Prisma.InputJsonValue,
-          deepLink: `/quizzes/${quiz.id}`,
-          sentAt: now,
-        })),
+    if (uniqueUserIds.length && (dto.immediate === true || !dto.dueAt)) {
+      await this.notifications.createForUsers(uniqueUserIds, {
+        schoolId: quiz.schoolId,
+        type: NotificationType.QUIZ_PUBLISHED,
+        title: `New quiz: ${quiz.title}`,
+        body: `A quiz has been published for your child's class.`,
+        data: { quizId: quiz.id } as Prisma.InputJsonValue,
+        deepLink: `/quiz/${quiz.id}`,
       });
     }
 

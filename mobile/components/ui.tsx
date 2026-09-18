@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, radii, shadows, spacing } from '@/constants/theme';
 
 export function LoadingState({ message = 'Loading…' }: { message?: string }) {
   return (
@@ -55,10 +55,11 @@ const styles = StyleSheet.create({
   message: {
     color: colors.slate500,
     fontSize: 15,
+    fontWeight: '600',
   },
   emptyTitle: {
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '800',
     color: colors.slate700,
     textAlign: 'center',
   },
@@ -74,8 +75,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   retry: {
-    color: colors.primary,
-    fontWeight: '600',
+    color: colors.primaryDark,
+    fontWeight: '800',
     marginTop: spacing.sm,
   },
 });
@@ -103,14 +104,15 @@ export function Card({
 const cardStyles = StyleSheet.create({
   card: {
     backgroundColor: colors.white,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.slate200,
+    borderWidth: 0,
     marginBottom: spacing.sm,
+    ...shadows.card,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.78,
+    transform: [{ scale: 0.99 }],
   },
 });
 
@@ -129,11 +131,11 @@ const sectionStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
   },
   title: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.slate800,
   },
 });
@@ -157,7 +159,7 @@ const badgeStyles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderRadius: radii.full,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    paddingVertical: 4,
   },
   text: {
     fontSize: 12,
