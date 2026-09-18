@@ -4,7 +4,7 @@ function publicApiUrl() {
   if (process.env.NEXT_PUBLIC_USE_LOCAL_API === "true") {
     return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
   }
-  return PRODUCTION_API_URL;
+  return process.env.NEXT_PUBLIC_API_URL || PRODUCTION_API_URL;
 }
 
 /** @type {import('next').NextConfig} */
