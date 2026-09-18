@@ -50,12 +50,6 @@ export default function TeacherClassAnalyticsPage() {
     queryKey: ["class-analytics", params.id, sectionId],
     queryFn: () => insightsService.classOverview(params.id, sectionId || undefined) as Promise<ClassOverview>,
   });
-
-  if (query.isLoading) {
-    return <PageLoader variant="page" />;
-  }
-  if (!query.data) return <div className="p-4 sm:p-6 lg:p-8">Class not found.</div>;
-  const data = query.data;
   const assessmentDetails = useQuery({
     queryKey: [
       "assessment-details",
@@ -72,6 +66,12 @@ export default function TeacherClassAnalyticsPage() {
       }),
     enabled: Boolean(selectedAssessment),
   });
+
+  if (query.isLoading) {
+    return <PageLoader variant="page" />;
+  }
+  if (!query.data) return <div className="p-4 sm:p-6 lg:p-8">Class not found.</div>;
+  const data = query.data;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
