@@ -235,6 +235,7 @@ export class InsightsService {
         parents: student.parents.map((link) => ({
           relationship: link.relationship,
           parent: {
+            id: link.parent.id,
             phone: link.parent.phone ?? link.parent.user.phone ?? null,
             user: {
               firstName: link.parent.user.firstName,

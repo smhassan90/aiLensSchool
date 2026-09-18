@@ -18,6 +18,7 @@ import {
   ClipboardList,
   FileText,
   GraduationCap,
+  KeyRound,
   Sparkles,
   Wallet,
 } from "lucide-react";
@@ -44,6 +45,7 @@ export type Student360Data = {
     parents?: Array<{
       relationship: string;
       parent: {
+        id: string;
         phone?: string | null;
         user: {
           firstName: string;
@@ -236,6 +238,9 @@ export function Student360View({
   markPaidPending,
   onScienceGroupChange,
   scienceGroupPending,
+  onResetParentPassword,
+  resetParentPasswordPending,
+  parentPasswordReset,
   showFullProfileLink = false,
 }: {
   data: Student360Data;
@@ -246,6 +251,12 @@ export function Student360View({
   markPaidPending?: boolean;
   onScienceGroupChange?: (value: string) => void;
   scienceGroupPending?: boolean;
+  onResetParentPassword?: (parentProfileId: string) => void;
+  resetParentPasswordPending?: boolean;
+  parentPasswordReset?: {
+    username: string | null;
+    temporaryPassword: string;
+  } | null;
   showFullProfileLink?: boolean;
 }) {
   const student = data.student;
@@ -352,6 +363,28 @@ export function Student360View({
                   .filter(Boolean)
                   .join(" · ") || "No father contact linked"}
               </p>
+              {father && onResetParentPassword ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                  onClick={() => onResetParentPassword(father.parent.id)}
+                  disabled={resetParentPasswordPending}
+                >
+                  <KeyRound className="h-4 w-4" />
+                  {resetParentPasswordPending ? "Resetting…" : "Reset parent password"}
+                </Button>
+              ) : null}
+              {parentPasswordReset ? (
+                <div className="mt-3 max-w-md rounded-xl border border-amber-200/30 bg-amber-100/10 p-3 text-sm text-amber-50">
+                  <p className="font-semibold">Temporary parent password</p>
+                  <p className="mt-1">
+                    {(parentPasswordReset.username ?? fatherLogin) || "Parent"}:{" "}
+                    <span className="font-mono font-semibold">{parentPasswordReset.temporaryPassword}</span>
+                  </p>
+                  <p className="mt-1 text-xs text-amber-100/80">Share this securely. The parent must change it after login.</p>
+                </div>
+              ) : null}
               <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
                 <span className="rounded-full bg-white/10 px-3 py-1 backdrop-blur">{student.studentCode}</span>
                 {student.admissionNumber && student.admissionNumber !== student.studentCode ? (
