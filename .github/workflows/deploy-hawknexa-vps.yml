@@ -120,12 +120,12 @@ jobs:
             status_body="$(curl -fsS -H "Authorization: Bearer ${DEPLOY_SECRET}" "${STATUS_URL}" 2>/dev/null || true)"
             if [ -n "${status_body}" ]; then
               echo "${status_body}"
-              if echo "${status_body}" | grep -q '"status":"success"' \
-                && echo "${status_body}" | grep -q "\"commit\":\"${short_sha}\""; then
+              if echo "${status_body}" | jq -e --arg sha "${short_sha}" \
+                '.status == "success" and .commit == $sha' >/dev/null 2>&1; then
                 echo "OK: deploy status success for ${short_sha}"
                 exit 0
               fi
-              if echo "${status_body}" | grep -q '"status":"failed"'; then
+              if echo "${status_body}" | jq -e '.status == "failed"' >/dev/null 2>&1; then
                 echo "::error::VPS deploy failed. Check /tmp/hawknexa-deploy.log on the server."
                 exit 1
               fi
@@ -133,7 +133,8 @@ jobs:
 
             if [ "${BUILD_BACKEND}" = "true" ]; then
               health_body="$(curl -fsS "${HEALTH_URL}" 2>/dev/null || true)"
-              if [ -n "${health_body}" ] && echo "${health_body}" | grep -q "\"commit\":\"${short_sha}\""; then
+              if [ -n "${health_body}" ] && echo "${health_body}" | jq -e --arg sha "${short_sha}" \
+                '.data.commit == $sha' >/dev/null 2>&1; then
                 echo "OK: API health reports ${short_sha}"
                 exit 0
               fi
