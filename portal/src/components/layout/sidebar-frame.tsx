@@ -34,7 +34,7 @@ export function SidebarFrame({
         <BrandMark inverted subtitle={subtitle} />
       </div>
 
-      <nav className="relative flex min-h-0 flex-1 flex-col justify-start gap-0.5 overflow-hidden px-3 py-3">
+      <nav className="relative flex min-h-0 flex-1 flex-col justify-start gap-0.5 overflow-y-auto overflow-x-hidden px-3 py-3 [scrollbar-color:rgba(255,255,255,0.25)_transparent] [scrollbar-width:thin]">
         {children}
       </nav>
 

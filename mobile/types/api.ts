@@ -251,14 +251,29 @@ export interface StudentFee {
 export interface FeeReceipt {
   id: string;
   receiptNumber?: string | null;
-  amount: number;
   paidAt: string;
   method?: string | null;
   notes?: string | null;
-  periodLabel: string;
-  student: { firstName: string; lastName: string; studentCode: string };
+  collected: number;
+  balance: number;
   school: { name: string; address?: string | null; phone?: string | null };
-  recordedBy?: { firstName: string; lastName: string } | null;
+  student: {
+    id: string;
+    name: string;
+    studentCode: string;
+    admissionNumber?: string;
+    className?: string | null;
+    sectionName?: string | null;
+  };
+  fee: {
+    id: string;
+    name: string;
+    periodLabel: string;
+    billed: number;
+    paidToDate: number;
+    status: string;
+  };
+  receivedBy?: string | null;
 }
 
 export interface DayOffRequest {

@@ -1,6 +1,7 @@
+import '@/polyfills';
 import 'react-native-gesture-handler';
-import { Text } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import { Platform, Text } from 'react-native';
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
@@ -19,6 +20,8 @@ DefaultText.defaultProps = {
 
 export default function RootLayout() {
   useEffect(() => {
+    if (Constants.appOwnership === 'expo' || Platform.OS === 'web') return;
+    const Notifications: typeof import('expo-notifications') = require('expo-notifications');
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const deepLink = response.notification.request.content.data?.deepLink;
       if (typeof deepLink === 'string' && deepLink.startsWith('/')) {

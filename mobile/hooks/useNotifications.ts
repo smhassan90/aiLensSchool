@@ -1,8 +1,12 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { registerDeviceToken } from '@/services/notifications.service';
 
-Notifications.setNotificationHandler({
+const isExpoGo = Constants.appOwnership === 'expo';
+const Notifications: typeof import('expo-notifications') | null =
+  !isExpoGo && Platform.OS !== 'web' ? require('expo-notifications') : null;
+
+Notifications?.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList: true,
@@ -12,7 +16,7 @@ Notifications.setNotificationHandler({
 });
 
 export async function registerPushNotifications(): Promise<void> {
-  if (Platform.OS !== 'android') return;
+  if (Platform.OS !== 'android' || !Notifications) return;
 
   await Notifications.setNotificationChannelAsync('school-updates', {
     name: 'School updates',

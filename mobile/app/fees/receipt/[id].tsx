@@ -29,12 +29,12 @@ export default function FeeReceiptScreen() {
           <Text style={styles.title}>{receipt.receiptNumber ?? 'Receipt'}</Text>
           <Text style={styles.meta}>{receipt.school.name}</Text>
           <Text style={styles.meta}>
-            {receipt.student.firstName} {receipt.student.lastName} · {receipt.student.studentCode}
+            {receipt.student.name} · {receipt.student.studentCode}
           </Text>
           <Text style={styles.label}>Fee</Text>
-          <Text style={styles.value}>{receipt.periodLabel}</Text>
+          <Text style={styles.value}>{receipt.fee.name} · {receipt.fee.periodLabel}</Text>
           <Text style={styles.label}>Paid</Text>
-          <Text style={styles.amount}>{formatAmount(receipt.amount)}</Text>
+          <Text style={styles.amount}>{formatAmount(receipt.collected)}</Text>
           <Text style={styles.meta}>
             {new Date(receipt.paidAt).toLocaleString()} · {receipt.method ?? 'Payment'}
           </Text>

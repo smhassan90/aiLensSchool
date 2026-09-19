@@ -139,6 +139,8 @@ export default function SchoolDashboardPage() {
   const teachersPresent = data?.teacherAttendanceToday?.present ?? 0;
   const monthName = new Date().toLocaleString("en", { month: "long" });
   const examSubmissions = data?.examPaperSubmissions;
+  const pendingSubmissionPreview = examSubmissions?.pendingTeachers.slice(0, 5) ?? [];
+  const pendingSubmissionCount = examSubmissions?.pendingTeachers.length ?? 0;
 
   if (dashboard.isLoading) {
     return (
@@ -240,7 +242,7 @@ export default function SchoolDashboardPage() {
           title="Exam paper submissions"
           action={
             <Link href="/school/submitted-exam-papers" className="text-sm font-medium text-teal-700 hover:underline">
-              View papers
+              See all
             </Link>
           }
         >
@@ -260,9 +262,14 @@ export default function SchoolDashboardPage() {
             </div>
             {examSubmissions.pendingTeachers.length ? (
               <div>
-                <p className="mb-2 text-sm font-medium text-slate-700">Still waiting on</p>
+                <p className="mb-2 text-sm font-medium text-slate-700">
+                  Still waiting on{" "}
+                  <span className="font-normal text-slate-500">
+                    (showing {pendingSubmissionPreview.length} of {pendingSubmissionCount})
+                  </span>
+                </p>
                 <ul className="space-y-2 text-sm">
-                  {examSubmissions.pendingTeachers.map((row, index) => (
+                  {pendingSubmissionPreview.map((row, index) => (
                     <li key={`${row.teacherName}-${row.className}-${index}`} className="rounded-md border px-3 py-2">
                       <span className="font-medium text-slate-900">{row.teacherName}</span>
                       <span className="text-slate-500">
