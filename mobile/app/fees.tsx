@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Href, router } from 'expo-router';
@@ -6,13 +7,21 @@ import { ChildHeader } from '@/components/ChildHeader';
 import { Badge, Card, EmptyState, ErrorState, LoadingState } from '@/components/ui';
 import { ProgressBar } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
-import { colors, spacing, typography } from '@/constants/theme';
+import { colors, radii, spacing, typography } from '@/constants/theme';
 import { formatAmount } from '@/lib/format';
 import { fetchStudentFees } from '@/services/parent-records.service';
+import { StudentFee } from '@/types/api';
+
+type FeesTab = 'due' | 'paid';
+
+function latestPayment(fee: StudentFee) {
+  return fee.payments?.[0] ?? null;
+}
 
 export default function FeesScreen() {
   const { selectedChildId, isLoading: childLoading } = useChild();
   const studentId = selectedChildId ?? '';
+  const [tab, setTab] = useState<FeesTab>('due');
 
   const query = useQuery({
     queryKey: ['fees', studentId],
@@ -20,16 +29,11 @@ export default function FeesScreen() {
     enabled: !!studentId,
   });
 
-  if (childLoading) return <LoadingState message="Loading…" />;
-  if (!studentId) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <EmptyState title="Select a child" />
-      </SafeAreaView>
-    );
-  }
-
   const items = query.data?.items ?? [];
+  const dueItems = useMemo(() => items.filter((item) => item.status !== 'PAID'), [items]);
+  const paidItems = useMemo(() => items.filter((item) => item.status === 'PAID'), [items]);
+  const visibleItems = tab === 'paid' ? paidItems : dueItems;
+
   const totals = items.length
     ? items.reduce(
         (acc, item) => ({
@@ -39,6 +43,15 @@ export default function FeesScreen() {
         { amount: 0, paid: 0 },
       )
     : null;
+
+  if (childLoading) return <LoadingState message="Loading…" />;
+  if (!studentId) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <EmptyState title="Select a child" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -60,9 +73,27 @@ export default function FeesScreen() {
                 </Text>
               </View>
             ) : null}
+            <View style={styles.tabs}>
+              <Pressable
+                style={[styles.tab, tab === 'due' && styles.tabActive]}
+                onPress={() => setTab('due')}
+              >
+                <Text style={[styles.tabText, tab === 'due' && styles.tabTextActive]}>
+                  Due ({dueItems.length})
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.tab, tab === 'paid' && styles.tabActive]}
+                onPress={() => setTab('paid')}
+              >
+                <Text style={[styles.tabText, tab === 'paid' && styles.tabTextActive]}>
+                  Paid ({paidItems.length})
+                </Text>
+              </Pressable>
+            </View>
           </>
         }
-        data={query.data?.items ?? []}
+        data={visibleItems}
         keyExtractor={(item) => item.id}
         refreshing={query.isRefetching}
         onRefresh={() => query.refetch()}
@@ -72,31 +103,36 @@ export default function FeesScreen() {
           ) : query.isError ? (
             <ErrorState message="Could not load fees" onRetry={() => query.refetch()} />
           ) : (
-            <EmptyState title="No fee records" />
+            <EmptyState title={tab === 'paid' ? 'No paid fees yet' : 'No outstanding fees'} />
           )
         }
         renderItem={({ item }) => {
           const amount = Number(item.amount) || 0;
           const paid = Number(item.paidAmount) || 0;
-          const payment = item.payments?.[0];
+          const payment = latestPayment(item);
+          const isPaid = item.status === 'PAID';
+
+          const openReceipt = () => {
+            if (payment?.id) {
+              router.push(`/fees/receipt/${payment.id}` as Href);
+            }
+          };
+
           return (
-            <Card>
+            <Card onPress={isPaid && payment ? openReceipt : undefined}>
               <Text style={styles.cardTitle}>
                 {item.feeStructure?.name ?? item.periodLabel ?? 'Fee'}
               </Text>
               <Text style={styles.cardMeta}>
-                Due {new Date(item.dueDate).toLocaleDateString()} · Balance{' '}
-                {formatAmount(item.balance)}
+                Due {new Date(item.dueDate).toLocaleDateString()}
+                {isPaid ? '' : ` · Balance ${formatAmount(item.balance)}`}
               </Text>
               <ProgressBar value={paid} max={Math.max(1, amount)} height={8} />
-              <Badge
-                label={item.status}
-                tone={item.status === 'PAID' ? 'success' : 'warning'}
-              />
-              {payment ? (
-                <Pressable onPress={() => router.push(`/fees/receipt/${payment.id}` as Href)}>
+              <Badge label={item.status} tone={isPaid ? 'success' : 'warning'} />
+              {isPaid && payment ? (
+                <Pressable onPress={openReceipt}>
                   <Text style={styles.receiptLink}>
-                    View paid receipt · {payment.receiptNumber ?? 'Open'}
+                    View receipt · {payment.receiptNumber ?? 'Open'}
                   </Text>
                 </Pressable>
               ) : null}
@@ -112,23 +148,80 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.md, flexGrow: 1 },
   note: {
+    fontFamily: typography.family,
     color: colors.slate600,
     fontSize: 13,
     lineHeight: 18,
     marginBottom: spacing.sm,
   },
-  cardTitle: { fontFamily: typography.family, fontSize: 16, fontWeight: typography.semibold, color: colors.slate800 },
-  cardMeta: { fontFamily: typography.family, fontSize: 13, color: colors.slate500, marginTop: 4, marginBottom: spacing.sm },
-  receiptLink: { color: colors.primary, fontFamily: typography.family, fontWeight: typography.semibold, marginTop: spacing.sm },
+  tabs: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  tab: {
+    flex: 1,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    backgroundColor: colors.white,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  tabActive: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.primary,
+  },
+  tabText: {
+    fontFamily: typography.family,
+    fontSize: 14,
+    fontWeight: typography.medium,
+    color: colors.slate600,
+  },
+  tabTextActive: {
+    color: colors.primaryDark,
+    fontWeight: typography.semibold,
+  },
+  cardTitle: {
+    fontFamily: typography.family,
+    fontSize: 16,
+    fontWeight: typography.semibold,
+    color: colors.slate800,
+  },
+  cardMeta: {
+    fontFamily: typography.family,
+    fontSize: 13,
+    color: colors.slate500,
+    marginTop: 4,
+    marginBottom: spacing.sm,
+  },
+  receiptLink: {
+    color: colors.primary,
+    fontFamily: typography.family,
+    fontWeight: typography.semibold,
+    marginTop: spacing.sm,
+  },
   snapshot: {
     backgroundColor: colors.white,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.slate200,
     marginTop: spacing.sm,
     marginBottom: spacing.sm,
   },
-  snapshotTitle: { fontFamily: typography.family, fontSize: 14, fontWeight: typography.semibold, color: colors.slate700, marginBottom: 8 },
-  snapshotMeta: { fontFamily: typography.family, marginTop: 8, fontSize: 12, color: colors.slate500 },
+  snapshotTitle: {
+    fontFamily: typography.family,
+    fontSize: 14,
+    fontWeight: typography.semibold,
+    color: colors.slate700,
+    marginBottom: 8,
+  },
+  snapshotMeta: {
+    fontFamily: typography.family,
+    marginTop: 8,
+    fontSize: 12,
+    color: colors.slate500,
+  },
 });

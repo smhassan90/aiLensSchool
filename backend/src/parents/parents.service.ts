@@ -103,6 +103,7 @@ export class ParentsService {
                 enrollments: {
                   where: { status: 'ACTIVE' },
                   include: { grade: true, section: true, academicYear: true },
+                  orderBy: { createdAt: 'desc' },
                   take: 1,
                 },
               },
@@ -243,9 +244,26 @@ export class ParentsService {
 
   async listDayOffRequests(query: DayOffQueryDto, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
+    const day = query.date ? this.dayOnly(query.date) : null;
     const where: Prisma.ParentDayOffRequestWhereInput = {
       schoolId,
       ...(query.studentId ? { studentId: query.studentId } : {}),
+      ...(query.sectionId
+        ? {
+            student: {
+              enrollments: {
+                some: { sectionId: query.sectionId, status: 'ACTIVE' },
+              },
+            },
+          }
+        : {}),
+      ...(day
+        ? {
+            startDate: { lte: day },
+            endDate: { gte: day },
+            status: { in: [DayOffRequestStatus.PENDING, DayOffRequestStatus.APPROVED] },
+          }
+        : {}),
       ...(this.tenant.isParent(user) ? { parent: { userId: user.id } } : {}),
     };
     return this.prisma.parentDayOffRequest.findMany({
@@ -353,7 +371,19 @@ export class ParentsService {
   }
 
   async getActiveEnrollment(parentUserId: string, studentId: string) {
-    await this.assertParentOwnsStudent(parentUserId, studentId);
+    const parent = await this.assertParentOwnsStudent(parentUserId, studentId);
+    const currentYear = await this.prisma.academicYear.findFirst({
+      where: { schoolId: parent.schoolId, isCurrent: true },
+      orderBy: { startDate: 'desc' },
+      select: { id: true },
+    });
+    if (currentYear) {
+      const current = await this.prisma.studentEnrollment.findFirst({
+        where: { studentId, status: 'ACTIVE', academicYearId: currentYear.id },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (current) return current;
+    }
     return this.prisma.studentEnrollment.findFirst({
       where: { studentId, status: 'ACTIVE' },
       orderBy: { createdAt: 'desc' },

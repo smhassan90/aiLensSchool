@@ -84,9 +84,9 @@ export default function HomeworkTabScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.md, paddingBottom: spacing.xl, flexGrow: 1 },
-  eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.3, color: colors.primary },
-  title: { fontSize: 30, fontWeight: '900', color: colors.slate900, marginTop: 3, marginBottom: spacing.md },
+  content: { padding: spacing.md, paddingBottom: 110, flexGrow: 1 },
+  eyebrow: { fontSize: 11, fontWeight: '500', letterSpacing: 1.2, color: colors.primary },
+  title: { fontSize: 26, fontWeight: '600', color: colors.slate900, marginTop: 3, marginBottom: spacing.md },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   iconWrap: {
     width: 38,
@@ -94,8 +94,8 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceLavender,
+    backgroundColor: colors.accentSoft,
   },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800 },
+  cardTitle: { fontSize: 16, fontWeight: '500', color: colors.slate800 },
   cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4, marginBottom: spacing.sm },
 });

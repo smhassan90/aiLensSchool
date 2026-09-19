@@ -37,7 +37,7 @@ const ringStyles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.white,
   },
-  value: { fontSize: 22, fontWeight: '800' },
+  value: { fontSize: 22, fontWeight: '600' },
   label: {
     marginTop: 8,
     fontSize: 12,
@@ -115,7 +115,7 @@ const labeledStyles = StyleSheet.create({
     gap: spacing.sm,
   },
   label: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.slate700 },
-  value: { fontSize: 13, fontWeight: '800' },
+  value: { fontSize: 13, fontWeight: '600' },
   hint: { marginTop: 4, fontSize: 11, color: colors.slate500 },
 });
 

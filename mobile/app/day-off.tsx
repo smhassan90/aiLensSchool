@@ -79,7 +79,8 @@ export default function DayOffScreen() {
         {query.isError ? <ErrorState message="Could not load requests" onRetry={() => query.refetch()} /> : null}
         {!query.isLoading && !query.isError && !query.data?.length ? <EmptyState title="No requests yet" /> : null}
         {query.data?.map((request) => {
-          const canDelete = new Date(request.startDate) > new Date();
+          const today = new Date().toISOString().slice(0, 10);
+          const canDelete = request.startDate.slice(0, 10) > today;
           return (
             <Card key={request.id}>
               <View style={styles.row}>

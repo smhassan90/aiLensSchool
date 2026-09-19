@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useChild } from '@/providers/ChildProvider';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, radii, spacing, typography } from '@/constants/theme';
 
 export function ChildHeader() {
   const { selectedChild, children } = useChild();
@@ -42,24 +42,28 @@ const styles = StyleSheet.create({
   },
   label: {
     color: colors.primaryLight,
+    fontFamily: typography.family,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: typography.medium,
     textTransform: 'uppercase',
   },
   name: {
     color: colors.white,
+    fontFamily: typography.family,
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: typography.semibold,
     marginTop: 2,
   },
   meta: {
     color: '#ccfbf1',
+    fontFamily: typography.family,
     fontSize: 13,
     marginTop: 2,
   },
   switch: {
     color: colors.white,
-    fontWeight: '600',
+    fontFamily: typography.family,
+    fontWeight: typography.medium,
     fontSize: 14,
   },
 });

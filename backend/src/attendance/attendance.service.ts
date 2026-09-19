@@ -99,17 +99,17 @@ export class AttendanceService {
       .filter((entry) => entry.status === 'ABSENT')
       .map((entry) => entry.studentId);
     if (absentStudentIds.length) {
-      const approvedDayOffs = await this.prisma.parentDayOffRequest.findMany({
+      const dayOffCoverage = await this.prisma.parentDayOffRequest.findMany({
         where: {
           schoolId,
           studentId: { in: absentStudentIds },
-          status: 'APPROVED',
+          status: { in: ['PENDING', 'APPROVED'] },
           startDate: { lte: date },
           endDate: { gte: date },
         },
         select: { studentId: true },
       });
-      const coveredIds = new Set(approvedDayOffs.map((request) => request.studentId));
+      const coveredIds = new Set(dayOffCoverage.map((request) => request.studentId));
       const unexplainedIds = absentStudentIds.filter((studentId) => !coveredIds.has(studentId));
       if (unexplainedIds.length) {
         const links = await this.prisma.studentParent.findMany({
@@ -122,7 +122,7 @@ export class AttendanceService {
             schoolId,
             type: NotificationType.STUDENT_ABSENCE,
             title: 'Attendance follow-up',
-            body: 'Your child was marked absent today. Please contact the school if this absence was expected.',
+            body: 'We noticed your child was marked absent today. If you have a moment, please let the school know the reason through the app or by calling the office.',
             data: { studentIds: unexplainedIds, date: dto.date } as Prisma.InputJsonValue,
             deepLink: '/attendance',
           },
@@ -190,11 +190,11 @@ export class AttendanceService {
                 studentCode: true,
                 dayOffRequests: {
                   where: {
-                    status: 'APPROVED',
+                    status: { in: ['PENDING', 'APPROVED'] },
                     startDate: { lte: query.date ? dateFromIso(query.date.slice(0, 10)) : new Date() },
                     endDate: { gte: query.date ? dateFromIso(query.date.slice(0, 10)) : new Date() },
                   },
-                  select: { id: true, startDate: true, endDate: true, reason: true },
+                  select: { id: true, startDate: true, endDate: true, reason: true, status: true },
                 },
               },
             },

@@ -57,15 +57,26 @@ export default function AttendancePage() {
     const byStudent = new Map(
       (existing.data?.items ?? []).map((row) => [row.student?.id ?? "", row]),
     );
-    const rows = new Map<string, { studentId: string; name: string; status: AttendanceMark; dayOffReason?: string }>();
+    const rows = new Map<
+      string,
+      {
+        studentId: string;
+        name: string;
+        status: AttendanceMark;
+        dayOff?: { reason: string; status: "PENDING" | "APPROVED" | "REJECTED" };
+      }
+    >();
     for (const enr of students) {
       const studentId = enr.student?.id ?? enr.studentId;
       if (!studentId || rows.has(studentId)) continue;
+      const dayOffRequest = byStudent.get(studentId)?.student?.dayOffRequests?.[0];
       rows.set(studentId, {
         studentId,
         name: enr.student ? `${enr.student.firstName} ${enr.student.lastName}` : studentId,
         status: marks[studentId] ?? toPresentAbsent(byStudent.get(studentId)?.status) ?? "PRESENT",
-        dayOffReason: byStudent.get(studentId)?.student?.dayOffRequests?.[0]?.reason,
+        dayOff: dayOffRequest
+          ? { reason: dayOffRequest.reason, status: dayOffRequest.status as "PENDING" | "APPROVED" | "REJECTED" }
+          : undefined,
       });
     }
     return Array.from(rows.values());

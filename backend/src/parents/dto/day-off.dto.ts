@@ -20,6 +20,14 @@ export class DayOffQueryDto {
   @IsOptional()
   @IsString()
   studentId?: string;
+
+  @IsOptional()
+  @IsString()
+  sectionId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  date?: string;
 }
 
 export class ReviewDayOffDto {

@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { EmptyState } from "@/components/layout/empty-state";
 import { attendanceService } from "@/services/attendance.service";
 import { academicsService } from "@/services/academics.service";
+import { parentsService } from "@/services/parents.service";
 import { teachersService } from "@/services/teachers.service";
 import { PageLoader } from "@/components/layout/page-loader";
 import { useToast } from "@/providers/toast-provider";
@@ -38,6 +39,11 @@ export default function TeacherAttendancePage() {
     queryKey: ["attendance", sectionId, date],
     queryFn: () => attendanceService.list({ sectionId, date, limit: 100 }),
     enabled: Boolean(sectionId),
+  });
+  const dayOffs = useQuery({
+    queryKey: ["day-off-requests", sectionId, date],
+    queryFn: () => parentsService.listDayOffRequests({ sectionId, date }),
+    enabled: Boolean(sectionId) && Boolean(date),
   });
 
   const sections = useMemo(() => {
@@ -76,7 +82,16 @@ export default function TeacherAttendancePage() {
     const byStudent = new Map(
       (existing.data?.items ?? []).map((row) => [row.student?.id ?? "", toPresentAbsent(row.status)]),
     );
-    const rows = new Map<string, { studentId: string; name: string; status: AttendanceMark }>();
+    const dayOffByStudent = new Map(
+      (dayOffs.data ?? []).map((request) => [
+        request.student.id,
+        { reason: request.reason, status: request.status },
+      ]),
+    );
+    const rows = new Map<
+      string,
+      { studentId: string; name: string; status: AttendanceMark; dayOff?: { reason: string; status: "PENDING" | "APPROVED" | "REJECTED" } }
+    >();
     for (const enr of students) {
       const studentId = enr.student?.id ?? enr.studentId;
       if (!studentId || rows.has(studentId)) continue;
@@ -84,10 +99,11 @@ export default function TeacherAttendancePage() {
         studentId,
         name: enr.student ? `${enr.student.firstName} ${enr.student.lastName}` : studentId,
         status: marks[studentId] ?? byStudent.get(studentId) ?? "PRESENT",
+        dayOff: dayOffByStudent.get(studentId),
       });
     }
     return Array.from(rows.values());
-  }, [enrollments.data, existing.data, marks]);
+  }, [enrollments.data, existing.data, dayOffs.data, marks]);
 
   const canSave =
     Boolean(sectionId) &&
@@ -191,7 +207,7 @@ export default function TeacherAttendancePage() {
         </div>
       </div>
       {sectionId &&
-        (enrollments.isLoading || existing.isLoading ? (
+        (enrollments.isLoading || existing.isLoading || dayOffs.isLoading ? (
           <PageLoader variant="panel" />
         ) : enrollments.isError ? (
           <p className="text-sm text-destructive">Could not load students. Try again.</p>

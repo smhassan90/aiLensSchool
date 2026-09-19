@@ -10,7 +10,13 @@ export interface AttendanceRow {
     firstName: string;
     lastName: string;
     studentCode: string;
-    dayOffRequests?: Array<{ id: string; startDate: string; endDate: string; reason: string }>;
+    dayOffRequests?: Array<{
+      id: string;
+      startDate: string;
+      endDate: string;
+      reason: string;
+      status: "PENDING" | "APPROVED" | "REJECTED";
+    }>;
   };
 }
 

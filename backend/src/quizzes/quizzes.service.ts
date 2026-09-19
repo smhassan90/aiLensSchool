@@ -933,11 +933,18 @@ export class QuizzesService {
       if (!enrollment) {
         return paginate([], 0, page, limit);
       }
+      const schoolId = this.tenant.requireSchoolId(user);
+      const now = new Date();
       const where: Prisma.QuizWhereInput = {
         sectionId: enrollment.sectionId,
         status: QuizStatus.PUBLISHED,
         paperKind: 'QUIZ',
-        schoolId: this.tenant.requireSchoolId(user),
+        schoolId,
+        OR: [
+          { dueAt: null },
+          { dueAt: { gt: now } },
+          { results: { some: { studentId: query.studentId } } },
+        ],
       };
       const [items, total] = await pageQuery(
         (skip, take) =>

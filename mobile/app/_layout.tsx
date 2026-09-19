@@ -15,7 +15,7 @@ import { AuthGate } from '@/components/AuthGate';
 const DefaultText = Text as typeof Text & { defaultProps?: { style?: unknown } };
 DefaultText.defaultProps = {
   ...(DefaultText.defaultProps ?? {}),
-  style: { fontFamily: 'serif' },
+  style: { fontFamily: 'Times New Roman' },
 };
 
 export default function RootLayout() {

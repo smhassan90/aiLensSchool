@@ -163,7 +163,7 @@ export default function DiaryScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.md, paddingBottom: spacing.xl },
+  content: { padding: spacing.md, paddingBottom: 110 },
   title: { fontSize: 28, fontWeight: '800', color: colors.slate900, marginBottom: spacing.md },
   snapshot: {
     flexDirection: 'row',

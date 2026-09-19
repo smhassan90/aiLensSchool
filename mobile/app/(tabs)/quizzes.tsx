@@ -8,6 +8,7 @@ import { Badge, Card, EmptyState, ErrorState, LoadingState } from '@/components/
 import { ProgressBar, toneColor } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
 import { colors, spacing } from '@/constants/theme';
+import { filterAccessibleQuizzes } from '@/lib/quiz-visibility';
 import { fetchQuizzes, isQuizNew } from '@/services/quizzes.service';
 import { fetchQuizResults } from '@/services/results.service';
 import { QuizResult } from '@/types/api';
@@ -44,9 +45,7 @@ export default function QuizzesTabScreen() {
   const average = scored.length
     ? Math.round(scored.reduce((sum, n) => sum + n, 0) / scored.length)
     : null;
-  const visibleQuizzes = (query.data?.items ?? []).filter(
-    (quiz) => !quiz.dueAt || new Date(quiz.dueAt) > new Date() || resultsByQuiz.has(quiz.id),
-  );
+  const visibleQuizzes = filterAccessibleQuizzes(query.data?.items ?? [], resultsByQuiz);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -130,9 +129,9 @@ export default function QuizzesTabScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.md, paddingBottom: spacing.xl, flexGrow: 1 },
-  eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.3, color: colors.primary },
-  title: { fontSize: 30, fontWeight: '900', color: colors.slate900, marginTop: 3, marginBottom: spacing.md },
+  content: { padding: spacing.md, paddingBottom: 110, flexGrow: 1 },
+  eyebrow: { fontSize: 11, fontWeight: '500', letterSpacing: 1.2, color: colors.primary },
+  title: { fontSize: 26, fontWeight: '600', color: colors.slate900, marginTop: 3, marginBottom: spacing.md },
   hint: { color: colors.slate500, marginBottom: spacing.md },
   snapshot: {
     backgroundColor: colors.white,
@@ -142,9 +141,9 @@ const styles = StyleSheet.create({
     borderColor: colors.slate200,
     marginBottom: spacing.md,
   },
-  snapshotLabel: { fontSize: 12, fontWeight: '700', color: colors.slate500, marginBottom: 8 },
+  snapshotLabel: { fontSize: 12, fontWeight: '500', color: colors.slate500, marginBottom: 8 },
   snapshotRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  snapshotValue: { fontSize: 28, fontWeight: '800', width: 72 },
+  snapshotValue: { fontSize: 28, fontWeight: '600', width: 72 },
   snapshotBar: { flex: 1 },
   scoreBlock: { gap: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -156,6 +155,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.surfaceYellow,
   },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800, flex: 1 },
+  cardTitle: { fontSize: 16, fontWeight: '500', color: colors.slate800, flex: 1 },
   cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4, marginBottom: spacing.sm },
 });

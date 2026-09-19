@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Badge, EmptyState, ErrorState, LoadingState } from '@/components/ui';
 import { useChild } from '@/providers/ChildProvider';
-import { colors, spacing } from '@/constants/theme';
+import { colors, spacing, typography } from '@/constants/theme';
+import { ApiError } from '@/lib/api';
 import { fetchQuizById } from '@/services/quizzes.service';
 import { fetchQuizResultForStudent } from '@/services/results.service';
 import { QuizQuestion } from '@/types/api';
@@ -36,12 +37,13 @@ export default function QuizDetailScreen() {
 
   if (quizQuery.isLoading) return <LoadingState message="Loading quiz…" />;
   if (quizQuery.isError || !quizQuery.data) {
+    const message =
+      quizQuery.error instanceof ApiError
+        ? quizQuery.error.message
+        : 'This quiz is not available for the selected child.';
     return (
       <SafeAreaView style={styles.safe}>
-        <ErrorState
-          message="This quiz is not available for the selected child."
-          onRetry={() => quizQuery.refetch()}
-        />
+        <ErrorState message={message} onRetry={() => quizQuery.refetch()} />
       </SafeAreaView>
     );
   }
@@ -91,17 +93,28 @@ export default function QuizDetailScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.lg, gap: spacing.md },
-  title: { fontSize: 24, fontWeight: '800', color: colors.slate900 },
-  meta: { color: colors.slate500 },
-  body: { fontSize: 16, lineHeight: 24, color: colors.slate700 },
-  section: { fontSize: 18, fontWeight: '700', color: colors.slate800, marginTop: spacing.md },
-  previewMeta: { color: colors.slate600, lineHeight: 22 },
+  title: {
+    fontFamily: typography.family,
+    fontSize: 24,
+    fontWeight: typography.semibold,
+    color: colors.slate900,
+  },
+  meta: { fontFamily: typography.family, color: colors.slate500 },
+  body: { fontFamily: typography.family, fontSize: 16, lineHeight: 24, color: colors.slate700 },
+  section: {
+    fontFamily: typography.family,
+    fontSize: 18,
+    fontWeight: typography.semibold,
+    color: colors.slate800,
+    marginTop: spacing.md,
+  },
+  previewMeta: { fontFamily: typography.family, color: colors.slate600, lineHeight: 22 },
   resultLink: {
     backgroundColor: colors.primary,
     padding: spacing.md,
     borderRadius: 10,
     alignItems: 'center',
   },
-  resultText: { color: colors.white, fontWeight: '700' },
-  unavailable: { color: colors.warning, fontSize: 15, lineHeight: 22 },
+  resultText: { fontFamily: typography.family, color: colors.white, fontWeight: typography.semibold },
+  unavailable: { fontFamily: typography.family, color: colors.warning, fontSize: 15, lineHeight: 22 },
 });

@@ -13,6 +13,7 @@ import { colors, radii, spacing } from '@/constants/theme';
 import { fetchLessonsForStudent, isLessonToday } from '@/services/lessons.service';
 import { fetchHomework, needsHomeworkSubmission } from '@/services/homework.service';
 import { fetchQuizzes, isQuizNew } from '@/services/quizzes.service';
+import { pendingQuizzes } from '@/lib/quiz-visibility';
 import { fetchQuizResults } from '@/services/results.service';
 import { fetchAttendance } from '@/services/attendance.service';
 import { fetchEvents, isUpcomingEvent } from '@/services/events.service';
@@ -131,7 +132,8 @@ export default function HomeScreen() {
   const todayLessons = (lessonsQuery.data ?? []).filter(isLessonToday);
   const openHomework = (homeworkQuery.data?.items ?? []).filter(needsHomeworkSubmission);
   const resultByQuiz = new Map((resultsQuery.data?.items ?? []).map((row) => [row.quizId, row]));
-  const newQuizzes = (quizzesQuery.data?.items ?? []).filter((quiz) =>
+  const accessibleQuizzes = pendingQuizzes(quizzesQuery.data?.items ?? [], resultByQuiz);
+  const newQuizzes = accessibleQuizzes.filter((quiz) =>
     isQuizNew(quiz, { hasResult: resultByQuiz.has(quiz.id) }),
   );
   const upcomingEvents = (eventsQuery.data?.items ?? []).filter(isUpcomingEvent).slice(0, 3);
@@ -149,7 +151,7 @@ export default function HomeScreen() {
               {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
             </Text>
           </View>
-          <Pressable style={styles.profileButton} onPress={() => router.push('/profile')}>
+          <Pressable style={styles.profileButton} onPress={() => router.push('/(tabs)/profile')}>
             <Ionicons name="person-outline" size={20} color={colors.primary} />
           </Pressable>
         </View>
@@ -166,13 +168,17 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.quickRow}>
-          <Pressable style={[styles.quickLink, styles.quickLinkLavender]} onPress={() => router.push('/fees')}>
+          <Pressable style={[styles.quickLink, styles.quickLinkSoft]} onPress={() => router.push('/fees')}>
             <Ionicons name="wallet-outline" size={22} color={colors.primary} />
             <Text style={styles.quickLinkText}>Fees</Text>
           </Pressable>
-          <Pressable style={[styles.quickLink, styles.quickLinkYellow]} onPress={() => router.push('/report-cards')}>
-            <Ionicons name="ribbon-outline" size={22} color={colors.warning} />
-            <Text style={styles.quickLinkText}>Report cards</Text>
+          <Pressable style={[styles.quickLink, styles.quickLinkYellow]} onPress={() => router.push('/day-off')}>
+            <Ionicons name="calendar-outline" size={22} color={colors.warning} />
+            <Text style={styles.quickLinkText}>Day off</Text>
+          </Pressable>
+          <Pressable style={[styles.quickLink, styles.quickLinkSoft]} onPress={() => router.push('/student-photo')}>
+            <Ionicons name="camera-outline" size={22} color={colors.primary} />
+            <Text style={styles.quickLinkText}>Photo</Text>
           </Pressable>
         </View>
 
@@ -208,7 +214,7 @@ export default function HomeScreen() {
 
         <View style={styles.statsRow}>
           <StatPill label="To-do HW" value={openHomework.length} />
-          <StatPill label="New quizzes" value={newQuizzes.length} />
+          <StatPill label="Pending quizzes" value={accessibleQuizzes.length} />
           <StatPill label="Unread" value={unreadCount} />
         </View>
 
@@ -254,7 +260,7 @@ export default function HomeScreen() {
         )}
 
         <SectionTitle
-          title="New quizzes"
+          title="Pending quizzes"
           action={
             <Text style={styles.link} onPress={() => router.push('/(tabs)/quizzes')}>
               See all
@@ -265,14 +271,14 @@ export default function HomeScreen() {
           <LoadingState message="Loading quizzes…" />
         ) : quizzesQuery.isError ? (
           <ErrorState message="Could not load quizzes" onRetry={() => quizzesQuery.refetch()} />
-        ) : newQuizzes.length === 0 ? (
-          <EmptyState title="No new quizzes" />
+        ) :           accessibleQuizzes.length === 0 ? (
+          <EmptyState title="No pending quizzes" />
         ) : (
-          newQuizzes.slice(0, 3).map((quiz: Quiz) => (
+          accessibleQuizzes.slice(0, 3).map((quiz: Quiz) => (
             <Card key={quiz.id} onPress={() => router.push(`/quiz/${quiz.id}`)}>
               <View style={styles.row}>
                 <Text style={styles.cardTitle}>{quiz.title}</Text>
-                <Badge label="New" tone="success" />
+                {isQuizNew(quiz, { hasResult: false }) ? <Badge label="New" tone="success" /> : null}
               </View>
               <Text style={styles.cardMeta}>{quiz.subject?.name}</Text>
             </Card>
@@ -333,7 +339,7 @@ function StatPill({ label, value }: { label: string; value: number }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
-  content: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
+  content: { paddingHorizontal: spacing.md, paddingBottom: 110 },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -341,14 +347,14 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     marginBottom: spacing.md,
   },
-  eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.4, color: colors.primary },
-  greeting: { fontSize: 28, fontWeight: '900', color: colors.slate900, marginTop: 3 },
+  eyebrow: { fontSize: 11, fontWeight: '500', letterSpacing: 1.2, color: colors.primary },
+  greeting: { fontSize: 26, fontWeight: '600', color: colors.slate900, marginTop: 3 },
   date: { color: colors.slate500, marginTop: 5, fontSize: 13 },
   profileButton: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: colors.surfaceLavender,
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -382,13 +388,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.sm,
   },
-  quickLinkLavender: {
-    backgroundColor: colors.surfaceLavender,
+  quickLinkSoft: {
+    backgroundColor: colors.accentSoft,
   },
   quickLinkYellow: {
     backgroundColor: colors.surfaceYellow,
   },
-  quickLinkText: { color: colors.slate800, fontWeight: '800', fontSize: 14 },
+  quickLinkText: { color: colors.slate800, fontWeight: '500', fontSize: 14 },
   snapshot: {
     backgroundColor: colors.white,
     borderRadius: radii.xl,
@@ -402,12 +408,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
-  snapshotKicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.2, color: colors.slate400 },
-  snapshotTitle: { fontSize: 20, fontWeight: '900', color: colors.slate800, marginTop: 3 },
+  snapshotKicker: { fontSize: 10, fontWeight: '500', letterSpacing: 1.1, color: colors.slate400 },
+  snapshotTitle: { fontSize: 18, fontWeight: '600', color: colors.slate800, marginTop: 3 },
   rings: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
   dotsWrap: { marginTop: spacing.md },
   subjects: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.slate100 },
-  subjectsTitle: { fontSize: 13, fontWeight: '700', color: colors.slate600, marginBottom: spacing.sm },
+  subjectsTitle: { fontSize: 13, fontWeight: '500', color: colors.slate600, marginBottom: spacing.sm },
   snapshotHint: { marginTop: spacing.md, fontSize: 12, color: colors.slate500 },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   statPill: {
@@ -417,9 +423,9 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     alignItems: 'center',
   },
-  statValue: { fontSize: 22, fontWeight: '900', color: colors.primaryDark },
+  statValue: { fontSize: 22, fontWeight: '600', color: colors.primaryDark },
   statLabel: { fontSize: 11, color: colors.slate500, marginTop: 2, textAlign: 'center' },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800 },
+  cardTitle: { fontSize: 16, fontWeight: '500', color: colors.slate800 },
   cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4 },
   link: { color: colors.primary, fontWeight: '600' },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

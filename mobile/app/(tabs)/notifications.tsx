@@ -78,7 +78,7 @@ export default function NotificationsTabScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.md, paddingBottom: spacing.xl, flexGrow: 1 },
+  content: { padding: spacing.md, paddingBottom: 110, flexGrow: 1 },
   title: { fontSize: 28, fontWeight: '800', color: colors.slate900, marginBottom: spacing.md },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800, flex: 1 },
