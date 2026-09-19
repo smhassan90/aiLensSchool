@@ -1,4 +1,9 @@
+import { existsSync } from 'fs';
+import path from 'path';
 import { ExpoConfig, ConfigContext } from 'expo/config';
+
+const googleServicesPath = process.env.GOOGLE_SERVICES_JSON ?? './android/google-services.json';
+const googleServicesResolved = path.resolve(__dirname, googleServicesPath);
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -20,8 +25,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#ffffff',
     },
     package: 'com.sms.parent',
-    versionCode: 3,
-    googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './android/google-services.json',
+    versionCode: 4,
+    ...(existsSync(googleServicesResolved) ? { googleServicesFile: googleServicesPath } : {}),
   },
   web: {
     bundler: 'metro',
