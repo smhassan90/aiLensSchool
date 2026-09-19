@@ -47,6 +47,9 @@ services:
       - .env
     environment:
       RUN_SEED: ${RUN_SEED:-false}
+      # Apply additive Prisma schema changes during every production restart.
+      # This keeps the VPS database aligned with the shipped Prisma client.
+      SKIP_DB_PUSH: "false"
       # Always use in-stack MySQL/Redis — never a remote database host.
       DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}?connection_limit=10&pool_timeout=30&connect_timeout=15
       REDIS_URL: redis://redis:6379
