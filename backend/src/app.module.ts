@@ -35,6 +35,7 @@ import { ExpensesModule } from './expenses/expenses.module';
 import { DocumentsModule } from './documents/documents.module';
 import { InsightsModule } from './insights/insights.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { HeadTeachersModule } from './head-teachers/head-teachers.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
@@ -127,6 +128,7 @@ const queuesEnabled = areQueuesEnabled();
     DocumentsModule,
     InsightsModule,
     DashboardModule,
+    HeadTeachersModule,
   ],
   controllers: [HealthController],
   providers: [

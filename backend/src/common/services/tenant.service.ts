@@ -64,4 +64,10 @@ export class TenantService {
   isSchoolAdmin(user: AuthUser): boolean {
     return user.roles.includes(RoleName.SCHOOL_ADMIN);
   }
+
+  isSchoolStaff(user: AuthUser): boolean {
+    return (
+      user.roles.includes(RoleName.SCHOOL_ADMIN) || user.roles.includes(RoleName.PRINCIPAL)
+    );
+  }
 }

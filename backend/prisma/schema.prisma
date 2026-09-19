@@ -494,6 +494,7 @@ model School {
   assessmentMarks               AssessmentMark[]
   timetableSlots                TimetableSlot[]
   reportCardTemplates           ReportCardTemplate[]
+  headTeacherAssignments        HeadTeacherAssignment[]
   pricingPlanId                 String?                        @map("pricing_plan_id")
   pricingPlan                   PricingPlan?                   @relation(fields: [pricingPlanId], references: [id])
 
@@ -757,6 +758,7 @@ model TeacherProfile {
   timetableSlots            TimetableSlot[]
   examPaperAssignments      ExamPaperAssignment[]
   deadlineExtensionRequests ExamDeadlineExtensionRequest[]
+  headTeacherAssignment     HeadTeacherAssignment?
 
   @@unique([schoolId, employeeCode])
   @@index([schoolId])
@@ -917,6 +919,7 @@ model Section {
   assessmentMarks      AssessmentMark[]
   timetableSlots       TimetableSlot[]
   examPaperAssignments ExamPaperAssignment[]
+  headTeacherSection   HeadTeacherSection?
 
   @@unique([branchId, gradeId, name])
   @@index([schoolId])
@@ -924,6 +927,35 @@ model Section {
   @@index([gradeId])
   @@index([classTeacherId])
   @@map("sections")
+}
+
+model HeadTeacherAssignment {
+  id        String   @id @default(uuid())
+  schoolId  String   @map("school_id")
+  teacherId String   @unique @map("teacher_id")
+  title     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  school   School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacher  TeacherProfile       @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  sections HeadTeacherSection[]
+
+  @@index([schoolId])
+  @@map("head_teacher_assignments")
+}
+
+model HeadTeacherSection {
+  id                      String   @id @default(uuid())
+  headTeacherAssignmentId String   @map("head_teacher_assignment_id")
+  sectionId               String   @unique @map("section_id")
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  headTeacher HeadTeacherAssignment @relation(fields: [headTeacherAssignmentId], references: [id], onDelete: Cascade)
+  section     Section               @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([headTeacherAssignmentId])
+  @@map("head_teacher_sections")
 }
 
 model Subject {

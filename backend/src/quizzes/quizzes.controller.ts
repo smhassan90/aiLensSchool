@@ -104,13 +104,13 @@ export class QuizzesController {
     return this.quizzesService.submitForPrint(id, user, dto);
   }
 
-  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL, RoleName.TEACHER)
   @Post(':id/approve-paper')
   approvePaper(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.quizzesService.approvePaper(id, user);
   }
 
-  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL, RoleName.TEACHER)
   @Post(':id/reject-paper')
   rejectPaper(
     @Param('id') id: string,

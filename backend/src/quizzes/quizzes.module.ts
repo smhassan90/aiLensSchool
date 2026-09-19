@@ -6,6 +6,7 @@ import { AuditModule } from '../audit/audit.module';
 import { AiModule } from '../ai/ai.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ParentsModule } from '../parents/parents.module';
+import { HeadTeachersModule } from '../head-teachers/head-teachers.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ParentsModule } from '../parents/parents.module';
     AiModule,
     forwardRef(() => NotificationsModule),
     ParentsModule,
+    HeadTeachersModule,
   ],
   providers: [QuizzesService],
   controllers: [QuizzesController],

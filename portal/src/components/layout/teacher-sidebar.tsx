@@ -7,6 +7,7 @@ import {
   FileQuestion,
   FileText,
   LayoutDashboard,
+  School,
   Trophy,
   User,
   Users,
@@ -22,6 +23,7 @@ import {
   prefetchMenuHref,
 } from "@/components/layout/background-prefetch";
 import { teachersService } from "@/services/teachers.service";
+import { headTeachersService } from "@/services/head-teachers.service";
 import { personFullName } from "@/lib/person-name";
 
 const baseNavItems = [
@@ -44,8 +46,18 @@ export function TeacherSidebar() {
     queryKey: ["teacher-classes"],
     queryFn: () => teachersService.myClasses(),
   });
+  const headTeacher = useQuery({
+    queryKey: ["head-teacher-me"],
+    queryFn: () => headTeachersService.getMyAssignment(),
+  });
   const isClassTeacher = (classes.data ?? []).some((row) => row.isClassTeacher);
-  const navItems = baseNavItems.filter((item) => !item.classTeacherOnly || isClassTeacher);
+  const isHeadTeacher = Boolean(headTeacher.data?.sections?.length);
+  const navItems = [
+    ...baseNavItems.filter((item) => !item.classTeacherOnly || isClassTeacher),
+    ...(isHeadTeacher
+      ? [{ href: "/teacher/head", label: "Academic oversight", icon: School }]
+      : []),
+  ];
 
   return (
     <SidebarFrame

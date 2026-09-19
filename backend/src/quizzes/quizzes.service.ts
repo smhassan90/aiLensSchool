@@ -33,6 +33,7 @@ import { examPaperLabel, EXAM_PAPER_KINDS, isExamPaperKind } from './exam-paper'
 import { paperKindFromExamName } from './exam-config-map';
 import { normalizeGeneratedQuestion, sectionLabelForQuestionType } from '../ai/quiz-mix';
 import { deadlineBlockedMessage, isDeadlineOpen } from '../academics/exam-deadlines';
+import { HeadTeachersService } from '../head-teachers/head-teachers.service';
 
 @Injectable()
 export class QuizzesService {
@@ -43,6 +44,7 @@ export class QuizzesService {
     private readonly quizGeneration: QuizGenerationService,
     private readonly parentsService: ParentsService,
     private readonly notifications: NotificationService,
+    private readonly headTeachers: HeadTeachersService,
   ) {}
 
   async generateFromLessons(dto: GenerateQuizDto, user: AuthUser) {
@@ -771,10 +773,12 @@ export class QuizzesService {
   }
 
   async approvePaper(id: string, user: AuthUser) {
-    if (!this.tenant.isSchoolAdmin(user)) {
+    const canReview =
+      this.tenant.isSchoolStaff(user) || (await this.headTeachers.canReviewExamPaper(user, id));
+    if (!canReview) {
       throw new ForbiddenException({
-        code: 'ADMIN_REQUIRED',
-        message: 'Only the office can approve exam papers',
+        code: 'REVIEW_FORBIDDEN',
+        message: 'You cannot approve this exam paper',
       });
     }
     const quiz = await this.prisma.quiz.findUnique({
@@ -814,10 +818,12 @@ export class QuizzesService {
   }
 
   async rejectPaper(id: string, reason: string, user: AuthUser) {
-    if (!this.tenant.isSchoolAdmin(user)) {
+    const canReview =
+      this.tenant.isSchoolStaff(user) || (await this.headTeachers.canReviewExamPaper(user, id));
+    if (!canReview) {
       throw new ForbiddenException({
-        code: 'ADMIN_REQUIRED',
-        message: 'Only the office can reject exam papers',
+        code: 'REVIEW_FORBIDDEN',
+        message: 'You cannot reject this exam paper',
       });
     }
     const trimmed = reason.trim();

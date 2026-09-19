@@ -26,6 +26,7 @@ type SubmittedExamPapersListProps = {
   papers: ExamPaperSubmissionPaper[];
   isLoading?: boolean;
   detailBasePath?: string;
+  submissionsQueryKey?: string;
 };
 
 function reviewStatus(status?: string): TeacherExamPaperStatus {
@@ -123,6 +124,7 @@ export function SubmittedExamPapersList({
   papers,
   isLoading,
   detailBasePath = "/school/submitted-exam-papers",
+  submissionsQueryKey = "school-exam-paper-submissions",
 }: SubmittedExamPapersListProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -133,7 +135,7 @@ export function SubmittedExamPapersList({
     mutationFn: (id: string) => quizzesService.approvePaper(id),
     onSuccess: () => {
       toast({ title: "Paper approved", variant: "success" });
-      queryClient.invalidateQueries({ queryKey: ["school-exam-paper-submissions"] });
+      queryClient.invalidateQueries({ queryKey: [submissionsQueryKey] });
     },
     onError: (err) =>
       toast({
@@ -149,7 +151,7 @@ export function SubmittedExamPapersList({
       toast({ title: "Paper rejected", description: "The teacher can revise and resubmit.", variant: "success" });
       setRejectId(null);
       setRejectReason("");
-      queryClient.invalidateQueries({ queryKey: ["school-exam-paper-submissions"] });
+      queryClient.invalidateQueries({ queryKey: [submissionsQueryKey] });
     },
     onError: (err) =>
       toast({

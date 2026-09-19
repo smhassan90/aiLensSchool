@@ -1296,6 +1296,7 @@ export class AcademicsService {
       sectionId?: string;
       subjectId?: string;
       teacherId?: string;
+      restrictSectionIds?: string[];
     },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
@@ -1363,12 +1364,18 @@ export class AcademicsService {
       deadline.setDate(deadline.getDate() - submissionDaysBefore);
     }
 
+    const sectionScope = query.sectionId
+      ? [query.sectionId]
+      : query.restrictSectionIds?.length
+        ? query.restrictSectionIds
+        : undefined;
+
     const assignments = await this.prisma.classSubject.findMany({
       where: {
         section: { schoolId },
         academicYearId: year.id,
         teacherId: { not: null },
-        ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+        ...(sectionScope ? { sectionId: { in: sectionScope } } : {}),
         ...(query.subjectId ? { subjectId: query.subjectId } : {}),
         ...(query.teacherId ? { teacher: { userId: query.teacherId } } : {}),
       },
@@ -1394,6 +1401,7 @@ export class AcademicsService {
         section: { schoolId },
         academicYearId: year.id,
         teacherId: { not: null },
+        ...(sectionScope ? { sectionId: { in: sectionScope } } : {}),
       },
       select: {
         sectionId: true,
@@ -1417,7 +1425,7 @@ export class AcademicsService {
         academicYearId: year.id,
         examConfigId: selectedExam.id,
         paperKind: { in: [...EXAM_PAPER_KINDS] },
-        ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+        ...(sectionScope ? { sectionId: { in: sectionScope } } : {}),
         ...(query.subjectId ? { subjectId: query.subjectId } : {}),
         ...(query.teacherId ? { createdById: query.teacherId } : {}),
       },

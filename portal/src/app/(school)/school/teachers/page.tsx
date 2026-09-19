@@ -80,7 +80,10 @@ export default function TeachersPage() {
         description="Add, update, or mark a teacher inactive. Open a row to see full details."
         actions={
           can("MANAGE_TEACHERS") ? (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Link href="/school/teachers/head-teachers">
+                <Button variant="outline">Head teachers</Button>
+              </Link>
               <Link href="/school/teachers/attendance">
                 <Button variant="outline">Teacher attendance</Button>
               </Link>
