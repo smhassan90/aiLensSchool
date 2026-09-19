@@ -7,6 +7,7 @@ DEPLOY_DIR="/opt/apps/hawknexa/deploy"
 COMPOSE_FILE="${DEPLOY_DIR}/docker-compose.prod.yml"
 BRANCH="${DEPLOY_BRANCH:-main}"
 HEALTH_URL="${DEPLOY_HEALTH_URL:-https://hawknexabackend.fynals.com/api/v1/health}"
+HEALTH_ATTEMPTS="${DEPLOY_HEALTH_ATTEMPTS:-24}"
 STATUS_FILE="${DEPLOY_DIR}/.last-deploy.json"
 PID_FILE="/tmp/hawknexa-deploy.pid"
 LOCK_DIR="/tmp/hawknexa-deploy.lockdir"
@@ -171,7 +172,7 @@ if ! compose_up 1; then
 fi
 
 echo "=== Health check ==="
-for i in 1 2 3 4 5 6; do
+for i in $(seq 1 "${HEALTH_ATTEMPTS}"); do
   if curl -fsS "${HEALTH_URL}" >/dev/null; then
     echo "OK: ${HEALTH_URL}"
     docker compose -f "${COMPOSE_FILE}" ps
