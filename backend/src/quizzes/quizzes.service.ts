@@ -646,12 +646,15 @@ export class QuizzesService {
     });
 
     const uniqueUserIds = [...new Set(parents.map((p) => p.parent.userId))];
-    if (uniqueUserIds.length && (dto.immediate === true || !dto.dueAt)) {
+    if (uniqueUserIds.length) {
+      const dueSuffix = dueAt
+        ? ` Please complete it by ${dueAt.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}.`
+        : '';
       await this.notifications.createForUsers(uniqueUserIds, {
         schoolId: quiz.schoolId,
         type: NotificationType.QUIZ_PUBLISHED,
         title: `New quiz: ${quiz.title}`,
-        body: `A quiz has been published for your child's class.`,
+        body: `A quiz has been published for your child's class.${dueSuffix}`,
         data: { quizId: quiz.id } as Prisma.InputJsonValue,
         deepLink: `/quiz/${quiz.id}`,
       });

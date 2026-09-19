@@ -6,6 +6,7 @@ import { Badge, EmptyState, ErrorState, LoadingState } from '@/components/ui';
 import { useChild } from '@/providers/ChildProvider';
 import { colors, spacing, typography } from '@/constants/theme';
 import { ApiError } from '@/lib/api';
+import { formatDateTime } from '@/lib/format';
 import { fetchQuizById } from '@/services/quizzes.service';
 import { fetchQuizResultForStudent } from '@/services/results.service';
 import { QuizQuestion } from '@/types/api';
@@ -62,6 +63,12 @@ export default function QuizDetailScreen() {
         <Text style={styles.meta}>
           {selectedChild?.firstName} · {quiz.subject?.name} · {totalMarks} marks
         </Text>
+        {formatDateTime(quiz.publishedAt) ? (
+          <Text style={styles.arrivedAt}>Arrived {formatDateTime(quiz.publishedAt)}</Text>
+        ) : null}
+        {formatDateTime(quiz.dueAt) ? (
+          <Text style={styles.dueAt}>Due by {formatDateTime(quiz.dueAt)}</Text>
+        ) : null}
         <Badge label={quiz.status} tone={quiz.status === 'PUBLISHED' ? 'success' : 'default'} />
 
         {quiz.description ? <Text style={styles.body}>{quiz.description}</Text> : null}
@@ -100,6 +107,8 @@ const styles = StyleSheet.create({
     color: colors.slate900,
   },
   meta: { fontFamily: typography.family, color: colors.slate500 },
+  arrivedAt: { fontFamily: typography.family, color: colors.slate600, fontSize: 14 },
+  dueAt: { fontFamily: typography.family, color: colors.warning, fontSize: 14 },
   body: { fontFamily: typography.family, fontSize: 16, lineHeight: 24, color: colors.slate700 },
   section: {
     fontFamily: typography.family,

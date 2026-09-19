@@ -8,6 +8,7 @@ import { Badge, Card, EmptyState, ErrorState, LoadingState } from '@/components/
 import { ProgressBar, toneColor } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
 import { colors, spacing } from '@/constants/theme';
+import { formatDateTime } from '@/lib/format';
 import { filterAccessibleQuizzes } from '@/lib/quiz-visibility';
 import { fetchQuizzes, isQuizNew } from '@/services/quizzes.service';
 import { fetchQuizResults } from '@/services/results.service';
@@ -108,6 +109,12 @@ export default function QuizzesTabScreen() {
                 {item.subject?.name} · {item.totalMarks ?? '—'} marks
                 {item.section?.name ? ` · ${item.section.name}` : ''}
               </Text>
+              {formatDateTime(item.publishedAt) ? (
+                <Text style={styles.arrivedAt}>Arrived {formatDateTime(item.publishedAt)}</Text>
+              ) : null}
+              {formatDateTime(item.dueAt) ? (
+                <Text style={styles.dueAt}>Due by {formatDateTime(item.dueAt)}</Text>
+              ) : null}
               {result ? (
                 <View style={styles.scoreBlock}>
                   <ProgressBar value={Number(result.percentage)} height={8} />
@@ -156,5 +163,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceYellow,
   },
   cardTitle: { fontSize: 16, fontWeight: '500', color: colors.slate800, flex: 1 },
-  cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4, marginBottom: spacing.sm },
+  cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4 },
+  arrivedAt: { fontSize: 12, color: colors.slate600, marginTop: 4 },
+  dueAt: { fontSize: 12, color: colors.warning, marginTop: 2, marginBottom: spacing.sm },
 });

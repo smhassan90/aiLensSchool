@@ -12,6 +12,7 @@ import { useChild } from '@/providers/ChildProvider';
 import { colors, radii, spacing } from '@/constants/theme';
 import { fetchLessonsForStudent, isLessonToday } from '@/services/lessons.service';
 import { fetchHomework, needsHomeworkSubmission } from '@/services/homework.service';
+import { formatDateTime } from '@/lib/format';
 import { fetchQuizzes, isQuizNew } from '@/services/quizzes.service';
 import { pendingQuizzes } from '@/lib/quiz-visibility';
 import { fetchQuizResults } from '@/services/results.service';
@@ -280,7 +281,10 @@ export default function HomeScreen() {
                 <Text style={styles.cardTitle}>{quiz.title}</Text>
                 {isQuizNew(quiz, { hasResult: false }) ? <Badge label="New" tone="success" /> : null}
               </View>
-              <Text style={styles.cardMeta}>{quiz.subject?.name}</Text>
+              <Text style={styles.cardMeta}>
+                {quiz.subject?.name}
+                {formatDateTime(quiz.publishedAt) ? ` · Arrived ${formatDateTime(quiz.publishedAt)}` : ''}
+              </Text>
             </Card>
           ))
         )}
