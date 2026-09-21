@@ -1396,19 +1396,16 @@ export class AcademicsService {
       query.subjectName,
     );
 
-    const assignments = await this.prisma.classSubject.findMany({
+    const examAssignments = await this.prisma.examPaperAssignment.findMany({
       where: {
-        section: { schoolId },
-        academicYearId: year.id,
-        teacherId: { not: null },
+        schoolId,
+        examConfigId: selectedExam.id,
+        releasedAt: { not: null },
         ...(sectionScope ? { sectionId: { in: sectionScope } } : {}),
         ...(subjectScope ? { subjectId: { in: subjectScope } } : {}),
-        ...(query.teacherId ? { teacher: { userId: query.teacherId } } : {}),
       },
-      select: {
-        sectionId: true,
-        subjectId: true,
-        section: { select: { id: true, name: true, grade: { select: { id: true, name: true } } } },
+      include: {
+        section: { select: { id: true, name: true, grade: { select: { name: true } } } },
         subject: { select: { id: true, name: true } },
         teacher: {
           select: {
@@ -1418,32 +1415,70 @@ export class AcademicsService {
             user: { select: { firstName: true, lastName: true } },
           },
         },
+        quizzes: {
+          where: { paperKind: { in: [...EXAM_PAPER_KINDS] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            reviewStatus: true,
+            submittedAt: true,
+            createdById: true,
+            createdBy: {
+              select: {
+                firstName: true,
+                lastName: true,
+                teacherProfile: { select: { gender: true } },
+              },
+            },
+          },
+        },
       },
-      orderBy: [{ section: { grade: { name: 'asc' } } }, { section: { name: 'asc' } }],
+      orderBy: [
+        { section: { grade: { level: 'asc' } } },
+        { section: { name: 'asc' } },
+        { subject: { name: 'asc' } },
+      ],
     });
 
-    const allAssignments = await this.prisma.classSubject.findMany({
-      where: {
-        section: { schoolId },
-        academicYearId: year.id,
-        teacherId: { not: null },
-        ...(sectionScope ? { sectionId: { in: sectionScope } } : {}),
-      },
-      select: {
-        sectionId: true,
-        subjectId: true,
-        section: { select: { id: true, name: true, grade: { select: { id: true, name: true } } } },
-        subject: { select: { id: true, name: true } },
-        teacher: {
-          select: {
-            id: true,
-            userId: true,
-            gender: true,
-            user: { select: { firstName: true, lastName: true } },
+    const classSubjectTeachers = examAssignments.length
+      ? await this.prisma.classSubject.findMany({
+          where: {
+            academicYearId: year.id,
+            OR: examAssignments.map((row) => ({
+              sectionId: row.sectionId,
+              subjectId: row.subjectId,
+            })),
           },
-        },
-      },
-    });
+          select: {
+            sectionId: true,
+            subjectId: true,
+            teacher: {
+              select: {
+                id: true,
+                userId: true,
+                gender: true,
+                user: { select: { firstName: true, lastName: true } },
+              },
+            },
+            assistantTeacher: {
+              select: {
+                id: true,
+                userId: true,
+                gender: true,
+                user: { select: { firstName: true, lastName: true } },
+              },
+            },
+          },
+        })
+      : [];
+    const teacherByClassSubject = new Map(
+      classSubjectTeachers.map((row) => [
+        `${row.sectionId}:${row.subjectId}`,
+        row.teacher ?? row.assistantTeacher,
+      ]),
+    );
 
     const papers = await this.prisma.quiz.findMany({
       where: {
@@ -1484,15 +1519,6 @@ export class AcademicsService {
       },
     });
 
-    const paperByAssignment = new Map<string, (typeof papers)[number]>();
-    for (const paper of papers) {
-      const key = `${paper.createdById}:${paper.sectionId}:${paper.subjectId}`;
-      const existing = paperByAssignment.get(key);
-      if (!existing || paper.createdAt > existing.createdAt) {
-        paperByAssignment.set(key, paper);
-      }
-    }
-
     type AssignmentRow = {
       sectionId: string;
       subjectId: string;
@@ -1516,22 +1542,50 @@ export class AcademicsService {
     >();
 
     let submittedTotal = 0;
-    for (const row of assignments) {
-      if (!row.teacher?.userId) continue;
-      const teacherId = row.teacher.userId;
-      const className = `${row.section.grade.name} ${row.section.name}`;
-      const key = `${teacherId}:${row.sectionId}:${row.subjectId}`;
-      const paper = paperByAssignment.get(key);
-      let status: AssignmentRow['status'] = 'MISSING';
+    for (const row of examAssignments) {
+      const latestQuiz = row.quizzes[0] ?? null;
+      const classTeacher = teacherByClassSubject.get(`${row.sectionId}:${row.subjectId}`) ?? null;
+      const responsibleTeacher = row.teacher ?? classTeacher;
+      const teacherUserId = responsibleTeacher?.userId ?? latestQuiz?.createdById;
+      if (!teacherUserId) continue;
       if (
-        paper?.status === QuizStatus.CLOSED &&
-        paper.reviewStatus !== ExamPaperReviewStatus.REJECTED
+        query.teacherId &&
+        teacherUserId !== query.teacherId &&
+        latestQuiz?.createdById !== query.teacherId
       ) {
-        status = 'SUBMITTED';
-        submittedTotal += 1;
-      } else if (paper?.status === QuizStatus.DRAFT) {
-        status = paper.reviewStatus === ExamPaperReviewStatus.REJECTED ? 'REJECTED' : 'DRAFT';
+        continue;
       }
+
+      const className = `${row.section.grade.name} ${row.section.name}`;
+      let status: AssignmentRow['status'] = 'MISSING';
+      if (latestQuiz) {
+        if (latestQuiz.reviewStatus === ExamPaperReviewStatus.REJECTED) {
+          status = 'REJECTED';
+        } else if (
+          latestQuiz.reviewStatus === ExamPaperReviewStatus.PENDING_REVIEW ||
+          latestQuiz.reviewStatus === ExamPaperReviewStatus.APPROVED ||
+          latestQuiz.status === QuizStatus.CLOSED
+        ) {
+          status = 'SUBMITTED';
+          submittedTotal += 1;
+        } else {
+          status = 'DRAFT';
+        }
+      }
+
+      const teacherName = responsibleTeacher
+        ? teacherDisplayName(
+            responsibleTeacher.user.firstName,
+            responsibleTeacher.user.lastName,
+            responsibleTeacher.gender,
+          )
+        : latestQuiz
+          ? teacherDisplayName(
+              latestQuiz.createdBy.firstName,
+              latestQuiz.createdBy.lastName,
+              latestQuiz.createdBy.teacherProfile?.gender ?? null,
+            )
+          : 'Teacher';
 
       const assignmentRow: AssignmentRow = {
         sectionId: row.sectionId,
@@ -1539,24 +1593,20 @@ export class AcademicsService {
         className,
         subjectName: row.subject.name,
         status,
-        paperId: paper?.id ?? null,
-        submittedAt: paper?.submittedAt?.toISOString() ?? null,
+        paperId: latestQuiz?.id ?? null,
+        submittedAt: latestQuiz?.submittedAt?.toISOString() ?? null,
       };
 
-      const existing = teacherMap.get(teacherId);
+      const existing = teacherMap.get(teacherUserId);
       if (existing) {
         existing.expectedCount += 1;
         if (status === 'SUBMITTED') existing.submittedCount += 1;
         existing.assignments.push(assignmentRow);
       } else {
-        teacherMap.set(teacherId, {
-          teacherId,
-          teacherName: teacherDisplayName(
-            row.teacher.user.firstName,
-            row.teacher.user.lastName,
-            row.teacher.gender,
-          ),
-          gender: row.teacher.gender,
+        teacherMap.set(teacherUserId, {
+          teacherId: teacherUserId,
+          teacherName,
+          gender: responsibleTeacher?.gender ?? latestQuiz?.createdBy.teacherProfile?.gender ?? null,
           submittedCount: status === 'SUBMITTED' ? 1 : 0,
           expectedCount: 1,
           assignments: [assignmentRow],
@@ -1571,31 +1621,35 @@ export class AcademicsService {
     const sectionOptions = new Map<string, string>();
     const subjectOptions = new Map<string, string>();
     const teacherOptions = new Map<string, string>();
-    for (const row of allAssignments) {
-      if (!row.teacher?.userId) continue;
-      sectionOptions.set(
-        row.sectionId,
-        `${row.section.grade.name} ${row.section.name}`,
-      );
+    for (const row of examAssignments) {
+      const classTeacher = teacherByClassSubject.get(`${row.sectionId}:${row.subjectId}`) ?? null;
+      const responsibleTeacher = row.teacher ?? classTeacher;
+      const teacherUserId = responsibleTeacher?.userId ?? row.quizzes[0]?.createdById;
+      if (!teacherUserId) continue;
+      sectionOptions.set(row.sectionId, `${row.section.grade.name} ${row.section.name}`);
       const subjectName = row.subject.name.trim();
       if (subjectName) {
         subjectOptions.set(subjectName.toLowerCase(), subjectName);
       }
-      teacherOptions.set(
-        row.teacher.userId,
-        teacherDisplayName(
-          row.teacher.user.firstName,
-          row.teacher.user.lastName,
-          row.teacher.gender,
-        ),
-      );
+      if (responsibleTeacher) {
+        teacherOptions.set(
+          responsibleTeacher.userId,
+          teacherDisplayName(
+            responsibleTeacher.user.firstName,
+            responsibleTeacher.user.lastName,
+            responsibleTeacher.gender,
+          ),
+        );
+      }
     }
 
     const submittedPapers = papers
       .filter(
         (paper) =>
-          paper.status === QuizStatus.CLOSED &&
-          paper.reviewStatus !== ExamPaperReviewStatus.REJECTED,
+          paper.reviewStatus === ExamPaperReviewStatus.PENDING_REVIEW ||
+          paper.reviewStatus === ExamPaperReviewStatus.APPROVED ||
+          (paper.status === QuizStatus.CLOSED &&
+            paper.reviewStatus !== ExamPaperReviewStatus.REJECTED),
       )
       .map((paper) => ({
         ...paper,
@@ -1617,7 +1671,7 @@ export class AcademicsService {
         deadline: deadline?.toISOString().slice(0, 10) ?? null,
       },
       submitted: submittedTotal,
-      expected: assignments.length,
+      expected: examAssignments.length,
       exams,
       filters: {
         sections: [...sectionOptions.entries()]
