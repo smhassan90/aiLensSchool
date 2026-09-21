@@ -61,7 +61,7 @@ export const headTeachersService = {
   saveBoard(assignments: Array<{ teacherId: string; title: string; sectionIds: string[] }>) {
     return apiClient<HeadTeacherBoard>("/head-teachers/board", {
       method: "PUT",
-      body: { assignments },
+      body: JSON.stringify({ assignments }),
     });
   },
 
