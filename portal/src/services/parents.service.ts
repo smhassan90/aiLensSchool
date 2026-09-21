@@ -18,7 +18,12 @@ export const parentsService = {
     });
   },
 
-  listDayOffRequests(params?: { studentId?: string; sectionId?: string; date?: string }) {
+  listDayOffRequests(params?: {
+    studentId?: string;
+    sectionId?: string;
+    date?: string;
+    status?: "PENDING" | "APPROVED" | "REJECTED";
+  }) {
     return apiClient<Array<{
       id: string;
       startDate: string;
@@ -26,7 +31,15 @@ export const parentsService = {
       reason: string;
       status: "PENDING" | "APPROVED" | "REJECTED";
       reviewNote?: string | null;
-      student: { id: string; firstName: string; lastName: string; studentCode: string };
+      student: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        studentCode: string;
+        enrollments?: Array<{
+          section?: { name: string; grade?: { name: string } | null } | null;
+        }>;
+      };
       parent: { user: { firstName: string; lastName: string; username?: string | null } };
     }>>(`/parents/day-off-requests${buildQuery(params ?? {})}`);
   },

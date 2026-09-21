@@ -6,9 +6,9 @@ import { PageLoader } from "@/components/layout/page-loader";
 import { DayOffRequestsList } from "@/components/parents/day-off-requests-list";
 import { parentsService } from "@/services/parents.service";
 
-export default function DayOffRequestsPage() {
+export default function TeacherDayOffRequestsPage() {
   const query = useQuery({
-    queryKey: ["day-off-requests"],
+    queryKey: ["teacher-day-off-requests"],
     queryFn: () => parentsService.listDayOffRequests(),
     refetchOnWindowFocus: true,
   });
@@ -17,7 +17,7 @@ export default function DayOffRequestsPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Day-off requests"
-        description="Track parent day-off requests across the school. Class teachers approve or reject requests for their students."
+        description="Approve or reject day-off requests from parents for students in your class."
       />
       {query.isLoading ? <PageLoader variant="panel" /> : null}
       {query.isError ? (
@@ -26,7 +26,11 @@ export default function DayOffRequestsPage() {
         </p>
       ) : null}
       {!query.isLoading && !query.isError ? (
-        <DayOffRequestsList requests={query.data ?? []} />
+        <DayOffRequestsList
+          requests={query.data ?? []}
+          canReview
+          queryKey="teacher-day-off-requests"
+        />
       ) : null}
     </div>
   );

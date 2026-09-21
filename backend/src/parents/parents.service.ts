@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { DayOffRequestStatus, NotificationType, Prisma, RoleName } from '@prisma/client';
+import { DayOffRequestStatus, EnrollmentStatus, NotificationType, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -217,46 +217,72 @@ export class ParentsService {
         endDate,
         reason: dto.reason.trim(),
       },
-      include: { student: { select: { firstName: true, lastName: true } } },
+      include: {
+        student: {
+          select: {
+            firstName: true,
+            lastName: true,
+            enrollments: {
+              where: { status: EnrollmentStatus.ACTIVE },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: {
+                section: {
+                  select: {
+                    name: true,
+                    grade: { select: { name: true } },
+                    classTeacher: { select: { userId: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
-    const admins = await this.prisma.user.findMany({
-      where: {
-        schoolId,
-        status: 'ACTIVE',
-        roles: { some: { role: { name: RoleName.SCHOOL_ADMIN } } },
-      },
-      select: { id: true },
-    });
-    await this.notifications.createForUsers(
-      admins.map((admin) => admin.id),
-      {
+    const studentName = `${request.student.firstName} ${request.student.lastName}`.trim();
+    const enrollment = request.student.enrollments[0];
+    const classTeacherUserId = enrollment?.section?.classTeacher?.userId ?? null;
+    const classLabel = enrollment?.section
+      ? `${enrollment.section.grade.name} ${enrollment.section.name}`
+      : 'their class';
+    const dateLabel = `${startDate.toISOString().slice(0, 10)} → ${endDate.toISOString().slice(0, 10)}`;
+
+    if (classTeacherUserId) {
+      await this.notifications.createForUsers([classTeacherUserId], {
         schoolId,
         type: NotificationType.DAY_OFF_REQUESTED,
-        title: 'New day-off request',
-        body: `${request.student.firstName} ${request.student.lastName} has a day-off request awaiting review.`,
-        data: { dayOffRequestId: request.id } as Prisma.InputJsonValue,
-        deepLink: '/school/day-off-requests',
-      },
-    );
+        title: `Day-off request: ${studentName}`,
+        body: `${studentName} (${classLabel}) requested day off ${dateLabel}.`,
+        data: { dayOffRequestId: request.id, studentId: dto.studentId } as Prisma.InputJsonValue,
+        deepLink: '/teacher/day-off-requests',
+      });
+    }
+
     return request;
   }
 
   async listDayOffRequests(query: DayOffQueryDto, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
     const day = query.date ? this.dayOnly(query.date) : null;
+    const classTeacherFilter = await this.classTeacherStudentFilter(user);
+    const studentFilters: Prisma.StudentWhereInput[] = [];
+    if (query.sectionId) {
+      studentFilters.push({
+        enrollments: {
+          some: { sectionId: query.sectionId, status: EnrollmentStatus.ACTIVE },
+        },
+      });
+    }
+    if (classTeacherFilter) {
+      studentFilters.push(classTeacherFilter);
+    }
     const where: Prisma.ParentDayOffRequestWhereInput = {
       schoolId,
       ...(query.studentId ? { studentId: query.studentId } : {}),
-      ...(query.sectionId
-        ? {
-            student: {
-              enrollments: {
-                some: { sectionId: query.sectionId, status: 'ACTIVE' },
-              },
-            },
-          }
-        : {}),
+      ...(studentFilters.length ? { student: { AND: studentFilters } } : {}),
+      ...(query.status ? { status: query.status as DayOffRequestStatus } : {}),
       ...(day
         ? {
             startDate: { lte: day },
@@ -270,7 +296,24 @@ export class ParentsService {
       where,
       orderBy: [{ startDate: 'asc' }, { createdAt: 'desc' }],
       include: {
-        student: { select: { id: true, firstName: true, lastName: true, studentCode: true } },
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            studentCode: true,
+            enrollments: {
+              where: { status: EnrollmentStatus.ACTIVE },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: {
+                section: {
+                  select: { name: true, grade: { select: { name: true } } },
+                },
+              },
+            },
+          },
+        },
         parent: { include: { user: { select: { firstName: true, lastName: true, username: true } } } },
       },
     });
@@ -294,6 +337,7 @@ export class ParentsService {
       include: { parent: { select: { userId: true } } },
     });
     if (!request) throw new NotFoundException({ code: 'DAY_OFF_NOT_FOUND', message: 'Day-off request not found' });
+    await this.assertClassTeacherForStudent(user, request.studentId);
     if (request.status !== DayOffRequestStatus.PENDING) {
       throw new BadRequestException({ code: 'DAY_OFF_ALREADY_REVIEWED', message: 'This request has already been reviewed' });
     }
@@ -321,6 +365,50 @@ export class ParentsService {
     const date = new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
     if (Number.isNaN(date.getTime())) throw new BadRequestException({ code: 'INVALID_DATE', message: 'Invalid date' });
     return date;
+  }
+
+  private async classTeacherStudentFilter(user: AuthUser) {
+    if (!this.tenant.isTeacher(user) || this.tenant.isSchoolStaff(user)) return undefined;
+    const teacher = await this.prisma.teacherProfile.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    if (!teacher) {
+      throw new ForbiddenException({ code: 'TEACHER_PROFILE_NOT_FOUND', message: 'Teacher profile not found' });
+    }
+    return {
+      enrollments: {
+        some: {
+          status: EnrollmentStatus.ACTIVE,
+          section: { classTeacherId: teacher.id },
+        },
+      },
+    } satisfies Prisma.StudentWhereInput;
+  }
+
+  private async assertClassTeacherForStudent(user: AuthUser, studentId: string) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.prisma.teacherProfile.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    if (!teacher) {
+      throw new ForbiddenException({ code: 'TEACHER_PROFILE_NOT_FOUND', message: 'Teacher profile not found' });
+    }
+    const enrollment = await this.prisma.studentEnrollment.findFirst({
+      where: {
+        studentId,
+        status: EnrollmentStatus.ACTIVE,
+        section: { schoolId, classTeacherId: teacher.id },
+      },
+      select: { id: true },
+    });
+    if (!enrollment) {
+      throw new ForbiddenException({
+        code: 'CLASS_TEACHER_REQUIRED',
+        message: 'Only the class teacher can approve or reject this day-off request',
+      });
+    }
   }
 
   async getParentChildren(parentProfileId: string, user: AuthUser) {

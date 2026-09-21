@@ -1,4 +1,4 @@
-import { IsDateString, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsDateString, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CreateDayOffDto {
   @IsString()
@@ -28,6 +28,10 @@ export class DayOffQueryDto {
   @IsOptional()
   @IsDateString()
   date?: string;
+
+  @IsOptional()
+  @IsIn(['PENDING', 'APPROVED', 'REJECTED'])
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED';
 }
 
 export class ReviewDayOffDto {

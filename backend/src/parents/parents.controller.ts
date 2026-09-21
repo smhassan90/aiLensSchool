@@ -57,7 +57,7 @@ export class ParentsController {
     return this.parentsService.deleteDayOffRequest(id, user);
   }
 
-  @Roles(RoleName.SCHOOL_ADMIN)
+  @Roles(RoleName.TEACHER)
   @Patch('day-off-requests/:id/review')
   reviewDayOff(
     @Param('id') id: string,

@@ -2,6 +2,7 @@
 
 import {
   BookOpen,
+  CalendarDays,
   ClipboardCheck,
   ClipboardList,
   FileQuestion,
@@ -30,6 +31,7 @@ const baseNavItems = [
   { href: "/teacher/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/teacher/classes", label: "My classes", icon: Users },
   { href: "/teacher/attendance", label: "Attendance", icon: ClipboardCheck, classTeacherOnly: true },
+  { href: "/teacher/day-off-requests", label: "Day-off requests", icon: CalendarDays, classTeacherOnly: true },
   { href: "/teacher/lessons", label: "Lessons", icon: BookOpen },
   { href: "/teacher/homework", label: "Homework", icon: ClipboardList },
   { href: "/teacher/quizzes", label: "Quizzes", icon: FileQuestion },
