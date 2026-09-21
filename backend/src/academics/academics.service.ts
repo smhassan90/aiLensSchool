@@ -2484,6 +2484,36 @@ export class AcademicsService {
     return until;
   }
 
+  private async ensureTeacherExamAssignmentsSynced(
+    schoolId: string,
+    teacherId: string,
+    examConfigId: string,
+    assignedById: string,
+  ) {
+    const exam = await this.prisma.examConfig.findFirst({
+      where: { id: examConfigId, schoolId },
+      select: { academicYearId: true },
+    });
+    if (!exam) return;
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        academicYearId: exam.academicYearId,
+        OR: [{ teacherId }, { assistantTeacherId: teacherId }],
+      },
+      select: { sectionId: true, subjectId: true },
+    });
+    if (!classSubjects.length) return;
+
+    await this.syncTeacherExamAssignments(
+      schoolId,
+      exam.academicYearId,
+      teacherId,
+      classSubjects,
+      assignedById,
+    );
+  }
+
   private async teacherAssignmentIdsForExam(
     schoolId: string,
     teacherId: string,
@@ -2530,9 +2560,10 @@ export class AcademicsService {
     days: 1 | 2 | 3,
   ) {
     if (!assignmentIds.length) {
-      throw new NotFoundException({
+      throw new BadRequestException({
         code: 'ASSIGNMENT_NOT_FOUND',
-        message: 'No exam assignments found for this teacher',
+        message:
+          'No released exam assignments found for this teacher and exam. Release the exam papers first.',
       });
     }
     const until = this.extensionUntil(days);
@@ -2733,6 +2764,12 @@ export class AcademicsService {
     const grantDays = (days ?? request.days) as 1 | 2 | 3;
     const kind =
       request.kind === 'PAPER' ? 'paper' : request.kind === 'SCORE' ? 'score' : 'both';
+    await this.ensureTeacherExamAssignmentsSynced(
+      schoolId,
+      request.teacherId,
+      request.assignment.examConfigId,
+      user.id,
+    );
     const assignmentIds = await this.teacherAssignmentIdsForExam(
       schoolId,
       request.teacherId,
@@ -2782,6 +2819,88 @@ export class AcademicsService {
     };
   }
 
+  async listTeacherExamExtensionOptions(user: AuthUser, teacherUserId: string) {
+    if (!this.tenant.isSchoolAdmin(user)) {
+      throw new ForbiddenException({
+        code: 'ADMIN_REQUIRED',
+        message: 'Only the office can manage exam deadline extensions',
+      });
+    }
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.prisma.teacherProfile.findFirst({
+      where: { userId: teacherUserId, schoolId },
+      select: { id: true },
+    });
+    if (!teacher) {
+      throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
+    }
+
+    const year = await this.prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      orderBy: { startDate: 'desc' },
+      select: { id: true },
+    });
+    if (!year) {
+      return { exams: [] };
+    }
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        academicYearId: year.id,
+        OR: [{ teacherId: teacher.id }, { assistantTeacherId: teacher.id }],
+      },
+      select: { sectionId: true, subjectId: true },
+    });
+    const teachKeys = new Set(classSubjects.map((row) => `${row.sectionId}:${row.subjectId}`));
+
+    const assigner = await this.prisma.examPaperAssignment.findFirst({
+      where: { schoolId, releasedAt: { not: null } },
+      select: { assignedById: true },
+      orderBy: { releasedAt: 'desc' },
+    });
+    await this.syncTeacherExamAssignments(
+      schoolId,
+      year.id,
+      teacher.id,
+      classSubjects,
+      assigner?.assignedById ?? user.id,
+    );
+
+    const assignments = await this.prisma.examPaperAssignment.findMany({
+      where: {
+        schoolId,
+        releasedAt: { not: null },
+        examConfig: { academicYearId: year.id },
+      },
+      select: {
+        sectionId: true,
+        subjectId: true,
+        teacherId: true,
+        examConfig: {
+          select: { id: true, name: true, startDate: true, maxMarks: true, sequence: true },
+        },
+      },
+      orderBy: [{ examConfig: { sequence: 'asc' } }, { examConfig: { name: 'asc' } }],
+    });
+
+    const exams = new Map<
+      string,
+      { id: string; name: string; startDate: string | null; maxMarks: number }
+    >();
+    for (const row of assignments) {
+      if (row.teacherId && row.teacherId !== teacher.id) continue;
+      if (!row.teacherId && !teachKeys.has(`${row.sectionId}:${row.subjectId}`)) continue;
+      exams.set(row.examConfig.id, {
+        id: row.examConfig.id,
+        name: row.examConfig.name,
+        startDate: row.examConfig.startDate?.toISOString().slice(0, 10) ?? null,
+        maxMarks: row.examConfig.maxMarks,
+      });
+    }
+
+    return { exams: [...exams.values()] };
+  }
+
   async extendExamDeadlines(
     user: AuthUser,
     body: {
@@ -2805,6 +2924,12 @@ export class AcademicsService {
     if (!teacher) {
       throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
     }
+    await this.ensureTeacherExamAssignmentsSynced(
+      schoolId,
+      teacher.id,
+      body.examConfigId,
+      user.id,
+    );
     const assignmentIds = await this.teacherAssignmentIdsForExam(
       schoolId,
       teacher.id,

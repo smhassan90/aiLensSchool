@@ -48,9 +48,10 @@ export default function ExamDeadlineExtensionsPage() {
     enabled: Boolean(teacherId),
   });
 
-  const examConfigs = useQuery({
-    queryKey: ["exam-configs-extensions"],
-    queryFn: () => academicsService.listExamConfigs(),
+  const teacherExams = useQuery({
+    queryKey: ["teacher-exam-extension-options", teacher.data?.user.id],
+    queryFn: () => academicsService.listTeacherExamExtensionOptions(teacher.data!.user.id),
+    enabled: Boolean(teacher.data?.user.id),
   });
 
   const approve = useMutation({
@@ -217,15 +218,30 @@ export default function ExamDeadlineExtensionsPage() {
             <>
               <div className="space-y-2">
                 <Label>Exam</Label>
-                <Select value={examConfigId} onChange={(e) => setExamConfigId(e.target.value)}>
-                  <option value="">Select exam</option>
-                  {(examConfigs.data ?? []).map((exam) => (
+                <Select
+                  value={examConfigId}
+                  onChange={(e) => setExamConfigId(e.target.value)}
+                  disabled={teacherExams.isLoading}
+                >
+                  <option value="">
+                    {teacherExams.isLoading
+                      ? "Loading exams…"
+                      : (teacherExams.data?.exams.length ?? 0) === 0
+                        ? "No released exams for this teacher"
+                        : "Select exam"}
+                  </option>
+                  {(teacherExams.data?.exams ?? []).map((exam) => (
                     <option key={exam.id} value={exam.id}>
                       {exam.name}
                       {exam.startDate ? ` · ${formatDate(exam.startDate)}` : ""}
                     </option>
                   ))}
                 </Select>
+                {!teacherExams.isLoading && (teacherExams.data?.exams.length ?? 0) === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Release exam papers for this teacher&apos;s classes first, then you can extend deadlines here.
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-2">

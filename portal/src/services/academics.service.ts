@@ -416,6 +416,12 @@ export const academicsService = {
     );
   },
 
+  listTeacherExamExtensionOptions(teacherUserId: string) {
+    return apiClient<{
+      exams: Array<{ id: string; name: string; startDate: string | null; maxMarks: number }>;
+    }>(`/academics/teachers/${teacherUserId}/exam-extension-options`);
+  },
+
   extendExamDeadlines(payload: {
     teacherUserId: string;
     examConfigId: string;

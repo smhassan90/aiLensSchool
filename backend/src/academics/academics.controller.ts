@@ -381,6 +381,16 @@ export class AcademicsController {
 
   @Roles(RoleName.SCHOOL_ADMIN)
   @RequirePermission('MANAGE_EXAMS')
+  @Get('teachers/:teacherUserId/exam-extension-options')
+  listTeacherExamExtensionOptions(
+    @Param('teacherUserId') teacherUserId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.academicsService.listTeacherExamExtensionOptions(user, teacherUserId);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_EXAMS')
   @Post('exam-deadline-extensions')
   extendExamDeadlines(
     @Body()
