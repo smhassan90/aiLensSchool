@@ -1,19 +1,19 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageLoader } from "@/components/layout/page-loader";
+import { StudentIdPhotoUpload } from "@/components/students/student-id-photo-upload";
 import { documentsService } from "@/services/documents.service";
 import { studentsService } from "@/services/students.service";
-import { useToast } from "@/providers/toast-provider";
-import { ApiClientError, assetUrl } from "@/lib/api-client";
+import { assetUrl } from "@/lib/api-client";
 import type { IdCard, Student, StudentParentLink } from "@/lib/types";
-import { Camera, IdCard as IdCardIcon, Printer, Search } from "lucide-react";
+import { IdCard as IdCardIcon, Printer, Search } from "lucide-react";
 
 function primaryParent(student?: Student) {
   const links = student?.parents ?? [];
@@ -33,9 +33,6 @@ function parentDetails(link?: StudentParentLink) {
 }
 
 export default function IdCardsPage() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const fileRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -63,21 +60,6 @@ export default function IdCardsPage() {
   const parent = parentDetails(primaryParent(student));
   const photo = assetUrl(student?.photoUrl);
   const enrollment = student?.enrollments?.[0];
-
-  const uploadPhoto = useMutation({
-    mutationFn: (file: File) => studentsService.uploadPhoto(selectedStudent!.id, file),
-    onSuccess: () => {
-      toast({ title: "Photo uploaded", variant: "success" });
-      queryClient.invalidateQueries({ queryKey: ["id-card-students"] });
-      queryClient.invalidateQueries({ queryKey: ["id-card", selectedStudent?.id] });
-    },
-    onError: (err) =>
-      toast({
-        title: "Upload failed",
-        description: err instanceof ApiClientError ? err.message : "",
-        variant: "error",
-      }),
-  });
 
   const runSearch = () => {
     const next = query.trim();
@@ -192,28 +174,17 @@ export default function IdCardsPage() {
             </div>
           </div>
 
-          <div className="flex gap-2 print:hidden">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) uploadPhoto.mutate(file);
-                e.target.value = "";
-              }}
+          {selectedStudent ? (
+            <StudentIdPhotoUpload
+              studentId={selectedStudent.id}
+              photoUrl={student?.photoUrl}
+              firstName={student?.firstName}
+              lastName={student?.lastName}
+              showPreview={false}
+              invalidateKeys={[["id-card-students"], ["id-card", selectedStudent.id]]}
+              className="print:hidden"
             />
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!selectedStudent || uploadPhoto.isPending}
-              onClick={() => fileRef.current?.click()}
-            >
-              <Camera className="h-4 w-4" />
-              {uploadPhoto.isPending ? "Uploading…" : "Upload photo"}
-            </Button>
-          </div>
+          ) : null}
         </div>
       ) : null}
     </div>

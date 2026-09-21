@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { ReportCardSheet } from "@/components/report-cards/report-card-sheet";
+import { StudentIdPhotoUpload } from "@/components/students/student-id-photo-upload";
 import { formatPkr } from "@/lib/money";
 import { personFullName, teacherDisplayNameFromUser } from "@/lib/person-name";
+import { assetUrl } from "@/lib/api-client";
 import { cn, formatDate } from "@/lib/utils";
 import type { ReportCard } from "@/lib/types";
 import {
@@ -30,6 +32,7 @@ export type Student360Data = {
     lastName: string;
     studentCode: string;
     admissionNumber?: string;
+    photoUrl?: string | null;
     status: string;
     scienceGroup?: string | null;
     grade?: { name: string; level?: number } | null;
@@ -242,6 +245,8 @@ export function Student360View({
   resetParentPasswordPending,
   parentPasswordReset,
   showFullProfileLink = false,
+  allowPhotoUpload = false,
+  photoUploadInvalidateKeys = [],
 }: {
   data: Student360Data;
   studentId: string;
@@ -258,8 +263,11 @@ export function Student360View({
     temporaryPassword: string;
   } | null;
   showFullProfileLink?: boolean;
+  allowPhotoUpload?: boolean;
+  photoUploadInvalidateKeys?: string[][];
 }) {
   const student = data.student;
+  const photo = assetUrl(student.photoUrl);
   const fullName = personFullName(student.firstName, student.lastName);
   const classTeacher = student.section?.classTeacher;
   const father = pickFather(student.parents ?? []);
@@ -346,8 +354,30 @@ export function Student360View({
 
         <div className="relative flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex min-w-0 items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-200 to-teal-300 font-display text-lg font-semibold text-teal-950 shadow-lg shadow-black/20">
-              {initials(student.firstName, student.lastName)}
+            <div className="shrink-0">
+              <div className="flex h-20 w-16 overflow-hidden rounded-2xl border-2 border-white/20 bg-gradient-to-br from-amber-200 to-teal-300 shadow-lg shadow-black/20">
+                {photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photo} alt={fullName} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center font-display text-lg font-semibold text-teal-950">
+                    {initials(student.firstName, student.lastName)}
+                  </div>
+                )}
+              </div>
+              {allowPhotoUpload ? (
+                <StudentIdPhotoUpload
+                  studentId={studentId}
+                  photoUrl={student.photoUrl}
+                  firstName={student.firstName}
+                  lastName={student.lastName}
+                  showPreview={false}
+                  buttonLabel={photo ? "Change photo" : "Upload ID photo"}
+                  invalidateKeys={[["student-360", studentId], ...photoUploadInvalidateKeys]}
+                  className="mt-2"
+                  buttonClassName="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                />
+              ) : null}
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-teal-200/90">Student 360</p>

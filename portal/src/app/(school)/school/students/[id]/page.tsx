@@ -89,6 +89,7 @@ export default function Student360Page() {
         studentId={params.id}
         backHref="/school/students"
         backLabel="All students"
+        allowPhotoUpload
         onMarkPaid={(id) => markPaid.mutate(id)}
         markPaidPending={markPaid.isPending}
         onScienceGroupChange={(value) => saveStream.mutate(value)}
