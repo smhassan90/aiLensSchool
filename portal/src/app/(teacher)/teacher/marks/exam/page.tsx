@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { academicsService } from "@/services/academics.service";
 import { teachersService } from "@/services/teachers.service";
 import { useToast } from "@/providers/toast-provider";
+import { ApiClientError } from "@/lib/api-client";
 import { formatDate, formatMarks } from "@/lib/utils";
 
 export default function TeacherExamScoresPage() {
@@ -30,11 +31,23 @@ export default function TeacherExamScoresPage() {
   });
   const selected = classes.data?.find((cls) => `${cls.sectionId}:${cls.subjectId}` === classKey);
 
-  const examConfigs = useQuery({
-    queryKey: ["exam-configs", selected?.academicYearId],
-    queryFn: () => academicsService.listExamConfigs(selected?.academicYearId),
-    enabled: Boolean(selected?.academicYearId),
+  const myAssignments = useQuery({
+    queryKey: ["my-exam-paper-assignments"],
+    queryFn: () => academicsService.listMyExamPaperAssignments(),
   });
+
+  const examOptions = useMemo(() => {
+    if (!selected) return [];
+    const seen = new Set<string>();
+    return (myAssignments.data?.assignments ?? []).filter((row) => {
+      if (row.sectionId !== selected.sectionId || row.subjectId !== selected.subjectId || !row.releasedAt) {
+        return false;
+      }
+      if (seen.has(row.examConfigId)) return false;
+      seen.add(row.examConfigId);
+      return true;
+    });
+  }, [myAssignments.data, selected]);
 
   const sheet = useQuery({
     queryKey: ["exam-score-sheet", examConfigId, selected?.sectionId, selected?.subjectId],
@@ -85,6 +98,13 @@ export default function TeacherExamScoresPage() {
 
   const maxMarks = sheet.data?.exam.maxMarks ?? 0;
   const filledCount = Object.values(scores).filter((v) => v.trim() !== "").length;
+  const canEditScores = Boolean(sheet.data?.canEnterScores);
+  const sheetErrorMessage =
+    sheet.error instanceof ApiClientError
+      ? sheet.error.message
+      : sheet.error
+        ? "Could not load the score sheet."
+        : "";
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -126,19 +146,47 @@ export default function TeacherExamScoresPage() {
             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
             value={examConfigId}
             onChange={(e) => setExamConfigId(e.target.value)}
-            disabled={!selected}
+            disabled={!selected || myAssignments.isLoading}
           >
-            <option value="">Select exam</option>
-            {(examConfigs.data ?? []).map((exam) => (
-              <option key={exam.id} value={exam.id}>
-                {exam.name} (out of {exam.maxMarks})
+            <option value="">
+              {!selected
+                ? "Select class first"
+                : myAssignments.isLoading
+                  ? "Loading exams…"
+                  : examOptions.length === 0
+                    ? "No released exams for this class"
+                    : "Select exam"}
+            </option>
+            {examOptions.map((exam) => (
+              <option key={exam.examConfigId} value={exam.examConfigId}>
+                {exam.examName} (out of {exam.maxMarks})
               </option>
             ))}
           </select>
         </div>
       </div>
 
+      {selected && !myAssignments.isLoading && examOptions.length === 0 ? (
+        <p className="mb-6 rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+          No released exam papers for this class yet. Check{" "}
+          <Link href="/teacher/exams" className="font-medium text-primary underline">
+            Exam papers
+          </Link>{" "}
+          once the school releases an assignment.
+        </p>
+      ) : null}
+
       {sheet.isLoading && examConfigId ? <PageLoader variant="panel" task="exams" /> : null}
+
+      {sheet.isError && examConfigId ? (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-destructive">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="font-medium">Could not load score sheet</p>
+            <p className="mt-1 text-sm">{sheetErrorMessage}</p>
+          </div>
+        </div>
+      ) : null}
 
       {sheet.data?.scoresSubmitted ? (
         <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-950">
@@ -171,7 +219,7 @@ export default function TeacherExamScoresPage() {
         </div>
       ) : null}
 
-      {sheet.data?.canEnterScores ? (
+      {sheet.data ? (
         <>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/30 px-4 py-3 text-sm">
             <div>
@@ -184,67 +232,76 @@ export default function TeacherExamScoresPage() {
             <p className="text-muted-foreground">{filledCount} / {sheet.data.students.length} entered</p>
           </div>
 
-          <div className="overflow-hidden rounded-xl border bg-card">
-            <div className="grid grid-cols-[2.5rem_6rem_minmax(8rem,1fr)_7rem] gap-3 border-b bg-muted/40 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <span>Sr. No.</span>
-              <span>Roll number</span>
-              <span>Name of student</span>
-              <span>Marks obtained</span>
-            </div>
-            <div className="divide-y">
-              {sheet.data.students.map((student, index) => (
-                <div
-                  key={student.studentId}
-                  className="grid grid-cols-[2.5rem_6rem_minmax(8rem,1fr)_7rem] items-center gap-3 px-4 py-3"
-                >
-                  <span className="text-sm text-muted-foreground">{index + 1}</span>
-                  <p className="text-sm text-muted-foreground">{student.studentCode}</p>
-                  <div>
-                    <p className="font-medium">{student.firstName} {student.lastName}</p>
+          {sheet.data.students.length === 0 ? (
+            <p className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+              No students are enrolled in this class yet.
+            </p>
+          ) : (
+            <div className="overflow-hidden rounded-xl border bg-card">
+              <div className="grid grid-cols-[2.5rem_6rem_minmax(8rem,1fr)_7rem] gap-3 border-b bg-muted/40 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <span>Sr. No.</span>
+                <span>Roll number</span>
+                <span>Name of student</span>
+                <span>Marks obtained</span>
+              </div>
+              <div className="divide-y">
+                {sheet.data.students.map((student, index) => (
+                  <div
+                    key={student.studentId}
+                    className="grid grid-cols-[2.5rem_6rem_minmax(8rem,1fr)_7rem] items-center gap-3 px-4 py-3"
+                  >
+                    <span className="text-sm text-muted-foreground">{index + 1}</span>
+                    <p className="text-sm text-muted-foreground">{student.studentCode}</p>
+                    <div>
+                      <p className="font-medium">{student.firstName} {student.lastName}</p>
+                    </div>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={maxMarks}
+                      step={0.1}
+                      inputMode="decimal"
+                      value={scores[student.studentId] ?? ""}
+                      disabled={!canEditScores}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setScores((prev) => ({ ...prev, [student.studentId]: value }));
+                        if (value.trim() === "") {
+                          setScoreError("");
+                        } else {
+                          const marks = Number(value);
+                          setScoreError(
+                            !Number.isFinite(marks) || marks < 0 || marks > maxMarks
+                              ? `Marks obtained must be between 0 and ${formatMarks(maxMarks)}.`
+                              : "",
+                          );
+                        }
+                      }}
+                      className="h-9"
+                      aria-invalid={Boolean(scoreError)}
+                      placeholder="—"
+                    />
                   </div>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={maxMarks}
-                    step={0.1}
-                    inputMode="decimal"
-                    value={scores[student.studentId] ?? ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setScores((prev) => ({ ...prev, [student.studentId]: value }));
-                      if (value.trim() === "") {
-                        setScoreError("");
-                      } else {
-                        const marks = Number(value);
-                        setScoreError(
-                          !Number.isFinite(marks) || marks < 0 || marks > maxMarks
-                            ? `Marks obtained must be between 0 and ${formatMarks(maxMarks)}.`
-                            : "",
-                        );
-                      }
-                    }}
-                    className="h-9"
-                    aria-invalid={Boolean(scoreError)}
-                    placeholder="—"
-                  />
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {scoreError ? (
+          {scoreError && canEditScores ? (
             <p className="mt-3 text-sm text-destructive" role="alert">{scoreError}</p>
           ) : null}
 
-          <div className="mt-6 flex justify-end">
-            <Button
-              onClick={() => save.mutate()}
-              disabled={save.isPending || filledCount !== sheet.data.students.length}
-            >
-              <Save className="h-4 w-4" />
-              {save.isPending ? "Saving…" : "Save all marks"}
-            </Button>
-          </div>
+          {canEditScores && sheet.data.students.length > 0 ? (
+            <div className="mt-6 flex justify-end">
+              <Button
+                onClick={() => save.mutate()}
+                disabled={save.isPending || filledCount !== sheet.data.students.length}
+              >
+                <Save className="h-4 w-4" />
+                {save.isPending ? "Saving…" : "Save all marks"}
+              </Button>
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>

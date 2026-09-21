@@ -47,6 +47,10 @@ const HREF_PREFETCH: Record<string, PrefetchItem[]> = {
   "/teacher/quizzes": [TEACHER_MENU_PREFETCH[4], TEACHER_MENU_PREFETCH[1]],
   "/teacher/exams": [TEACHER_MENU_PREFETCH[5], TEACHER_MENU_PREFETCH[1]],
   "/teacher/marks": [TEACHER_MENU_PREFETCH[1]],
+  "/teacher/marks/exam": [
+    TEACHER_MENU_PREFETCH[1],
+    { key: ["my-exam-paper-assignments"], fn: () => academicsService.listMyExamPaperAssignments() },
+  ],
   "/teacher/results": [TEACHER_MENU_PREFETCH[6]],
   "/school/dashboard": [SCHOOL_MENU_PREFETCH[0]],
   "/school/academics": [SCHOOL_MENU_PREFETCH[1], SCHOOL_MENU_PREFETCH[2], SCHOOL_MENU_PREFETCH[3]],
