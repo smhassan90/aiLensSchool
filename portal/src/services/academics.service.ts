@@ -47,6 +47,7 @@ export interface ExamPaperSubmissionOverview {
       className: string;
       subjectName: string;
       status: "SUBMITTED" | "DRAFT" | "MISSING" | "REJECTED";
+      reviewStatus?: string | null;
       paperId: string | null;
       submittedAt: string | null;
     }>;

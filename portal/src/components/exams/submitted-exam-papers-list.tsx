@@ -27,6 +27,7 @@ type SubmittedExamPapersListProps = {
   isLoading?: boolean;
   detailBasePath?: string;
   submissionsQueryKey?: string;
+  canReview?: boolean;
 };
 
 function reviewStatus(status?: string): TeacherExamPaperStatus {
@@ -38,12 +39,14 @@ function reviewStatus(status?: string): TeacherExamPaperStatus {
 function PaperCard({
   paper,
   detailBasePath,
+  canReview,
   onReject,
   onApprove,
   approvePending,
 }: {
   paper: ExamPaperSubmissionPaper;
   detailBasePath: string;
+  canReview: boolean;
   onReject: () => void;
   onApprove: () => void;
   approvePending: boolean;
@@ -92,7 +95,7 @@ function PaperCard({
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          {isPending ? (
+          {canReview && isPending ? (
             <>
               <Button size="sm" onClick={onApprove} disabled={approvePending}>
                 Approve
@@ -109,8 +112,10 @@ function PaperCard({
                   <Printer className="h-4 w-4" />
                   Print
                 </>
-              ) : (
+              ) : canReview ? (
                 "Review"
+              ) : (
+                "View"
               )}
             </Button>
           </Link>
@@ -125,6 +130,7 @@ export function SubmittedExamPapersList({
   isLoading,
   detailBasePath = "/school/submitted-exam-papers",
   submissionsQueryKey = "school-exam-paper-submissions",
+  canReview = false,
 }: SubmittedExamPapersListProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -171,15 +177,19 @@ export function SubmittedExamPapersList({
     return (
       <EmptyState
         icon={<FileText className="h-10 w-10" />}
-        title="No submitted papers match"
-        description="Try another exam or clear the filters. Papers appear here after teachers submit them."
+        title={canReview ? "No submitted papers match" : "No approved papers yet"}
+        description={
+          canReview
+            ? "Try another exam or clear the filters. Papers appear here after teachers submit them."
+            : "Approved papers appear here for printing. Papers still waiting for head teacher approval are listed in the teacher status section below."
+        }
       />
     );
   }
 
   return (
     <>
-      {pendingPapers.length ? (
+      {canReview && pendingPapers.length ? (
         <section className="mb-8">
           <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3">
             <Clock className="h-5 w-5 text-amber-700" />
@@ -196,6 +206,7 @@ export function SubmittedExamPapersList({
                 key={paper.id}
                 paper={paper}
                 detailBasePath={detailBasePath}
+                canReview={canReview}
                 approvePending={approve.isPending}
                 onApprove={() => approve.mutate(paper.id)}
                 onReject={() => setRejectId(paper.id)}
@@ -208,7 +219,11 @@ export function SubmittedExamPapersList({
       {otherPapers.length ? (
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            {pendingPapers.length ? "Other submitted papers" : "Submitted papers"}
+            {canReview && pendingPapers.length
+              ? "Other submitted papers"
+              : canReview
+                ? "Submitted papers"
+                : "Approved papers ready to print"}
           </h2>
           <div className="grid gap-3">
             {otherPapers.map((paper) => (
@@ -216,6 +231,7 @@ export function SubmittedExamPapersList({
                 key={paper.id}
                 paper={paper}
                 detailBasePath={detailBasePath}
+                canReview={canReview}
                 approvePending={approve.isPending}
                 onApprove={() => approve.mutate(paper.id)}
                 onReject={() => setRejectId(paper.id)}
@@ -225,6 +241,7 @@ export function SubmittedExamPapersList({
         </section>
       ) : null}
 
+      {canReview ? (
       <RejectExamPaperDialog
         open={Boolean(rejectId)}
         onOpenChange={(open) => {
@@ -239,6 +256,7 @@ export function SubmittedExamPapersList({
         paperTitle={rejectPaper?.title}
         onConfirm={() => rejectId && reject.mutate({ id: rejectId, reason: rejectReason.trim() })}
       />
+      ) : null}
     </>
   );
 }

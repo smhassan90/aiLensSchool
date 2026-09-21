@@ -1317,6 +1317,7 @@ export class AcademicsService {
       subjectName?: string;
       teacherId?: string;
       restrictSectionIds?: string[];
+      approvedPapersOnly?: boolean;
     },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
@@ -1525,6 +1526,7 @@ export class AcademicsService {
       className: string;
       subjectName: string;
       status: 'SUBMITTED' | 'DRAFT' | 'MISSING' | 'REJECTED';
+      reviewStatus: string | null;
       paperId: string | null;
       submittedAt: string | null;
     };
@@ -1593,6 +1595,7 @@ export class AcademicsService {
         className,
         subjectName: row.subject.name,
         status,
+        reviewStatus: latestQuiz?.reviewStatus ?? null,
         paperId: latestQuiz?.id ?? null,
         submittedAt: latestQuiz?.submittedAt?.toISOString() ?? null,
       };
@@ -1644,13 +1647,17 @@ export class AcademicsService {
     }
 
     const submittedPapers = papers
-      .filter(
-        (paper) =>
+      .filter((paper) => {
+        if (query.approvedPapersOnly) {
+          return paper.reviewStatus === ExamPaperReviewStatus.APPROVED;
+        }
+        return (
           paper.reviewStatus === ExamPaperReviewStatus.PENDING_REVIEW ||
           paper.reviewStatus === ExamPaperReviewStatus.APPROVED ||
           (paper.status === QuizStatus.CLOSED &&
-            paper.reviewStatus !== ExamPaperReviewStatus.REJECTED),
-      )
+            paper.reviewStatus !== ExamPaperReviewStatus.REJECTED)
+        );
+      })
       .map((paper) => ({
         ...paper,
         teacherName: teacherDisplayName(

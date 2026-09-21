@@ -319,6 +319,7 @@ export class AcademicsController {
       subjectId,
       subjectName,
       teacherId,
+      approvedPapersOnly: true,
     });
   }
 

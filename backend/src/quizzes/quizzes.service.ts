@@ -773,8 +773,7 @@ export class QuizzesService {
   }
 
   async approvePaper(id: string, user: AuthUser) {
-    const canReview =
-      this.tenant.isSchoolStaff(user) || (await this.headTeachers.canReviewExamPaper(user, id));
+    const canReview = await this.headTeachers.canReviewExamPaper(user, id);
     if (!canReview) {
       throw new ForbiddenException({
         code: 'REVIEW_FORBIDDEN',
@@ -818,8 +817,7 @@ export class QuizzesService {
   }
 
   async rejectPaper(id: string, reason: string, user: AuthUser) {
-    const canReview =
-      this.tenant.isSchoolStaff(user) || (await this.headTeachers.canReviewExamPaper(user, id));
+    const canReview = await this.headTeachers.canReviewExamPaper(user, id);
     if (!canReview) {
       throw new ForbiddenException({
         code: 'REVIEW_FORBIDDEN',

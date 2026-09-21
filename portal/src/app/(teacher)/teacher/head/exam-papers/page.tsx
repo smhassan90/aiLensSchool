@@ -127,7 +127,11 @@ export default function HeadTeacherExamPapersPage() {
 
       {data?.teachers?.length ? (
         <div className="mb-6">
-          <ExamPaperTeacherSummary teachers={data.teachers} />
+          <ExamPaperTeacherSummary
+            teachers={data.teachers}
+            detailBasePath="/teacher/head/exam-papers"
+            canReview
+          />
         </div>
       ) : null}
 
@@ -136,6 +140,7 @@ export default function HeadTeacherExamPapersPage() {
         isLoading={overview.isFetching}
         detailBasePath="/teacher/head/exam-papers"
         submissionsQueryKey="head-teacher-exam-papers"
+        canReview
       />
     </div>
   );

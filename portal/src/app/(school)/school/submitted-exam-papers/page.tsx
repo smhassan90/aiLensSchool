@@ -35,7 +35,11 @@ export default function SubmittedExamPapersPage() {
 
   const data = overview.data;
   const selectedExamId = examConfigId || data?.selectedExam?.id || "";
-  const pendingCount = (data?.papers ?? []).filter((p) => p.reviewStatus === "PENDING_REVIEW").length;
+  const pendingApprovalCount = (data?.teachers ?? []).reduce(
+    (count, teacher) =>
+      count + teacher.assignments.filter((row) => row.reviewStatus === "PENDING_REVIEW").length,
+    0,
+  );
 
   if (overview.isLoading && !data) {
     return (
@@ -50,7 +54,7 @@ export default function SubmittedExamPapersPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Exam papers"
-        description="Approve teacher papers, set the exam date before printing, and track who still needs to submit."
+        description="Print approved exam papers, set the exam date before printing, and track submission progress. Head teachers approve papers before they appear here."
       />
 
       <div className="mb-6 grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -109,7 +113,7 @@ export default function SubmittedExamPapersPage() {
           <p className="font-medium text-foreground">{data.selectedExam.name}</p>
           <p className="mt-1 text-muted-foreground">
             {data.submitted} of {data.expected} papers submitted
-            {pendingCount ? ` · ${pendingCount} waiting for approval` : ""}
+            {pendingApprovalCount ? ` · ${pendingApprovalCount} awaiting head teacher approval` : ""}
             {data.selectedExam.examDate ? ` · Exam date ${formatDate(data.selectedExam.examDate)}` : " · Exam date not set yet"}
             {data.selectedExam.deadline
               ? ` · Paper due ${formatDate(data.selectedExam.deadline)}`

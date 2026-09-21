@@ -16,9 +16,11 @@ function statusBadge(status: "SUBMITTED" | "DRAFT" | "MISSING" | "REJECTED") {
 export function ExamPaperTeacherSummary({
   teachers,
   detailBasePath = "/school/submitted-exam-papers",
+  canReview = false,
 }: {
   teachers: ExamPaperSubmissionOverview["teachers"];
   detailBasePath?: string;
+  canReview?: boolean;
 }) {
   if (!teachers.length) {
     return (
@@ -63,6 +65,13 @@ export function ExamPaperTeacherSummary({
                     {row.status === "SUBMITTED" && row.submittedAt ? (
                       <p className="text-xs text-muted-foreground">
                         Submitted {new Date(row.submittedAt).toLocaleDateString("en-GB")}
+                        {row.reviewStatus === "PENDING_REVIEW"
+                          ? canReview
+                            ? " · awaiting your approval"
+                            : " · awaiting head teacher approval"
+                          : row.reviewStatus === "APPROVED"
+                            ? " · approved"
+                            : ""}
                       </p>
                     ) : row.status === "MISSING" ? (
                       <p className="text-xs text-amber-800">Waiting for paper</p>
@@ -72,9 +81,13 @@ export function ExamPaperTeacherSummary({
                   </div>
                   <div className="flex items-center gap-2">
                     {statusBadge(row.status)}
-                    {row.paperId && row.status === "SUBMITTED" ? (
+                    {row.paperId && row.reviewStatus === "APPROVED" ? (
                       <Link href={`${detailBasePath}/${row.paperId}`}>
                         <Button size="sm" variant="outline">Print</Button>
+                      </Link>
+                    ) : row.paperId && canReview && row.reviewStatus === "PENDING_REVIEW" ? (
+                      <Link href={`${detailBasePath}/${row.paperId}`}>
+                        <Button size="sm" variant="outline">Review</Button>
                       </Link>
                     ) : null}
                   </div>

@@ -32,9 +32,13 @@ import { ApiClientError } from "@/lib/api-client";
 export function ExamPaperPrintScreen({
   quizId,
   listHref,
+  canReview = false,
+  submissionsQueryKey = "school-exam-paper-submissions",
 }: {
   quizId: string;
   listHref: string;
+  canReview?: boolean;
+  submissionsQueryKey?: string;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -62,7 +66,7 @@ export function ExamPaperPrintScreen({
     onSuccess: () => {
       toast({ title: "Paper approved", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["quiz", quizId] });
-      queryClient.invalidateQueries({ queryKey: ["school-exam-paper-submissions"] });
+      queryClient.invalidateQueries({ queryKey: [submissionsQueryKey] });
     },
     onError: (err) =>
       toast({
@@ -79,7 +83,7 @@ export function ExamPaperPrintScreen({
       setRejectOpen(false);
       setRejectReason("");
       queryClient.invalidateQueries({ queryKey: ["quiz", quizId] });
-      queryClient.invalidateQueries({ queryKey: ["school-exam-paper-submissions"] });
+      queryClient.invalidateQueries({ queryKey: [submissionsQueryKey] });
     },
     onError: (err) =>
       toast({
@@ -171,7 +175,7 @@ export function ExamPaperPrintScreen({
                   Back
                 </Button>
               </Link>
-              {isPending ? (
+              {canReview && isPending ? (
                 <>
                   <Button onClick={() => approve.mutate()} disabled={approve.isPending}>
                     Approve
@@ -220,14 +224,16 @@ export function ExamPaperPrintScreen({
             </span>
           ) : null}
         </div>
-        {isPending ? (
+        {canReview && isPending ? (
           <p className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
             This paper is waiting for your approval. Review it below, then approve or reject with feedback for the teacher.
           </p>
         ) : null}
-        {!canPrint && !isPending ? (
+        {!canPrint && (!isPending || !canReview) ? (
           <p className="mb-6 rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-            Printing is available after you approve the paper.
+            {canReview
+              ? "Printing is available after you approve the paper."
+              : "Printing is available after the head teacher approves this paper."}
           </p>
         ) : null}
       </div>
@@ -242,15 +248,17 @@ export function ExamPaperPrintScreen({
         }
       `}</style>
 
-      <RejectExamPaperDialog
-        open={rejectOpen}
-        onOpenChange={setRejectOpen}
-        reason={rejectReason}
-        onReasonChange={setRejectReason}
-        onConfirm={() => reject.mutate()}
-        isPending={reject.isPending}
-        paperTitle={quiz.title}
-      />
+      {canReview ? (
+        <RejectExamPaperDialog
+          open={rejectOpen}
+          onOpenChange={setRejectOpen}
+          reason={rejectReason}
+          onReasonChange={setRejectReason}
+          onConfirm={() => reject.mutate()}
+          isPending={reject.isPending}
+          paperTitle={quiz.title}
+        />
+      ) : null}
 
       <ExamDateDialog
         open={examDateOpen}

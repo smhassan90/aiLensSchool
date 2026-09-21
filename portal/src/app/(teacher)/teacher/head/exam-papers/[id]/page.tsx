@@ -9,6 +9,8 @@ export default function HeadTeacherExamPaperPrintPage() {
     <ExamPaperPrintScreen
       quizId={params.id}
       listHref="/teacher/head/exam-papers"
+      canReview
+      submissionsQueryKey="head-teacher-exam-papers"
     />
   );
 }
