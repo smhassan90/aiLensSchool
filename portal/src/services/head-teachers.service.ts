@@ -160,12 +160,14 @@ export const headTeachersService = {
     examConfigId?: string;
     sectionId?: string;
     subjectId?: string;
+    subjectName?: string;
     teacherId?: string;
   }) {
     const query = new URLSearchParams();
     if (params?.examConfigId) query.set("examConfigId", params.examConfigId);
     if (params?.sectionId) query.set("sectionId", params.sectionId);
     if (params?.subjectId) query.set("subjectId", params.subjectId);
+    if (params?.subjectName) query.set("subjectName", params.subjectName);
     if (params?.teacherId) query.set("teacherId", params.teacherId);
     const suffix = query.toString() ? `?${query.toString()}` : "";
     return apiClient<ExamPaperSubmissionOverview>(`/head-teachers/me/exam-paper-submissions${suffix}`);

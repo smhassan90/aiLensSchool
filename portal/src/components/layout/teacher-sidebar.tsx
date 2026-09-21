@@ -52,11 +52,15 @@ export function TeacherSidebar() {
   });
   const isClassTeacher = (classes.data ?? []).some((row) => row.isClassTeacher);
   const isHeadTeacher = Boolean(headTeacher.data?.sections?.length);
+  const teacherNavItems = baseNavItems.filter((item) => !item.classTeacherOnly || isClassTeacher);
+  const dashboard = teacherNavItems.find((item) => item.href === "/teacher/dashboard");
+  const restNavItems = teacherNavItems.filter((item) => item.href !== "/teacher/dashboard");
   const navItems = [
-    ...baseNavItems.filter((item) => !item.classTeacherOnly || isClassTeacher),
+    ...(dashboard ? [dashboard] : []),
     ...(isHeadTeacher
-      ? [{ href: "/teacher/head", label: "Academic oversight", icon: School }]
+      ? [{ href: "/teacher/head", label: "Academic insights", icon: School }]
       : []),
+    ...restNavItems,
   ];
 
   return (

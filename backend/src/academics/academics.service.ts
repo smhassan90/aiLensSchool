@@ -1289,12 +1289,32 @@ export class AcademicsService {
     };
   }
 
+  private async subjectIdsForExamPaperFilter(
+    schoolId: string,
+    subjectId?: string,
+    subjectName?: string,
+  ): Promise<string[] | undefined> {
+    const label = subjectName?.trim() || subjectId?.trim();
+    if (!label) return undefined;
+
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(label);
+    if (isUuid) return [label];
+
+    const rows = await this.prisma.subject.findMany({
+      where: { schoolId, name: label },
+      select: { id: true },
+    });
+    return rows.length ? rows.map((row) => row.id) : ['__none__'];
+  }
+
   async getExamPaperSubmissions(
     user: AuthUser,
     query: {
       examConfigId?: string;
       sectionId?: string;
       subjectId?: string;
+      subjectName?: string;
       teacherId?: string;
       restrictSectionIds?: string[];
     },
@@ -1370,13 +1390,19 @@ export class AcademicsService {
         ? query.restrictSectionIds
         : undefined;
 
+    const subjectScope = await this.subjectIdsForExamPaperFilter(
+      schoolId,
+      query.subjectId,
+      query.subjectName,
+    );
+
     const assignments = await this.prisma.classSubject.findMany({
       where: {
         section: { schoolId },
         academicYearId: year.id,
         teacherId: { not: null },
         ...(sectionScope ? { sectionId: { in: sectionScope } } : {}),
-        ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+        ...(subjectScope ? { subjectId: { in: subjectScope } } : {}),
         ...(query.teacherId ? { teacher: { userId: query.teacherId } } : {}),
       },
       select: {
@@ -1426,7 +1452,7 @@ export class AcademicsService {
         examConfigId: selectedExam.id,
         paperKind: { in: [...EXAM_PAPER_KINDS] },
         ...(sectionScope ? { sectionId: { in: sectionScope } } : {}),
-        ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+        ...(subjectScope ? { subjectId: { in: subjectScope } } : {}),
         ...(query.teacherId ? { createdById: query.teacherId } : {}),
       },
       orderBy: { submittedAt: 'desc' },
@@ -1551,7 +1577,10 @@ export class AcademicsService {
         row.sectionId,
         `${row.section.grade.name} ${row.section.name}`,
       );
-      subjectOptions.set(row.subjectId, row.subject.name);
+      const subjectName = row.subject.name.trim();
+      if (subjectName) {
+        subjectOptions.set(subjectName.toLowerCase(), subjectName);
+      }
       teacherOptions.set(
         row.teacher.userId,
         teacherDisplayName(
@@ -1594,8 +1623,8 @@ export class AcademicsService {
         sections: [...sectionOptions.entries()]
           .map(([id, name]) => ({ id, name }))
           .sort((a, b) => a.name.localeCompare(b.name)),
-        subjects: [...subjectOptions.entries()]
-          .map(([id, name]) => ({ id, name }))
+        subjects: [...subjectOptions.values()]
+          .map((name) => ({ id: name, name }))
           .sort((a, b) => a.name.localeCompare(b.name)),
         teachers: [...teacherOptions.entries()]
           .map(([id, name]) => ({ id, name }))

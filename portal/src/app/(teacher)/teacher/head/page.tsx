@@ -36,7 +36,7 @@ export default function HeadTeacherDashboardPage() {
   if (dashboard.isLoading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <PageHeader title="Academic oversight" />
+        <PageHeader title="Academic insights" />
         <PageLoader variant="page" />
       </div>
     );
@@ -46,7 +46,7 @@ export default function HeadTeacherDashboardPage() {
   if (!data) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <PageHeader title="Academic oversight" />
+        <PageHeader title="Academic insights" />
         <p className="text-sm text-muted-foreground">Head teacher access is not set up for your account.</p>
       </div>
     );

@@ -35,6 +35,10 @@ export class HeadTeacherListQueryDto {
 
   @IsOptional()
   @IsString()
+  subjectName?: string;
+
+  @IsOptional()
+  @IsString()
   examConfigId?: string;
 
   @IsOptional()

@@ -309,6 +309,7 @@ export class AcademicsController {
     @Query('examConfigId') examConfigId: string | undefined,
     @Query('sectionId') sectionId: string | undefined,
     @Query('subjectId') subjectId: string | undefined,
+    @Query('subjectName') subjectName: string | undefined,
     @Query('teacherId') teacherId: string | undefined,
     @CurrentUser() user: AuthUser,
   ) {
@@ -316,6 +317,7 @@ export class AcademicsController {
       examConfigId,
       sectionId,
       subjectId,
+      subjectName,
       teacherId,
     });
   }

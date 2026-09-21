@@ -17,12 +17,12 @@ import { formatDate } from "@/lib/utils";
 export default function HeadTeacherExamPapersPage() {
   const [examConfigId, setExamConfigId] = useState("");
   const [sectionId, setSectionId] = useState("");
-  const [subjectId, setSubjectId] = useState("");
+  const [subjectName, setSubjectName] = useState("");
   const [teacherId, setTeacherId] = useState("");
 
   const queryKey = useMemo(
-    () => ["head-teacher-exam-papers", examConfigId, sectionId, subjectId, teacherId],
-    [examConfigId, sectionId, subjectId, teacherId],
+    () => ["head-teacher-exam-papers", examConfigId, sectionId, subjectName, teacherId],
+    [examConfigId, sectionId, subjectName, teacherId],
   );
 
   const overview = useQuery({
@@ -31,7 +31,7 @@ export default function HeadTeacherExamPapersPage() {
       headTeachersService.getExamPaperSubmissions({
         examConfigId: examConfigId || undefined,
         sectionId: sectionId || undefined,
-        subjectId: subjectId || undefined,
+        subjectName: subjectName || undefined,
         teacherId: teacherId || undefined,
       }),
   });
@@ -73,7 +73,7 @@ export default function HeadTeacherExamPapersPage() {
             onChange={(e) => {
               setExamConfigId(e.target.value);
               setSectionId("");
-              setSubjectId("");
+              setSubjectName("");
               setTeacherId("");
             }}
           >
@@ -97,10 +97,10 @@ export default function HeadTeacherExamPapersPage() {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="subject-filter">Subject</Label>
-          <Select id="subject-filter" value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
+          <Select id="subject-filter" value={subjectName} onChange={(e) => setSubjectName(e.target.value)}>
             <option value="">All subjects</option>
             {(data?.filters.subjects ?? []).map((row) => (
-              <option key={row.id} value={row.id}>{row.name}</option>
+              <option key={row.name} value={row.name}>{row.name}</option>
             ))}
           </Select>
         </div>

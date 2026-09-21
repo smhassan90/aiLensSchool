@@ -469,6 +469,7 @@ export const academicsService = {
     examConfigId?: string;
     sectionId?: string;
     subjectId?: string;
+    subjectName?: string;
     teacherId?: string;
   }) {
     return apiClient<ExamPaperSubmissionOverview>(
