@@ -116,13 +116,14 @@ export function gradeClassLabel(section?: SectionLike): string {
   return "—";
 }
 
-/** Full label including section, e.g. "Class 4 A". */
+/** Full label including section, e.g. "Class 4 A" or "Level 1 A". */
 export function sectionClassLabel(section?: SectionLike): string {
   if (!section) return "—";
-  const grade = gradeClassLabel(section);
+  const gradeName = section.grade?.name?.trim() ?? "";
   const name = section.name?.trim() ?? "";
-  if (grade !== "—" && name) return `${grade} ${name}`;
-  return grade !== "—" ? grade : name || "—";
+  if (gradeName && name) return `${gradeName} ${name}`;
+  if (gradeName) return gradeName;
+  return name || "—";
 }
 
 export function formatDateTime(value?: string | Date | null): string {

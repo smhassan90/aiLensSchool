@@ -23,4 +23,9 @@ describe('sectionClassLabel', () => {
   it('combines grade name and section', () => {
     expect(sectionClassLabel({ name: 'A', grade: { name: 'Class 8', level: 10 } })).toBe('Class 8 A');
   });
+
+  it('keeps Level and Class grade names distinct', () => {
+    expect(sectionClassLabel({ name: 'A', grade: { name: 'Level 1', level: 1 } })).toBe('Level 1 A');
+    expect(sectionClassLabel({ name: 'A', grade: { name: 'Class 1', level: 1 } })).toBe('Class 1 A');
+  });
 });
