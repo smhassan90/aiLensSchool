@@ -7,6 +7,7 @@ import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { FilesService } from '../files/files.service';
+import { MemoryCacheService } from '../common/services/memory-cache.service';
 import { buildParentUsername, generateParentPassword } from './parent-accounts';
 
 const admin: AuthUser = {
@@ -43,6 +44,7 @@ describe('StudentsService', () => {
         { provide: PrismaService, useValue: {} },
         { provide: AuditService, useValue: { log: jest.fn() } },
         { provide: FilesService, useValue: {} },
+        { provide: MemoryCacheService, useValue: { invalidatePrefix: jest.fn() } },
         TenantService,
       ],
     }).compile();

@@ -35,7 +35,8 @@ export class HttpCacheInterceptor implements NestInterceptor {
       url.includes('/docs') ||
       url.includes('/uploads') ||
       url.includes('/coach') ||
-      url.includes('/scoreboard')
+      url.includes('/scoreboard') ||
+      url.includes('/photo-assets')
     ) {
       return next.handle();
     }

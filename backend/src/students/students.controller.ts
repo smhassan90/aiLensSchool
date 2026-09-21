@@ -118,13 +118,13 @@ export class StudentsController {
     return this.studentsService.requestPhoto(id, file, user);
   }
 
-  @Roles(RoleName.SCHOOL_ADMIN)
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
   @Get('photo-assets')
   listPhotoAssets(@CurrentUser() user: AuthUser) {
     return this.studentsService.listPhotoAssets(user);
   }
 
-  @Roles(RoleName.SCHOOL_ADMIN)
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
   @Patch('photo-assets/:photoId')
   reviewPhoto(
     @Param('photoId') photoId: string,

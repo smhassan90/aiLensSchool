@@ -23,6 +23,7 @@ import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto
 import { CreateParentInlineDto, CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { FilesService } from '../files/files.service';
+import { MemoryCacheService } from '../common/services/memory-cache.service';
 import {
   buildParentUsername,
   generateParentPassword,
@@ -38,7 +39,12 @@ export class StudentsService {
     private readonly audit: AuditService,
     private readonly tenant: TenantService,
     private readonly files: FilesService,
+    private readonly cache: MemoryCacheService,
   ) {}
+
+  private invalidateSchoolHttpCache(schoolId: string) {
+    this.cache.invalidatePrefix(`http:${schoolId}:`);
+  }
 
   async create(dto: CreateStudentDto, user: AuthUser) {
     if (!dto.father?.firstName && !dto.mother?.firstName) {
@@ -455,9 +461,9 @@ export class StudentsService {
   }
 
   async updatePhoto(id: string, file: Express.Multer.File | undefined, user: AuthUser) {
-    await this.findOne(id, user);
-    const asset = await this.files.upload(file, user);
-    return this.prisma.student.update({
+    const student = await this.findOne(id, user);
+    const asset = await this.files.upload(file, { ...user, schoolId: student.schoolId });
+    const updated = await this.prisma.student.update({
       where: { id },
       data: { photoUrl: asset.url },
       include: {
@@ -470,17 +476,21 @@ export class StudentsService {
         parents: { include: { parent: { include: { user: true } } } },
       },
     });
+    this.invalidateSchoolHttpCache(student.schoolId);
+    return updated;
   }
 
   async requestPhoto(id: string, file: Express.Multer.File | undefined, user: AuthUser) {
     await this.assertParentOwnsStudent(user.id, id);
-    const student = await this.prisma.student.findFirst({
-      where: { id, schoolId: this.tenant.requireSchoolId(user) },
+    const student = await this.prisma.student.findUnique({
+      where: { id },
       select: { id: true, schoolId: true },
     });
-    if (!student) throw new NotFoundException({ code: 'STUDENT_NOT_FOUND', message: 'Student not found' });
-    const asset = await this.files.upload(file, user);
-    return this.prisma.studentPhotoAsset.create({
+    if (!student) {
+      throw new NotFoundException({ code: 'STUDENT_NOT_FOUND', message: 'Student not found' });
+    }
+    const asset = await this.files.upload(file, { ...user, schoolId: student.schoolId });
+    const created = await this.prisma.studentPhotoAsset.create({
       data: {
         schoolId: student.schoolId,
         studentId: student.id,
@@ -489,6 +499,8 @@ export class StudentsService {
       },
       include: { fileAsset: true },
     });
+    this.invalidateSchoolHttpCache(student.schoolId);
+    return created;
   }
 
   async listPhotoAssets(user: AuthUser) {
@@ -549,6 +561,7 @@ export class StudentsService {
       }
       return reviewed;
     });
+    this.invalidateSchoolHttpCache(schoolId);
     return updated;
   }
 

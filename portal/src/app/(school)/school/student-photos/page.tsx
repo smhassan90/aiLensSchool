@@ -20,7 +20,11 @@ export default function StudentPhotosPage() {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const queryReview = useQuery({ queryKey: ["student-photo-assets"], queryFn: studentsService.listPhotoAssets });
+  const queryReview = useQuery({
+    queryKey: ["student-photo-assets"],
+    queryFn: studentsService.listPhotoAssets,
+    refetchOnWindowFocus: true,
+  });
 
   const students = useQuery({
     queryKey: ["student-photo-search", search],
@@ -140,7 +144,12 @@ export default function StudentPhotosPage() {
           Parent submissions awaiting review
         </h2>
         {queryReview.isLoading ? <PageLoader variant="panel" /> : null}
-        {!queryReview.isLoading && !queryReview.data?.length ? (
+        {queryReview.isError ? (
+          <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            Could not load pending photos. Refresh the page or sign in again as school admin.
+          </p>
+        ) : null}
+        {!queryReview.isLoading && !queryReview.isError && !queryReview.data?.length ? (
           <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
             No photos waiting for review.
           </p>
