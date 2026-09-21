@@ -14,7 +14,7 @@ export default function DayOffRequestsPage() {
   const { toast } = useToast();
   const query = useQuery({
     queryKey: ["day-off-requests"],
-    queryFn: parentsService.listDayOffRequests,
+    queryFn: () => parentsService.listDayOffRequests(),
   });
   const review = useMutation({
     mutationFn: ({ id, status }: { id: string; status: "APPROVED" | "REJECTED" }) =>
