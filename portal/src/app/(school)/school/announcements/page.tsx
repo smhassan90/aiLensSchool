@@ -242,7 +242,9 @@ export default function AnnouncementsPage() {
                 !title.trim() ||
                 !description.trim() ||
                 (audience === "SECTION" && sectionIds.length === 0) ||
-                (publishAt && expiresAt && new Date(publishAt) > new Date(expiresAt))
+                Boolean(
+                  publishAt && expiresAt && new Date(publishAt) > new Date(expiresAt),
+                )
               }
               onClick={() => create.mutate()}
             >
