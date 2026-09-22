@@ -90,13 +90,45 @@ export class StudentsService {
       throw new NotFoundException({ code: 'SCHOOL_NOT_FOUND', message: 'School not found' });
     }
 
+    const studentCode = dto.studentCode.trim();
+    const admissionNumber = dto.admissionNumber.trim();
+    if (!studentCode || !admissionNumber) {
+      throw new BadRequestException({
+        code: 'STUDENT_ID_REQUIRED',
+        message: 'Student ID and admission number are required',
+      });
+    }
+
+    const [existingCode, existingAdmission] = await Promise.all([
+      this.prisma.student.findFirst({
+        where: { schoolId, studentCode },
+        select: { id: true, firstName: true, lastName: true },
+      }),
+      this.prisma.student.findFirst({
+        where: { schoolId, admissionNumber },
+        select: { id: true, firstName: true, lastName: true },
+      }),
+    ]);
+    if (existingCode) {
+      throw new ConflictException({
+        code: 'STUDENT_CODE_EXISTS',
+        message: `Student ID "${studentCode}" is already used by ${personFullName(existingCode.firstName, existingCode.lastName)}`,
+      });
+    }
+    if (existingAdmission) {
+      throw new ConflictException({
+        code: 'ADMISSION_NUMBER_EXISTS',
+        message: `Admission number "${admissionNumber}" is already used by ${personFullName(existingAdmission.firstName, existingAdmission.lastName)}`,
+      });
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
       const student = await tx.student.create({
         data: {
           schoolId,
           branchId: dto.branchId,
-          studentCode: dto.studentCode,
-          admissionNumber: dto.admissionNumber,
+          studentCode,
+          admissionNumber,
           firstName: dto.firstName.trim(),
           lastName: sanitizeLastName(dto.lastName),
           dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
@@ -132,7 +164,7 @@ export class StudentsService {
             schoolId,
             schoolCode: school.code,
             studentId: student.id,
-            studentCode: dto.studentCode,
+            studentCode,
             studentLastName: sanitizeLastName(dto.lastName),
             parentRoleId: parentRole.id,
             relationship: ParentRelationship.FATHER,
@@ -146,7 +178,7 @@ export class StudentsService {
             schoolId,
             schoolCode: school.code,
             studentId: student.id,
-            studentCode: dto.studentCode,
+            studentCode,
             studentLastName: sanitizeLastName(dto.lastName),
             parentRoleId: parentRole.id,
             relationship: ParentRelationship.MOTHER,
