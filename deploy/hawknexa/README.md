@@ -19,6 +19,41 @@ Script: `stage1-2-server-prep.sh`
 - Overwrite existing `daemon.json` log settings (merges or skips)
 - Deploy HawkNexa application containers
 
+## Push notifications (FCM)
+
+The mobile app uses package `com.hawknexa.student` with Firebase project `hawknexa-69fb8`
+(see `mobile/google-services.json`).
+
+Place the Firebase Admin key in the repo at:
+
+`mobile/hawknexa-69fb8-firebase-adminsdk-fbsvc-*.json`
+
+**Hostinger VPS:** port 22 is often blocked from your PC. Use **hPanel → VPS → Browser terminal**
+(not `scp` from Windows).
+
+Option A — paste the env line from your PC:
+
+```powershell
+.\deploy\hawknexa\print-firebase-env-line.ps1
+```
+
+Copy the printed `FIREBASE_SERVICE_ACCOUNT_JSON=...` line into `/opt/apps/hawknexa/deploy/.env`
+via `nano`, then on the VPS:
+
+```bash
+bash /opt/apps/hawknexa/deploy/deploy.sh
+```
+
+Option B — if the JSON file is already on the server under `mobile/`:
+
+```bash
+bash /opt/apps/hawknexa/repo/deploy/hawknexa/set-firebase-env.sh
+bash /opt/apps/hawknexa/deploy/deploy.sh
+```
+
+If this variable is missing or points at a different Firebase project, in-app notifications
+still work but FCM push delivery will not.
+
 ## GitHub Actions auto-deploy (push to `main`)
 
 Workflow: `.github/workflows/deploy-hawknexa-vps.yml`

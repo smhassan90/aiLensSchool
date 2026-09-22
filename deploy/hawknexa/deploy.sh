@@ -151,7 +151,7 @@ compose_up() {
   elif [[ "${BUILD_BACKEND}" == "true" ]]; then
     docker compose -f "${COMPOSE_FILE}" up -d --no-deps backend
   elif [[ "${BUILD_PORTAL}" == "true" ]]; then
-    docker compose -f "${COMPOSE_FILE}" up -d --no-deps portal
+    docker compose -f "${COMPOSE_FILE}" up -d --no-deps portal caddy
   elif [[ "${RESTART_CADDY}" == "true" ]]; then
     docker compose -f "${COMPOSE_FILE}" up -d --no-deps caddy
     if [[ "${SKIP_WEBHOOK_RESTART}" != "true" ]]; then

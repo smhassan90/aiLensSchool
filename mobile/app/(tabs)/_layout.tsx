@@ -1,42 +1,56 @@
-import { ColorValue, Platform, StyleSheet, View } from 'react-native';
+import { ColorValue, StyleSheet, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radii, shadows, typography } from '@/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, fontSizes, radii, shadows, typography } from '@/constants/theme';
 
 type TabIconName = keyof typeof Ionicons.glyphMap;
 
 function TabIcon({
   name,
-  focused,
   color,
   size,
 }: {
   name: TabIconName;
-  focused: boolean;
   color: ColorValue;
   size: number;
 }) {
   return (
-    <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+    <View style={styles.iconWrap}>
       <Ionicons name={name} color={color} size={size} />
     </View>
   );
 }
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 8);
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.slate500,
+        tabBarLabelPosition: 'below-icon',
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: fontSizes.caption,
           fontFamily: typography.family,
           fontWeight: typography.medium,
           marginTop: 2,
+          marginBottom: 0,
         },
-        tabBarStyle: styles.tabBar,
+        tabBarIconStyle: {
+          marginTop: 0,
+          marginBottom: 0,
+        },
+        tabBarStyle: {
+          ...styles.tabBar,
+          bottom: bottomInset,
+          height: 58,
+          paddingTop: 8,
+          paddingBottom: 8,
+        },
         tabBarItemStyle: styles.tabItem,
       }}
     >
@@ -44,13 +58,8 @@ export default function TabsLayout() {
         name="home"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon
-              name={focused ? 'home' : 'home-outline'}
-              focused={focused}
-              color={color}
-              size={size}
-            />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name={focused ? 'home' : 'home-outline'} color={color} size={22} />
           ),
         }}
       />
@@ -58,13 +67,8 @@ export default function TabsLayout() {
         name="diary"
         options={{
           title: 'Diary',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon
-              name={focused ? 'book' : 'book-outline'}
-              focused={focused}
-              color={color}
-              size={size}
-            />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name={focused ? 'book' : 'book-outline'} color={color} size={22} />
           ),
         }}
       />
@@ -72,12 +76,11 @@ export default function TabsLayout() {
         name="homework"
         options={{
           title: 'Homework',
-          tabBarIcon: ({ color, size, focused }) => (
+          tabBarIcon: ({ color, focused }) => (
             <TabIcon
               name={focused ? 'document-text' : 'document-text-outline'}
-              focused={focused}
               color={color}
-              size={size}
+              size={22}
             />
           ),
         }}
@@ -86,12 +89,11 @@ export default function TabsLayout() {
         name="quizzes"
         options={{
           title: 'Quizzes',
-          tabBarIcon: ({ color, size, focused }) => (
+          tabBarIcon: ({ color, focused }) => (
             <TabIcon
               name={focused ? 'help-circle' : 'help-circle-outline'}
-              focused={focused}
               color={color}
-              size={size}
+              size={22}
             />
           ),
         }}
@@ -100,55 +102,37 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon
-              name={focused ? 'person' : 'person-outline'}
-              focused={focused}
-              color={color}
-              size={size}
-            />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name={focused ? 'person' : 'person-outline'} color={color} size={22} />
           ),
         }}
       />
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          href: null,
-        }}
-      />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
     </Tabs>
   );
 }
 
-const spacingInset = 14;
-
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    left: spacingInset,
-    right: spacingInset,
-    bottom: Platform.OS === 'ios' ? 22 : 14,
-    height: 68,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
+    left: 12,
+    right: 12,
     backgroundColor: colors.tabBar,
     borderTopWidth: 0,
-    borderRadius: radii.xl,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.tabBarBorder,
     ...shadows.tabBar,
   },
   tabItem: {
-    paddingTop: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 0,
   },
   iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  iconWrapActive: {
-    backgroundColor: colors.accentSoft,
   },
 });

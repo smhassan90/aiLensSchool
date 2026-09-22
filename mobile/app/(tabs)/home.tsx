@@ -5,11 +5,11 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChildHeader } from '@/components/ChildHeader';
-import { Badge, Card, EmptyState, ErrorState, LoadingState, SectionTitle } from '@/components/ui';
+import { Badge, Card, EmptyState, ErrorState, LoadingState, SectionBlock, textStyles } from '@/components/ui';
 import { AttendanceDots, LabeledBar, ScoreRing } from '@/components/visuals';
 import { useAuth } from '@/providers/AuthProvider';
 import { useChild } from '@/providers/ChildProvider';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, fontSizes, radii, spacing, tabBarClearance, typography } from '@/constants/theme';
 import { fetchLessonsForStudent, isLessonToday } from '@/services/lessons.service';
 import { fetchHomework, needsHomeworkSubmission } from '@/services/homework.service';
 import { formatDateTime } from '@/lib/format';
@@ -18,14 +18,12 @@ import { pendingQuizzes } from '@/lib/quiz-visibility';
 import { fetchQuizResults } from '@/services/results.service';
 import { fetchAttendance } from '@/services/attendance.service';
 import { fetchEvents, isUpcomingEvent } from '@/services/events.service';
-import { fetchNotifications } from '@/services/notifications.service';
 import { fetchAnnouncements } from '@/services/announcements.service';
 import { Announcement, EventItem, Homework, LessonSummary, Quiz } from '@/types/api';
 
 export default function HomeScreen() {
   const { user } = useAuth();
   const { selectedChild, selectedChildId, isLoading: childLoading } = useChild();
-
   const studentId = selectedChildId ?? '';
 
   const lessonsQuery = useQuery({
@@ -54,7 +52,7 @@ export default function HomeScreen() {
 
   const attendanceQuery = useQuery({
     queryKey: ['home', 'attendance', studentId],
-    queryFn: () => fetchAttendance(studentId, { limit: 20 }),
+    queryFn: () => fetchAttendance(studentId, { limit: 30 }),
     enabled: !!studentId,
   });
 
@@ -66,11 +64,6 @@ export default function HomeScreen() {
   const announcementsQuery = useQuery({
     queryKey: ['home', 'announcements'],
     queryFn: () => fetchAnnouncements({ limit: 5 }),
-  });
-
-  const notificationsQuery = useQuery({
-    queryKey: ['home', 'notifications'],
-    queryFn: () => fetchNotifications({ limit: 5, unreadOnly: true }),
   });
 
   const snapshot = useMemo(() => {
@@ -118,9 +111,7 @@ export default function HomeScreen() {
     };
   }, [attendanceQuery.data, resultsQuery.data, homeworkQuery.data, quizzesQuery.data]);
 
-  if (childLoading) {
-    return <LoadingState message="Loading children…" />;
-  }
+  if (childLoading) return <LoadingState message="Loading children…" />;
 
   if (!selectedChild || !studentId) {
     return (
@@ -134,11 +125,7 @@ export default function HomeScreen() {
   const openHomework = (homeworkQuery.data?.items ?? []).filter(needsHomeworkSubmission);
   const resultByQuiz = new Map((resultsQuery.data?.items ?? []).map((row) => [row.quizId, row]));
   const accessibleQuizzes = pendingQuizzes(quizzesQuery.data?.items ?? [], resultByQuiz);
-  const newQuizzes = accessibleQuizzes.filter((quiz) =>
-    isQuizNew(quiz, { hasResult: resultByQuiz.has(quiz.id) }),
-  );
   const upcomingEvents = (eventsQuery.data?.items ?? []).filter(isUpcomingEvent).slice(0, 3);
-  const unreadCount = notificationsQuery.data?.total ?? 0;
   const latestAnnouncements = announcementsQuery.data?.items ?? [];
 
   return (
@@ -153,53 +140,45 @@ export default function HomeScreen() {
             </Text>
           </View>
           <Pressable style={styles.profileButton} onPress={() => router.push('/(tabs)/profile')}>
-            <Ionicons name="person-outline" size={20} color={colors.primary} />
+            <Ionicons name="person-outline" size={18} color={colors.primary} />
           </Pressable>
         </View>
 
         <ChildHeader />
 
-        <View style={styles.contextBanner}>
-          <View style={styles.contextIcon}>
-            <Ionicons name="sparkles-outline" size={20} color={colors.primaryDark} />
-          </View>
-          <Text style={styles.helpHint}>
-            Here’s what {selectedChild.firstName} needs your attention on today.
-          </Text>
-        </View>
-
         <View style={styles.quickRow}>
           <Pressable style={[styles.quickLink, styles.quickLinkSoft]} onPress={() => router.push('/fees')}>
-            <Ionicons name="wallet-outline" size={22} color={colors.primary} />
+            <Ionicons name="wallet-outline" size={20} color={colors.primary} />
             <Text style={styles.quickLinkText}>Fees</Text>
           </Pressable>
           <Pressable style={[styles.quickLink, styles.quickLinkYellow]} onPress={() => router.push('/day-off')}>
-            <Ionicons name="calendar-outline" size={22} color={colors.warning} />
+            <Ionicons name="calendar-outline" size={20} color={colors.warning} />
             <Text style={styles.quickLinkText}>Day off</Text>
-          </Pressable>
-          <Pressable style={[styles.quickLink, styles.quickLinkSoft]} onPress={() => router.push('/student-photo')}>
-            <Ionicons name="camera-outline" size={22} color={colors.primary} />
-            <Text style={styles.quickLinkText}>Photo</Text>
           </Pressable>
         </View>
 
         <View style={styles.snapshot}>
           <View style={styles.snapshotHeader}>
-            <View>
-              <Text style={styles.snapshotKicker}>PROGRESS CHECK</Text>
-              <Text style={styles.snapshotTitle}>At a glance</Text>
-            </View>
-            <Ionicons name="trending-up-outline" size={25} color={colors.mint} />
+            <Text style={styles.snapshotTitle}>At a glance</Text>
+            <Ionicons name="trending-up-outline" size={20} color={colors.mint} />
           </View>
           <View style={styles.rings}>
-            <ScoreRing value={snapshot.attendanceRate} label="Attendance" />
-            <ScoreRing value={snapshot.quizAvg} label="Quiz average" />
+            <ScoreRing
+              value={snapshot.attendanceRate}
+              label="Attendance"
+              onPress={() => router.push('/attendance')}
+            />
+            <ScoreRing
+              value={snapshot.quizAvg}
+              label="Quiz average"
+              onPress={() => router.push('/quiz-results')}
+            />
             <ScoreRing value={snapshot.homeworkDoneRate} label="Homework done" />
           </View>
           {snapshot.recentAttendance.length ? (
-            <View style={styles.dotsWrap}>
+            <Pressable style={styles.dotsWrap} onPress={() => router.push('/attendance')}>
               <AttendanceDots statuses={snapshot.recentAttendance} />
-            </View>
+            </Pressable>
           ) : null}
           {snapshot.subjects.length ? (
             <View style={styles.subjects}>
@@ -208,142 +187,187 @@ export default function HomeScreen() {
                 <LabeledBar key={item.name} label={item.name} value={item.value} hint={item.hint} />
               ))}
             </View>
-          ) : (
-            <Text style={styles.snapshotHint}>Quiz subject bars appear after the first result.</Text>
-          )}
+          ) : null}
         </View>
 
         <View style={styles.statsRow}>
-          <StatPill label="To-do HW" value={openHomework.length} />
-          <StatPill label="Pending quizzes" value={accessibleQuizzes.length} />
-          <StatPill label="Unread" value={unreadCount} />
+          <StatPill
+            label="To-do HW"
+            value={openHomework.length}
+            tint={colors.surfaceMint}
+            onPress={() => router.push('/(tabs)/homework')}
+          />
+          <StatPill
+            label="Pending quizzes"
+            value={accessibleQuizzes.length}
+            tint={colors.surfaceYellow}
+            onPress={() => router.push('/(tabs)/quizzes')}
+          />
         </View>
 
-        <SectionTitle title="Today's lessons" />
-        {lessonsQuery.isLoading ? (
-          <LoadingState message="Loading lessons…" />
-        ) : lessonsQuery.isError ? (
-          <ErrorState message="Could not load lessons" onRetry={() => lessonsQuery.refetch()} />
-        ) : todayLessons.length === 0 ? (
-          <EmptyState title="No lessons today" subtitle="Check the diary for recent activity." />
-        ) : (
-          todayLessons.map((lesson: LessonSummary) => (
-            <Card key={lesson.id} onPress={() => router.push(`/lesson/${lesson.id}`)}>
-              <Text style={styles.cardTitle}>{lesson.topicName ?? lesson.chapterName ?? 'Lesson'}</Text>
-              <Text style={styles.cardMeta}>{lesson.subject?.name ?? 'Subject'}</Text>
-            </Card>
-          ))
-        )}
+        <SectionBlock title="Today's lessons" accent={colors.sky}>
+          {lessonsQuery.isLoading ? (
+            <LoadingState message="Loading lessons…" />
+          ) : lessonsQuery.isError ? (
+            <ErrorState message="Could not load lessons" onRetry={() => lessonsQuery.refetch()} />
+          ) : todayLessons.length === 0 ? (
+            <EmptyState title="No lessons today" subtitle="Check the diary for recent activity." />
+          ) : (
+            todayLessons.map((lesson: LessonSummary) => (
+              <Card
+                key={lesson.id}
+                onPress={() =>
+                  router.push(
+                    lesson.homeworkId ? `/homework/${lesson.homeworkId}` : `/lesson/${lesson.id}`,
+                  )
+                }
+              >
+                <Text style={textStyles.cardTitle} numberOfLines={2}>
+                  {lesson.topicName ?? lesson.chapterName ?? 'Lesson'}
+                </Text>
+                <Text style={textStyles.caption}>{lesson.subject?.name ?? 'Subject'}</Text>
+              </Card>
+            ))
+          )}
+        </SectionBlock>
 
-        <SectionTitle
+        <SectionBlock
           title="Homework to do"
+          accent={colors.primary}
           action={
             <Text style={styles.link} onPress={() => router.push('/(tabs)/homework')}>
               See all
             </Text>
           }
-        />
-        {homeworkQuery.isLoading ? (
-          <LoadingState message="Loading homework…" />
-        ) : homeworkQuery.isError ? (
-          <ErrorState message="Could not load homework" onRetry={() => homeworkQuery.refetch()} />
-        ) : openHomework.length === 0 ? (
-          <EmptyState title="All caught up" subtitle="No unsubmitted homework right now." />
-        ) : (
-          openHomework.slice(0, 3).map((item: Homework) => (
-            <Card key={item.id} onPress={() => router.push(`/homework/${item.id}`)}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={styles.cardMeta}>
-                Due {new Date(item.dueDate).toLocaleDateString()} · {item.subject?.name}
-              </Text>
-            </Card>
-          ))
-        )}
+        >
+          {homeworkQuery.isLoading ? (
+            <LoadingState message="Loading homework…" />
+          ) : homeworkQuery.isError ? (
+            <ErrorState message="Could not load homework" onRetry={() => homeworkQuery.refetch()} />
+          ) : openHomework.length === 0 ? (
+            <EmptyState title="All caught up" subtitle="No unsubmitted homework right now." />
+          ) : (
+            openHomework.slice(0, 3).map((item: Homework) => (
+              <Card key={item.id} onPress={() => router.push(`/homework/${item.id}`)}>
+                <Text style={textStyles.cardTitle} numberOfLines={2}>
+                  {item.title}
+                </Text>
+                <Text style={textStyles.caption}>
+                  Due {new Date(item.dueDate).toLocaleDateString()} · {item.subject?.name}
+                </Text>
+              </Card>
+            ))
+          )}
+        </SectionBlock>
 
-        <SectionTitle
+        <SectionBlock
           title="Pending quizzes"
+          accent={colors.warning}
           action={
             <Text style={styles.link} onPress={() => router.push('/(tabs)/quizzes')}>
               See all
             </Text>
           }
-        />
-        {quizzesQuery.isLoading ? (
-          <LoadingState message="Loading quizzes…" />
-        ) : quizzesQuery.isError ? (
-          <ErrorState message="Could not load quizzes" onRetry={() => quizzesQuery.refetch()} />
-        ) :           accessibleQuizzes.length === 0 ? (
-          <EmptyState title="No pending quizzes" />
-        ) : (
-          accessibleQuizzes.slice(0, 3).map((quiz: Quiz) => (
-            <Card key={quiz.id} onPress={() => router.push(`/quiz/${quiz.id}`)}>
-              <View style={styles.row}>
-                <Text style={styles.cardTitle}>{quiz.title}</Text>
-                {isQuizNew(quiz, { hasResult: false }) ? <Badge label="New" tone="success" /> : null}
-              </View>
-              <Text style={styles.cardMeta}>
-                {quiz.subject?.name}
-                {formatDateTime(quiz.publishedAt) ? ` · Arrived ${formatDateTime(quiz.publishedAt)}` : ''}
-              </Text>
-            </Card>
-          ))
-        )}
+        >
+          {quizzesQuery.isLoading ? (
+            <LoadingState message="Loading quizzes…" />
+          ) : quizzesQuery.isError ? (
+            <ErrorState message="Could not load quizzes" onRetry={() => quizzesQuery.refetch()} />
+          ) : accessibleQuizzes.length === 0 ? (
+            <EmptyState title="No pending quizzes" />
+          ) : (
+            accessibleQuizzes.slice(0, 3).map((quiz: Quiz) => (
+              <Card key={quiz.id} onPress={() => router.push(`/quiz/${quiz.id}`)}>
+                <View style={styles.row}>
+                  <Text style={textStyles.cardTitle} numberOfLines={2}>
+                    {quiz.title}
+                  </Text>
+                  {isQuizNew(quiz, { hasResult: false }) ? <Badge label="New" tone="success" /> : null}
+                </View>
+                <Text style={textStyles.caption}>
+                  {quiz.subject?.name}
+                  {formatDateTime(quiz.publishedAt) ? ` · Arrived ${formatDateTime(quiz.publishedAt)}` : ''}
+                </Text>
+              </Card>
+            ))
+          )}
+        </SectionBlock>
 
-        <SectionTitle
+        <SectionBlock
           title="Announcements"
+          accent={colors.slate500}
           action={
             <Text style={styles.link} onPress={() => router.push('/announcements')}>
               See all
             </Text>
           }
-        />
-        {announcementsQuery.isLoading ? (
-          <LoadingState message="Loading announcements…" />
-        ) : latestAnnouncements.length === 0 ? (
-          <EmptyState title="No announcements" />
-        ) : (
-          latestAnnouncements.slice(0, 3).map((item: Announcement) => (
-            <Card key={item.id} onPress={() => router.push(`/announcement/${item.id}`)}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={styles.cardMeta}>
-                {new Date(item.publishAt ?? item.createdAt).toLocaleDateString()}
-              </Text>
-            </Card>
-          ))
-        )}
+        >
+          {announcementsQuery.isLoading ? (
+            <LoadingState message="Loading announcements…" />
+          ) : latestAnnouncements.length === 0 ? (
+            <EmptyState title="No announcements" />
+          ) : (
+            latestAnnouncements.slice(0, 3).map((item: Announcement) => (
+              <Card key={item.id} onPress={() => router.push(`/announcement/${item.id}`)}>
+                <Text style={textStyles.cardTitle} numberOfLines={2}>
+                  {item.title}
+                </Text>
+                <Text style={textStyles.caption}>
+                  {new Date(item.publishAt ?? item.createdAt).toLocaleDateString()}
+                </Text>
+              </Card>
+            ))
+          )}
+        </SectionBlock>
 
-        <SectionTitle title="Upcoming events" />
-        {eventsQuery.isLoading ? (
-          <LoadingState message="Loading events…" />
-        ) : upcomingEvents.length === 0 ? (
-          <EmptyState title="No upcoming events" />
-        ) : (
-          upcomingEvents.map((event: EventItem) => (
-            <Card key={event.id} onPress={() => router.push(`/event/${event.id}`)}>
-              <Text style={styles.cardTitle}>{event.title}</Text>
-              <Text style={styles.cardMeta}>
-                {new Date(event.startDate).toLocaleString()} · {event.location ?? event.type}
-              </Text>
-            </Card>
-          ))
-        )}
+        <SectionBlock title="Upcoming events" accent={colors.mint}>
+          {eventsQuery.isLoading ? (
+            <LoadingState message="Loading events…" />
+          ) : upcomingEvents.length === 0 ? (
+            <EmptyState title="No upcoming events" />
+          ) : (
+            upcomingEvents.map((event: EventItem) => (
+              <Card key={event.id} onPress={() => router.push(`/event/${event.id}`)}>
+                <Text style={textStyles.cardTitle} numberOfLines={2}>
+                  {event.title}
+                </Text>
+                <Text style={textStyles.caption}>
+                  {new Date(event.startDate).toLocaleString()} · {event.location ?? event.type}
+                </Text>
+              </Card>
+            ))
+          )}
+        </SectionBlock>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function StatPill({ label, value }: { label: string; value: number }) {
+function StatPill({
+  label,
+  value,
+  tint,
+  onPress,
+}: {
+  label: string;
+  value: number;
+  tint: string;
+  onPress?: () => void;
+}) {
   return (
-    <View style={styles.statPill}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.statPill, { backgroundColor: tint }, pressed && styles.statPillPressed]}
+    >
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
-  content: { paddingHorizontal: spacing.md, paddingBottom: 110 },
+  content: { paddingHorizontal: spacing.md, paddingBottom: tabBarClearance },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -351,60 +375,47 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     marginBottom: spacing.md,
   },
-  eyebrow: { fontSize: 11, fontWeight: '500', letterSpacing: 1.2, color: colors.primary },
-  greeting: { fontSize: 26, fontWeight: '600', color: colors.slate900, marginTop: 3 },
-  date: { color: colors.slate500, marginTop: 5, fontSize: 13 },
+  eyebrow: {
+    fontSize: fontSizes.caption,
+    fontWeight: typography.medium,
+    letterSpacing: 1,
+    color: colors.primary,
+  },
+  greeting: {
+    fontSize: fontSizes.title,
+    fontFamily: typography.family,
+    fontWeight: typography.semibold,
+    color: colors.slate900,
+    marginTop: 2,
+  },
+  date: { color: colors.slate500, marginTop: 4, fontSize: fontSizes.body },
   profileButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.accentSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  contextBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceBlue,
-    borderRadius: radii.lg,
-    padding: spacing.sm,
-    marginBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  contextIcon: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.white,
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  helpHint: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.slate600,
-  },
-  quickRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  quickRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   quickLink: {
     flex: 1,
     borderRadius: radii.lg,
-    padding: spacing.md,
-    gap: spacing.sm,
+    padding: spacing.sm,
+    gap: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  quickLinkSoft: {
-    backgroundColor: colors.accentSoft,
-  },
-  quickLinkYellow: {
-    backgroundColor: colors.surfaceYellow,
-  },
-  quickLinkText: { color: colors.slate800, fontWeight: '500', fontSize: 14 },
+  quickLinkSoft: { backgroundColor: colors.accentSoft },
+  quickLinkYellow: { backgroundColor: colors.surfaceYellow },
+  quickLinkText: { color: colors.slate800, fontWeight: typography.medium, fontSize: fontSizes.body },
   snapshot: {
     backgroundColor: colors.white,
-    borderRadius: radii.xl,
+    borderRadius: radii.lg,
     padding: spacing.md,
-    borderWidth: 0,
     marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.slate100,
   },
   snapshotHeader: {
     flexDirection: 'row',
@@ -412,25 +423,46 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
-  snapshotKicker: { fontSize: 10, fontWeight: '500', letterSpacing: 1.1, color: colors.slate400 },
-  snapshotTitle: { fontSize: 18, fontWeight: '600', color: colors.slate800, marginTop: 3 },
+  snapshotTitle: {
+    fontSize: fontSizes.title,
+    fontFamily: typography.family,
+    fontWeight: typography.semibold,
+    color: colors.slate800,
+  },
   rings: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
   dotsWrap: { marginTop: spacing.md },
-  subjects: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.slate100 },
-  subjectsTitle: { fontSize: 13, fontWeight: '500', color: colors.slate600, marginBottom: spacing.sm },
-  snapshotHint: { marginTop: spacing.md, fontSize: 12, color: colors.slate500 },
-  statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  subjects: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.slate100,
+  },
+  subjectsTitle: {
+    fontSize: fontSizes.caption,
+    fontWeight: typography.medium,
+    color: colors.slate600,
+    marginBottom: spacing.sm,
+  },
+  statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   statPill: {
     flex: 1,
-    backgroundColor: colors.surfaceMint,
     borderRadius: radii.lg,
     padding: spacing.sm,
     alignItems: 'center',
   },
-  statValue: { fontSize: 22, fontWeight: '600', color: colors.primaryDark },
-  statLabel: { fontSize: 11, color: colors.slate500, marginTop: 2, textAlign: 'center' },
-  cardTitle: { fontSize: 16, fontWeight: '500', color: colors.slate800 },
-  cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4 },
-  link: { color: colors.primary, fontWeight: '600' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  statPillPressed: { opacity: 0.8 },
+  statValue: {
+    fontSize: fontSizes.title,
+    fontFamily: typography.family,
+    fontWeight: typography.semibold,
+    color: colors.primaryDark,
+  },
+  statLabel: {
+    fontSize: fontSizes.caption,
+    color: colors.slate500,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  link: { color: colors.primary, fontWeight: typography.semibold, fontSize: fontSizes.caption },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
 });

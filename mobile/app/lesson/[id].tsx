@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { ScrollView, StyleSheet, Text } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui';
@@ -18,6 +19,12 @@ export default function LessonDetailScreen() {
     enabled: !!id && !!studentId,
   });
 
+  useEffect(() => {
+    if (query.data?.homeworkId) {
+      router.replace(`/homework/${query.data.homeworkId}`);
+    }
+  }, [query.data?.homeworkId]);
+
   if (!studentId) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -26,7 +33,7 @@ export default function LessonDetailScreen() {
     );
   }
 
-  if (query.isLoading) return <LoadingState message="Loading lesson…" />;
+  if (query.isLoading || query.data?.homeworkId) return <LoadingState message="Loading lesson…" />;
   if (query.isError || !query.data) {
     return (
       <SafeAreaView style={styles.safe}>

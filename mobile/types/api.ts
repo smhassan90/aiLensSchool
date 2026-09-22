@@ -308,4 +308,5 @@ export interface LessonSummary {
   aiSummary?: string | null;
   subject?: Subject;
   status?: string;
+  homeworkId?: string | null;
 }

@@ -41,7 +41,9 @@ export async function fetchLessonById(
     return await apiFetch<LessonSummary>(`/lessons/${id}`);
   } catch {
     const homework = await fetchHomework(studentId, { limit: 100 });
-    const linked = homework.items.find((item) => item.lessonId === id);
+    const linked =
+      homework.items.find((item) => item.lessonId === id) ??
+      homework.items.find((item) => item.id === id);
     return linked ? mapHomeworkToLesson(linked) : null;
   }
 }
@@ -49,6 +51,7 @@ export async function fetchLessonById(
 function mapHomeworkToLesson(item: Homework): LessonSummary {
   return {
     id: item.lessonId ?? item.id,
+    homeworkId: item.id,
     date: item.publishedAt ?? item.dueDate,
     topicName: item.title,
     chapterName: item.subject?.name ?? undefined,

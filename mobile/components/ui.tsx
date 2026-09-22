@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radii, shadows, spacing, typography } from '@/constants/theme';
+import { colors, fontSizes, radii, shadows, spacing, typography } from '@/constants/theme';
 
 export function LoadingState({ message = 'Loading…' }: { message?: string }) {
   return (
@@ -54,19 +54,19 @@ const styles = StyleSheet.create({
   },
   message: {
     color: colors.slate500,
-    fontSize: 15,
+    fontSize: fontSizes.body,
     fontFamily: typography.family,
     fontWeight: typography.medium,
   },
   emptyTitle: {
-    fontSize: 17,
+    fontSize: fontSizes.title,
     fontFamily: typography.family,
     fontWeight: typography.semibold,
     color: colors.slate700,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     color: colors.slate500,
     textAlign: 'center',
     marginTop: spacing.xs,
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   error: {
     color: colors.error,
     textAlign: 'center',
-    fontSize: 15,
+    fontSize: fontSizes.body,
   },
   retry: {
     color: colors.primaryDark,
@@ -119,9 +119,17 @@ const cardStyles = StyleSheet.create({
   },
 });
 
-export function SectionTitle({ title, action }: { title: string; action?: React.ReactNode }) {
+export function SectionTitle({
+  title,
+  action,
+  compact,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  compact?: boolean;
+}) {
   return (
-    <View style={sectionStyles.row}>
+    <View style={[sectionStyles.row, compact && sectionStyles.rowCompact]}>
       <Text style={sectionStyles.title}>{title}</Text>
       {action}
     </View>
@@ -136,11 +144,44 @@ const sectionStyles = StyleSheet.create({
     marginBottom: spacing.sm,
     marginTop: spacing.lg,
   },
+  rowCompact: {
+    marginTop: 0,
+  },
   title: {
-    fontSize: 18,
+    fontSize: fontSizes.title,
     fontFamily: typography.family,
     fontWeight: typography.semibold,
     color: colors.slate800,
+  },
+});
+
+export function SectionBlock({
+  title,
+  action,
+  accent = colors.primary,
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  accent?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={[sectionBlockStyles.block, { borderLeftColor: accent }]}>
+      <SectionTitle title={title} action={action} compact />
+      {children}
+    </View>
+  );
+}
+
+const sectionBlockStyles = StyleSheet.create({
+  block: {
+    backgroundColor: colors.white,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderLeftWidth: 4,
+    ...shadows.card,
   },
 });
 
@@ -166,8 +207,34 @@ const badgeStyles = StyleSheet.create({
     paddingVertical: 4,
   },
   text: {
-    fontSize: 12,
+    fontSize: fontSizes.caption,
     fontFamily: typography.family,
     fontWeight: typography.medium,
+  },
+});
+
+export const textStyles = StyleSheet.create({
+  title: {
+    fontSize: fontSizes.title,
+    fontFamily: typography.family,
+    fontWeight: typography.semibold,
+    color: colors.slate800,
+  },
+  body: {
+    fontSize: fontSizes.body,
+    fontFamily: typography.family,
+    color: colors.slate600,
+  },
+  caption: {
+    fontSize: fontSizes.caption,
+    fontFamily: typography.family,
+    color: colors.slate500,
+  },
+  cardTitle: {
+    flex: 1,
+    fontSize: fontSizes.body,
+    fontFamily: typography.family,
+    fontWeight: typography.medium,
+    color: colors.slate800,
   },
 });

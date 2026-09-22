@@ -56,7 +56,6 @@ export default function ProfileTabScreen() {
         <View style={styles.quickGrid}>
           <QuickLink icon="wallet-outline" label="Fees" onPress={() => router.push('/fees')} />
           <QuickLink icon="calendar-outline" label="Day off" onPress={() => router.push('/day-off')} />
-          <QuickLink icon="camera-outline" label="Student photo" onPress={() => router.push('/student-photo')} />
           <QuickLink icon="ribbon-outline" label="Report cards" onPress={() => router.push('/report-cards')} />
           <QuickLink icon="notifications-outline" label="Alerts" onPress={() => router.push('/(tabs)/notifications')} />
           <QuickLink icon="megaphone-outline" label="News" onPress={() => router.push('/announcements')} />

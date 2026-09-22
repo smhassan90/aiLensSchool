@@ -1,33 +1,22 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChildHeader } from '@/components/ChildHeader';
-import { Badge, Card, EmptyState, ErrorState, LoadingState, SectionTitle } from '@/components/ui';
-import { AttendanceDots, ScoreRing } from '@/components/visuals';
+import { Card, EmptyState, ErrorState, LoadingState, SectionBlock, textStyles } from '@/components/ui';
 import { useChild } from '@/providers/ChildProvider';
-import { colors, spacing } from '@/constants/theme';
-import { fetchAttendance, groupAttendanceByDate } from '@/services/attendance.service';
-import { fetchHomework } from '@/services/homework.service';
+import { colors, fontSizes, spacing, tabBarClearance, typography } from '@/constants/theme';
 import { fetchRecentLessons } from '@/services/lessons.service';
 import { fetchHomeDiaries } from '@/services/parent-records.service';
-import { Homework, HomeDiary, LessonSummary } from '@/types/api';
+import { HomeDiary, LessonSummary } from '@/types/api';
+
+function lessonRoute(lesson: LessonSummary) {
+  return lesson.homeworkId ? `/homework/${lesson.homeworkId}` : `/lesson/${lesson.id}`;
+}
 
 export default function DiaryScreen() {
   const { selectedChildId, isLoading: childLoading } = useChild();
   const studentId = selectedChildId ?? '';
-
-  const attendanceQuery = useQuery({
-    queryKey: ['diary', 'attendance', studentId],
-    queryFn: () => fetchAttendance(studentId, { limit: 30 }),
-    enabled: !!studentId,
-  });
-
-  const homeworkQuery = useQuery({
-    queryKey: ['diary', 'homework', studentId],
-    queryFn: () => fetchHomework(studentId, { limit: 20 }),
-    enabled: !!studentId,
-  });
 
   const lessonsQuery = useQuery({
     queryKey: ['diary', 'lessons', studentId],
@@ -50,112 +39,51 @@ export default function DiaryScreen() {
     );
   }
 
-  const grouped = groupAttendanceByDate(attendanceQuery.data?.items ?? []);
-  const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
-  const attendanceItems = attendanceQuery.data?.items ?? [];
-  const presentCount = attendanceItems.filter((row) => row.status === 'PRESENT' || row.status === 'LATE').length;
-  const attendanceRate = attendanceItems.length
-    ? Math.round((presentCount / attendanceItems.length) * 100)
-    : null;
-  const recentAttendance = [...attendanceItems]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(-14)
-    .map((row) => ({ date: `${row.id}-${row.date}`, status: row.status }));
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.eyebrow}>CLASSROOM NOTES</Text>
         <Text style={styles.title}>School diary</Text>
         <ChildHeader />
 
-        <SectionTitle title="Attendance" />
-        {attendanceQuery.isLoading ? (
-          <LoadingState message="Loading attendance…" />
-        ) : attendanceQuery.isError ? (
-          <ErrorState message="Could not load attendance" onRetry={() => attendanceQuery.refetch()} />
-        ) : dates.length === 0 ? (
-          <EmptyState title="No attendance records" />
-        ) : (
-          <>
-            <View style={styles.snapshot}>
-              <ScoreRing value={attendanceRate} label="Present" />
-              <View style={styles.snapshotDots}>
-                <Text style={styles.snapshotHint}>Last {recentAttendance.length} days</Text>
-                <AttendanceDots statuses={recentAttendance} />
-              </View>
-            </View>
-          {dates.slice(0, 10).map((date) => (
-            <Card key={date}>
-              <Text style={styles.dateHeading}>
-                {new Date(date).toLocaleDateString(undefined, {
-                  weekday: 'long',
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </Text>
-              {grouped[date].map((record) => (
-                <View key={record.id} style={styles.row}>
-                  <Badge
-                    label={record.status}
-                    tone={record.status === 'PRESENT' ? 'success' : 'warning'}
-                  />
-                  {record.remarks ? <Text style={styles.remarks}>{record.remarks}</Text> : null}
-                </View>
-              ))}
-            </Card>
-          ))
-          }
-          </>
-        )}
+        <SectionBlock title="Recent lessons" accent={colors.sky}>
+          {lessonsQuery.isLoading ? (
+            <LoadingState message="Loading lessons…" />
+          ) : lessonsQuery.isError ? (
+            <ErrorState message="Could not load lessons" onRetry={() => lessonsQuery.refetch()} />
+          ) : (lessonsQuery.data?.length ?? 0) === 0 ? (
+            <EmptyState title="No confirmed lessons" />
+          ) : (
+            lessonsQuery.data?.map((lesson: LessonSummary) => (
+              <Card key={lesson.id} onPress={() => router.push(lessonRoute(lesson))}>
+                <Text style={textStyles.cardTitle} numberOfLines={2}>
+                  {lesson.topicName ?? lesson.chapterName ?? 'Lesson'}
+                </Text>
+                <Text style={textStyles.caption}>
+                  {new Date(lesson.date).toLocaleDateString()} · {lesson.subject?.name}
+                </Text>
+              </Card>
+            ))
+          )}
+        </SectionBlock>
 
-        <SectionTitle title="Recent lessons" />
-        {lessonsQuery.isLoading ? (
-          <LoadingState message="Loading lessons…" />
-        ) : (lessonsQuery.data?.length ?? 0) === 0 ? (
-          <EmptyState title="No confirmed lessons" />
-        ) : (
-          lessonsQuery.data?.map((lesson: LessonSummary) => (
-            <Card key={lesson.id} onPress={() => router.push(`/lesson/${lesson.id}`)}>
-              <Text style={styles.cardTitle}>{lesson.topicName ?? lesson.chapterName ?? 'Lesson'}</Text>
-              <Text style={styles.cardMeta}>
-                {new Date(lesson.date).toLocaleDateString()} · {lesson.subject?.name}
-              </Text>
-            </Card>
-          ))
-        )}
-
-        <SectionTitle title="Teacher diary notes" />
-        {diariesQuery.isLoading ? (
-          <LoadingState message="Loading diary notes…" />
-        ) : (diariesQuery.data?.items.length ?? 0) === 0 ? (
-          <EmptyState title="No diary notes" />
-        ) : (
-          diariesQuery.data?.items.map((item: HomeDiary) => (
-            <Card key={item.id}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={styles.cardMeta}>{new Date(item.date).toLocaleDateString()}</Text>
-              {item.lessonSummary ? <Text style={styles.remarks}>{item.lessonSummary}</Text> : null}
-              {item.homeworkNotes ? <Text style={styles.remarks}>HW: {item.homeworkNotes}</Text> : null}
-              {item.teacherRemarks ? <Text style={styles.remarks}>{item.teacherRemarks}</Text> : null}
-            </Card>
-          ))
-        )}
-
-        <SectionTitle title="Recent homework" />
-        {homeworkQuery.isLoading ? (
-          <LoadingState message="Loading homework…" />
-        ) : (homeworkQuery.data?.items.length ?? 0) === 0 ? (
-          <EmptyState title="No homework entries" />
-        ) : (
-          homeworkQuery.data?.items.map((item: Homework) => (
-            <Card key={item.id} onPress={() => router.push(`/homework/${item.id}`)}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={styles.cardMeta}>
-                Due {new Date(item.dueDate).toLocaleDateString()} · {item.subject?.name}
-              </Text>
-            </Card>
-          ))
-        )}
+        <SectionBlock title="Teacher diary notes" accent={colors.primary}>
+          {diariesQuery.isLoading ? (
+            <LoadingState message="Loading diary notes…" />
+          ) : (diariesQuery.data?.items.length ?? 0) === 0 ? (
+            <EmptyState title="No diary notes" />
+          ) : (
+            diariesQuery.data?.items.map((item: HomeDiary) => (
+              <Card key={item.id}>
+                <Text style={textStyles.cardTitle} numberOfLines={2}>{item.title}</Text>
+                <Text style={textStyles.caption}>{new Date(item.date).toLocaleDateString()}</Text>
+                {item.lessonSummary ? <Text style={styles.note}>{item.lessonSummary}</Text> : null}
+                {item.homeworkNotes ? <Text style={styles.note}>HW: {item.homeworkNotes}</Text> : null}
+                {item.teacherRemarks ? <Text style={styles.note}>{item.teacherRemarks}</Text> : null}
+              </Card>
+            ))
+          )}
+        </SectionBlock>
       </ScrollView>
     </SafeAreaView>
   );
@@ -163,24 +91,25 @@ export default function DiaryScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.md, paddingBottom: 110 },
-  title: { fontSize: 28, fontWeight: '800', color: colors.slate900, marginBottom: spacing.md },
-  snapshot: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    marginBottom: spacing.sm,
+  content: { padding: spacing.md, paddingBottom: tabBarClearance },
+  eyebrow: {
+    fontSize: fontSizes.caption,
+    fontWeight: typography.medium,
+    letterSpacing: 1,
+    color: colors.primary,
   },
-  snapshotDots: { flex: 1 },
-  snapshotHint: { fontSize: 12, fontWeight: '700', color: colors.slate600, marginBottom: 8 },
-  dateHeading: { fontWeight: '700', color: colors.slate800, marginBottom: spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
-  remarks: { color: colors.slate500, flex: 1, marginTop: 4 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800 },
-  cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4 },
+  title: {
+    fontSize: fontSizes.title,
+    fontFamily: typography.family,
+    fontWeight: typography.semibold,
+    color: colors.slate900,
+    marginTop: 2,
+    marginBottom: spacing.md,
+  },
+  note: {
+    fontSize: fontSizes.body,
+    color: colors.slate600,
+    marginTop: spacing.xs,
+    lineHeight: 20,
+  },
 });

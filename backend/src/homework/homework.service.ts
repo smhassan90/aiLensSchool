@@ -125,6 +125,24 @@ export class HomeworkService {
     return [];
   }
 
+  private parseQuestions(questionsJson: Prisma.JsonValue | null | undefined) {
+    if (!questionsJson) return [];
+    if (Array.isArray(questionsJson)) {
+      return stripAnswersFromQuestions(questionsJson as unknown as HomeworkQuestionItem[]);
+    }
+    if (typeof questionsJson === 'string') {
+      try {
+        const parsed = JSON.parse(questionsJson) as unknown;
+        if (Array.isArray(parsed)) {
+          return stripAnswersFromQuestions(parsed as HomeworkQuestionItem[]);
+        }
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+
   /** Parents/students never receive the teacher answer key. */
   private forParentView(
     homework: {
@@ -142,9 +160,7 @@ export class HomeworkService {
     } | null,
   ) {
     const { answerKey: _answerKey, questionsJson, ...safe } = homework;
-    const questions = Array.isArray(questionsJson)
-      ? stripAnswersFromQuestions(questionsJson as unknown as HomeworkQuestionItem[])
-      : [];
+    const questions = this.parseQuestions(questionsJson);
     return {
       ...safe,
       questions,

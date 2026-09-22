@@ -1,6 +1,6 @@
 import '@/polyfills';
 import 'react-native-gesture-handler';
-import { Platform, Text } from 'react-native';
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
@@ -11,12 +11,6 @@ import { QueryProvider } from '@/providers/QueryProvider';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { ChildProvider } from '@/providers/ChildProvider';
 import { AuthGate } from '@/components/AuthGate';
-
-const DefaultText = Text as typeof Text & { defaultProps?: { style?: unknown } };
-DefaultText.defaultProps = {
-  ...(DefaultText.defaultProps ?? {}),
-  style: { fontFamily: 'Times New Roman' },
-};
 
 export default function RootLayout() {
   useEffect(() => {
@@ -38,7 +32,13 @@ export default function RootLayout() {
           <ChildProvider>
             <AuthGate>
               <StatusBar style="light" />
-              <Stack screenOptions={{ headerShown: false }}>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  animation: 'slide_from_right',
+                  animationDuration: 200,
+                }}
+              >
                 <Stack.Screen name="index" />
                 <Stack.Screen name="login" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="change-password" options={{ headerShown: true, title: 'Change password', gestureEnabled: false }} />
@@ -61,7 +61,8 @@ export default function RootLayout() {
                 <Stack.Screen name="profile" options={{ headerShown: true, title: 'Profile' }} />
                 <Stack.Screen name="settings" options={{ headerShown: true, title: 'Settings' }} />
                 <Stack.Screen name="day-off" options={{ headerShown: true, title: 'Day off' }} />
-                <Stack.Screen name="student-photo" options={{ headerShown: true, title: 'Student photo' }} />
+                <Stack.Screen name="attendance" options={{ headerShown: true, title: 'Attendance' }} />
+                <Stack.Screen name="quiz-results" options={{ headerShown: true, title: 'Quiz results' }} />
               </Stack>
             </AuthGate>
           </ChildProvider>

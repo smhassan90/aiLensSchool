@@ -4,9 +4,9 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChildHeader } from '@/components/ChildHeader';
-import { Badge, Card, EmptyState, ErrorState, LoadingState } from '@/components/ui';
+import { Badge, Card, EmptyState, ErrorState, LoadingState, textStyles } from '@/components/ui';
 import { useChild } from '@/providers/ChildProvider';
-import { colors, spacing } from '@/constants/theme';
+import { colors, fontSizes, spacing, tabBarClearance, typography } from '@/constants/theme';
 import {
   fetchHomework,
   getHomeworkListStatus,
@@ -63,15 +63,15 @@ export default function HomeworkTabScreen() {
             <Card onPress={() => router.push(`/homework/${item.id}`)}>
               <View style={styles.cardHeader}>
                 <View style={styles.iconWrap}>
-                  <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+                  <Ionicons name="document-text-outline" size={18} color={colors.primary} />
                 </View>
-                <Text style={styles.cardTitle}>{item.title}</Text>
+                <Text style={textStyles.cardTitle} numberOfLines={2}>
+                  {item.title}
+                </Text>
               </View>
-              <Text style={styles.cardMeta}>
+              <Text style={textStyles.caption}>
                 Due {new Date(item.dueDate).toLocaleDateString()} · {item.subject?.name}
-                {item.result
-                  ? ` · ${Number(item.result.percentage).toFixed(0)}%`
-                  : ''}
+                {item.result ? ` · ${Number(item.result.percentage).toFixed(0)}%` : ''}
               </Text>
               <Badge label={homeworkStatusLabel(status)} tone={homeworkStatusTone(status)} />
             </Card>
@@ -84,18 +84,29 @@ export default function HomeworkTabScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.md, paddingBottom: 110, flexGrow: 1 },
-  eyebrow: { fontSize: 11, fontWeight: '500', letterSpacing: 1.2, color: colors.primary },
-  title: { fontSize: 26, fontWeight: '600', color: colors.slate900, marginTop: 3, marginBottom: spacing.md },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  content: { padding: spacing.md, paddingBottom: tabBarClearance, flexGrow: 1 },
+  eyebrow: {
+    fontSize: fontSizes.caption,
+    fontWeight: typography.medium,
+    letterSpacing: 1,
+    color: colors.primary,
+  },
+  title: {
+    fontSize: fontSizes.title,
+    fontFamily: typography.family,
+    fontWeight: typography.semibold,
+    color: colors.slate900,
+    marginTop: 2,
+    marginBottom: spacing.md,
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: 4 },
   iconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.accentSoft,
+    marginTop: 1,
   },
-  cardTitle: { fontSize: 16, fontWeight: '500', color: colors.slate800 },
-  cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4, marginBottom: spacing.sm },
 });

@@ -47,6 +47,13 @@ docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook caddy
 
 sleep 4
 
+echo "=== Start database, cache, backend, and portal ==="
+docker compose -f "${COMPOSE_FILE}" up -d mysql redis
+docker compose -f "${COMPOSE_FILE}" up -d --build backend portal
+docker compose -f "${COMPOSE_FILE}" up -d --no-deps caddy
+
+sleep 6
+
 echo "=== Listening ports ==="
 ss -tlnp | grep -E ':80|:443' || netstat -tlnp 2>/dev/null | grep -E ':80|:443' || true
 
@@ -70,9 +77,24 @@ fi
 echo "=== Public webhook health ==="
 if curl -fsS --max-time 15 https://hawknexabackend.fynals.com/internal/deploy/health; then
   echo ""
-  echo "OK: public webhook healthy. Run: bash ${DEPLOY_DIR}/deploy.sh"
+  echo "OK: public webhook healthy."
 else
   echo "WARN: public HTTPS still failing. Check Hostinger firewall panel (allow 80/443) and DNS for hawknexabackend.fynals.com" >&2
   echo "Local test: curl -vk https://127.0.0.1/internal/deploy/health -H 'Host: hawknexabackend.fynals.com'" >&2
+  exit 1
+fi
+
+echo "=== Local portal health ==="
+if curl -fsS --max-time 10 http://127.0.0.1/privacy-policy.html -H 'Host: hawknexa.fynals.com' | grep -q 'HawkNexa Parent'; then
+  echo "OK: portal serves privacy policy locally"
+else
+  echo "WARN: portal not responding locally — check: docker compose -f ${COMPOSE_FILE} logs portal --tail 40" >&2
+fi
+
+echo "=== Public portal health ==="
+if curl -fsS --max-time 15 https://hawknexa.fynals.com/privacy-policy.html | grep -q 'HawkNexa Parent'; then
+  echo "OK: https://hawknexa.fynals.com/privacy-policy.html is live"
+else
+  echo "WARN: portal HTTPS still failing from the internet. Open Hostinger VPS panel → Firewall and allow inbound TCP 80 and 443." >&2
   exit 1
 fi

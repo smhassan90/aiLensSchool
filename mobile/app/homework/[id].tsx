@@ -23,13 +23,20 @@ import {
 } from '@/services/homework.service';
 import { HomeworkQuestion } from '@/types/api';
 
+function isChoiceQuestion(question: HomeworkQuestion): boolean {
+  return (
+    question.type === 'MCQ' ||
+    question.type === 'TRUE_FALSE' ||
+    Boolean(question.options?.length && question.type !== 'FILL_IN_THE_BLANK')
+  );
+}
+
 function isAnswered(
   question: HomeworkQuestion,
   answer?: { optionId?: string; answerText?: string },
 ): boolean {
   if (!answer) return false;
-  const isChoice = question.type === 'MCQ' || question.type === 'TRUE_FALSE';
-  if (isChoice) return Boolean(answer.optionId);
+  if (isChoiceQuestion(question)) return Boolean(answer.optionId);
   return Boolean(answer.answerText?.trim());
 }
 
@@ -51,12 +58,15 @@ export default function HomeworkDetailScreen() {
     queryKey: ['homework', id, studentId],
     queryFn: () => fetchHomeworkById(id!, studentId),
     enabled: !!id && !!studentId,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
-  const questions = useMemo(
-    () => (query.data?.questions as HomeworkQuestion[] | undefined) ?? [],
-    [query.data?.questions],
-  );
+  const questions = useMemo(() => {
+    const raw = query.data?.questions;
+    if (Array.isArray(raw)) return raw as HomeworkQuestion[];
+    return [];
+  }, [query.data?.questions]);
 
   const submit = useMutation({
     mutationFn: () =>
@@ -145,7 +155,7 @@ export default function HomeworkDetailScreen() {
             </Text>
             {questions.map((question, index) => {
               const current = answers[question.id] ?? {};
-              const isChoice = question.type === 'MCQ' || question.type === 'TRUE_FALSE';
+              const isChoice = isChoiceQuestion(question);
               return (
                 <View key={question.id} style={styles.card}>
                   <Text style={styles.question}>

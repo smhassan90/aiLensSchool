@@ -34,32 +34,6 @@ export async function deleteDayOffRequest(id: string): Promise<DayOffRequest> {
   return apiFetch<DayOffRequest>(`/parents/day-off-requests/${id}`, { method: 'DELETE' });
 }
 
-export async function uploadStudentPhoto(
-  studentId: string,
-  asset: { uri: string; fileName?: string | null; mimeType?: string | null },
-) {
-  const body = new FormData();
-  body.append('file', {
-    uri: asset.uri,
-    name: asset.fileName ?? 'student-photo.jpg',
-    type: asset.mimeType ?? 'image/jpeg',
-  } as never);
-  return apiFetch(`/students/${studentId}/photo/request`, {
-    method: 'POST',
-    body,
-  });
-}
-
-export async function fetchStudentPhotoAssets(studentId: string) {
-  return apiFetch<Array<{
-    id: string;
-    status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
-    reviewNote?: string | null;
-    createdAt: string;
-    fileAsset?: { url?: string | null };
-  }>>(`/students/${studentId}/photo-assets`);
-}
-
 export async function fetchHomeDiaries(
   studentId: string,
   params?: { page?: number; limit?: number; date?: string },

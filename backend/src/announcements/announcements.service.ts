@@ -130,10 +130,17 @@ export class AnnouncementsService {
     const schoolId = this.tenant.requireSchoolId(user);
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+    const now = new Date();
     const where: Prisma.AnnouncementWhereInput = {
       schoolId,
       ...(this.tenant.isParent(user)
-        ? { status: AnnouncementStatus.PUBLISHED }
+        ? {
+            status: AnnouncementStatus.PUBLISHED,
+            AND: [
+              { OR: [{ publishAt: null }, { publishAt: { lte: now } }] },
+              { OR: [{ expiresAt: null }, { expiresAt: { gte: now } }] },
+            ],
+          }
         : query.status
           ? { status: query.status }
           : {}),
@@ -159,11 +166,26 @@ export class AnnouncementsService {
       });
     }
     this.tenant.assertSchoolAccess(user, announcement.schoolId);
-    if (this.tenant.isParent(user) && announcement.status !== AnnouncementStatus.PUBLISHED) {
-      throw new ForbiddenException({
-        code: 'ANNOUNCEMENT_NOT_AVAILABLE',
-        message: 'Announcement is not available',
-      });
+    if (this.tenant.isParent(user)) {
+      if (announcement.status !== AnnouncementStatus.PUBLISHED) {
+        throw new ForbiddenException({
+          code: 'ANNOUNCEMENT_NOT_AVAILABLE',
+          message: 'Announcement is not available',
+        });
+      }
+      const now = new Date();
+      if (announcement.publishAt && announcement.publishAt > now) {
+        throw new ForbiddenException({
+          code: 'ANNOUNCEMENT_NOT_AVAILABLE',
+          message: 'Announcement is not available yet',
+        });
+      }
+      if (announcement.expiresAt && announcement.expiresAt < now) {
+        throw new ForbiddenException({
+          code: 'ANNOUNCEMENT_NOT_AVAILABLE',
+          message: 'Announcement has expired',
+        });
+      }
     }
     return announcement;
   }

@@ -24,12 +24,15 @@ Point `EXPO_PUBLIC_API_URL` at your API (local or hosted).
 Push registration uses the native FCM token, so it requires a development/release
 build rather than Expo Go:
 
-1. Create an Android app in Firebase with package `com.sms.parent`.
+1. Create an Android app in Firebase with package `com.hawknexa.student`.
 2. Download `google-services.json` into `mobile/`.
 3. Set `GOOGLE_SERVICES_JSON=./google-services.json` before running `expo prebuild`
    or building the Android app.
-4. Configure the backend `FIREBASE_SERVICE_ACCOUNT_JSON` with the Firebase Admin
-   service-account JSON.
+4. Place the Firebase Admin service-account JSON in `mobile/` (for example
+   `hawknexa-69fb8-firebase-adminsdk-fbsvc-*.json`) and run
+   `deploy/hawknexa/set-firebase-env.sh` on the VPS (or `set-firebase-env.ps1` locally)
+   so `FIREBASE_SERVICE_ACCOUNT_JSON` matches the same Firebase project as
+   `google-services.json`.
 
 When a teacher immediately publishes a quiz or creates homework, the backend
 creates the in-app notification and sends FCM to active devices belonging to

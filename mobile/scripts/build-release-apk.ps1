@@ -33,7 +33,7 @@ if (-not $apk) {
 }
 
 New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
-$target = Join-Path $releaseDir "hawknexa-parent-release.apk"
+$target = Join-Path $releaseDir "hawknexa-student-release.apk"
 Copy-Item -Path $apk.FullName -Destination $target -Force
 
 Write-Host ""

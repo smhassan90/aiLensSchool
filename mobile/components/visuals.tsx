@@ -1,5 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { colors, radii, spacing } from '@/constants/theme';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { colors, fontSizes, radii, spacing } from '@/constants/theme';
 
 export function toneColor(value: number | null | undefined) {
   if (value == null) return colors.slate300;
@@ -11,19 +11,29 @@ export function toneColor(value: number | null | undefined) {
 export function ScoreRing({
   value,
   label,
+  onPress,
 }: {
   value: number | null;
   label: string;
+  onPress?: () => void;
 }) {
   const color = toneColor(value);
-  return (
-    <View style={ringStyles.wrap}>
+  const content = (
+    <>
       <View style={[ringStyles.ring, { borderColor: color, backgroundColor: `${color}12` }]}>
         <Text style={[ringStyles.value, { color }]}>{value == null ? '—' : Math.round(value)}</Text>
       </View>
       <Text style={ringStyles.label}>{label}</Text>
-    </View>
+    </>
   );
+  if (onPress) {
+    return (
+      <Pressable onPress={onPress} style={({ pressed }) => [ringStyles.wrap, pressed && ringStyles.pressed]}>
+        {content}
+      </Pressable>
+    );
+  }
+  return <View style={ringStyles.wrap}>{content}</View>;
 }
 
 const ringStyles = StyleSheet.create({
@@ -37,14 +47,15 @@ const ringStyles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.white,
   },
-  value: { fontSize: 22, fontWeight: '600' },
+  value: { fontSize: fontSizes.title, fontWeight: '600' },
   label: {
-    marginTop: 8,
-    fontSize: 12,
+    marginTop: 6,
+    fontSize: fontSizes.caption,
     fontWeight: '600',
     color: colors.slate600,
     textAlign: 'center',
   },
+  pressed: { opacity: 0.75 },
 });
 
 export function ProgressBar({
@@ -138,18 +149,15 @@ export function AttendanceDots({
           );
         })}
       </View>
-      <View style={dotStyles.legend}>
-        <Text style={dotStyles.legendText}>Latest {statuses.length} school days · teal present · red absent</Text>
-      </View>
+      <Text style={dotStyles.caption}>Latest {statuses.length} school days</Text>
     </View>
   );
 }
 
 const dotStyles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  dot: { width: 13, height: 13, borderRadius: 7 },
-  legend: { marginTop: 8 },
-  legendText: { fontSize: 11, color: colors.slate500 },
+  dot: { width: 12, height: 12, borderRadius: 6 },
+  caption: { marginTop: 8, fontSize: fontSizes.caption, color: colors.slate500 },
 });
 
 export function SplitBar({

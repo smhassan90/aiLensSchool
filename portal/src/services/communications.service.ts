@@ -11,6 +11,7 @@ export interface Announcement {
   sectionId?: string | null;
   status: string;
   publishAt?: string;
+  expiresAt?: string;
   createdAt: string;
 }
 
@@ -34,6 +35,8 @@ export const communicationsService = {
     audience?: string;
     sectionId?: string;
     sectionIds?: string[];
+    publishAt?: string;
+    expiresAt?: string;
   }) {
     return apiClient<Announcement | Announcement[]>("/announcements", {
       method: "POST",

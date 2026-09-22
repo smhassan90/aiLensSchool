@@ -4,10 +4,10 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChildHeader } from '@/components/ChildHeader';
-import { Badge, Card, EmptyState, ErrorState, LoadingState } from '@/components/ui';
+import { Badge, Card, EmptyState, ErrorState, LoadingState, textStyles } from '@/components/ui';
 import { ProgressBar, toneColor } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
-import { colors, spacing } from '@/constants/theme';
+import { colors, fontSizes, radii, spacing, tabBarClearance, typography } from '@/constants/theme';
 import { formatDateTime } from '@/lib/format';
 import { filterAccessibleQuizzes } from '@/lib/quiz-visibility';
 import { fetchQuizzes, isQuizNew } from '@/services/quizzes.service';
@@ -43,9 +43,7 @@ export default function QuizzesTabScreen() {
     (resultsQuery.data?.items ?? []).map((result: QuizResult) => [result.quizId, result]),
   );
   const scored = (resultsQuery.data?.items ?? []).map((row) => Number(row.percentage));
-  const average = scored.length
-    ? Math.round(scored.reduce((sum, n) => sum + n, 0) / scored.length)
-    : null;
+  const average = scored.length ? Math.round(scored.reduce((sum, n) => sum + n, 0) / scored.length) : null;
   const visibleQuizzes = filterAccessibleQuizzes(query.data?.items ?? [], resultsByQuiz);
 
   return (
@@ -57,16 +55,24 @@ export default function QuizzesTabScreen() {
             <Text style={styles.eyebrow}>TEST YOUR KNOWLEDGE</Text>
             <Text style={styles.title}>Quizzes</Text>
             <ChildHeader />
-            <Text style={styles.hint}>
-              Showing published quizzes for {selectedChild?.firstName ?? 'this child'} only.
+            <Text style={textStyles.caption}>
+              Published quizzes for {selectedChild?.firstName ?? 'this child'}.
             </Text>
             {average != null ? (
               <View style={styles.snapshot}>
-                <Text style={styles.snapshotLabel}>Average score</Text>
+                <View style={styles.snapshotTop}>
+                  <Text style={textStyles.caption}>Average score</Text>
+                  <Text
+                    style={styles.viewAll}
+                    onPress={() => router.push('/quiz-results')}
+                  >
+                    View all marks
+                  </Text>
+                </View>
                 <View style={styles.snapshotRow}>
                   <Text style={[styles.snapshotValue, { color: toneColor(average) }]}>{average}%</Text>
                   <View style={styles.snapshotBar}>
-                    <ProgressBar value={average} height={10} />
+                    <ProgressBar value={average} height={8} />
                   </View>
                 </View>
               </View>
@@ -88,7 +94,7 @@ export default function QuizzesTabScreen() {
           ) : (
             <EmptyState
               title="No available quizzes"
-              subtitle="Published quizzes appear here while they are available for this child."
+              subtitle="Published quizzes appear here while they are available."
             />
           )
         }
@@ -98,26 +104,23 @@ export default function QuizzesTabScreen() {
             <Card onPress={() => router.push(`/quiz/${item.id}`)}>
               <View style={styles.row}>
                 <View style={styles.iconWrap}>
-                  <Ionicons name="bulb-outline" size={20} color={colors.warning} />
+                  <Ionicons name="bulb-outline" size={18} color={colors.warning} />
                 </View>
-                <Text style={styles.cardTitle}>{item.title}</Text>
-                {isQuizNew(item, { hasResult: !!result }) ? (
-                  <Badge label="New" tone="success" />
-                ) : null}
+                <Text style={textStyles.cardTitle} numberOfLines={2}>
+                  {item.title}
+                </Text>
+                {isQuizNew(item, { hasResult: !!result }) ? <Badge label="New" tone="success" /> : null}
               </View>
-              <Text style={styles.cardMeta}>
+              <Text style={textStyles.caption}>
                 {item.subject?.name} · {item.totalMarks ?? '—'} marks
                 {item.section?.name ? ` · ${item.section.name}` : ''}
               </Text>
-              {formatDateTime(item.publishedAt) ? (
-                <Text style={styles.arrivedAt}>Arrived {formatDateTime(item.publishedAt)}</Text>
-              ) : null}
               {formatDateTime(item.dueAt) ? (
                 <Text style={styles.dueAt}>Due by {formatDateTime(item.dueAt)}</Text>
               ) : null}
               {result ? (
                 <View style={styles.scoreBlock}>
-                  <ProgressBar value={Number(result.percentage)} height={8} />
+                  <ProgressBar value={Number(result.percentage)} height={6} />
                   <Badge
                     label={`${Number(result.percentage).toFixed(0)}%`}
                     tone={Number(result.percentage) >= 50 ? 'success' : 'warning'}
@@ -136,34 +139,45 @@ export default function QuizzesTabScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.md, paddingBottom: 110, flexGrow: 1 },
-  eyebrow: { fontSize: 11, fontWeight: '500', letterSpacing: 1.2, color: colors.primary },
-  title: { fontSize: 26, fontWeight: '600', color: colors.slate900, marginTop: 3, marginBottom: spacing.md },
-  hint: { color: colors.slate500, marginBottom: spacing.md },
+  content: { padding: spacing.md, paddingBottom: tabBarClearance, flexGrow: 1 },
+  eyebrow: {
+    fontSize: fontSizes.caption,
+    fontWeight: typography.medium,
+    letterSpacing: 1,
+    color: colors.primary,
+  },
+  title: {
+    fontSize: fontSizes.title,
+    fontFamily: typography.family,
+    fontWeight: typography.semibold,
+    color: colors.slate900,
+    marginTop: 2,
+    marginBottom: spacing.sm,
+  },
   snapshot: {
     backgroundColor: colors.white,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: colors.slate200,
+    borderColor: colors.slate100,
+    marginTop: spacing.sm,
     marginBottom: spacing.md,
   },
-  snapshotLabel: { fontSize: 12, fontWeight: '500', color: colors.slate500, marginBottom: 8 },
+  snapshotTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  viewAll: { color: colors.primary, fontSize: fontSizes.caption, fontWeight: typography.semibold },
   snapshotRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  snapshotValue: { fontSize: 28, fontWeight: '600', width: 72 },
+  snapshotValue: { fontSize: fontSizes.title, fontWeight: typography.semibold, width: 56 },
   snapshotBar: { flex: 1 },
-  scoreBlock: { gap: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  scoreBlock: { gap: 8, marginTop: 4 },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   iconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surfaceYellow,
+    marginTop: 1,
   },
-  cardTitle: { fontSize: 16, fontWeight: '500', color: colors.slate800, flex: 1 },
-  cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4 },
-  arrivedAt: { fontSize: 12, color: colors.slate600, marginTop: 4 },
-  dueAt: { fontSize: 12, color: colors.warning, marginTop: 2, marginBottom: spacing.sm },
+  dueAt: { fontSize: fontSizes.caption, color: colors.warning, marginTop: 2, marginBottom: spacing.sm },
 });

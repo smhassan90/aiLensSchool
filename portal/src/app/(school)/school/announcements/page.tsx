@@ -27,6 +27,8 @@ export default function AnnouncementsPage() {
   const [description, setDescription] = useState("");
   const [audience, setAudience] = useState<"ALL_SCHOOL" | "SECTION">("ALL_SCHOOL");
   const [sectionIds, setSectionIds] = useState<string[]>([]);
+  const [publishAt, setPublishAt] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
   const list = useQuery({
     queryKey: ["announcements"],
     queryFn: () => communicationsService.listAnnouncements({ limit: 50 }),
@@ -55,6 +57,8 @@ export default function AnnouncementsPage() {
         description,
         audience,
         ...(audience === "SECTION" ? { sectionIds } : {}),
+        ...(publishAt ? { publishAt: new Date(publishAt).toISOString() } : {}),
+        ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
       }),
     onSuccess: () => {
       toast({
@@ -70,6 +74,8 @@ export default function AnnouncementsPage() {
       setDescription("");
       setAudience("ALL_SCHOOL");
       setSectionIds([]);
+      setPublishAt("");
+      setExpiresAt("");
     },
     onError: (err) => toast({ title: "Save failed", description: err instanceof ApiClientError ? err.message : "", variant: "error" }),
   });
@@ -101,6 +107,8 @@ export default function AnnouncementsPage() {
               <TableRow>
                 <TableHead>Title</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Show from</TableHead>
+                <TableHead>Expires</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -115,6 +123,8 @@ export default function AnnouncementsPage() {
                   <TableCell>
                     <Badge variant={row.status === "PUBLISHED" ? "success" : "secondary"}>{row.status}</Badge>
                   </TableCell>
+                  <TableCell>{row.publishAt ? formatDate(row.publishAt) : "On publish"}</TableCell>
+                  <TableCell>{row.expiresAt ? formatDate(row.expiresAt) : "—"}</TableCell>
                   <TableCell>{formatDate(row.createdAt)}</TableCell>
                   <TableCell>
                     {row.status !== "PUBLISHED" && (
@@ -140,6 +150,24 @@ export default function AnnouncementsPage() {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Write the notification message"
             />
+            <Label>Applicable date</Label>
+            <Input
+              type="date"
+              value={publishAt}
+              onChange={(e) => setPublishAt(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              When the announcement becomes visible in the app. Leave empty to show as soon as it is published.
+            </p>
+            <Label>Expiry date</Label>
+            <Input
+              type="date"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              When the announcement is removed from the app. Leave empty to keep it visible indefinitely.
+            </p>
             <Label>Send to</Label>
             <Select
               value={audience}
@@ -213,7 +241,8 @@ export default function AnnouncementsPage() {
                 create.isPending ||
                 !title.trim() ||
                 !description.trim() ||
-                (audience === "SECTION" && sectionIds.length === 0)
+                (audience === "SECTION" && sectionIds.length === 0) ||
+                (publishAt && expiresAt && new Date(publishAt) > new Date(expiresAt))
               }
               onClick={() => create.mutate()}
             >
