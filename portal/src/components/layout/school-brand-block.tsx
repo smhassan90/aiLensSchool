@@ -27,28 +27,28 @@ export function SchoolBrandBlock({
     <div
       className={cn(
         "min-w-0",
-        isSidebar ? "flex w-full flex-col items-start gap-2.5" : "flex items-center gap-3",
+        isSidebar ? "flex w-full flex-col items-start gap-3" : "flex items-center gap-3",
         className,
       )}
     >
       {isSidebar ? (
-        <>
+        <div className="flex w-full min-w-0 items-center gap-2.5">
           {logoSrc ? (
             <img
               src={logoSrc}
               alt=""
-              className="h-20 w-20 shrink-0 rounded-xl border border-white/15 object-cover shadow-sm"
+              className="h-10 w-10 shrink-0 rounded-lg border border-white/15 object-cover"
             />
           ) : (
-            <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xl font-semibold text-white">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-xs font-semibold text-white">
               {schoolName.slice(0, 2).toUpperCase()}
             </span>
           )}
-          <div className="min-w-0 w-full">
-            <p className="text-2xl font-semibold leading-tight text-white">{schoolName}</p>
-            {subtitle ? <p className="mt-1 text-xs text-white/50">{subtitle}</p> : null}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium leading-tight text-white">{schoolName}</p>
+            {subtitle ? <p className="mt-0.5 truncate text-[11px] text-white/45">{subtitle}</p> : null}
           </div>
-        </>
+        </div>
       ) : (
         <>
           {logoSrc ? (
