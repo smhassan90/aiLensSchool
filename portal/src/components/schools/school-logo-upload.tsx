@@ -11,10 +11,11 @@ type SchoolLogoUploadProps = {
   value?: string | null;
   file?: File | null;
   onFileChange: (file: File | null) => void;
+  onClear?: () => void;
   className?: string;
 };
 
-export function SchoolLogoUpload({ value, file, onFileChange, className }: SchoolLogoUploadProps) {
+export function SchoolLogoUpload({ value, file, onFileChange, onClear, className }: SchoolLogoUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
@@ -66,6 +67,7 @@ export function SchoolLogoUpload({ value, file, onFileChange, className }: Schoo
               className="text-destructive"
               onClick={() => {
                 onFileChange(null);
+                onClear?.();
                 if (inputRef.current) inputRef.current.value = "";
               }}
             >

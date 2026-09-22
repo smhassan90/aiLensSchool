@@ -29,7 +29,7 @@ export const colors = {
   surfaceBlue: '#f0f9ff',
   surfaceLilac: '#f5f3ff',
   tabBar: '#ffffff',
-  tabBarBorder: '#dae0e7',
+  tabBarBorder: '#2a9d90',
 };
 
 /** Three uniform text sizes across the app */
@@ -71,11 +71,11 @@ export const shadows = {
     elevation: 2,
   },
   tabBar: {
-    shadowColor: '#1d2530',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowColor: '#1b655c',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 12,
   },
 };
 

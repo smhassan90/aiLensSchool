@@ -25,7 +25,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#ffffff',
     },
     package: 'com.hawknexa.student',
-    versionCode: 7,
+    versionCode: 8,
     ...(existsSync(googleServicesResolved) ? { googleServicesFile: googleServicesPath } : {}),
   },
   web: {

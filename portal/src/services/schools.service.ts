@@ -45,7 +45,12 @@ export const schoolsService = {
     return apiClient<School>(`/schools/${id}`);
   },
 
-  update(id: string, payload: Partial<Pick<School, "name" | "email" | "phone" | "address" | "city" | "country" | "logo">>) {
+  update(
+    id: string,
+    payload: Partial<
+      Pick<School, "name" | "email" | "phone" | "address" | "city" | "country" | "logo" | "status">
+    >,
+  ) {
     return apiClient<School>(`/schools/${id}`, {
       method: "PATCH",
       body: JSON.stringify(payload),

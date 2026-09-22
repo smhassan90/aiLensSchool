@@ -18,7 +18,8 @@ import {
 import { EmptyState } from "@/components/layout/empty-state";
 import { schoolsService } from "@/services/schools.service";
 import { formatDate } from "@/lib/utils";
-import { Plus, School } from "lucide-react";
+import { assetUrl } from "@/lib/api-client";
+import { Plus, Pencil, School } from "lucide-react";
 
 function statusVariant(status: string) {
   switch (status) {
@@ -76,23 +77,49 @@ export default function SchoolsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-14">Logo</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Code</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
+                <TableHead className="w-16" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.items.map((school) => (
                 <TableRow key={school.id}>
-                  <TableCell className="font-medium">{school.name}</TableCell>
+                  <TableCell>
+                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
+                      {school.logo ? (
+                        <img
+                          src={assetUrl(school.logo) ?? undefined}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <School className="h-4 w-4 text-muted-foreground/50" />
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    <Link href={`/super-admin/schools/${school.id}`} className="hover:underline">
+                      {school.name}
+                    </Link>
+                  </TableCell>
                   <TableCell>{school.code}</TableCell>
                   <TableCell>{school.email}</TableCell>
                   <TableCell>
                     <Badge variant={statusVariant(school.status)}>{school.status}</Badge>
                   </TableCell>
                   <TableCell>{formatDate(school.createdAt)}</TableCell>
+                  <TableCell>
+                    <Link href={`/super-admin/schools/${school.id}`}>
+                      <Button variant="ghost" size="icon" aria-label={`Edit ${school.name}`}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
