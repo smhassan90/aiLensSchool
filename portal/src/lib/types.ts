@@ -83,6 +83,7 @@ export interface School {
   city?: string;
   country?: string;
   createdAt: string;
+  branches?: Branch[];
   _count?: { branches: number; students: number; teachers?: number; parents?: number };
 }
 
