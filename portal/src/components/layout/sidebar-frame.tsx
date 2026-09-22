@@ -6,7 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/brand/brand-mark";
-import { assetUrl } from "@/lib/api-client";
+import { SchoolBrandBlock } from "@/components/layout/school-brand-block";
 
 export function SidebarFrame({
   subtitle,
@@ -14,6 +14,7 @@ export function SidebarFrame({
   userName,
   schoolName,
   schoolLogo,
+  search,
   onLogout,
 }: {
   subtitle: string;
@@ -21,9 +22,9 @@ export function SidebarFrame({
   userName?: string;
   schoolName?: string | null;
   schoolLogo?: string | null;
+  search?: ReactNode;
   onLogout: () => void;
 }) {
-  const schoolLogoSrc = assetUrl(schoolLogo);
   const initials = (userName ?? "")
     .split(" ")
     .filter(Boolean)
@@ -37,23 +38,20 @@ export function SidebarFrame({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-teal-300/50 to-transparent" />
 
       <div className="relative shrink-0 border-b border-white/10 px-5 py-5">
-        <BrandMark inverted subtitle={subtitle} />
         {schoolName ? (
-          <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
-            {schoolLogoSrc ? (
-              <img
-                src={schoolLogoSrc}
-                alt=""
-                className="h-9 w-9 shrink-0 rounded-md border border-white/10 object-cover"
-              />
-            ) : (
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/10 text-xs font-semibold text-white">
-                {schoolName.slice(0, 2).toUpperCase()}
-              </span>
-            )}
-            <p className="min-w-0 truncate text-sm font-medium leading-tight text-white">{schoolName}</p>
+          <div className="space-y-4">
+            <SchoolBrandBlock
+              schoolName={schoolName}
+              schoolLogo={schoolLogo}
+              subtitle={subtitle}
+              size="sidebar"
+              inverted
+            />
+            {search ? <div className="w-full">{search}</div> : null}
           </div>
-        ) : null}
+        ) : (
+          <BrandMark inverted subtitle={subtitle} />
+        )}
       </div>
 
       <nav className="relative flex min-h-0 flex-1 flex-col justify-start gap-0.5 overflow-y-auto overflow-x-hidden px-3 py-3 [scrollbar-color:rgba(255,255,255,0.25)_transparent] [scrollbar-width:thin]">

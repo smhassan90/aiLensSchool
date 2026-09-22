@@ -42,8 +42,8 @@ export function AppShell({ sidebar, header, children, className, inverted }: App
 
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex h-dvh w-72 max-w-[min(18rem,85vw)] flex-col overflow-hidden print:hidden",
-          "transition-transform duration-200 ease-out lg:static lg:z-auto lg:h-full lg:w-[17.5rem] lg:max-w-none lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex h-dvh w-80 max-w-[min(20rem,85vw)] flex-col overflow-hidden print:hidden",
+          "transition-transform duration-200 ease-out lg:static lg:z-auto lg:h-full lg:w-[19.5rem] lg:max-w-none lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >

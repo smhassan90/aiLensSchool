@@ -102,6 +102,7 @@ export function SchoolSidebar() {
       userName={personFullName(user?.firstName, user?.lastName)}
       schoolName={schoolName}
       schoolLogo={schoolLogo}
+      search={<GlobalSearch tone="dark" />}
       onLogout={logout}
     >
       {items.map(({ href, label, icon, matchSetup }) => (
@@ -120,7 +121,7 @@ export function SchoolSidebar() {
 
 export function SchoolShell({ children }: { children: React.ReactNode }) {
   return (
-    <AppShell inverted sidebar={<SchoolSidebar />} header={<SchoolHeaderBar trailing={<GlobalSearch />} />}>
+    <AppShell inverted sidebar={<SchoolSidebar />} header={<SchoolHeaderBar />}>
       <SchoolBackgroundPrefetch />
       {children}
     </AppShell>

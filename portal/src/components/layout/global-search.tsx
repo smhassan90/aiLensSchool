@@ -6,8 +6,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { insightsService } from "@/services/insights.service";
 import { Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export function GlobalSearch() {
+export function GlobalSearch({ tone = "light" }: { tone?: "light" | "dark" }) {
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
@@ -31,8 +32,13 @@ export function GlobalSearch() {
     0;
 
   return (
-    <div className="relative w-full max-w-xl">
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    <div className="relative w-full">
+      <Search
+        className={cn(
+          "pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2",
+          tone === "dark" ? "text-white/45" : "text-muted-foreground",
+        )}
+      />
       <Input
         value={q}
         onChange={(e) => {
@@ -42,7 +48,11 @@ export function GlobalSearch() {
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 180)}
         placeholder="Student ID, parent phone or name"
-        className="pl-9"
+        className={cn(
+          "pl-9",
+          tone === "dark" &&
+            "border-white/15 bg-white/10 text-white placeholder:text-white/40 focus-visible:ring-teal-400/40",
+        )}
       />
       {open && debounced.length >= 2 && (
         <div className="absolute z-50 mt-2 max-h-96 w-full overflow-auto rounded-md border bg-card p-2 shadow-lg">
