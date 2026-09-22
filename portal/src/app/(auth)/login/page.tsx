@@ -8,7 +8,7 @@ export default function LoginPage() {
     <RedirectIfAuthenticated>
       <div className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 p-4 sm:p-6">
         <div className="mb-8">
-          <BrandMark variant="full" subtitle="See farther. Lead better." />
+          <BrandMark variant="full" subtitle="School administration & teacher portal" />
         </div>
         <div className="relative w-full max-w-md">
           <LoginForm

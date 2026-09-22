@@ -1,4 +1,5 @@
 import type { FeeReceipt } from "@/lib/types";
+import { SchoolLetterhead } from "@/components/brand/school-letterhead";
 import { formatPkr } from "@/lib/money";
 import { formatDate } from "@/lib/utils";
 
@@ -32,9 +33,12 @@ export function FeeReceiptSheet({ receipt }: { receipt: FeeReceipt }) {
   return (
     <article className="fee-receipt mx-auto max-w-xl border border-black bg-white p-6 text-black">
       <header className="text-center">
-        <p className="text-xl font-bold tracking-wide">{(receipt.school?.name ?? "School").toUpperCase()}</p>
-        {receipt.school?.address ? <p className="mt-1 text-xs">{receipt.school.address}</p> : null}
-        {receipt.school?.phone ? <p className="text-xs">Contact: {receipt.school.phone}</p> : null}
+        <SchoolLetterhead
+          name={(receipt.school?.name ?? "School").toUpperCase()}
+          logo={receipt.school?.logo}
+          address={receipt.school?.address}
+          phone={receipt.school?.phone}
+        />
         <p className="mt-3 text-sm font-semibold tracking-[0.18em]">FEE RECEIPT</p>
         <p className="mt-1 text-sm">No. {receipt.receiptNumber ?? receipt.id.slice(0, 8)}</p>
       </header>

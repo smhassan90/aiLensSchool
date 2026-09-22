@@ -1,5 +1,6 @@
 "use client";
 
+import { SchoolLetterhead } from "@/components/brand/school-letterhead";
 import { examPaperLabel } from "@/lib/exam-paper";
 import type { Quiz, QuizQuestion } from "@/lib/types";
 import { formatMarks, quizOptionLabel, quizQuestionTypeLabel } from "@/lib/utils";
@@ -54,7 +55,11 @@ export function ExamPrintView({
   return (
     <div className="exam-print mx-auto max-w-3xl bg-white p-6 text-black print:max-w-none print:p-0">
       <div className="exam-print-header border-b-2 border-black pb-4 text-center">
-        <h1 className="text-2xl font-bold uppercase tracking-wide">{schoolName}</h1>
+        <SchoolLetterhead
+          name={schoolName}
+          logo={quiz.school?.logo}
+          titleClassName="text-2xl"
+        />
         <p className="mt-3 text-sm">
           <span className="font-semibold">Date:</span> {examDate ?? "____________________"}
         </p>

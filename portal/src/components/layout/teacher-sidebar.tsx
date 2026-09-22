@@ -26,6 +26,8 @@ import {
 import { teachersService } from "@/services/teachers.service";
 import { headTeachersService } from "@/services/head-teachers.service";
 import { personFullName } from "@/lib/person-name";
+import { useSchoolBranding } from "@/hooks/use-school-branding";
+import { SchoolHeaderBar } from "@/components/layout/school-header-bar";
 
 const baseNavItems = [
   { href: "/teacher/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -44,6 +46,7 @@ export function TeacherSidebar() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const { user, logout } = useAuth();
+  const { schoolName, schoolLogo } = useSchoolBranding();
   const classes = useQuery({
     queryKey: ["teacher-classes"],
     queryFn: () => teachersService.myClasses(),
@@ -69,6 +72,8 @@ export function TeacherSidebar() {
     <SidebarFrame
       subtitle="Teacher Hub"
       userName={personFullName(user?.firstName, user?.lastName)}
+      schoolName={schoolName}
+      schoolLogo={schoolLogo}
       onLogout={logout}
     >
       {navItems.map(({ href, label, icon }) => (
@@ -90,7 +95,7 @@ export function TeacherShell({ children }: { children: React.ReactNode }) {
     <AppShell
       inverted
       sidebar={<TeacherSidebar />}
-      header={<p className="truncate text-sm font-medium text-muted-foreground">Teacher Hub</p>}
+      header={<SchoolHeaderBar />}
     >
       <TeacherBackgroundPrefetch />
       {children}

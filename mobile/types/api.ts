@@ -52,7 +52,7 @@ export interface RefreshResponse {
 
 export interface MeResponse extends AuthUser {
   phone?: string | null;
-  school?: { id: string; name: string; code: string; status: string } | null;
+  school?: { id: string; name: string; code: string; status: string; logo?: string | null } | null;
   parentProfile?: { id: string } | null;
 }
 
@@ -256,7 +256,7 @@ export interface FeeReceipt {
   notes?: string | null;
   collected: number;
   balance: number;
-  school: { name: string; address?: string | null; phone?: string | null };
+  school: { name: string; address?: string | null; phone?: string | null; logo?: string | null };
   student: {
     id: string;
     name: string;

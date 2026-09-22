@@ -1,10 +1,12 @@
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, ErrorState, LoadingState } from '@/components/ui';
 import { colors, spacing, typography } from '@/constants/theme';
+import { assetUrl } from '@/lib/assets';
 import { formatAmount } from '@/lib/format';
+import { radii } from '@/constants/theme';
 import { fetchFeeReceipt } from '@/services/parent-records.service';
 
 export default function FeeReceiptScreen() {
@@ -21,13 +23,19 @@ export default function FeeReceiptScreen() {
   }
 
   const receipt = query.data;
+  const schoolLogoUri = assetUrl(receipt.school.logo);
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Card>
+          <View style={styles.schoolHeader}>
+            {schoolLogoUri ? (
+              <Image source={{ uri: schoolLogoUri }} style={styles.schoolLogo} resizeMode="cover" />
+            ) : null}
+            <Text style={styles.schoolName}>{receipt.school.name}</Text>
+          </View>
           <Text style={styles.kicker}>Payment receipt</Text>
           <Text style={styles.title}>{receipt.receiptNumber ?? 'Receipt'}</Text>
-          <Text style={styles.meta}>{receipt.school.name}</Text>
           <Text style={styles.meta}>
             {receipt.student.name} · {receipt.student.studentCode}
           </Text>
@@ -48,6 +56,9 @@ export default function FeeReceiptScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.md },
+  schoolHeader: { alignItems: 'center', marginBottom: spacing.sm },
+  schoolLogo: { width: 64, height: 64, borderRadius: radii.md, marginBottom: spacing.xs },
+  schoolName: { color: colors.slate800, fontFamily: typography.family, fontSize: 16, fontWeight: typography.semibold, textAlign: 'center' },
   kicker: { color: colors.primary, fontFamily: typography.family, fontSize: 13 },
   title: { color: colors.slate900, fontFamily: typography.family, fontSize: 26, fontWeight: typography.semibold, marginTop: 4 },
   meta: { color: colors.slate500, fontFamily: typography.family, fontSize: 14, marginTop: 6 },

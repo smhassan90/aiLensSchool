@@ -133,7 +133,7 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.eyebrow}>YOUR FAMILY HUB</Text>
+            <Text style={styles.eyebrow}>{user?.school?.name?.toUpperCase() ?? 'YOUR FAMILY HUB'}</Text>
             <Text style={styles.greeting}>Hello, {user?.firstName ?? 'Parent'}!</Text>
             <Text style={styles.date}>
               {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}

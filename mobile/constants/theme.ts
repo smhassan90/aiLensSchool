@@ -80,4 +80,4 @@ export const shadows = {
 };
 
 /** Bottom padding so scroll content clears the floating tab bar */
-export const tabBarClearance = 88;
+export const tabBarClearance = 108;

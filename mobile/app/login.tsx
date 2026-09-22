@@ -83,7 +83,7 @@ export default function LoginScreen() {
     >
       <View style={styles.hero}>
         <View style={styles.markPlate}>
-          <Image source={require('../assets/hawk.png')} style={styles.mark} />
+          <Image source={require('../assets/icon.png')} style={styles.mark} />
         </View>
         <Text style={styles.brand}>
           <Text style={styles.brandHawk}>Hawk</Text>

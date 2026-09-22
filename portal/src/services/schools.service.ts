@@ -1,4 +1,4 @@
-import { apiClient, buildQuery } from "@/lib/api-client";
+import { apiClient, apiUpload, buildQuery } from "@/lib/api-client";
 import type { DashboardStats, Paginated, School } from "@/lib/types";
 
 export interface CreateSchoolPayload {
@@ -9,6 +9,7 @@ export interface CreateSchoolPayload {
   address?: string;
   city?: string;
   country?: string;
+  logo?: string;
   branch?: {
     name: string;
     code: string;
@@ -44,10 +45,14 @@ export const schoolsService = {
     return apiClient<School>(`/schools/${id}`);
   },
 
-  update(id: string, payload: Partial<Pick<School, "name" | "email" | "phone" | "address" | "city" | "country">>) {
+  update(id: string, payload: Partial<Pick<School, "name" | "email" | "phone" | "address" | "city" | "country" | "logo">>) {
     return apiClient<School>(`/schools/${id}`, {
       method: "PATCH",
       body: JSON.stringify(payload),
     });
+  },
+
+  uploadLogo(file: File) {
+    return apiUpload<{ url: string }>("/files/upload", file);
   },
 };

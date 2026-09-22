@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { schoolsService } from "@/services/schools.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { ArrowLeft } from "lucide-react";
+import { SchoolLogoUpload } from "@/components/schools/school-logo-upload";
 
 const schema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -39,6 +41,7 @@ type FormValues = z.infer<typeof schema>;
 export default function NewSchoolPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const {
     register,
@@ -54,8 +57,13 @@ export default function NewSchoolPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: (values: FormValues) =>
-      schoolsService.create({
+    mutationFn: async (values: FormValues) => {
+      let logo: string | undefined;
+      if (logoFile) {
+        const uploaded = await schoolsService.uploadLogo(logoFile);
+        logo = uploaded.url;
+      }
+      return schoolsService.create({
         name: values.name,
         code: values.code,
         email: values.email,
@@ -63,6 +71,7 @@ export default function NewSchoolPage() {
         address: values.address,
         city: values.city,
         country: values.country,
+        logo,
         branch: {
           name: values.branchName,
           code: values.branchCode,
@@ -75,7 +84,8 @@ export default function NewSchoolPage() {
           phone: values.adminPhone,
           password: values.adminPassword,
         },
-      }),
+      });
+    },
     onSuccess: (school) => {
       toast({
         title: "School created",
@@ -141,6 +151,9 @@ export default function NewSchoolPage() {
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="address">Address</Label>
               <Input id="address" {...register("address")} />
+            </div>
+            <div className="sm:col-span-2">
+              <SchoolLogoUpload file={logoFile} onFileChange={setLogoFile} />
             </div>
           </CardContent>
         </Card>

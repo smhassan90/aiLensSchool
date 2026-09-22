@@ -83,6 +83,7 @@ export class SchoolsService {
           address: dto.address,
           city: dto.city,
           country: dto.country,
+          logo: dto.logo,
           status: SchoolStatus.ACTIVE,
           pricingPlanId: defaultPlan.id,
         },

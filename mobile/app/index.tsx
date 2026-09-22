@@ -1,12 +1,18 @@
 import { Redirect } from 'expo-router';
-import { LoadingState } from '@/components/ui';
+import { AppSplash } from '@/components/AppSplash';
 import { useAuth } from '@/providers/AuthProvider';
 
 export default function IndexScreen() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
-    return <LoadingState message="Checking session…" />;
+    return (
+      <AppSplash
+        task="startup"
+        schoolName={user?.school?.name}
+        schoolLogo={user?.school?.logo}
+      />
+    );
   }
 
   if (!isAuthenticated) {

@@ -1,4 +1,4 @@
-# HawkNexa Parent Mobile App
+# Hawk Nexa Mobile App
 
 Expo React Native (TypeScript) parent app for the School Management System backend.
 

@@ -1336,7 +1336,7 @@ export class FeesService {
 
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
-      select: { name: true, address: true, phone: true, code: true },
+      select: { name: true, address: true, phone: true, code: true, logo: true },
     });
     const receiptNumber = await this.nextReceiptNumber(schoolId, school?.code ?? 'SCH');
     const noteParts = [dto.notes?.trim()].filter(Boolean) as string[];
@@ -1418,7 +1418,7 @@ export class FeesService {
                 parents: { include: { parent: { include: { user: true } } } },
               },
             },
-            school: { select: { name: true, address: true, phone: true, code: true } },
+            school: { select: { name: true, address: true, phone: true, code: true, logo: true } },
           },
         },
       },
@@ -1480,7 +1480,7 @@ export class FeesService {
       grade?: { name?: string } | null;
       section?: { name?: string } | null;
     } | null;
-    school: { name: string; address?: string | null; phone?: string | null; code?: string } | null;
+    school: { name: string; address?: string | null; phone?: string | null; code?: string; logo?: string | null } | null;
     remaining: number;
     recordedBy: { firstName: string; lastName: string };
   }) {

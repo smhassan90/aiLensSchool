@@ -25,6 +25,8 @@ import {
 } from "@/components/layout/background-prefetch";
 import type { StaffPermission } from "@/lib/types";
 import { personFullName } from "@/lib/person-name";
+import { useSchoolBranding } from "@/hooks/use-school-branding";
+import { SchoolHeaderBar } from "@/components/layout/school-header-bar";
 
 const setupPathPrefixes = [
   "/school/setup",
@@ -85,6 +87,7 @@ export function SchoolSidebar() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const { user, logout, can } = useAuth();
+  const { schoolName, schoolLogo } = useSchoolBranding();
   const subtitle = user?.roles.includes("PRINCIPAL") ? "Principal" : "Administration";
   const items = mainNav.filter((item) => {
     if (item.href === "/school/teachers") {
@@ -97,6 +100,8 @@ export function SchoolSidebar() {
     <SidebarFrame
       subtitle={subtitle}
       userName={personFullName(user?.firstName, user?.lastName)}
+      schoolName={schoolName}
+      schoolLogo={schoolLogo}
       onLogout={logout}
     >
       {items.map(({ href, label, icon, matchSetup }) => (
@@ -115,7 +120,7 @@ export function SchoolSidebar() {
 
 export function SchoolShell({ children }: { children: React.ReactNode }) {
   return (
-    <AppShell inverted sidebar={<SchoolSidebar />} header={<GlobalSearch />}>
+    <AppShell inverted sidebar={<SchoolSidebar />} header={<SchoolHeaderBar trailing={<GlobalSearch />} />}>
       <SchoolBackgroundPrefetch />
       {children}
     </AppShell>

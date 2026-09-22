@@ -24,7 +24,9 @@ function TabIcon({
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(insets.bottom, 8);
+  const tabBarHeight = 64;
+  const bottomGap = 14;
+  const bottomOffset = Math.max(insets.bottom, 10) + bottomGap;
 
   return (
     <Tabs
@@ -46,12 +48,15 @@ export default function TabsLayout() {
         },
         tabBarStyle: {
           ...styles.tabBar,
-          bottom: bottomInset,
-          height: 58,
-          paddingTop: 8,
-          paddingBottom: 8,
+          bottom: bottomOffset,
+          height: tabBarHeight,
+          paddingTop: 0,
+          paddingBottom: 0,
         },
-        tabBarItemStyle: styles.tabItem,
+        tabBarItemStyle: {
+          ...styles.tabItem,
+          height: tabBarHeight,
+        },
       }}
     >
       <Tabs.Screen
@@ -118,10 +123,11 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     backgroundColor: colors.tabBar,
-    borderTopWidth: 0,
+    borderTopWidth: 1,
+    borderTopColor: colors.slate300,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: colors.tabBarBorder,
+    borderColor: colors.slate300,
     ...shadows.tabBar,
   },
   tabItem: {

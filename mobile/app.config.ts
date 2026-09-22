@@ -7,7 +7,7 @@ const googleServicesResolved = path.resolve(__dirname, googleServicesPath);
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'HawkNexa Parent',
+  name: 'Hawk Nexa',
   slug: 'sms-parent',
   version: '1.0.0',
   orientation: 'portrait',
@@ -25,7 +25,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#ffffff',
     },
     package: 'com.hawknexa.student',
-    versionCode: 5,
+    versionCode: 7,
     ...(existsSync(googleServicesResolved) ? { googleServicesFile: googleServicesPath } : {}),
   },
   web: {
@@ -39,10 +39,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        image: './assets/splash.png',
-        backgroundColor: '#2a9d90',
-        resizeMode: 'cover',
-        enableFullScreenImage_legacy: true,
+        image: './assets/icon.png',
+        backgroundColor: '#ffffff',
+        imageWidth: 96,
+        resizeMode: 'contain',
       },
     ],
   ],

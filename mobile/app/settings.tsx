@@ -18,7 +18,7 @@ export default function SettingsScreen() {
 
         <View style={styles.card}>
           <Text style={styles.label}>App</Text>
-          <Text style={styles.value}>HawkNexa Parent</Text>
+          <Text style={styles.value}>Hawk Nexa</Text>
         </View>
 
         {__DEV__ ? (

@@ -6,11 +6,16 @@ import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { ChildProvider } from '@/providers/ChildProvider';
 import { AuthGate } from '@/components/AuthGate';
+
+ExpoSplashScreen.preventAutoHideAsync().catch(() => {
+  // Splash may already be hidden in dev fast refresh.
+});
 
 export default function RootLayout() {
   useEffect(() => {
@@ -31,7 +36,7 @@ export default function RootLayout() {
         <AuthProvider>
           <ChildProvider>
             <AuthGate>
-              <StatusBar style="light" />
+              <StatusBar style="dark" />
               <Stack
                 screenOptions={{
                   headerShown: false,

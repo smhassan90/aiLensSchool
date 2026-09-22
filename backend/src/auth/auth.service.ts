@@ -198,7 +198,7 @@ export class AuthService {
         roles: { include: { role: true } },
         teacherProfile: true,
         parentProfile: true,
-        school: { select: { id: true, name: true, code: true, status: true } },
+        school: { select: { id: true, name: true, code: true, status: true, logo: true } },
       },
     });
     if (!user) {

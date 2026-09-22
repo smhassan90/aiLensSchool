@@ -1,7 +1,7 @@
 import { PropsWithChildren, useEffect } from 'react';
 import { Href, useRouter, useSegments } from 'expo-router';
+import { AppSplash } from '@/components/AppSplash';
 import { useAuth } from '@/providers/AuthProvider';
-import { LoadingState } from '@/components/ui';
 
 /**
  * Redirects unauthenticated users to login and forces password change when required.
@@ -45,16 +45,19 @@ export function AuthGate({ children }: PropsWithChildren) {
     router,
   ]);
 
+  const schoolName = user?.school?.name ?? null;
+  const schoolLogo = user?.school?.logo ?? null;
+
   if (isLoading) {
-    return <LoadingState message="Checking session…" />;
+    return <AppSplash task="startup" schoolName={schoolName} schoolLogo={schoolLogo} />;
   }
 
   if (!isAuthenticated && !onLogin && !onIndex) {
-    return <LoadingState message="Redirecting to sign in…" />;
+    return <AppSplash task="sign-in" schoolName={schoolName} schoolLogo={schoolLogo} />;
   }
 
   if (isAuthenticated && user?.mustChangePassword && !onChangePassword) {
-    return <LoadingState message="Password update required…" />;
+    return <AppSplash task="password" schoolName={schoolName} schoolLogo={schoolLogo} />;
   }
 
   return <>{children}</>;

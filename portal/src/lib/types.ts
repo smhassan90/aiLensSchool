@@ -78,6 +78,7 @@ export interface School {
   email: string;
   phone?: string;
   address?: string;
+  logo?: string | null;
   status: string;
   city?: string;
   country?: string;
@@ -335,7 +336,7 @@ export interface Quiz {
   createdAt: string;
   description?: string | null;
   questions?: QuizQuestion[];
-  school?: { id: string; name: string } | null;
+  school?: { id: string; name: string; logo?: string | null } | null;
   examConfig?: { id: string; name: string; startDate?: string | null; endDate?: string | null } | null;
   examPaperAssignment?: { maxMarks: number } | null;
   section?: { id: string; name: string; grade?: { id: string; name: string } | null };
@@ -427,7 +428,7 @@ export interface Invoice {
   status: string;
   periodStart: string;
   periodEnd: string;
-  school?: { id: string; name: string };
+  school?: { id: string; name: string; logo?: string | null };
 }
 
 export interface AuditLog {
@@ -575,7 +576,7 @@ export interface FeeReceipt {
   paidAt: string;
   method: string;
   notes?: string | null;
-  school: { name: string; address?: string | null; phone?: string | null; code?: string } | null;
+  school: { name: string; address?: string | null; phone?: string | null; code?: string; logo?: string | null } | null;
   student: {
     id: string;
     name: string;
@@ -631,7 +632,7 @@ export interface ReportCard {
   grade?: Grade;
   section?: Section;
   academicYear?: AcademicYear;
-  school?: { name: string; address?: string | null; phone?: string | null };
+  school?: { name: string; address?: string | null; phone?: string | null; logo?: string | null };
   lines?: Array<{
     title?: string;
     maxMarks?: number | string | null;

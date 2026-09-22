@@ -1,6 +1,7 @@
 "use client";
 
 import type { Quiz, QuizQuestion } from "@/lib/types";
+import { SchoolLetterhead } from "@/components/brand/school-letterhead";
 import { examPaperLabel } from "@/lib/exam-paper";
 import { personFullName } from "@/lib/person-name";
 
@@ -18,7 +19,7 @@ export function ExamSolutionSheet({ quiz }: { quiz: Quiz }) {
   return (
     <div className="exam-solution mx-auto max-w-2xl bg-white p-6 text-black print:max-w-none print:p-0">
       <header className="border-b border-black pb-3 text-center">
-        <h1 className="text-lg font-bold uppercase">{schoolName}</h1>
+        <SchoolLetterhead name={schoolName} logo={quiz.school?.logo} titleClassName="text-lg" />
         <p className="mt-1 text-sm font-semibold">Answer key — {examPaperLabel(quiz.paperKind)}</p>
         <p className="text-xs text-neutral-700">
           {quiz.subject?.name ?? "Subject"}

@@ -79,6 +79,11 @@ export class CreateSchoolDto {
   @IsString()
   country?: string;
 
+  @ApiPropertyOptional({ description: 'Square school logo URL from /files/upload' })
+  @IsOptional()
+  @IsString()
+  logo?: string;
+
   @ApiPropertyOptional({ type: CreateBranchInlineDto })
   @IsOptional()
   @ValidateNested()
