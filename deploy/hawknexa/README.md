@@ -62,7 +62,8 @@ Workflow: `.github/workflows/deploy-hawknexa-vps.yml`
 
 ### One-time: deploy webhook + GitHub secret
 
-GitHub Actions cannot SSH into Hostinger VPS (port 22 is blocked from GitHub runners). Deploy uses an **HTTPS webhook** on port 443 instead.
+Deploy normally uses an **HTTPS webhook** on port 443. If Hostinger firewall blocks 80/443,
+GitHub Actions falls back to **SSH deploy** on port 22 when `HAWKNEXA_VPS_SSH_KEY` is set.
 
 On the VPS, the `deploy-webhook` Docker service handles deploy triggers. `DEPLOY_WEBHOOK_SECRET` must be set in `/opt/apps/hawknexa/deploy/.env`.
 
@@ -71,6 +72,7 @@ GitHub → **Settings → Secrets and variables → Actions → New repository s
 | Secret | Value |
 |--------|--------|
 | `HAWKNEXA_DEPLOY_WEBHOOK_SECRET` | Same value as `DEPLOY_WEBHOOK_SECRET` in the server `.env` |
+| `HAWKNEXA_VPS_SSH_KEY` | Private SSH key for `root@187.53.141.109` (SSH deploy fallback when 443 is blocked) |
 
 Optional variable: `HAWKNEXA_DEPLOY_URL` (default `https://hawknexabackend.fynals.com/internal/deploy`).
 

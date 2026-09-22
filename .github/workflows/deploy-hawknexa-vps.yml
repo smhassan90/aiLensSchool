@@ -48,6 +48,7 @@ jobs:
           fi
 
       - name: Check deploy webhook
+        id: webhook
         env:
           WEBHOOK_HEALTH_URL: ${{ vars.HAWKNEXA_WEBHOOK_HEALTH_URL || 'https://hawknexabackend.fynals.com/internal/deploy/health' }}
         run: |
@@ -56,18 +57,21 @@ jobs:
           webhook_code="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 "${WEBHOOK_HEALTH_URL}" 2>/dev/null || true)"
           webhook_code="${webhook_code:-000}"
           echo "Webhook health HTTP ${webhook_code}"
-          if [ "${webhook_code}" != "200" ]; then
-            echo "::error::Deploy webhook is not healthy (HTTP ${webhook_code})."
+          echo "code=${webhook_code}" >> "$GITHUB_OUTPUT"
+          if [ "${webhook_code}" = "200" ]; then
+            echo "healthy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "healthy=false" >> "$GITHUB_OUTPUT"
             if [ "${webhook_code}" = "000" ] || [ "${webhook_code}" = "000000" ]; then
-              echo "HTTP 000 = VPS ports 80/443 are not reachable (Caddy down or firewall blocking)."
+              echo "HTTP 000 = VPS ports 80/443 are not reachable from GitHub (Hostinger firewall)."
+              echo "Will fall back to SSH deploy on port 22 when HAWKNEXA_VPS_SSH_KEY is configured."
+            else
+              echo "Webhook unhealthy; will try SSH deploy fallback."
             fi
-            echo "On the VPS (Hostinger browser terminal) run:"
-            echo "  bash /opt/apps/hawknexa/deploy/recover-vps.sh"
-            echo "Or: bash /opt/apps/hawknexa/deploy/recover-deploy-webhook.sh"
-            exit 1
           fi
 
-      - name: Trigger deploy on VPS
+      - name: Trigger deploy on VPS (webhook)
+        if: steps.webhook.outputs.healthy == 'true'
         env:
           DEPLOY_URL: ${{ vars.HAWKNEXA_DEPLOY_URL || 'https://hawknexabackend.fynals.com/internal/deploy' }}
           DEPLOY_SECRET: ${{ env.DEPLOY_SECRET }}
@@ -105,7 +109,36 @@ jobs:
             exit 1
           fi
 
-      - name: Wait for VPS deploy to finish
+      - name: Deploy on VPS over SSH (webhook blocked)
+        if: steps.webhook.outputs.healthy != 'true'
+        env:
+          SSH_KEY: ${{ secrets.HAWKNEXA_VPS_SSH_KEY }}
+          BUILD_BACKEND: ${{ steps.changes.outputs.backend }}
+          BUILD_PORTAL: ${{ steps.changes.outputs.portal }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SSH_KEY}" ]; then
+            echo "::error::Webhook unreachable and HAWKNEXA_VPS_SSH_KEY is not set."
+            echo "Fix Hostinger firewall (allow TCP 80 and 443) OR add HAWKNEXA_VPS_SSH_KEY for SSH deploy fallback."
+            exit 1
+          fi
+          TARGETS=""
+          if [ "${BUILD_BACKEND}" = "true" ]; then TARGETS="backend"; fi
+          if [ "${BUILD_PORTAL}" = "true" ]; then
+            if [ -n "${TARGETS}" ]; then TARGETS="${TARGETS},portal"; else TARGETS="portal"; fi
+          fi
+          mkdir -p ~/.ssh
+          echo "${SSH_KEY}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          SSH_HOST="${{ vars.HAWKNEXA_VPS_HOST || '187.53.141.109' }}"
+          SSH_USER="${{ vars.HAWKNEXA_VPS_USER || 'root' }}"
+          ssh-keyscan -H "${SSH_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "SSH deploy to ${SSH_USER}@${SSH_HOST} (targets=${TARGETS:-all})"
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" \
+            "DEPLOY_TARGETS='${TARGETS}' bash /opt/apps/hawknexa/deploy/deploy.sh"
+
+      - name: Wait for VPS deploy to finish (webhook)
+        if: steps.webhook.outputs.healthy == 'true'
         env:
           STATUS_URL: ${{ vars.HAWKNEXA_DEPLOY_STATUS_URL || 'https://hawknexabackend.fynals.com/internal/deploy/status' }}
           HEALTH_URL: ${{ vars.HAWKNEXA_HEALTH_URL || 'https://hawknexabackend.fynals.com/api/v1/health' }}
@@ -145,3 +178,33 @@ jobs:
           done
           echo "::error::Deploy did not complete within 6 minutes."
           exit 1
+
+      - name: Verify VPS deploy over SSH
+        if: steps.webhook.outputs.healthy != 'true'
+        env:
+          SSH_KEY: ${{ secrets.HAWKNEXA_VPS_SSH_KEY }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          short_sha="$(echo "${EXPECTED_SHA}" | cut -c1-7)"
+          SSH_HOST="${{ vars.HAWKNEXA_VPS_HOST || '187.53.141.109' }}"
+          SSH_USER="${{ vars.HAWKNEXA_VPS_USER || 'root' }}"
+          mkdir -p ~/.ssh
+          echo "${SSH_KEY}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${SSH_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          remote_sha="$(ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" \
+            "cd /opt/apps/hawknexa/repo && git rev-parse --short HEAD")"
+          echo "Remote commit: ${remote_sha}"
+          if [ "${remote_sha}" != "${short_sha}" ]; then
+            echo "::error::Expected ${short_sha} but VPS repo is at ${remote_sha}"
+            exit 1
+          fi
+          status="$(ssh -i ~/.ssh/id_ed25519 "${SSH_USER}@${SSH_HOST}" \
+            "python3 -c \"import json; print(json.load(open('/opt/apps/hawknexa/deploy/.last-deploy.json'))['status'])\"")"
+          echo "Deploy status: ${status}"
+          if [ "${status}" != "success" ]; then
+            echo "::error::VPS deploy status is ${status}. Check /tmp/hawknexa-deploy.log on the server."
+            exit 1
+          fi
+          echo "OK: SSH deploy completed for ${short_sha}"
