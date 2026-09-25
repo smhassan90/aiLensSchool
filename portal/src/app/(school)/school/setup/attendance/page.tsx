@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { DeviceTeacherMappingPanel } from "@/components/attendance/device-teacher-mapping-panel";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLoader } from "@/components/layout/page-loader";
 import { Button } from "@/components/ui/button";
@@ -25,7 +27,14 @@ import { deviceService, type BiometricDevice } from "@/services/device.service";
 import { cn } from "@/lib/utils";
 import { Eye, EyeOff, Fingerprint } from "lucide-react";
 
-type Tab = "configuration" | "devices";
+type Tab = "mapping" | "configuration" | "devices";
+
+const TAB_IDS: Tab[] = ["mapping", "configuration", "devices"];
+
+function tabFromQuery(value: string | null): Tab {
+  if (value && TAB_IDS.includes(value as Tab)) return value as Tab;
+  return "mapping";
+}
 
 function DeviceRow({
   device,
@@ -85,6 +94,7 @@ function DeviceRow({
 
 function SetupTabs({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   const items: { id: Tab; label: string }[] = [
+    { id: "mapping", label: "Map teachers" },
     { id: "configuration", label: "Configuration" },
     { id: "devices", label: "Devices" },
   ];
@@ -110,12 +120,17 @@ function SetupTabs({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
 }
 
 export default function SetupAttendancePage() {
+  const searchParams = useSearchParams();
   const { can } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const canView = can("VIEW_BIOMETRIC_DEVICES") || can("MANAGE_TEACHERS");
   const canManage = can("MANAGE_BIOMETRIC_DEVICES") || can("MANAGE_TEACHERS");
-  const [tab, setTab] = useState<Tab>("configuration");
+  const [tab, setTab] = useState<Tab>(() => tabFromQuery(searchParams.get("tab")));
+
+  useEffect(() => {
+    setTab(tabFromQuery(searchParams.get("tab")));
+  }, [searchParams]);
   const [showKey, setShowKey] = useState(false);
 
   const setup = useQuery({
@@ -130,7 +145,6 @@ export default function SetupAttendancePage() {
   const [connectionTimeoutSec, setConnectionTimeoutSec] = useState("30");
   const [userSyncIntervalSec, setUserSyncIntervalSec] = useState("600");
   const [batchSize, setBatchSize] = useState("25");
-  const [configRefreshIntervalSec, setConfigRefreshIntervalSec] = useState("120");
 
   const [name, setName] = useState("");
   const [ip, setIp] = useState("");
@@ -146,7 +160,6 @@ export default function SetupAttendancePage() {
     setConnectionTimeoutSec(String(data.edgeSync.connectionTimeoutSec));
     setUserSyncIntervalSec(String(data.edgeSync.userSyncIntervalSec));
     setBatchSize(String(data.edgeSync.batchSize));
-    setConfigRefreshIntervalSec(String(data.edgeSync.configRefreshIntervalSec ?? 120));
   }, [setup.data]);
 
   const saveConfig = useMutation({
@@ -159,7 +172,6 @@ export default function SetupAttendancePage() {
           connectionTimeoutSec: Number(connectionTimeoutSec),
           userSyncIntervalSec: Number(userSyncIntervalSec),
           batchSize: Number(batchSize),
-          configRefreshIntervalSec: Number(configRefreshIntervalSec),
         },
       }),
     onSuccess: () => {
@@ -209,7 +221,7 @@ export default function SetupAttendancePage() {
     onSuccess: () => {
       toast({
         title: "Full sync queued",
-        description: "The laptop agent will re-upload all punches on its next config refresh.",
+        description: "Stop and run run-edge-sync.bat on the laptop to reload settings and re-upload punches.",
         variant: "success",
       });
     },
@@ -247,15 +259,13 @@ export default function SetupAttendancePage() {
       />
       <p className="mb-4 text-sm text-muted-foreground">
         <Link href="/school/setup" className="text-primary underline">Setup</Link>
-        {" · "}
-        <Link href="/school/teachers/attendance/devices" className="text-primary underline">
-          Map teachers to device users
-        </Link>
       </p>
 
       <SetupTabs tab={tab} onTab={setTab} />
 
-      {setup.isLoading ? (
+      {tab === "mapping" ? (
+        <DeviceTeacherMappingPanel setupHref="/school/setup/attendance?tab=devices" />
+      ) : setup.isLoading ? (
         <PageLoader variant="panel" />
       ) : tab === "configuration" ? (
         <div className="space-y-6 max-w-2xl">
@@ -323,16 +333,6 @@ export default function SetupAttendancePage() {
                   <option value="school_local">School local wall clock</option>
                   <option value="utc">UTC</option>
                 </Select>
-              </div>
-              <div>
-                <Label>Re-read portal settings every (sec)</Label>
-                <Input
-                  value={configRefreshIntervalSec}
-                  onChange={(e) => setConfigRefreshIntervalSec(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Agent checks for interval changes and full-sync requests.
-                </p>
               </div>
               <div>
                 <Label>User list sync interval (sec)</Label>

@@ -189,7 +189,6 @@ def remote_to_runtime(bootstrap: dict[str, str], remote: dict[str, Any]) -> dict
         "USER_SYNC_INTERVAL_SEC": int(remote.get("userSyncIntervalSec") or 600),
         "BATCH_SIZE": int(remote.get("batchSize") or 25),
         "PUNCH_TIME_MODE": remote.get("punchTimeMode") or "school_local",
-        "CONFIG_REFRESH_INTERVAL_SEC": int(remote.get("configRefreshIntervalSec") or 120),
     }
 
 
@@ -360,7 +359,6 @@ def main() -> None:
 
     device_errors = 0
     http_errors = 0
-    last_config_fetch = time.time()
     full_sync_pending = bool(remote.get("fullSync"))
     if full_sync_pending:
         log("Full re-upload requested from portal — clearing local dedup cache")
@@ -369,18 +367,6 @@ def main() -> None:
 
     while True:
         try:
-            now = time.time()
-            refresh_sec = int(cfg.get("CONFIG_REFRESH_INTERVAL_SEC") or 120)
-            if now - last_config_fetch >= refresh_sec:
-                remote = fetch_remote_config(bootstrap, quiet=True)
-                cfg = apply_remote_config(bootstrap, remote)
-                last_config_fetch = now
-                if remote.get("fullSync"):
-                    log("Full re-upload requested from portal — clearing local dedup cache")
-                    state["fingerprints"] = []
-                    save_state(state)
-                    full_sync_pending = True
-
             run_cycle(cfg, state, reset=False)
             if full_sync_pending:
                 ack_full_sync(cfg)
