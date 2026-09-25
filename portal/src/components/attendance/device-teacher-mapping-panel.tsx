@@ -172,15 +172,17 @@ export function DeviceTeacherMappingPanel({ setupHref, showSetupHint = false }: 
           </Card>
         ))}
         {!devices.data?.length ? (
-          <Card>
-            <CardContent className="py-8 text-center text-sm text-muted-foreground">
-              No biometric devices yet. Add one under{" "}
-              {setupHref ? (
-                <Link href={setupHref} className="text-primary underline">Devices</Link>
-              ) : (
-                "Setup → Attendance"
-              )}
-              .
+          <Card className="w-full">
+            <CardContent className="flex min-h-[120px] items-center justify-center py-8">
+              <p className="text-center text-sm text-muted-foreground">
+                No biometric devices yet. Add one under{" "}
+                {setupHref ? (
+                  <Link href={setupHref} className="text-primary underline">Devices</Link>
+                ) : (
+                  "Setup → Attendance"
+                )}
+                .
+              </p>
             </CardContent>
           </Card>
         ) : null}
