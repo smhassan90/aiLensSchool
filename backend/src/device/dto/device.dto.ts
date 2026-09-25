@@ -34,20 +34,6 @@ export class CreateDeviceDto {
   syncIntervalSeconds?: number;
 }
 
-export class UpdateAttendanceSetupDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(72)
-  autoCheckoutHours?: number;
-
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => EdgeSyncSettingsDto)
-  edgeSync?: EdgeSyncSettingsDto;
-}
-
 export class EdgeSyncSettingsDto {
   @IsOptional()
   @IsIn(['school_local', 'utc'])
@@ -84,6 +70,20 @@ export class EdgeSyncSettingsDto {
   @Min(30)
   @Max(3600)
   configRefreshIntervalSec?: number;
+}
+
+export class UpdateAttendanceSetupDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(72)
+  autoCheckoutHours?: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => EdgeSyncSettingsDto)
+  edgeSync?: EdgeSyncSettingsDto;
 }
 
 export class UpdateDeviceDto {
