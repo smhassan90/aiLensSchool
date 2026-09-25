@@ -1,0 +1,12 @@
+{
+  "BACKEND_URL": "https://your-api.example.com/api/v1",
+  "DEVICE_ID": "paste-device-uuid-from-admin",
+  "API_KEY": "hnx_your-school-sync-key",
+  "DEVICE_IP": "192.168.1.201",
+  "DEVICE_PORT": 4370,
+  "SCHOOL_TIMEZONE": "Asia/Karachi",
+  "SYNC_INTERVAL_SEC": 600,
+  "CONNECTION_TIMEOUT_SEC": 30,
+  "PREFER_UDP": false,
+  "PUNCH_TIME_MODE": "school_local"
+}

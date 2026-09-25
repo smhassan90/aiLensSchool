@@ -21,6 +21,8 @@ yarn.lock
 *.key
 *.mobileprovision
 *.keystore
+keystore.properties
+**/keystore.credentials.txt
 *.orig.*
 *.apk
 *.aab

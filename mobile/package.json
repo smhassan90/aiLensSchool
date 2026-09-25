@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "build:android:apk": "expo prebuild --platform android --no-install && cd android && gradlew.bat assembleRelease",
-    "build:android:aab": "expo prebuild --platform android --no-install && cd android && gradlew.bat bundleRelease"
+    "build:android:aab": "powershell -ExecutionPolicy Bypass -File ./scripts/build-release-aab.ps1"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",

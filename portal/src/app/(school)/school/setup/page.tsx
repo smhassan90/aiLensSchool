@@ -116,6 +116,13 @@ const setupSections: SetupSection[] = [
         permission: "MANAGE_TEACHERS",
       },
       {
+        href: "/school/setup/attendance",
+        title: "Attendance (biometric)",
+        description: "ZKTeco terminals, edge sync settings, and agent bootstrap",
+        icon: ClipboardCheck,
+        permission: "MANAGE_TEACHERS",
+      },
+      {
         href: "/school/staff",
         title: "Staff access",
         description: "Principal and staff logins with permissions",

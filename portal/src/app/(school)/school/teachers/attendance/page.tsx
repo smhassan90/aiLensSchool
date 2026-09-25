@@ -25,6 +25,7 @@ import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { localDateISO } from "@/lib/utils";
 import { Clock } from "lucide-react";
+import { TeacherAttendanceTabs } from "./attendance-tabs";
 
 function formatCheckInTime(iso: string | null, timeZone: string) {
   if (!iso) return "—";
@@ -131,9 +132,10 @@ export default function TeacherAttendancePage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="Teacher check-in"
-        description="Select a teacher and press Check in. The time is saved. After the late time they are late; after the absent time they are marked absent. Attendance machines can send the same punches later."
+        title="Teacher attendance"
+        description="Desk check-in for today, history reports, and ZKTeco device sync."
       />
+      <TeacherAttendanceTabs />
       {!can("MANAGE_TEACHERS") ? (
         <p className="text-sm text-muted-foreground">Ask the school admin to check teachers in.</p>
       ) : (

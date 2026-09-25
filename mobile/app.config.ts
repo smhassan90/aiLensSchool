@@ -9,7 +9,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Hawk Nexa',
   slug: 'sms-parent',
-  version: '1.0.0',
+  version: '1.0.2',
   orientation: 'portrait',
   scheme: 'smsparent',
   userInterfaceStyle: 'light',
@@ -25,7 +25,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#ffffff',
     },
     package: 'com.hawknexa.student',
-    versionCode: 8,
+    versionCode: 10,
     ...(existsSync(googleServicesResolved) ? { googleServicesFile: googleServicesPath } : {}),
   },
   web: {
