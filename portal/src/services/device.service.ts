@@ -74,7 +74,16 @@ export const deviceService = {
     syncIntervalSeconds?: number;
   }) =>
     apiClient<BiometricDevice>("/device", { method: "POST", body: JSON.stringify(body) }),
-  update: (id: string, body: Partial<{ name: string; ipAddress: string; port: number; isActive: boolean }>) =>
+  update: (
+    id: string,
+    body: Partial<{
+      name: string;
+      ipAddress: string;
+      port: number;
+      isActive: boolean;
+      syncIntervalSeconds: number;
+    }>,
+  ) =>
     apiClient<BiometricDevice>(`/device/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   remove: (id: string) => apiClient(`/device/${id}`, { method: "DELETE" }),
   test: (id: string) => apiClient<{ ok: boolean; serialNumber?: string }>(`/device/${id}/test`, { method: "POST" }),
