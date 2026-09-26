@@ -39,15 +39,21 @@ function tabFromQuery(value: string | null): Tab {
 function DeviceRow({
   device,
   canManage,
+  canDelete,
   onSavePoll,
   onFullSync,
+  onDelete,
   pollSaving,
+  deletePending,
 }: {
   device: BiometricDevice;
   canManage: boolean;
+  canDelete: boolean;
   onSavePoll: (sec: number) => void;
   onFullSync: () => void;
+  onDelete: () => void;
   pollSaving: boolean;
+  deletePending: boolean;
 }) {
   const [poll, setPoll] = useState(String(device.syncIntervalSeconds));
   useEffect(() => {
@@ -86,6 +92,22 @@ function DeviceRow({
           <Button type="button" size="sm" variant="outline" onClick={onFullSync}>
             Full sync
           </Button>
+          {canDelete ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              disabled={deletePending}
+              onClick={() => {
+                const ok = window.confirm(
+                  `Remove terminal "${device.name}" (${device.ipAddress})?\n\nDevice users, teacher mappings, and pending punches for this terminal will be removed. This cannot be undone.`,
+                );
+                if (ok) onDelete();
+              }}
+            >
+              {deletePending ? "Removing…" : "Delete"}
+            </Button>
+          ) : null}
         </TableCell>
       ) : null}
     </TableRow>
@@ -126,6 +148,7 @@ export default function SetupAttendancePage() {
   const queryClient = useQueryClient();
   const canView = can("VIEW_BIOMETRIC_DEVICES") || can("MANAGE_TEACHERS");
   const canManage = can("MANAGE_BIOMETRIC_DEVICES") || can("MANAGE_TEACHERS");
+  const canDeleteDevice = can("MANAGE_BIOMETRIC_DEVICES");
   const [tab, setTab] = useState<Tab>(() => tabFromQuery(searchParams.get("tab")));
 
   useEffect(() => {
@@ -234,6 +257,21 @@ export default function SetupAttendancePage() {
       toast({ title: "Poll interval saved", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["attendance-setup"] });
     },
+  });
+
+  const deleteDevice = useMutation({
+    mutationFn: (id: string) => deviceService.remove(id),
+    onSuccess: () => {
+      toast({ title: "Terminal removed", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["attendance-setup"] });
+      queryClient.invalidateQueries({ queryKey: ["biometric-devices"] });
+    },
+    onError: (err) =>
+      toast({
+        title: "Could not remove terminal",
+        description: err instanceof ApiClientError ? err.message : "",
+        variant: "error",
+      }),
   });
 
   const copyApiKey = async () => {
@@ -431,7 +469,10 @@ export default function SetupAttendancePage() {
                       canManage={canManage}
                       onSavePoll={(sec) => updateDevicePoll.mutate({ id: d.id, syncIntervalSeconds: sec })}
                       onFullSync={() => requestFullSync.mutate(d.id)}
+                      canDelete={canDeleteDevice}
+                      onDelete={() => deleteDevice.mutate(d.id)}
                       pollSaving={updateDevicePoll.isPending}
+                      deletePending={deleteDevice.isPending && deleteDevice.variables === d.id}
                     />
                   ))}
                 </TableBody>

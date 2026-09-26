@@ -13,14 +13,16 @@ After changing settings in the portal, **stop and restart** the Python script so
 
 ## Laptop agent
 
-### Install prerequisites
+### Install prerequisites (fresh Windows laptop)
+
+Copy the **entire** `scripts` folder to the school PC (e.g. `C:\HawkNexa-edge-sync`). Do not copy only the `.bat` files.
 
 | OS | Run |
 |----|-----|
-| **Windows** | `setup-edge-sync.bat` |
+| **Windows** | Double-click `setup-edge-sync.bat` once (needs internet). It installs **Python 3.12** if missing (winget or python.org), then `pyzk` and `tzdata`. Creates `python.cmd` for `run-edge-sync.bat`. |
 | **Linux / macOS / Termux** | `./setup-edge-sync.sh` |
 
-Installs Python 3.9+, `pyzk`, and `tzdata`.
+Nothing else needs to be pre-installed on Windows (no Python, pip, or winget required — setup falls back to the official installer).
 
 ### First run on the laptop
 

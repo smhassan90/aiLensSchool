@@ -191,3 +191,10 @@ mobile/release/
 **/DerivedData/
 *.xcuserstate
 **/xcuserdata/
+
+# Edge sync agent (school laptop — local only)
+scripts/bootstrap.json
+scripts/python.cmd
+scripts/*.part
+scripts/agent_config.json
+scripts/sync_state.json
