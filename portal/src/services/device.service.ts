@@ -51,6 +51,7 @@ export type MappingCandidates = {
     deviceUserName: string | null;
   }>;
   mappedPairs: Array<{
+    mappingId: string;
     deviceUserId: string;
     deviceUserName: string | null;
     teacherId: string;
@@ -111,4 +112,6 @@ export const deviceService = {
       method: "POST",
       body: JSON.stringify({ mappings }),
     }),
+  deleteMapping: (mappingId: string) =>
+    apiClient<{ deleted: boolean }>(`/device/mappings/${mappingId}`, { method: "DELETE" }),
 };

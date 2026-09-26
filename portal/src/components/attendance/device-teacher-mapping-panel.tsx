@@ -166,6 +166,25 @@ function DeviceMappingCard({
     });
   }, [suggestions]);
 
+  const unmapTeacher = useMutation({
+    mutationFn: (mappingId: string) => deviceService.deleteMapping(mappingId),
+    onSuccess: () => {
+      toast({
+        title: "Mapping removed",
+        description: "Pick the correct teacher below and save mappings.",
+        variant: "success",
+      });
+      setDraft({});
+      queryClient.invalidateQueries({ queryKey: ["device-mapping-candidates", device.id] });
+    },
+    onError: (err) =>
+      toast({
+        title: "Could not remove mapping",
+        description: err instanceof ApiClientError ? err.message : "",
+        variant: "error",
+      }),
+  });
+
   const confirmMappings = useMutation({
     mutationFn: (mappings: MappingRow[]) => deviceService.confirmMappings(device.id, mappings),
     onSuccess: (res) => {
@@ -257,17 +276,55 @@ function DeviceMappingCard({
                   <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Already mapped
                   </h4>
-                  <ul className="space-y-1 text-sm">
-                    {mappedPairs.map((row) => (
-                      <li key={row.deviceUserId}>
-                        <span className="font-medium">{row.deviceUserName || `ID ${row.deviceUserId}`}</span>
-                        <span className="text-muted-foreground"> → {row.teacherName}</span>
-                        {row.employeeCode ? (
-                          <span className="text-muted-foreground"> · {row.employeeCode}</span>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="overflow-x-auto rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Device user</TableHead>
+                          <TableHead>Teacher</TableHead>
+                          {canManage ? <TableHead className="w-[100px] text-right">Action</TableHead> : null}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {mappedPairs.map((row) => (
+                          <TableRow key={row.mappingId}>
+                            <TableCell>
+                              <div className="font-medium">
+                                {row.deviceUserName || `ID ${row.deviceUserId}`}
+                              </div>
+                              <div className="text-xs text-muted-foreground">ID {row.deviceUserId}</div>
+                            </TableCell>
+                            <TableCell>
+                              {row.teacherName}
+                              {row.employeeCode ? (
+                                <span className="text-muted-foreground"> · {row.employeeCode}</span>
+                              ) : null}
+                            </TableCell>
+                            {canManage ? (
+                              <TableCell className="text-right">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={unmapTeacher.isPending}
+                                  onClick={() => {
+                                    const ok = window.confirm(
+                                      `Remove mapping for "${row.deviceUserName || row.deviceUserId}" → ${row.teacherName}?\n\nThe device user will appear in the list below so you can map them to another teacher.`,
+                                    );
+                                    if (ok) unmapTeacher.mutate(row.mappingId);
+                                  }}
+                                >
+                                  {unmapTeacher.isPending && unmapTeacher.variables === row.mappingId
+                                    ? "Removing…"
+                                    : "Unmap"}
+                                </Button>
+                              </TableCell>
+                            ) : null}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               ) : null}
 

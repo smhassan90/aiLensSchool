@@ -378,7 +378,7 @@ export class DeviceService {
       this.prisma.biometricDeviceUser.findMany({ where: { deviceConfigId: deviceId } }),
       this.prisma.biometricDeviceUserMapping.findMany({
         where: { deviceConfigId: deviceId, isActive: true },
-        select: { deviceUserId: true, teacherId: true },
+        select: { id: true, deviceUserId: true, teacherId: true },
       }),
       this.prisma.teacherProfile.findMany({
         where: { schoolId, status: TeacherStatus.ACTIVE },
@@ -428,6 +428,7 @@ export class DeviceService {
       const deviceUser = deviceUserById.get(m.deviceUserId);
       const teacher = teacherById.get(m.teacherId);
       return {
+        mappingId: m.id,
         deviceUserId: m.deviceUserId,
         deviceUserName: deviceUser?.deviceUserName ?? null,
         teacherId: m.teacherId,

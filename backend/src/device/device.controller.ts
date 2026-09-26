@@ -148,7 +148,7 @@ export class DeviceController {
   }
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
-  @RequirePermission('MANAGE_BIOMETRIC_DEVICES')
+  @RequirePermission('MANAGE_BIOMETRIC_DEVICES', 'MANAGE_TEACHERS')
   @Post(':id/mappings/confirm')
   confirmMappings(
     @CurrentUser() user: AuthUser,
@@ -166,7 +166,7 @@ export class DeviceController {
   }
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
-  @RequirePermission('MANAGE_BIOMETRIC_DEVICES')
+  @RequirePermission('MANAGE_BIOMETRIC_DEVICES', 'MANAGE_TEACHERS')
   @Put('mappings/:mappingId')
   updateMapping(
     @CurrentUser() user: AuthUser,
@@ -177,7 +177,7 @@ export class DeviceController {
   }
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
-  @RequirePermission('MANAGE_BIOMETRIC_DEVICES')
+  @RequirePermission('MANAGE_BIOMETRIC_DEVICES', 'MANAGE_TEACHERS')
   @Delete('mappings/:mappingId')
   deleteMapping(@CurrentUser() user: AuthUser, @Param('mappingId') mappingId: string) {
     return this.deviceService.deleteMapping(user, mappingId);
