@@ -29,7 +29,6 @@ import { gradeClassLabel, gradeClassNumber } from "@/lib/utils";
 const schema = z.object({
   firstName: z.string().min(1, "Required"),
   lastName: z.string().min(1, "Required"),
-  email: z.string().email("Valid email required"),
   phone: z.string().optional(),
   branchId: z.string().min(1, "Select a branch"),
   employeeCode: z.string().min(1, "Required"),
@@ -100,7 +99,6 @@ export default function TeacherDetailsPage() {
     defaultValues: {
       firstName: "",
       lastName: "",
-      email: "",
       phone: "",
       branchId: "",
       employeeCode: "",
@@ -116,7 +114,6 @@ export default function TeacherDetailsPage() {
     form.reset({
       firstName: row.user.firstName,
       lastName: row.user.lastName,
-      email: row.user.email,
       phone: row.user.phone ?? "",
       branchId: row.branch?.id ?? "",
       employeeCode: row.employeeCode,
@@ -131,7 +128,6 @@ export default function TeacherDetailsPage() {
       teachersService.update(params.id, {
         firstName: values.firstName,
         lastName: values.lastName,
-        email: values.email,
         phone: values.phone,
         branchId: values.branchId,
         employeeCode: values.employeeCode,
@@ -254,11 +250,15 @@ export default function TeacherDetailsPage() {
               ) : null}
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" disabled={!canEdit} {...form.register("email")} />
-              {form.formState.errors.email ? (
-                <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
-              ) : null}
+              <Label htmlFor="loginUsername">Login username</Label>
+              <Input
+                id="loginUsername"
+                value={row.user.username ?? "—"}
+                readOnly
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-xs text-muted-foreground">Teachers sign in with this username, not an email address.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>

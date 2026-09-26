@@ -39,7 +39,7 @@ export interface CreateTeacherPayload {
   status?: "ACTIVE" | "INACTIVE" | "ON_LEAVE";
 }
 
-export type UpdateTeacherPayload = Partial<Omit<CreateTeacherPayload, "password">>;
+export type UpdateTeacherPayload = Partial<CreateTeacherPayload & { email?: string }>;
 
 export type ScoreKey =
   | "annualResults"
