@@ -12,6 +12,7 @@ export type TeacherAttendanceHistoryRow = {
 
 export type TeacherAttendanceHistoryResponse = {
   data: TeacherAttendanceHistoryRow[];
+  timezone?: string;
   page: number;
   limit: number;
   total: number;

@@ -25,9 +25,10 @@ import { localDateISO } from "@/lib/utils";
 import { History } from "lucide-react";
 import Link from "next/link";
 
-function formatTime(iso: string | null) {
+function formatTime(iso: string | null, timeZone: string) {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString("en-GB", {
+    timeZone,
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
@@ -67,6 +68,7 @@ export default function TeacherAttendanceHistoryPage() {
   });
 
   const rows = history.data?.data ?? [];
+  const timeZone = history.data?.timezone ?? "Asia/Karachi";
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -140,8 +142,8 @@ export default function TeacherAttendanceHistoryPage() {
                         <div className="font-medium">{row.teacher.name}</div>
                         <div className="text-xs text-muted-foreground">{row.teacher.employeeCode}</div>
                       </TableCell>
-                      <TableCell>{formatTime(row.checkInTime)}</TableCell>
-                      <TableCell>{formatTime(row.checkOutTime)}</TableCell>
+                      <TableCell>{formatTime(row.checkInTime, timeZone)}</TableCell>
+                      <TableCell>{formatTime(row.checkOutTime, timeZone)}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{row.status}</Badge>
                       </TableCell>

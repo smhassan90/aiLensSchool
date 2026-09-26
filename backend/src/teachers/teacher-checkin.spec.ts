@@ -37,7 +37,7 @@ describe('teacher check-in cut-offs', () => {
       AttendanceStatus.LATE,
     );
     expect(statusFromCheckIn(new Date('2026-09-13T04:00:00.000Z'), '08:15', '09:00', TZ)).toBe(
-      AttendanceStatus.ABSENT,
+      AttendanceStatus.LATE,
     );
   });
 

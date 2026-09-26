@@ -126,6 +126,7 @@ export interface TeacherAttendanceRow {
   employeeCode: string;
   status: TeacherAttendanceStatus | null;
   checkedInAt: string | null;
+  checkedOutAt: string | null;
   source: string | null;
 }
 

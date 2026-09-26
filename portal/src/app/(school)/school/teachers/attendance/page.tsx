@@ -248,6 +248,7 @@ export default function TeacherAttendancePage() {
                   <TableRow>
                     <TableHead>Teacher</TableHead>
                     <TableHead>Check-in</TableHead>
+                    <TableHead>Check-out</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Source</TableHead>
                   </TableRow>
@@ -261,7 +262,12 @@ export default function TeacherAttendancePage() {
                           <div className="text-xs text-muted-foreground">{row.employeeCode}</div>
                         ) : null}
                       </TableCell>
-                      <TableCell>{formatCheckInTime(row.checkedInAt, policy?.timezone ?? "Asia/Karachi")}</TableCell>
+                      <TableCell>
+                        {formatCheckInTime(row.checkedInAt, policy?.timezone ?? "Asia/Karachi")}
+                      </TableCell>
+                      <TableCell>
+                        {formatCheckInTime(row.checkedOutAt, policy?.timezone ?? "Asia/Karachi")}
+                      </TableCell>
                       <TableCell>{statusBadge(row.status)}</TableCell>
                       <TableCell>{sourceLabel(row.source)}</TableCell>
                     </TableRow>

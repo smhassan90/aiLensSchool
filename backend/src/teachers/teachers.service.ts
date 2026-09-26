@@ -718,7 +718,13 @@ export class TeachersService {
     });
     const marks = await this.prisma.teacherAttendance.findMany({
       where: { schoolId, date: day },
-      select: { teacherId: true, status: true, checkedInAt: true, source: true },
+      select: {
+        teacherId: true,
+        status: true,
+        checkedInAt: true,
+        checkedOutAt: true,
+        source: true,
+      },
     });
     const byTeacher = new Map(marks.map((row) => [row.teacherId, row]));
     const rows = teachers.map((teacher) => {
@@ -727,8 +733,16 @@ export class TeachersService {
         teacherId: teacher.id,
         name: teacherDisplayName(teacher.user.firstName, teacher.user.lastName, teacher.gender),
         employeeCode: teacher.employeeCode,
-        status: mark?.status ?? null,
+        status: mark?.checkedInAt
+          ? statusFromCheckIn(
+              mark.checkedInAt,
+              policy.lateAfter,
+              policy.absentAfter,
+              policy.timezone,
+            )
+          : (mark?.status ?? null),
         checkedInAt: mark?.checkedInAt?.toISOString() ?? null,
+        checkedOutAt: mark?.checkedOutAt?.toISOString() ?? null,
         source: mark?.source ?? null,
       };
     });

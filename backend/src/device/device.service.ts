@@ -16,7 +16,12 @@ import { DeviceSyncKeyService } from './device-sync-key.service';
 import { ZktService } from './zkt.service';
 import { normalizeTeacherName } from './biometric-punch.util';
 import { teacherDisplayName } from '../common/utils/person-name';
-import { dateFromIso, zonedDateIso } from '../teachers/teacher-checkin';
+import {
+  dateFromIso,
+  loadTeacherAttendancePolicy,
+  statusFromCheckIn,
+  zonedDateIso,
+} from '../teachers/teacher-checkin';
 import {
   EdgeSyncSettings,
   mergeEdgeSyncIntoMetadata,
@@ -574,6 +579,7 @@ export class DeviceService {
     },
   ) {
     const schoolId = this.requireSchool(user);
+    const policy = await loadTeacherAttendancePolicy(this.prisma, schoolId);
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const sortOrder = query.sortOrder ?? 'desc';
@@ -634,11 +640,18 @@ export class DeviceService {
       },
       checkInTime: row.checkedInAt?.toISOString() ?? null,
       checkOutTime: row.checkedOutAt?.toISOString() ?? null,
-      status: row.status,
+      status: row.checkedInAt
+        ? statusFromCheckIn(
+            row.checkedInAt,
+            policy.lateAfter,
+            policy.absentAfter,
+            policy.timezone,
+          )
+        : row.status,
       source: row.source,
     }));
 
-    return { data, ...paginate(data, total, page, limit) };
+    return { data, timezone: policy.timezone, ...paginate(data, total, page, limit) };
   }
 
   async listTeachersDropdown(user: AuthUser) {

@@ -47,18 +47,17 @@ export function dateFromIso(iso: string): Date {
   return new Date(`${iso}T00:00:00.000Z`);
 }
 
+/** Status for a recorded check-in. ABSENT is only used when there is no check-in (see finalizeTeacherAbsences). */
 export function statusFromCheckIn(
   checkedInAt: Date,
   lateAfter: string,
-  absentAfter: string,
+  _absentAfter: string,
   timeZone: string,
 ): AttendanceStatus {
   const punch = zonedMinutes(checkedInAt, timeZone);
   const lateAt = hmToMinutes(lateAfter);
-  const absentAt = hmToMinutes(absentAfter);
   if (punch < lateAt) return AttendanceStatus.PRESENT;
-  if (punch < absentAt) return AttendanceStatus.LATE;
-  return AttendanceStatus.ABSENT;
+  return AttendanceStatus.LATE;
 }
 
 export function shouldFinalizeAbsences(
