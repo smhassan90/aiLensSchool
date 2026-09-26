@@ -55,6 +55,9 @@ const HREF_PREFETCH: Record<string, PrefetchItem[]> = {
   "/school/dashboard": [SCHOOL_MENU_PREFETCH[0]],
   "/school/academics": [SCHOOL_MENU_PREFETCH[1], SCHOOL_MENU_PREFETCH[2], SCHOOL_MENU_PREFETCH[3]],
   "/school/teachers": [SCHOOL_MENU_PREFETCH[5]],
+  "/school/teachers/attendance": [
+    { key: ["teacher-attendance", ""], fn: () => teachersService.listAttendance(new Date().toISOString().slice(0, 10)) },
+  ],
   "/school/students": [SCHOOL_MENU_PREFETCH[6]],
   "/school/homework": [SCHOOL_MENU_PREFETCH[7], SCHOOL_MENU_PREFETCH[1], SCHOOL_MENU_PREFETCH[2]],
   "/school/quizzes": [SCHOOL_MENU_PREFETCH[8], SCHOOL_MENU_PREFETCH[1], SCHOOL_MENU_PREFETCH[2]],

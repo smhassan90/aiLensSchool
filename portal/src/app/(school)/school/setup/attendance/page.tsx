@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { DeviceTeacherMappingPanel } from "@/components/attendance/device-teacher-mapping-panel";
+import { TeacherAttendanceTabs } from "@/app/(school)/school/teachers/attendance/attendance-tabs";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLoader } from "@/components/layout/page-loader";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,6 @@ import { useAuth } from "@/providers/auth-provider";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { deviceService, type BiometricDevice } from "@/services/device.service";
-import { cn } from "@/lib/utils";
 import { Eye, EyeOff, Fingerprint } from "lucide-react";
 
 type Tab = "mapping" | "configuration" | "devices";
@@ -111,33 +111,6 @@ function DeviceRow({
         </TableCell>
       ) : null}
     </TableRow>
-  );
-}
-
-function SetupTabs({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
-  const items: { id: Tab; label: string }[] = [
-    { id: "mapping", label: "Map teachers" },
-    { id: "configuration", label: "Configuration" },
-    { id: "devices", label: "Devices" },
-  ];
-  return (
-    <nav className="mb-6 flex gap-2 border-b border-border pb-2">
-      {items.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => onTab(item.id)}
-          className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium",
-            tab === item.id
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:bg-muted",
-          )}
-        >
-          {item.label}
-        </button>
-      ))}
-    </nav>
   );
 }
 
@@ -300,7 +273,7 @@ export default function SetupAttendancePage() {
         <Link href="/school/setup" className="text-primary underline">Setup</Link>
       </p>
 
-      <SetupTabs tab={tab} onTab={setTab} />
+      <TeacherAttendanceTabs />
 
       {tab === "mapping" ? (
         <DeviceTeacherMappingPanel setupHref="/school/setup/attendance?tab=devices" />

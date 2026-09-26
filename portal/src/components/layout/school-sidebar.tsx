@@ -3,6 +3,7 @@
 import {
   CalendarClock,
   CalendarDays,
+  ClipboardCheck,
   FileText,
   GraduationCap,
   LayoutDashboard,
@@ -61,6 +62,7 @@ const mainNav: Array<{
   { href: "/school/dashboard", label: "Dashboard", icon: LayoutDashboard, permission: "VIEW_DASHBOARD" },
   { href: "/school/students", label: "Students", icon: GraduationCap },
   { href: "/school/teachers", label: "Teachers", icon: UserSquare2 },
+  { href: "/school/teachers/attendance", label: "Attendance", icon: ClipboardCheck },
   { href: "/school/exams", label: "Exams", icon: Trophy, permission: "MANAGE_EXAMS" },
   { href: "/school/submitted-exam-papers", label: "Exam papers", icon: FileText },
   { href: "/school/announcements", label: "Notifications", icon: Megaphone },
@@ -78,6 +80,10 @@ function isActivePath(pathname: string, href: string, matchSetup?: boolean) {
   }
   if (pathname === href) return true;
   if (href === "/school/dashboard" && pathname.startsWith("/school/classes")) return true;
+  if (href === "/school/teachers" && pathname.startsWith("/school/teachers/attendance")) return false;
+  if (href === "/school/teachers/attendance") {
+    return pathname === href || pathname.startsWith(`${href}/`) || pathname.startsWith("/school/setup/attendance");
+  }
   if (!pathname.startsWith(`${href}/`)) return false;
   if (href === "/school/fees" && pathname.startsWith("/school/fees")) return true;
   return true;
@@ -92,6 +98,13 @@ export function SchoolSidebar() {
   const items = mainNav.filter((item) => {
     if (item.href === "/school/teachers") {
       return can("MANAGE_TEACHERS") || can("VIEW_TEACHER_PROGRESS");
+    }
+    if (item.href === "/school/teachers/attendance") {
+      return (
+        can("MANAGE_TEACHERS") ||
+        can("VIEW_TEACHER_ATTENDANCE_HISTORY") ||
+        can("VIEW_BIOMETRIC_DEVICES")
+      );
     }
     return !item.permission || can(item.permission);
   });
