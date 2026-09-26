@@ -437,9 +437,12 @@ export class DeviceService {
       };
     });
 
+    const teacherOptions = teacherRows.map(({ normalizedName: _n, ...rest }) => rest);
+
     return {
       unmappedDeviceUsers,
       unmappedTeachers: unmappedTeachers.map(({ normalizedName: _n, ...rest }) => rest),
+      allTeachers: teacherOptions,
       suggestions,
       mappedPairs,
       pendingCounts: Object.fromEntries(pendingByUser),

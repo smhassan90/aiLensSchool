@@ -44,6 +44,7 @@ export type MappingCandidates = {
     pendingCount: number;
   }>;
   unmappedTeachers: Array<{ id: string; name: string; employeeCode: string }>;
+  allTeachers: Array<{ id: string; name: string; employeeCode: string }>;
   suggestions: Array<{
     deviceUserId: string;
     teacherId: string;

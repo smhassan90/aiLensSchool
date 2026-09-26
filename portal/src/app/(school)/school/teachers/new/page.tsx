@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ type FormValues = z.infer<typeof schema>;
 export default function NewTeacherPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const branches = useQuery({
     queryKey: ["branches"],
@@ -56,6 +57,10 @@ export default function NewTeacherPage() {
     mutationFn: (values: FormValues) => teachersService.create(values),
     onSuccess: () => {
       toast({ title: "Teacher created", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["teacher-attendance"] });
+      queryClient.invalidateQueries({ queryKey: ["device-mapping-candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["teacher-attendance-teachers"] });
+      queryClient.invalidateQueries({ queryKey: ["teachers"] });
       router.push("/school/teachers");
     },
     onError: (err) => {

@@ -42,13 +42,23 @@ function buildMappingsToSave(
     .filter((row): row is MappingRow => row !== null);
 }
 
-function teachersForDeviceUser(
+function teachersSelectableForDeviceUser(
   deviceUserId: string,
-  unmappedTeachers: Array<{ id: string; name: string; employeeCode: string }>,
+  allTeachers: Array<{ id: string; name: string; employeeCode: string }>,
+  mappedPairs: Array<{ teacherId: string; deviceUserId: string }>,
   suggestions: Array<{ deviceUserId: string; teacherId: string; teacherName: string }>,
   suggestionMap: Record<string, string>,
 ) {
-  const byId = new Map(unmappedTeachers.map((t) => [t.id, t]));
+  const teacherMappedToDevice = new Map(mappedPairs.map((m) => [m.teacherId, m.deviceUserId]));
+  const byId = new Map<string, { id: string; name: string; employeeCode: string }>();
+
+  for (const teacher of allTeachers) {
+    const mappedDevice = teacherMappedToDevice.get(teacher.id);
+    if (mappedDevice === undefined || mappedDevice === deviceUserId) {
+      byId.set(teacher.id, teacher);
+    }
+  }
+
   const suggestedId = suggestionMap[deviceUserId];
   if (suggestedId && !byId.has(suggestedId)) {
     const sug = suggestions.find((s) => s.deviceUserId === deviceUserId);
@@ -60,7 +70,8 @@ function teachersForDeviceUser(
       });
     }
   }
-  return [...byId.values()];
+
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }
 
 function DeviceMappingCard({
@@ -348,9 +359,12 @@ function DeviceMappingCard({
                   <TableBody>
                     {unmapped.map((user) => {
                       const value = draft[user.deviceUserId] ?? suggestionMap[user.deviceUserId] ?? "";
-                      const teacherOptions = teachersForDeviceUser(
+                      const teacherOptions = teachersSelectableForDeviceUser(
                         user.deviceUserId,
-                        candidates.data?.unmappedTeachers ?? [],
+                        candidates.data?.allTeachers ??
+                          candidates.data?.unmappedTeachers ??
+                          [],
+                        mappedPairs,
                         suggestions,
                         suggestionMap,
                       );

@@ -35,6 +35,14 @@ function formatTime(iso: string | null, timeZone: string) {
   });
 }
 
+function statusBadge(status: string) {
+  const normalized = status?.toUpperCase();
+  if (normalized === "PRESENT") return <Badge variant="success">Present</Badge>;
+  if (normalized === "LATE") return <Badge variant="warning">Late</Badge>;
+  if (normalized === "ABSENT") return <Badge variant="destructive">Absent</Badge>;
+  return <Badge variant="outline">{status || "—"}</Badge>;
+}
+
 export default function TeacherAttendanceHistoryPage() {
   const { can } = useAuth();
   const allowed = can("VIEW_TEACHER_ATTENDANCE_HISTORY") || can("MANAGE_TEACHERS");
@@ -144,9 +152,7 @@ export default function TeacherAttendanceHistoryPage() {
                       </TableCell>
                       <TableCell>{formatTime(row.checkInTime, timeZone)}</TableCell>
                       <TableCell>{formatTime(row.checkOutTime, timeZone)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{row.status}</Badge>
-                      </TableCell>
+                      <TableCell>{statusBadge(row.status)}</TableCell>
                       <TableCell>{row.source === "MACHINE" ? "Device" : row.source}</TableCell>
                     </TableRow>
                   ))}

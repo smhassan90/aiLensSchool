@@ -84,8 +84,10 @@ export default function TeacherAttendancePage() {
     setAbsentAfter(policy.absentAfter);
   }, [policy?.lateAfter, policy?.absentAfter]);
 
-  const waitingTeachers = teachers.filter((row) => !row.checkedInAt);
-  const selectedReady = waitingTeachers.some((row) => row.teacherId === teacherId);
+  const selectedTeacher = teachers.find((row) => row.teacherId === teacherId);
+  const selectedReady = Boolean(
+    teacherId && isToday && selectedTeacher && !selectedTeacher.checkedInAt,
+  );
 
   const savePolicy = useMutation({
     mutationFn: () =>
@@ -203,10 +205,11 @@ export default function TeacherAttendancePage() {
                   disabled={!isToday || day.isLoading}
                 >
                   <option value="">Select a teacher</option>
-                  {waitingTeachers.map((row) => (
-                    <option key={row.teacherId} value={row.teacherId}>
+                  {teachers.map((row) => (
+                    <option key={row.teacherId} value={row.teacherId} disabled={Boolean(row.checkedInAt)}>
                       {row.name}
                       {row.employeeCode ? ` · ${row.employeeCode}` : ""}
+                      {row.checkedInAt ? " (checked in)" : ""}
                     </option>
                   ))}
                 </Select>
