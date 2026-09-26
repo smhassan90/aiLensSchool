@@ -30,7 +30,7 @@ function mapClassAssignment(
 export interface CreateTeacherPayload {
   firstName: string;
   lastName: string;
-  phone?: string;
+  phone: string;
   password: string;
   branchId: string;
   employeeCode?: string;

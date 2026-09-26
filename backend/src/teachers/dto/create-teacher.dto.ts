@@ -60,11 +60,10 @@ export class CreateTeacherDto {
   @IsEmail()
   email?: string;
 
-  @ApiPropertyOptional()
-  @Transform(emptyStringToUndefined)
-  @IsOptional()
+  @ApiProperty({ description: 'Mobile number; used for login username and must be unique in the school' })
   @IsString()
-  phone?: string;
+  @MinLength(7)
+  phone!: string;
 
   @ApiProperty()
   @IsString()

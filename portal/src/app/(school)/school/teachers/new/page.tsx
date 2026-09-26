@@ -20,10 +20,17 @@ import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { ArrowLeft } from "lucide-react";
 
+function phoneDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 const schema = z.object({
   firstName: z.string().min(1, "Required"),
   lastName: z.string().min(1, "Required"),
-  phone: z.string().optional(),
+  phone: z
+    .string()
+    .min(1, "Mobile number is required")
+    .refine((v) => phoneDigits(v).length >= 7, "Enter at least 7 digits"),
   password: z.string().min(8, "Minimum 8 characters"),
   branchId: z.string().min(1, "Select a branch"),
   employeeCode: z.string().optional(),
@@ -54,16 +61,16 @@ export default function NewTeacherPage() {
 
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
-      const phone = values.phone?.trim();
+      const phone = values.phone.trim();
       const employeeCode = values.employeeCode?.trim();
       const hireDate = values.hireDate?.trim();
       return teachersService.create({
         firstName: values.firstName.trim(),
         lastName: values.lastName.trim(),
+        phone,
         password: values.password,
         branchId: values.branchId,
         status: values.status,
-        ...(phone ? { phone } : {}),
         ...(employeeCode ? { employeeCode } : {}),
         ...(hireDate ? { hireDate } : {}),
       });
@@ -119,8 +126,8 @@ export default function NewTeacherPage() {
             <CardHeader>
               <CardTitle>Teacher Details</CardTitle>
               <CardDescription>
-                A unique login username is generated from your school code and employee ID. Teachers sign in
-                with that username, not an email address.
+                Login username is generated from your school code and this mobile number (e.g. tps.032123234543).
+                The number must be unique among users at your school.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -135,8 +142,9 @@ export default function NewTeacherPage() {
                 {errors.lastName && <p className="text-sm text-destructive">{errors.lastName.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" type="tel" autoComplete="tel" {...register("phone")} />
+                <Label htmlFor="phone">Mobile number</Label>
+                <Input id="phone" type="tel" autoComplete="tel" placeholder="e.g. 032123234543" {...register("phone")} />
+                {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>

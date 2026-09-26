@@ -15,7 +15,12 @@ import { MemoryCacheService } from '../common/services/memory-cache.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
-import { buildTeacherUsername, teacherLocalEmail } from './teacher-accounts';
+import {
+  buildTeacherUsername,
+  normalizeTeacherPhoneDigits,
+  schoolPhonesMatch,
+  teacherLocalEmail,
+} from './teacher-accounts';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import { FAST_AI_PROVIDER, AiProvider } from '../ai/providers/ai.provider';
 import { hasStaffPermission } from '../common/permissions';
@@ -67,6 +72,14 @@ export class TeachersService {
       throw new ConflictException({ code: 'ROLE_MISSING', message: 'TEACHER role missing' });
     }
 
+    const phone = dto.phone.trim();
+    if (normalizeTeacherPhoneDigits(phone).length < 7) {
+      throw new BadRequestException({
+        code: 'PHONE_INVALID',
+        message: 'Enter a valid mobile number (at least 7 digits)',
+      });
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -91,12 +104,23 @@ export class TeachersService {
         });
       }
 
+      const usersWithPhone = await tx.user.findMany({
+        where: { schoolId, phone: { not: null } },
+        select: { phone: true },
+      });
+      if (usersWithPhone.some((row) => schoolPhonesMatch(row.phone, phone))) {
+        throw new ConflictException({
+          code: 'PHONE_EXISTS_IN_SCHOOL',
+          message: 'This phone number is already used at your school',
+        });
+      }
+
       const schoolCode = school?.code ?? 'SCH';
-      let username = buildTeacherUsername(schoolCode, employeeCode);
+      let username = buildTeacherUsername(schoolCode, phone);
       let attempt = 0;
       while (await tx.user.findUnique({ where: { username } })) {
         attempt += 1;
-        username = buildTeacherUsername(schoolCode, employeeCode, attempt);
+        username = buildTeacherUsername(schoolCode, phone, attempt);
       }
       const email = teacherLocalEmail(username, schoolCode);
 
@@ -107,7 +131,7 @@ export class TeachersService {
           passwordHash,
           firstName: dto.firstName,
           lastName: (dto.lastName ?? '').trim(),
-          phone: dto.phone,
+          phone,
           schoolId,
           status: dto.status === TeacherStatus.ACTIVE || !dto.status ? UserStatus.ACTIVE : UserStatus.INACTIVE,
         },
