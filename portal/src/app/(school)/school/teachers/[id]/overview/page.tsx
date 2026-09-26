@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -12,12 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Table,
   TableBody,
   TableCell,
@@ -27,7 +21,7 @@ import {
 } from "@/components/ui/table";
 import { teachersService } from "@/services/teachers.service";
 import { useAuth } from "@/providers/auth-provider";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronLeft } from "lucide-react";
 import { QuizAnalysis } from "@/components/quizzes/quiz-analysis";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +50,8 @@ export default function TeacherOverviewPage() {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [classPick, setClassPick] = useState<{ sectionId: string; subjectId: string; label: string } | null>(null);
   const [quizId, setQuizId] = useState<string | null>(null);
+  const classDetailRef = useRef<HTMLDivElement>(null);
+  const quizDetailRef = useRef<HTMLDivElement>(null);
 
   const overview = useQuery({
     queryKey: ["teacher-overview", params.id, month],
@@ -69,6 +65,28 @@ export default function TeacherOverviewPage() {
       teachersService.classInsights(params.id, classPick!.sectionId, classPick!.subjectId),
     enabled: Boolean(classPick),
   });
+
+  const selectClass = (pick: { sectionId: string; subjectId: string; label: string }) => {
+    setQuizId(null);
+    setClassPick(pick);
+  };
+
+  const clearClass = () => {
+    setQuizId(null);
+    setClassPick(null);
+  };
+
+  useEffect(() => {
+    if (classPick && classDetailRef.current) {
+      classDetailRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [classPick]);
+
+  useEffect(() => {
+    if (quizId && quizDetailRef.current) {
+      quizDetailRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [quizId]);
 
   const homeroom = useMemo(
     () => (overview.data?.assignments ?? []).filter((a) => a.role === "Class teacher"),
@@ -98,6 +116,8 @@ export default function TeacherOverviewPage() {
   const data = overview.data;
   const tz = data.timezone;
   const perf = data.performance;
+  const selectedQuizTitle =
+    quizId && insights.data?.quizzes.find((q) => q.id === quizId)?.title;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -152,14 +172,19 @@ export default function TeacherOverviewPage() {
                   {teaching.map((row) => {
                     const canDrill = row.sectionId && row.subjectId;
                     const label = `${row.className}${row.subject ? ` · ${row.subject}` : ""}`;
+                    const isSelected =
+                      classPick?.sectionId === row.sectionId && classPick?.subjectId === row.subjectId;
                     return (
                       <li key={row.id}>
                         {canDrill ? (
                           <button
                             type="button"
-                            className="text-left text-primary underline-offset-2 hover:underline"
+                            className={cn(
+                              "text-left underline-offset-2 hover:underline",
+                              isSelected ? "font-semibold text-primary" : "text-primary",
+                            )}
                             onClick={() =>
-                              setClassPick({
+                              selectClass({
                                 sectionId: row.sectionId!,
                                 subjectId: row.subjectId!,
                                 label,
@@ -245,7 +270,8 @@ export default function TeacherOverviewPage() {
         <CardHeader>
           <CardTitle className="text-base">Classes &amp; results (recent term)</CardTitle>
           <CardDescription>
-            Click a row to see lessons, quizzes, and class averages. Score snapshot: {perf.total}/100.
+            Select a class below to see lessons, quizzes, and averages on this page. Score snapshot:{" "}
+            {perf.total}/100.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -265,26 +291,33 @@ export default function TeacherOverviewPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {perf.byClass.map((cls) => (
-                    <TableRow
-                      key={`${cls.sectionId}-${cls.subjectId}`}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() =>
-                        setClassPick({
-                          sectionId: cls.sectionId,
-                          subjectId: cls.subjectId,
-                          label: `${cls.className} · ${cls.subject}`,
-                        })
-                      }
-                    >
-                      <TableCell className="font-medium">{cls.className}</TableCell>
-                      <TableCell>{cls.subject}</TableCell>
-                      <TableCell>{cls.lessons}</TableCell>
-                      <TableCell>{cls.quizzes}</TableCell>
-                      <TableCell>{cls.quizAverage ?? "—"}%</TableCell>
-                      <TableCell>{cls.termAverage ?? "—"}%</TableCell>
-                    </TableRow>
-                  ))}
+                  {perf.byClass.map((cls) => {
+                    const selected =
+                      classPick?.sectionId === cls.sectionId && classPick?.subjectId === cls.subjectId;
+                    return (
+                      <TableRow
+                        key={`${cls.sectionId}-${cls.subjectId}`}
+                        className={cn(
+                          "cursor-pointer hover:bg-muted/50",
+                          selected && "bg-primary/10 hover:bg-primary/15",
+                        )}
+                        onClick={() =>
+                          selectClass({
+                            sectionId: cls.sectionId,
+                            subjectId: cls.subjectId,
+                            label: `${cls.className} · ${cls.subject}`,
+                          })
+                        }
+                      >
+                        <TableCell className="font-medium">{cls.className}</TableCell>
+                        <TableCell>{cls.subject}</TableCell>
+                        <TableCell>{cls.lessons}</TableCell>
+                        <TableCell>{cls.quizzes}</TableCell>
+                        <TableCell>{cls.quizAverage ?? "—"}%</TableCell>
+                        <TableCell>{cls.termAverage ?? "—"}%</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -292,74 +325,102 @@ export default function TeacherOverviewPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={Boolean(classPick)} onOpenChange={(open) => !open && setClassPick(null)}>
-        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{classPick?.label}</DialogTitle>
-          </DialogHeader>
-          {insights.isLoading ? (
-            <PageLoader variant="panel" />
-          ) : insights.data ? (
-            <div className="space-y-6">
+      {classPick ? (
+        <div ref={classDetailRef} className="mb-6 scroll-mt-6 space-y-6">
+          <Card className="border-primary/30">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h3 className="mb-2 text-sm font-semibold">Lessons uploaded</h3>
-                {!insights.data.lessons.length ? (
-                  <p className="text-sm text-muted-foreground">No lessons yet.</p>
-                ) : (
-                  <ul className="space-y-1 text-sm">
-                    {insights.data.lessons.map((lesson) => (
-                      <li key={lesson.id} className="flex justify-between gap-2 border-b py-1">
-                        <span>{lesson.title}</span>
-                        <span className="text-muted-foreground">{lesson.date}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <CardTitle className="text-base">{classPick.label}</CardTitle>
+                <CardDescription>Lessons and quizzes for this class</CardDescription>
               </div>
-              <div>
-                <h3 className="mb-2 text-sm font-semibold">Quizzes &amp; class averages</h3>
-                {!insights.data.quizzes.length ? (
-                  <p className="text-sm text-muted-foreground">No quizzes yet.</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Quiz</TableHead>
-                        <TableHead>Attempts</TableHead>
-                        <TableHead>Average</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {insights.data.quizzes.map((quiz) => (
-                        <TableRow
-                          key={quiz.id}
-                          className={cn("cursor-pointer hover:bg-muted/50")}
-                          onClick={() => setQuizId(quiz.id)}
-                        >
-                          <TableCell className="font-medium">{quiz.title}</TableCell>
-                          <TableCell>{quiz.attempts}</TableCell>
-                          <TableCell>
-                            {quiz.averageScore != null ? `${quiz.averageScore}%` : "—"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </div>
+              <Button variant="outline" size="sm" onClick={clearClass}>
+                Clear selection
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {insights.isLoading ? (
+                <PageLoader variant="panel" />
+              ) : insights.data ? (
+                <div className="space-y-8">
+                  <div>
+                    <h3 className="mb-2 text-sm font-semibold">Lessons uploaded</h3>
+                    {!insights.data.lessons.length ? (
+                      <p className="text-sm text-muted-foreground">No lessons yet.</p>
+                    ) : (
+                      <ul className="space-y-1 text-sm">
+                        {insights.data.lessons.map((lesson) => (
+                          <li key={lesson.id} className="flex justify-between gap-2 border-b py-1">
+                            <span>{lesson.title}</span>
+                            <span className="text-muted-foreground">{lesson.date}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="mb-2 text-sm font-semibold">Quizzes &amp; class averages</h3>
+                    {!insights.data.quizzes.length ? (
+                      <p className="text-sm text-muted-foreground">No quizzes yet.</p>
+                    ) : (
+                      <div className="overflow-x-auto rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Quiz</TableHead>
+                              <TableHead>Attempts</TableHead>
+                              <TableHead>Average</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {insights.data.quizzes.map((quiz) => (
+                              <TableRow
+                                key={quiz.id}
+                                className={cn(
+                                  "cursor-pointer hover:bg-muted/50",
+                                  quizId === quiz.id && "bg-primary/10 hover:bg-primary/15",
+                                )}
+                                onClick={() => setQuizId(quiz.id)}
+                              >
+                                <TableCell className="font-medium">{quiz.title}</TableCell>
+                                <TableCell>{quiz.attempts}</TableCell>
+                                <TableCell>
+                                  {quiz.averageScore != null ? `${quiz.averageScore}%` : "—"}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          {quizId ? (
+            <div ref={quizDetailRef} className="scroll-mt-6">
+              <Card className="border-primary/30">
+                <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="text-base">Quiz breakdown</CardTitle>
+                    <CardDescription>
+                      {selectedQuizTitle ?? "Question-level results for this class"}
+                    </CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setQuizId(null)}>
+                    <ChevronLeft className="h-4 w-4" />
+                    Back to class
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <QuizAnalysis quizId={quizId} />
+                </CardContent>
+              </Card>
             </div>
           ) : null}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={Boolean(quizId)} onOpenChange={(open) => !open && setQuizId(null)}>
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Quiz breakdown</DialogTitle>
-          </DialogHeader>
-          {quizId ? <QuizAnalysis quizId={quizId} /> : null}
-        </DialogContent>
-      </Dialog>
+        </div>
+      ) : null}
     </div>
   );
 }
