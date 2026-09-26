@@ -347,9 +347,16 @@ def test_backend(cfg: dict[str, Any]) -> None:
     log(f"Backend OK — school={res.get('schoolName')} device={res.get('deviceName')}")
 
 
-def run_cycle(cfg: dict[str, Any], state: dict[str, Any], reset: bool) -> None:
+def run_cycle(
+    cfg: dict[str, Any],
+    state: dict[str, Any],
+    reset: bool,
+    force_user_sync: bool = False,
+) -> None:
     now = time.time()
-    if now - float(state.get("last_user_sync") or 0) >= float(cfg["USER_SYNC_INTERVAL_SEC"]):
+    user_interval = float(cfg["USER_SYNC_INTERVAL_SEC"])
+    last_user_sync = float(state.get("last_user_sync") or 0)
+    if force_user_sync or now - last_user_sync >= user_interval:
         sync_users(cfg)
         state["last_user_sync"] = now
         save_state(state)
@@ -360,6 +367,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="HawkNexa ZKTeco edge sync")
     parser.add_argument("--once", action="store_true", help="Run a single cycle")
     parser.add_argument("--reset", action="store_true", help="Clear local dedup state and re-upload")
+    parser.add_argument(
+        "--sync-users",
+        action="store_true",
+        help="Read the current user list from the terminal and upload to HawkNexa, then exit",
+    )
     parser.add_argument("--api-key", dest="api_key", help="School sync API key (or paste when prompted)")
     parser.add_argument("--device-id", dest="device_id", help="Terminal UUID (skip menu if set)")
     parser.add_argument(
@@ -393,17 +405,29 @@ def main() -> None:
 
     test_backend(cfg)
 
+    if args.sync_users:
+        log("Refreshing user list from terminal (one-shot)…")
+        sync_users(cfg)
+        state["last_user_sync"] = time.time()
+        save_state(state)
+        return
+
     device_errors = 0
     http_errors = 0
     full_sync_pending = bool(remote.get("fullSync"))
     if full_sync_pending:
-        log("Full re-upload requested from portal — clearing local dedup cache")
+        log("Full sync from portal — refreshing users and clearing local attendance dedup cache")
         state["fingerprints"] = []
         save_state(state)
 
+    log("Refreshing user list from terminal on startup…")
+    sync_users(cfg)
+    state["last_user_sync"] = time.time()
+    save_state(state)
+
     while True:
         try:
-            run_cycle(cfg, state, reset=False)
+            run_cycle(cfg, state, reset=False, force_user_sync=full_sync_pending)
             if full_sync_pending:
                 ack_full_sync(cfg)
                 full_sync_pending = False

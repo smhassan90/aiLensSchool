@@ -244,7 +244,8 @@ export default function SetupAttendancePage() {
     onSuccess: () => {
       toast({
         title: "Full sync queued",
-        description: "Stop and run run-edge-sync.bat on the laptop to reload settings and re-upload punches.",
+        description:
+          "On the laptop: stop and run run-edge-sync.bat. That run will refresh users from the terminal and re-upload all attendance punches (not just users).",
         variant: "success",
       });
     },

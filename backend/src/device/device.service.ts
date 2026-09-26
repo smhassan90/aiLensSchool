@@ -269,7 +269,7 @@ export class DeviceService {
 
   async clearSyncedUsers(user: AuthUser, id: string) {
     await this.getDevice(user, id);
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const pending = await tx.pendingBiometricAttendanceLog.deleteMany({
         where: { deviceConfigId: id },
       });
@@ -285,6 +285,7 @@ export class DeviceService {
         deletedPendingPunches: pending.count,
       };
     });
+    return result;
   }
 
   async testDevice(user: AuthUser, id: string) {
