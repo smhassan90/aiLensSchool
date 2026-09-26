@@ -198,3 +198,5 @@ scripts/python.cmd
 scripts/*.part
 scripts/agent_config.json
 scripts/sync_state.json
+scripts/hawknexa_agent_config.json
+scripts/hawknexa_sync_state.json

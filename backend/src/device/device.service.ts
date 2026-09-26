@@ -37,6 +37,7 @@ export class DeviceService {
   resolvePublicApiBaseUrl(): string {
     const fromEnv =
       this.config.get<string>('PUBLIC_API_BASE_URL')?.trim() ||
+      this.config.get<string>('PUBLIC_API_URL')?.trim() ||
       this.config.get<string>('API_PUBLIC_BASE_URL')?.trim();
     if (fromEnv) return fromEnv.replace(/\/$/, '');
     const port = this.config.get<string>('PORT') ?? '3001';

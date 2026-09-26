@@ -32,6 +32,19 @@ DEFAULT_BACKEND_URL = os.environ.get(
 ).rstrip("/")
 
 
+def is_local_backend_url(url: str) -> bool:
+    lower = (url or "").lower()
+    return "localhost" in lower or "127.0.0.1" in lower or "0.0.0.0" in lower
+
+
+def effective_backend_url(url: str, fallback: str) -> str:
+    url = (url or "").strip().rstrip("/")
+    fb = (fallback or DEFAULT_BACKEND_URL).strip().rstrip("/")
+    if not url or is_local_backend_url(url):
+        return fb
+    return url
+
+
 def log(msg: str) -> None:
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     print(f"[{ts}] {msg}", flush=True)
@@ -71,6 +84,11 @@ def http_post(url: str, api_key: str, body: dict[str, Any]) -> dict[str, Any]:
             raise RuntimeError(f"HTTP 429 — retry after {retry}s") from e
         body_text = e.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"HTTP {e.code}: {body_text}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(
+            f"Cannot reach HawkNexa API at {url} — {e.reason}. "
+            "Check internet, firewall, and that bootstrap.json backendUrl is not localhost."
+        ) from e
 
 
 def list_school_devices(backend_url: str, api_key: str) -> dict[str, Any]:
@@ -112,12 +130,16 @@ def resolve_bootstrap(args: argparse.Namespace) -> dict[str, str]:
 
     if BOOTSTRAP_PATH.exists() and not reconfigure:
         raw = load_json(BOOTSTRAP_PATH)
-        backend = str(raw.get("backendUrl") or backend).rstrip("/")
+        backend = effective_backend_url(str(raw.get("backendUrl") or ""), backend)
         api_key = api_key or str(raw.get("apiKey", "")).strip()
         device_id = device_id or str(raw.get("deviceId", "")).strip() or None
 
     if api_key and device_id and not reconfigure:
-        return {"backendUrl": backend, "apiKey": api_key, "deviceId": device_id}
+        return {
+            "backendUrl": effective_backend_url(backend, DEFAULT_BACKEND_URL),
+            "apiKey": api_key,
+            "deviceId": device_id,
+        }
 
     if not api_key:
         print("Paste the school sync API key from HawkNexa → Setup → Attendance → Configuration.")
@@ -128,7 +150,9 @@ def resolve_bootstrap(args: argparse.Namespace) -> dict[str, str]:
         sys.exit(1)
 
     listing = list_school_devices(backend, api_key)
-    backend = str(listing.get("backendUrl") or backend).rstrip("/")
+    backend = effective_backend_url(str(listing.get("backendUrl") or ""), backend)
+    if is_local_backend_url(str(listing.get("backendUrl") or "")):
+        log("API returned a localhost backendUrl — using the public API URL for this laptop instead.")
     devices = listing.get("devices") or []
     school = listing.get("schoolName", "")
     if school:
@@ -143,7 +167,7 @@ def resolve_bootstrap(args: argparse.Namespace) -> dict[str, str]:
 
 
 def fetch_remote_config(bootstrap: dict[str, str], quiet: bool = False) -> dict[str, Any]:
-    base = bootstrap["backendUrl"]
+    base = effective_backend_url(bootstrap["backendUrl"], DEFAULT_BACKEND_URL)
     device_id = bootstrap["deviceId"]
     api_key = bootstrap["apiKey"]
     url = f"{base}/device/{device_id}/edge-config-offline"
@@ -176,8 +200,12 @@ def apply_remote_config(bootstrap: dict[str, str], remote: dict[str, Any]) -> di
 def remote_to_runtime(bootstrap: dict[str, str], remote: dict[str, Any]) -> dict[str, Any]:
     if remote.get("isActive") is False:
         raise RuntimeError("Device is disabled in admin portal")
+    bootstrap_base = effective_backend_url(bootstrap.get("backendUrl", ""), DEFAULT_BACKEND_URL)
+    backend_url = effective_backend_url(str(remote.get("backendUrl") or ""), bootstrap_base)
+    if is_local_backend_url(str(remote.get("backendUrl") or "")):
+        log("Ignoring localhost backendUrl from API — using public HawkNexa URL for uploads.")
     return {
-        "BACKEND_URL": remote.get("backendUrl") or bootstrap["backendUrl"],
+        "BACKEND_URL": backend_url,
         "API_KEY": bootstrap["apiKey"],
         "DEVICE_ID": remote.get("deviceId") or bootstrap["deviceId"],
         "DEVICE_IP": remote.get("deviceIp", ""),
@@ -350,6 +378,14 @@ def main() -> None:
 
     remote = fetch_remote_config(bootstrap, quiet=False)
     cfg = apply_remote_config(bootstrap, remote)
+    save_json(
+        BOOTSTRAP_PATH,
+        {
+            "backendUrl": cfg["BACKEND_URL"],
+            "apiKey": bootstrap["apiKey"],
+            "deviceId": cfg["DEVICE_ID"],
+        },
+    )
 
     if not str(cfg.get("DEVICE_IP", "")).strip():
         log("Device IP missing — add the terminal in Setup → Attendance → Devices")
