@@ -50,6 +50,20 @@ class TeacherClassInsightsQueryDto {
   subjectId!: string;
 }
 
+class TeacherSelfAttendanceHistoryQueryDto extends PaginationDto {
+  @IsOptional()
+  @IsString()
+  teacherId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+}
+
 @ApiTags('Teachers')
 @ApiBearerAuth()
 @Controller({ path: 'teachers', version: '1' })
@@ -60,6 +74,27 @@ export class TeachersController {
   @Get('me/classes')
   myClasses(@CurrentUser() user: AuthUser) {
     return this.teachersService.myClasses(user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Get('me/supervision')
+  mySupervision(@CurrentUser() user: AuthUser) {
+    return this.teachersService.getTeacherSupervision(user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Get('me/overview')
+  myOverview(@Query() query: TeacherOverviewQueryDto, @CurrentUser() user: AuthUser) {
+    return this.teachersService.myOverview(user, query.month);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Get('me/attendance/history')
+  myAttendanceHistory(
+    @Query() query: TeacherSelfAttendanceHistoryQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.teachersService.listAttendanceHistoryForTeacher(user, query);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN)
@@ -128,8 +163,7 @@ export class TeachersController {
     return this.teachersService.performance(id, user);
   }
 
-  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
-  @RequirePermission('VIEW_TEACHER_PROGRESS', 'MANAGE_TEACHERS')
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL, RoleName.TEACHER)
   @Get(':id/overview')
   overview(
     @Param('id') id: string,
@@ -139,8 +173,7 @@ export class TeachersController {
     return this.teachersService.overview(id, user, query.month);
   }
 
-  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
-  @RequirePermission('VIEW_TEACHER_PROGRESS', 'MANAGE_TEACHERS')
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL, RoleName.TEACHER)
   @Get(':id/class-insights')
   classInsights(
     @Param('id') id: string,

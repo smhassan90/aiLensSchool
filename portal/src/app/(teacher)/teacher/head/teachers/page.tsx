@@ -50,7 +50,12 @@ export default function HeadTeacherTeachersPage() {
                 <h2 className="text-lg font-semibold">{row.teacher.name}</h2>
                 <p className="text-sm text-muted-foreground">Rank #{row.rank}</p>
               </div>
-              <p className={cn("text-2xl font-semibold", scoreTextClass(row.total))}>{row.total}/100</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link href={`/teacher/staff/${row.teacher.id}/overview`}>
+                  <Button variant="outline" size="sm">360 overview</Button>
+                </Link>
+                <p className={cn("text-2xl font-semibold", scoreTextClass(row.total))}>{row.total}/100</p>
+              </div>
             </div>
             <CriterionBars scores={row.scores} weights={progress.data?.weights ?? []} />
           </article>

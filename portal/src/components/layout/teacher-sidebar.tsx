@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
+  Clock,
   FileQuestion,
   FileText,
   LayoutDashboard,
@@ -31,8 +32,9 @@ import { SchoolHeaderBar } from "@/components/layout/school-header-bar";
 
 const baseNavItems = [
   { href: "/teacher/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/teacher/my-attendance", label: "My attendance", icon: Clock },
   { href: "/teacher/classes", label: "My classes", icon: Users },
-  { href: "/teacher/attendance", label: "Attendance", icon: ClipboardCheck, classTeacherOnly: true },
+  { href: "/teacher/attendance", label: "Class attendance", icon: ClipboardCheck, classTeacherOnly: true },
   { href: "/teacher/day-off-requests", label: "Day-off requests", icon: CalendarDays, classTeacherOnly: true },
   { href: "/teacher/lessons", label: "Lessons", icon: BookOpen },
   { href: "/teacher/homework", label: "Homework", icon: ClipboardList },
@@ -55,8 +57,13 @@ export function TeacherSidebar() {
     queryKey: ["head-teacher-me"],
     queryFn: () => headTeachersService.getMyAssignment(),
   });
+  const supervision = useQuery({
+    queryKey: ["teacher-supervision"],
+    queryFn: () => teachersService.getSupervision(),
+  });
   const isClassTeacher = (classes.data ?? []).some((row) => row.isClassTeacher);
   const isHeadTeacher = Boolean(headTeacher.data?.sections?.length);
+  const supervisesStaff = (supervision.data?.supervisedTeachers.length ?? 0) > 0;
   const teacherNavItems = baseNavItems.filter((item) => !item.classTeacherOnly || isClassTeacher);
   const dashboard = teacherNavItems.find((item) => item.href === "/teacher/dashboard");
   const restNavItems = teacherNavItems.filter((item) => item.href !== "/teacher/dashboard");
@@ -64,6 +71,9 @@ export function TeacherSidebar() {
     ...(dashboard ? [dashboard] : []),
     ...(isHeadTeacher
       ? [{ href: "/teacher/head", label: "Academic insights", icon: School }]
+      : []),
+    ...(supervisesStaff
+      ? [{ href: "/teacher/staff-attendance", label: "Staff attendance", icon: Users }]
       : []),
     ...restNavItems,
   ];

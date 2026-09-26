@@ -17,6 +17,7 @@ import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import { FAST_AI_PROVIDER, AiProvider } from '../ai/providers/ai.provider';
+import { hasStaffPermission } from '../common/permissions';
 import { teacherDisplayName } from '../common/utils/person-name';
 import { gradeClassLabel, gradeClassNumber } from '../common/utils/section-class-label';
 import {
@@ -663,7 +664,268 @@ export class TeachersService {
     return this.prisma.teacherProfile.findUnique({ where: { userId } });
   }
 
+  async requireTeacherProfile(user: AuthUser) {
+    if (!this.tenant.isTeacher(user)) {
+      throw new ForbiddenException({
+        code: 'TEACHER_REQUIRED',
+        message: 'Teacher access is required',
+      });
+    }
+    const schoolId = this.tenant.requireSchoolId(user);
+    const profile = await this.prisma.teacherProfile.findUnique({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        employeeCode: true,
+        gender: true,
+        user: { select: { firstName: true, lastName: true } },
+      },
+    });
+    if (!profile) {
+      throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher profile not found' });
+    }
+    return { schoolId, profile };
+  }
+
+  private async collectTeacherIdsForSections(sectionIds: string[]) {
+    const ids = new Set<string>();
+    if (!sectionIds.length) return ids;
+    const [homeroom, subjects] = await Promise.all([
+      this.prisma.section.findMany({
+        where: { id: { in: sectionIds }, classTeacherId: { not: null } },
+        select: { classTeacherId: true },
+      }),
+      this.prisma.classSubject.findMany({
+        where: { sectionId: { in: sectionIds } },
+        select: { teacherId: true, assistantTeacherId: true },
+      }),
+    ]);
+    for (const row of homeroom) {
+      if (row.classTeacherId) ids.add(row.classTeacherId);
+    }
+    for (const row of subjects) {
+      if (row.teacherId) ids.add(row.teacherId);
+      if (row.assistantTeacherId) ids.add(row.assistantTeacherId);
+    }
+    return ids;
+  }
+
+  async getTeacherSupervision(user: AuthUser) {
+    const { schoolId, profile } = await this.requireTeacherProfile(user);
+    const supervised = new Map<string, { id: string; name: string; employeeCode: string; roles: string[] }>();
+
+    const headAssignment = await this.prisma.headTeacherAssignment.findFirst({
+      where: { schoolId, teacherId: profile.id },
+      select: { title: true, sections: { select: { sectionId: true } } },
+    });
+    if (headAssignment?.sections.length) {
+      const sectionIds = headAssignment.sections.map((row) => row.sectionId);
+      const teacherIds = await this.collectTeacherIdsForSections(sectionIds);
+      const teachers = await this.prisma.teacherProfile.findMany({
+        where: { id: { in: [...teacherIds].filter((id) => id !== profile.id) } },
+        select: {
+          id: true,
+          employeeCode: true,
+          gender: true,
+          user: { select: { firstName: true, lastName: true } },
+        },
+      });
+      const label = headAssignment.title?.trim() || 'Head teacher';
+      for (const row of teachers) {
+        const existing = supervised.get(row.id);
+        const name = teacherDisplayName(row.user.firstName, row.user.lastName, row.gender);
+        if (existing) {
+          if (!existing.roles.includes(label)) existing.roles.push(label);
+        } else {
+          supervised.set(row.id, {
+            id: row.id,
+            name,
+            employeeCode: row.employeeCode,
+            roles: [label],
+          });
+        }
+      }
+    }
+
+    const stages = await this.prisma.schoolStage.findMany({
+      where: { schoolId, coordinatorId: profile.id },
+      select: { id: true, name: true },
+    });
+    if (stages.length) {
+      const grades = await this.prisma.grade.findMany({
+        where: { schoolId, stageId: { in: stages.map((row) => row.id) } },
+        select: { id: true },
+      });
+      const sections = await this.prisma.section.findMany({
+        where: { schoolId, gradeId: { in: grades.map((row) => row.id) } },
+        select: { id: true },
+      });
+      const teacherIds = await this.collectTeacherIdsForSections(sections.map((row) => row.id));
+      const teachers = await this.prisma.teacherProfile.findMany({
+        where: { id: { in: [...teacherIds].filter((id) => id !== profile.id) } },
+        select: {
+          id: true,
+          employeeCode: true,
+          gender: true,
+          user: { select: { firstName: true, lastName: true } },
+        },
+      });
+      for (const stage of stages) {
+        const label = `Coordinator · ${stage.name}`;
+        for (const row of teachers) {
+          const existing = supervised.get(row.id);
+          const name = teacherDisplayName(row.user.firstName, row.user.lastName, row.gender);
+          if (existing) {
+            if (!existing.roles.includes(label)) existing.roles.push(label);
+          } else {
+            supervised.set(row.id, {
+              id: row.id,
+              name,
+              employeeCode: row.employeeCode,
+              roles: [label],
+            });
+          }
+        }
+      }
+    }
+
+    const selfName = teacherDisplayName(
+      profile.user.firstName,
+      profile.user.lastName,
+      profile.gender,
+    );
+
+    return {
+      self: {
+        id: profile.id,
+        name: selfName,
+        employeeCode: profile.employeeCode,
+      },
+      isHeadTeacher: Boolean(headAssignment?.sections.length),
+      isStageCoordinator: stages.length > 0,
+      supervisedTeachers: [...supervised.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    };
+  }
+
+  private assertStaffTeacherOverviewPermission(user: AuthUser) {
+    if (!this.tenant.isSchoolStaff(user)) {
+      throw new ForbiddenException({
+        code: 'MISSING_PERMISSION',
+        message: 'You do not have access to teacher overview',
+      });
+    }
+    const allowed =
+      hasStaffPermission(user.roles, user.permissions, 'VIEW_TEACHER_PROGRESS') ||
+      hasStaffPermission(user.roles, user.permissions, 'MANAGE_TEACHERS');
+    if (!allowed) {
+      throw new ForbiddenException({
+        code: 'MISSING_PERMISSION',
+        message: 'You do not have access to teacher overview',
+      });
+    }
+  }
+
+  async assertTeacherPortalScope(user: AuthUser, teacherId: string) {
+    if (!this.tenant.isTeacher(user) || this.tenant.isSchoolStaff(user)) return;
+    const { profile } = await this.requireTeacherProfile(user);
+    if (teacherId === profile.id) return;
+    const supervision = await this.getTeacherSupervision(user);
+    const allowed = supervision.supervisedTeachers.some((row) => row.id === teacherId);
+    if (!allowed) {
+      throw new ForbiddenException({
+        code: 'TEACHER_OUT_OF_SCOPE',
+        message: 'You can only view your own profile or teachers under your supervision',
+      });
+    }
+  }
+
+  async myOverview(user: AuthUser, month?: string) {
+    const { profile } = await this.requireTeacherProfile(user);
+    return this.overview(profile.id, user, month);
+  }
+
+  async listAttendanceHistoryForTeacher(
+    user: AuthUser,
+    query: {
+      teacherId?: string;
+      startDate?: string;
+      endDate?: string;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    const { schoolId, profile } = await this.requireTeacherProfile(user);
+    const targetId = query.teacherId ?? profile.id;
+    if (targetId !== profile.id) {
+      await this.assertTeacherPortalScope(user, targetId);
+    }
+
+    const policy = await loadTeacherAttendancePolicy(this.prisma, schoolId);
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const where: Prisma.TeacherAttendanceWhereInput = {
+      schoolId,
+      teacherId: targetId,
+    };
+    if (query.startDate || query.endDate) {
+      where.date = {};
+      if (query.startDate) where.date.gte = dateFromIso(query.startDate);
+      if (query.endDate) where.date.lte = dateFromIso(query.endDate);
+    }
+
+    const [rows, total] = await pageQuery(
+      (skip, take) =>
+        this.prisma.teacherAttendance.findMany({
+          where,
+          skip,
+          take,
+          orderBy: [{ date: 'desc' }],
+          include: {
+            teacher: {
+              select: {
+                id: true,
+                employeeCode: true,
+                gender: true,
+                user: { select: { firstName: true, lastName: true } },
+              },
+            },
+          },
+        }),
+      () => this.prisma.teacherAttendance.count({ where }),
+      page,
+      limit,
+    );
+
+    const data = rows.map((row) => ({
+      date: row.date.toISOString().slice(0, 10),
+      teacher: {
+        id: row.teacher.id,
+        name: teacherDisplayName(
+          row.teacher.user.firstName,
+          row.teacher.user.lastName,
+          row.teacher.gender,
+        ),
+        employeeCode: row.teacher.employeeCode,
+      },
+      checkInTime: row.checkedInAt?.toISOString() ?? null,
+      checkOutTime: row.checkedOutAt?.toISOString() ?? null,
+      status: row.checkedInAt
+        ? statusFromCheckIn(
+            row.checkedInAt,
+            policy.lateAfter,
+            policy.absentAfter,
+            policy.timezone,
+          )
+        : row.status,
+      source: row.source,
+    }));
+
+    return { data, timezone: policy.timezone, ...paginate(data, total, page, limit) };
+  }
+
   async performance(id: string, user: AuthUser) {
+    await this.assertTeacherPortalScope(user, id);
     const schoolId = this.tenant.requireSchoolId(user);
     const scored = await this.scoreOne(id, schoolId);
     if (!scored) throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
@@ -671,6 +933,11 @@ export class TeachersService {
   }
 
   async overview(teacherId: string, user: AuthUser, month?: string) {
+    if (this.tenant.isTeacher(user) && !this.tenant.isSchoolStaff(user)) {
+      await this.assertTeacherPortalScope(user, teacherId);
+    } else {
+      this.assertStaffTeacherOverviewPermission(user);
+    }
     const schoolId = this.tenant.requireSchoolId(user);
     const detail = await this.findOne(teacherId, user);
     const performance = await this.performance(teacherId, user);
@@ -722,6 +989,11 @@ export class TeachersService {
     sectionId: string,
     subjectId: string,
   ) {
+    if (this.tenant.isTeacher(user) && !this.tenant.isSchoolStaff(user)) {
+      await this.assertTeacherPortalScope(user, teacherId);
+    } else {
+      this.assertStaffTeacherOverviewPermission(user);
+    }
     const schoolId = this.tenant.requireSchoolId(user);
     const teacher = await this.prisma.teacherProfile.findFirst({
       where: { id: teacherId, schoolId },

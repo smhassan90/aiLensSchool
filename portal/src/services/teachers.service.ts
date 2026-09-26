@@ -1,4 +1,5 @@
 import { apiClient, buildQuery } from "@/lib/api-client";
+import type { TeacherAttendanceHistoryResponse } from "@/services/teacher-attendance-report.service";
 import type {
   Paginated,
   Teacher,
@@ -197,10 +198,38 @@ export interface TeacherCheckInResult {
   alreadyCheckedIn: boolean;
 }
 
+export type TeacherSupervision = {
+  self: { id: string; name: string; employeeCode: string };
+  isHeadTeacher: boolean;
+  isStageCoordinator: boolean;
+  supervisedTeachers: Array<{
+    id: string;
+    name: string;
+    employeeCode: string;
+    roles: string[];
+  }>;
+};
+
 export const teachersService = {
   myClasses() {
     return apiClient<TeacherClassAssignment[]>("/teachers/me/classes").then((items) =>
       items.map(mapClassAssignment),
+    );
+  },
+
+  getSupervision() {
+    return apiClient<TeacherSupervision>("/teachers/me/supervision");
+  },
+
+  attendanceHistory(query: {
+    teacherId?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return apiClient<TeacherAttendanceHistoryResponse>(
+      `/teachers/me/attendance/history${buildQuery(query)}`,
     );
   },
 

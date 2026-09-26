@@ -18,7 +18,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { headTeachersService } from "@/services/head-teachers.service";
 
 const links = [
-  { href: "/teacher/head/attendance", label: "Attendance overview", icon: ClipboardCheck },
+  { href: "/teacher/staff-attendance", label: "Staff attendance & 360", icon: ClipboardCheck },
+  { href: "/teacher/head/attendance", label: "Student attendance overview", icon: ClipboardCheck },
   { href: "/teacher/head/students", label: "Student search & 360", icon: GraduationCap },
   { href: "/teacher/head/teachers", label: "Teacher progress", icon: Users },
   { href: "/teacher/head/quizzes", label: "Quizzes by teachers", icon: FileQuestion },
