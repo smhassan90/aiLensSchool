@@ -201,6 +201,18 @@ export class SchoolsService {
     return school;
   }
 
+  async getBranding(user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { id: true, name: true, logo: true },
+    });
+    if (!school) {
+      throw new NotFoundException({ code: 'SCHOOL_NOT_FOUND', message: 'School not found' });
+    }
+    return school;
+  }
+
   async update(id: string, dto: UpdateSchoolDto, user: AuthUser) {
     await this.findOne(id, user);
     const school = await this.prisma.school.update({

@@ -75,6 +75,17 @@ export class SchoolsController {
     return this.schoolsService.findAll(query);
   }
 
+  @Roles(
+    RoleName.SCHOOL_ADMIN,
+    RoleName.TEACHER,
+    RoleName.PRINCIPAL,
+    RoleName.PARENT,
+  )
+  @Get('me/branding')
+  branding(@CurrentUser() user: AuthUser) {
+    return this.schoolsService.getBranding(user);
+  }
+
   @Roles(RoleName.SUPER_ADMIN, RoleName.SCHOOL_ADMIN)
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {

@@ -10,7 +10,7 @@ export function useSchoolBranding() {
 
   const query = useQuery({
     queryKey: ["school-branding", schoolId],
-    queryFn: () => schoolsService.getById(schoolId!),
+    queryFn: () => schoolsService.getBranding(),
     enabled: Boolean(schoolId),
     staleTime: 5 * 60 * 1000,
   });

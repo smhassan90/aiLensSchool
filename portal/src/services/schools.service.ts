@@ -45,6 +45,10 @@ export const schoolsService = {
     return apiClient<School>(`/schools/${id}`);
   },
 
+  getBranding() {
+    return apiClient<Pick<School, "id" | "name" | "logo">>(`/schools/me/branding`);
+  },
+
   update(
     id: string,
     payload: Partial<
