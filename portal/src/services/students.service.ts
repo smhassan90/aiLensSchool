@@ -12,8 +12,8 @@ export interface ParentCredential {
 export interface CreateStudentPayload {
   firstName: string;
   lastName?: string;
-  studentCode: string;
-  admissionNumber: string;
+  studentCode?: string;
+  admissionNumber?: string;
   dateOfBirth?: string;
   gender?: string;
   branchId: string;

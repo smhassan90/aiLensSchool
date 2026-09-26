@@ -27,7 +27,7 @@ const schema = z.object({
   phone: z.string().optional(),
   password: z.string().min(8, "Minimum 8 characters"),
   branchId: z.string().min(1, "Select a branch"),
-  employeeCode: z.string().min(1, "Required"),
+  employeeCode: z.string().optional(),
   hireDate: z.string().optional(),
   status: z.enum(["ACTIVE", "INACTIVE", "ON_LEAVE"]),
 });
@@ -54,7 +54,11 @@ export default function NewTeacherPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: (values: FormValues) => teachersService.create(values),
+    mutationFn: (values: FormValues) =>
+      teachersService.create({
+        ...values,
+        employeeCode: values.employeeCode?.trim() || undefined,
+      }),
     onSuccess: () => {
       toast({ title: "Teacher created", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["teacher-attendance"] });
@@ -125,9 +129,12 @@ export default function NewTeacherPage() {
                 {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="employeeCode">Employee Code</Label>
-                <Input id="employeeCode" {...register("employeeCode")} placeholder="T-002" />
+                <Label htmlFor="employeeCode">Employee code (optional)</Label>
+                <Input id="employeeCode" {...register("employeeCode")} placeholder="Leave blank for SCHOOL-0001 style ID" />
                 {errors.employeeCode && <p className="text-sm text-destructive">{errors.employeeCode.message}</p>}
+                <p className="text-xs text-muted-foreground">
+                  Used for biometric devices and attendance. Blank assigns the next code with your school prefix.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="branchId">Branch</Label>

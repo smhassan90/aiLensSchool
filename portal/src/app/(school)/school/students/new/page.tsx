@@ -26,8 +26,8 @@ const schema = z
   .object({
     firstName: z.string().min(1, "Required"),
     lastName: z.string().optional(),
-    studentCode: z.string().min(1, "Required"),
-    admissionNumber: z.string().min(1, "Required"),
+    studentCode: z.string().optional(),
+    admissionNumber: z.string().optional(),
     dateOfBirth: z.string().optional(),
     gender: z.string().optional(),
     branchId: z.string().min(1, "Select a branch"),
@@ -89,8 +89,8 @@ export default function NewStudentPage() {
       studentsService.create({
         firstName: values.firstName,
         lastName: values.lastName?.trim() || undefined,
-        studentCode: values.studentCode,
-        admissionNumber: values.admissionNumber,
+        studentCode: values.studentCode?.trim() || undefined,
+        admissionNumber: values.admissionNumber?.trim() || undefined,
         dateOfBirth: values.dateOfBirth || undefined,
         gender: values.gender || undefined,
         branchId: values.branchId,
@@ -170,16 +170,20 @@ export default function NewStudentPage() {
                 {errors.lastName && <p className="text-sm text-destructive">{errors.lastName.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="studentCode">Student ID</Label>
-                <Input id="studentCode" {...register("studentCode")} placeholder="Daily ID / computer number" />
+                <Label htmlFor="studentCode">Student ID (optional)</Label>
+                <Input id="studentCode" {...register("studentCode")} placeholder="Leave blank for next number (e.g. 0001)" />
                 {errors.studentCode && <p className="text-sm text-destructive">{errors.studentCode.message}</p>}
-                <p className="text-xs text-muted-foreground">Used on lists, ID cards, and search.</p>
+                <p className="text-xs text-muted-foreground">
+                  Used on lists, ID cards, and search. Blank assigns the next sequential ID for this school.
+                </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="admissionNumber">Admission number</Label>
-                <Input id="admissionNumber" {...register("admissionNumber")} placeholder="School register number" />
+                <Label htmlFor="admissionNumber">Admission number (optional)</Label>
+                <Input id="admissionNumber" {...register("admissionNumber")} placeholder="Leave blank for next admission number" />
                 {errors.admissionNumber && <p className="text-sm text-destructive">{errors.admissionNumber.message}</p>}
-                <p className="text-xs text-muted-foreground">Official number in the admission register. Can match Student ID.</p>
+                <p className="text-xs text-muted-foreground">
+                  Official register number. Blank assigns the next sequential admission number (separate from student ID).
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dateOfBirth">Date of Birth</Label>

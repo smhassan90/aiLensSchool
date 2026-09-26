@@ -68,9 +68,10 @@ export class CreateTeacherDto {
   @IsString()
   branchId!: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({ description: 'Leave blank to auto-generate e.g. SCHOOLCODE-0001' })
+  @IsOptional()
   @IsString()
-  employeeCode!: string;
+  employeeCode?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

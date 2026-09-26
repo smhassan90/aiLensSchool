@@ -41,13 +41,15 @@ export class CreateStudentDto {
   @IsString()
   lastName?: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({ description: 'Leave blank to auto-generate the next sequential student ID' })
+  @IsOptional()
   @IsString()
-  studentCode!: string;
+  studentCode?: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({ description: 'Leave blank to auto-generate the next sequential admission number' })
+  @IsOptional()
   @IsString()
-  admissionNumber!: string;
+  admissionNumber?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -111,7 +111,14 @@ export function Teacher360View({
     <>
       <PageHeader
         title={data.teacher.name}
-        description={`Teacher 360 · ${data.teacher.employeeCode}${data.teacher.branchName ? ` · ${data.teacher.branchName}` : ""}`}
+        description={[
+          "Teacher 360",
+          data.teacher.employeeCode,
+          data.teacher.username ? `Username ${data.teacher.username}` : null,
+          data.teacher.branchName,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
         actions={headerActions}
       />
 

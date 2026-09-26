@@ -29,6 +29,7 @@ import {
   generateParentPassword,
   parentLocalEmail,
 } from './parent-accounts';
+import { nextSequentialIdentifier } from './student-sequences';
 import { personFullName, sanitizeLastName } from '../common/utils/person-name';
 import { studentSearchWhere } from '../common/utils/student-search';
 
@@ -90,39 +91,41 @@ export class StudentsService {
       throw new NotFoundException({ code: 'SCHOOL_NOT_FOUND', message: 'School not found' });
     }
 
-    const studentCode = dto.studentCode.trim();
-    const admissionNumber = dto.admissionNumber.trim();
-    if (!studentCode || !admissionNumber) {
-      throw new BadRequestException({
-        code: 'STUDENT_ID_REQUIRED',
-        message: 'Student ID and admission number are required',
-      });
-    }
-
-    const [existingCode, existingAdmission] = await Promise.all([
-      this.prisma.student.findFirst({
-        where: { schoolId, studentCode },
-        select: { id: true, firstName: true, lastName: true },
-      }),
-      this.prisma.student.findFirst({
-        where: { schoolId, admissionNumber },
-        select: { id: true, firstName: true, lastName: true },
-      }),
-    ]);
-    if (existingCode) {
-      throw new ConflictException({
-        code: 'STUDENT_CODE_EXISTS',
-        message: `Student ID "${studentCode}" is already used by ${personFullName(existingCode.firstName, existingCode.lastName)}`,
-      });
-    }
-    if (existingAdmission) {
-      throw new ConflictException({
-        code: 'ADMISSION_NUMBER_EXISTS',
-        message: `Admission number "${admissionNumber}" is already used by ${personFullName(existingAdmission.firstName, existingAdmission.lastName)}`,
-      });
-    }
-
     const result = await this.prisma.$transaction(async (tx) => {
+      const existingRows = await tx.student.findMany({
+        where: { schoolId },
+        select: { studentCode: true, admissionNumber: true },
+      });
+      const studentCode =
+        dto.studentCode?.trim() ||
+        nextSequentialIdentifier(existingRows.map((row) => row.studentCode));
+      const admissionNumber =
+        dto.admissionNumber?.trim() ||
+        nextSequentialIdentifier(existingRows.map((row) => row.admissionNumber));
+
+      const [existingCode, existingAdmission] = await Promise.all([
+        tx.student.findFirst({
+          where: { schoolId, studentCode },
+          select: { id: true, firstName: true, lastName: true },
+        }),
+        tx.student.findFirst({
+          where: { schoolId, admissionNumber },
+          select: { id: true, firstName: true, lastName: true },
+        }),
+      ]);
+      if (existingCode) {
+        throw new ConflictException({
+          code: 'STUDENT_CODE_EXISTS',
+          message: `Student ID "${studentCode}" is already used by ${personFullName(existingCode.firstName, existingCode.lastName)}`,
+        });
+      }
+      if (existingAdmission) {
+        throw new ConflictException({
+          code: 'ADMISSION_NUMBER_EXISTS',
+          message: `Admission number "${admissionNumber}" is already used by ${personFullName(existingAdmission.firstName, existingAdmission.lastName)}`,
+        });
+      }
+
       const student = await tx.student.create({
         data: {
           schoolId,

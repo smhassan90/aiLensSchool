@@ -34,7 +34,7 @@ export interface CreateTeacherPayload {
   phone?: string;
   password: string;
   branchId: string;
-  employeeCode: string;
+  employeeCode?: string;
   hireDate?: string;
   gender?: "MALE" | "FEMALE" | "OTHER";
   status?: "ACTIVE" | "INACTIVE" | "ON_LEAVE";
@@ -64,6 +64,7 @@ export type TeacherOverview = {
   teacher: {
     id: string;
     name: string;
+    username: string | null;
     employeeCode: string;
     status: string;
     branchName: string | null;

@@ -9,6 +9,7 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { FilesService } from '../files/files.service';
 import { MemoryCacheService } from '../common/services/memory-cache.service';
 import { buildParentUsername, generateParentPassword } from './parent-accounts';
+import { nextPrefixedSequentialIdentifier, nextSequentialIdentifier } from './student-sequences';
 
 const admin: AuthUser = {
   id: 'u-admin',
@@ -31,6 +32,17 @@ describe('parent account helpers', () => {
 
   it('uses the shared default parent password', () => {
     expect(generateParentPassword()).toBe('Password123');
+  });
+
+  it('picks the next sequential identifier from existing values', () => {
+    expect(nextSequentialIdentifier([])).toBe('0001');
+    expect(nextSequentialIdentifier(['0001', '0002', 'STU-0009'])).toBe('0010');
+    expect(nextSequentialIdentifier(['ADM-42'])).toBe('0043');
+  });
+
+  it('builds prefixed teacher employee codes from school code', () => {
+    expect(nextPrefixedSequentialIdentifier('tps', [])).toBe('TPS-0001');
+    expect(nextPrefixedSequentialIdentifier('TPS', ['TPS-0001', 'TPS-0009'])).toBe('TPS-0010');
   });
 });
 

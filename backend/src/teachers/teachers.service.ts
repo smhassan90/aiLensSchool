@@ -39,6 +39,7 @@ import {
   zonedDateIso,
   type TeacherAttendanceSource,
 } from './teacher-checkin';
+import { nextPrefixedSequentialIdentifier } from '../students/student-sequences';
 
 @Injectable()
 export class TeachersService {
@@ -69,16 +70,6 @@ export class TeachersService {
       });
     }
 
-    const existingCode = await this.prisma.teacherProfile.findUnique({
-      where: { schoolId_employeeCode: { schoolId, employeeCode: dto.employeeCode } },
-    });
-    if (existingCode) {
-      throw new ConflictException({
-        code: 'EMPLOYEE_CODE_EXISTS',
-        message: 'Employee code already exists',
-      });
-    }
-
     const teacherRole = await this.prisma.role.findUnique({ where: { name: RoleName.TEACHER } });
     if (!teacherRole) {
       throw new ConflictException({ code: 'ROLE_MISSING', message: 'TEACHER role missing' });
@@ -87,6 +78,27 @@ export class TeachersService {
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const [school, existingCodes] = await Promise.all([
+        tx.school.findUnique({ where: { id: schoolId }, select: { code: true } }),
+        tx.teacherProfile.findMany({ where: { schoolId }, select: { employeeCode: true } }),
+      ]);
+      const employeeCode =
+        dto.employeeCode?.trim() ||
+        nextPrefixedSequentialIdentifier(
+          school?.code ?? 'SCH',
+          existingCodes.map((row) => row.employeeCode),
+        );
+
+      const existingCode = await tx.teacherProfile.findUnique({
+        where: { schoolId_employeeCode: { schoolId, employeeCode } },
+      });
+      if (existingCode) {
+        throw new ConflictException({
+          code: 'EMPLOYEE_CODE_EXISTS',
+          message: 'Employee code already exists',
+        });
+      }
+
       const teacherUser = await tx.user.create({
         data: {
           email,
@@ -109,7 +121,7 @@ export class TeachersService {
           userId: teacherUser.id,
           schoolId,
           branchId: dto.branchId,
-          employeeCode: dto.employeeCode,
+          employeeCode,
           hireDate: dto.hireDate ? new Date(dto.hireDate) : null,
           gender: dto.gender ?? null,
           status: dto.status ?? TeacherStatus.ACTIVE,
@@ -973,6 +985,7 @@ export class TeachersService {
       teacher: {
         id: detail.id,
         name: teacherDisplayName(detail.user.firstName, detail.user.lastName, detail.gender),
+        username: detail.user.username ?? null,
         employeeCode: detail.employeeCode,
         status: detail.status,
         branchName: detail.branch?.name ?? null,
