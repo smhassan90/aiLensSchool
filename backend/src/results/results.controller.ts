@@ -24,13 +24,13 @@ class ResultsQueryDto extends PaginationDto {
 export class ResultsController {
   constructor(private readonly resultsService: ResultsService) {}
 
-  @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)
+  @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
   @Get('quiz/:quizId/stats')
   classStats(@Param('quizId') quizId: string, @CurrentUser() user: AuthUser) {
     return this.resultsService.classStats(quizId, user);
   }
 
-  @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)
+  @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
   @Get(':id')
   detail(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.resultsService.detail(id, user);

@@ -351,6 +351,7 @@ export interface Quiz {
 
 export interface QuizAnalysisStudent {
   studentId: string;
+  resultId: string | null;
   firstName: string;
   lastName: string;
   studentCode: string;

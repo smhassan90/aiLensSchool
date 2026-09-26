@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -18,6 +18,7 @@ import { PageLoader } from "@/components/layout/page-loader";
 import { resultsService } from "@/services/results.service";
 import { formatDateTime, quizQuestionTypeLabel } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { QuizStudentAttemptView } from "@/components/quizzes/quiz-student-attempt-view";
 
 const BAND_COLORS: Record<string, string> = {
   below40: "bg-rose-500",
@@ -36,6 +37,8 @@ function scoreBadgeVariant(percentage: number | null) {
 
 export function QuizAnalysis({ quizId }: { quizId: string }) {
   const [search, setSearch] = useState("");
+  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
+  const attemptRef = useRef<HTMLDivElement>(null);
   const analysis = useQuery({
     queryKey: ["quiz-analysis", quizId],
     queryFn: () => resultsService.quizStats(quizId),
@@ -49,6 +52,16 @@ export function QuizAnalysis({ quizId }: { quizId: string }) {
       `${row.firstName} ${row.lastName} ${row.studentCode}`.toLowerCase().includes(term),
     );
   }, [data, search]);
+
+  useEffect(() => {
+    setSelectedResultId(null);
+  }, [quizId]);
+
+  useEffect(() => {
+    if (selectedResultId && attemptRef.current) {
+      attemptRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedResultId]);
 
   if (analysis.isLoading) {
     return <PageLoader variant="panel" task="quiz" />;
@@ -193,7 +206,9 @@ export function QuizAnalysis({ quizId }: { quizId: string }) {
             <Trophy className="h-4 w-4" />
             Which student scored what
           </CardTitle>
-          <CardDescription>Every child in the class, with their score</CardDescription>
+          <CardDescription>
+            Every child in the class, with their score. Click a submitted row to see their answers.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
@@ -214,8 +229,20 @@ export function QuizAnalysis({ quizId }: { quizId: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {students.map((row) => (
-                  <TableRow key={row.studentId}>
+                {students.map((row) => {
+                  const submitted = row.status === "SUBMITTED" && row.resultId;
+                  const selected = submitted && selectedResultId === row.resultId;
+                  return (
+                  <TableRow
+                    key={row.studentId}
+                    className={cn(
+                      submitted && "cursor-pointer hover:bg-muted/50",
+                      selected && "bg-primary/10 hover:bg-primary/15",
+                    )}
+                    onClick={() => {
+                      if (row.resultId) setSelectedResultId(row.resultId);
+                    }}
+                  >
                     <TableCell className="font-medium">
                       {row.firstName} {row.lastName}
                     </TableCell>
@@ -232,10 +259,19 @@ export function QuizAnalysis({ quizId }: { quizId: string }) {
                       {formatDateTime(row.submittedAt)}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
+          {selectedResultId ? (
+            <div ref={attemptRef} className="scroll-mt-4 pt-2">
+              <QuizStudentAttemptView
+                resultId={selectedResultId}
+                onClose={() => setSelectedResultId(null)}
+              />
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

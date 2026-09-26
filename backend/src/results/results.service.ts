@@ -97,6 +97,7 @@ export class ResultsService {
         const result = resultByStudent.get(student.id);
         return {
           studentId: student.id,
+          resultId: result?.id ?? null,
           firstName: student.firstName,
           lastName: student.lastName,
           studentCode: student.studentCode,
@@ -174,7 +175,6 @@ export class ResultsService {
       scoreBands: bands,
       students,
       questions,
-      results,
     };
   }
 
