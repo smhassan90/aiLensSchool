@@ -18,7 +18,10 @@ import { FAST_AI_PROVIDER, AiProvider } from '../ai/providers/ai.provider';
 import { teacherDisplayName } from '../common/utils/person-name';
 import {
   dateFromIso,
+  effectiveTeacherAttendanceStatus,
   finalizeTeacherAbsences,
+  loadTeacherAttendancePolicy,
+  reconcileTeacherAttendanceStatusesForDay,
   zonedDateIso,
 } from '../teachers/teacher-checkin';
 
@@ -63,6 +66,8 @@ export class DashboardService {
     });
     const todayIso = zonedDateIso(now, setup?.timezone || 'Asia/Karachi');
     await finalizeTeacherAbsences(this.prisma, schoolId, todayIso, now);
+    await reconcileTeacherAttendanceStatusesForDay(this.prisma, schoolId, todayIso);
+    const teacherPolicy = await loadTeacherAttendancePolicy(this.prisma, schoolId);
     const today = dateFromIso(todayIso);
     const [
       studentCount,
@@ -74,7 +79,7 @@ export class DashboardService {
       expenses,
       classTeachers,
       attendanceTodayRows,
-      teacherAttendanceTodayRows,
+      teacherAttendanceTodayMarks,
     ] = await Promise.all([
       this.prisma.student.count({ where: { schoolId, status: StudentStatus.ACTIVE } }),
       this.prisma.teacherProfile.count({ where: { schoolId, status: TeacherStatus.ACTIVE } }),
@@ -127,10 +132,9 @@ export class DashboardService {
         where: { schoolId, date: today },
         _count: { _all: true },
       }),
-      this.prisma.teacherAttendance.groupBy({
-        by: ['status'],
+      this.prisma.teacherAttendance.findMany({
         where: { schoolId, date: today },
-        _count: { _all: true },
+        select: { status: true, checkedInAt: true },
       }),
     ]);
 
@@ -147,15 +151,16 @@ export class DashboardService {
       ? Number(((presentLike / attendanceToday.marked) * 100).toFixed(1))
       : 0;
 
-    const teacherAttendanceToday = { marked: 0, present: 0, absent: 0 };
-    for (const row of teacherAttendanceTodayRows) {
-      const count = row._count._all;
-      teacherAttendanceToday.marked += count;
-      if (row.status === AttendanceStatus.PRESENT || row.status === AttendanceStatus.LATE) {
-        teacherAttendanceToday.present += count;
-      }
-      if (row.status === AttendanceStatus.ABSENT) teacherAttendanceToday.absent = count;
+    const teacherAttendanceToday = { marked: 0, present: 0, late: 0, absent: 0, checkedIn: 0 };
+    for (const row of teacherAttendanceTodayMarks) {
+      teacherAttendanceToday.marked += 1;
+      const effective = effectiveTeacherAttendanceStatus(row, teacherPolicy);
+      if (effective === AttendanceStatus.PRESENT) teacherAttendanceToday.present += 1;
+      else if (effective === AttendanceStatus.LATE) teacherAttendanceToday.late += 1;
+      else if (effective === AttendanceStatus.ABSENT) teacherAttendanceToday.absent += 1;
     }
+    teacherAttendanceToday.checkedIn =
+      teacherAttendanceToday.present + teacherAttendanceToday.late;
 
     const remainingThisMonth = Math.max(
       0,

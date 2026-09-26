@@ -18,7 +18,9 @@ export interface SchoolDashboardSummary {
   teacherAttendanceToday: {
     marked: number;
     present: number;
+    late: number;
     absent: number;
+    checkedIn: number;
   };
   financeMonths: Array<{
     key: string;

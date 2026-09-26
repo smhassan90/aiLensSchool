@@ -32,6 +32,7 @@ import {
   finalizeTeacherAbsences,
   hmToMinutes,
   loadTeacherAttendancePolicy,
+  reconcileTeacherAttendanceStatusesForDay,
   normalizeHm,
   statusFromCheckIn,
   zonedDateIso,
@@ -903,6 +904,7 @@ export class TeachersService {
     const policy = await loadTeacherAttendancePolicy(this.prisma, schoolId);
     const dateIso = date || zonedDateIso(new Date(), policy.timezone);
     await finalizeTeacherAbsences(this.prisma, schoolId, dateIso);
+    await reconcileTeacherAttendanceStatusesForDay(this.prisma, schoolId, dateIso);
     const day = dateFromIso(dateIso);
     const teachers = await this.prisma.teacherProfile.findMany({
       where: { schoolId, status: TeacherStatus.ACTIVE },
@@ -1038,11 +1040,23 @@ export class TeachersService {
     });
 
     if (existing?.checkedInAt && existing.checkedInAt <= input.checkedInAt) {
+      const status = statusFromCheckIn(
+        existing.checkedInAt,
+        policy.lateAfter,
+        policy.absentAfter,
+        policy.timezone,
+      );
+      if (existing.status !== status) {
+        await this.prisma.teacherAttendance.update({
+          where: { id: existing.id },
+          data: { status },
+        });
+      }
       return {
         teacherId: teacher.id,
         date: dateIso,
         checkedInAt: existing.checkedInAt.toISOString(),
-        status: existing.status,
+        status,
         source: existing.source,
         alreadyCheckedIn: true,
       };

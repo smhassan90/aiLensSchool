@@ -136,7 +136,9 @@ export default function SchoolDashboardPage() {
   );
   const attendance = data?.attendanceToday;
   const studentsPresent = (attendance?.present ?? 0) + (attendance?.late ?? 0);
-  const teachersPresent = data?.teacherAttendanceToday?.present ?? 0;
+  const teachersCheckedIn =
+    data?.teacherAttendanceToday?.checkedIn ??
+    (data?.teacherAttendanceToday?.present ?? 0) + (data?.teacherAttendanceToday?.late ?? 0);
   const monthName = new Date().toLocaleString("en", { month: "long" });
   const examSubmissions = data?.examPaperSubmissions;
   const pendingSubmissionPreview = examSubmissions?.pendingTeachers.slice(0, 5) ?? [];
@@ -204,7 +206,7 @@ export default function SchoolDashboardPage() {
         <StatCard
           href="/school/teachers/attendance"
           label="Teachers"
-          value={data ? `${teachersPresent} / ${data.teacherCount}` : "—"}
+          value={data ? `${teachersCheckedIn} / ${data.teacherCount}` : "—"}
           hint="Checked in today / staff"
           icon={UserSquare2}
           tone="from-sky-500/10 via-white to-white"

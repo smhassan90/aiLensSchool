@@ -101,6 +101,51 @@ export async function loadTeacherAttendancePolicy(
   return readTeacherAttendancePolicy(row);
 }
 
+/** Align stored status with check-in time (fixes legacy rows marked ABSENT despite a punch). */
+export async function reconcileTeacherAttendanceStatusesForDay(
+  prisma: PrismaService,
+  schoolId: string,
+  dateIso: string,
+) {
+  const policy = await loadTeacherAttendancePolicy(prisma, schoolId);
+  const day = dateFromIso(dateIso);
+  const rows = await prisma.teacherAttendance.findMany({
+    where: { schoolId, date: day, checkedInAt: { not: null } },
+    select: { id: true, checkedInAt: true, status: true },
+  });
+  let updated = 0;
+  for (const row of rows) {
+    if (!row.checkedInAt) continue;
+    const next = statusFromCheckIn(
+      row.checkedInAt,
+      policy.lateAfter,
+      policy.absentAfter,
+      policy.timezone,
+    );
+    if (row.status !== next) {
+      await prisma.teacherAttendance.update({ where: { id: row.id }, data: { status: next } });
+      updated += 1;
+    }
+  }
+  return { updated, policy };
+}
+
+export function effectiveTeacherAttendanceStatus(
+  mark: { checkedInAt: Date | null; status: AttendanceStatus } | null | undefined,
+  policy: TeacherAttendancePolicy,
+): AttendanceStatus | null {
+  if (!mark) return null;
+  if (mark.checkedInAt) {
+    return statusFromCheckIn(
+      mark.checkedInAt,
+      policy.lateAfter,
+      policy.absentAfter,
+      policy.timezone,
+    );
+  }
+  return mark.status;
+}
+
 export async function finalizeTeacherAbsences(
   prisma: PrismaService,
   schoolId: string,
@@ -125,18 +170,19 @@ export async function finalizeTeacherAbsences(
   ]);
   const have = new Set(existing.map((row) => row.teacherId));
   const missing = teachers.filter((teacher) => !have.has(teacher.id));
-  if (!missing.length) return { finalized: 0, policy };
-
-  await prisma.teacherAttendance.createMany({
-    data: missing.map((teacher) => ({
-      schoolId,
-      teacherId: teacher.id,
-      date: day,
-      status: AttendanceStatus.ABSENT,
-      source: 'SYSTEM',
-    })),
-    skipDuplicates: true,
-  });
+  if (missing.length) {
+    await prisma.teacherAttendance.createMany({
+      data: missing.map((teacher) => ({
+        schoolId,
+        teacherId: teacher.id,
+        date: day,
+        status: AttendanceStatus.ABSENT,
+        source: 'SYSTEM',
+      })),
+      skipDuplicates: true,
+    });
+  }
+  await reconcileTeacherAttendanceStatusesForDay(prisma, schoolId, dateIso);
   return { finalized: missing.length, policy };
 }
 
