@@ -210,9 +210,12 @@ export default function TeacherDetailsPage() {
                 All teachers
               </Button>
             </Link>
+            <Link href={`/school/teachers/${params.id}/overview`}>
+              <Button variant="outline">360 overview</Button>
+            </Link>
             {can("VIEW_TEACHER_PROGRESS") ? (
               <Link href={`/school/teachers/${params.id}/progress`}>
-                <Button variant="outline">Progress</Button>
+                <Button variant="outline">AI progress</Button>
               </Link>
             ) : null}
           </div>

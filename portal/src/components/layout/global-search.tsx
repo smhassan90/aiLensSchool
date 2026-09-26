@@ -88,7 +88,7 @@ export function GlobalSearch({ tone = "light" }: { tone?: "light" | "dark" }) {
           {results.data?.teachers.map((item) => (
             <Link
               key={item.id}
-              href={`/school/teachers/${item.id}`}
+              href={`/school/teachers/${item.id}/overview`}
               className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
             >
               <span className="font-medium">{item.name}</span>

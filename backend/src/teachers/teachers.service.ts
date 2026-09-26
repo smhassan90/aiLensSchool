@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -307,11 +308,13 @@ export class TeachersService {
       classSections: Array<{ id: string; name: string; gradeId: string; grade?: { name: string; level: number } | null }>;
       classSubjects: Array<{
         id: string;
+        subjectId: string;
         subject?: { name: string } | null;
         section?: { id: string; name: string; gradeId: string; grade?: { name: string; level: number } | null } | null;
       }>;
       assistantClassSubjects: Array<{
         id: string;
+        subjectId: string;
         subject?: { name: string } | null;
         section?: { id: string; name: string; gradeId: string; grade?: { name: string; level: number } | null } | null;
       }>;
@@ -323,11 +326,13 @@ export class TeachersService {
       section: { id: string; name: string; gradeId: string; grade?: { name: string; level: number } | null },
       subject: string | null,
       role: 'Class teacher' | 'Subject teacher' | 'Assistant',
+      subjectId: string | null = null,
     ) => {
       const enriched = this.withGrade(section, gradeById);
       return {
         id,
         sectionId: section.id,
+        subjectId,
         className: gradeClassLabel(enriched),
         classNumber: gradeClassNumber(enriched),
         sectionName: section.name?.trim() || null,
@@ -342,12 +347,28 @@ export class TeachersService {
       ),
       ...teacher.classSubjects.flatMap((item) =>
         item.section
-          ? [mapAssignment(item.id, item.section, item.subject?.name ?? null, 'Subject teacher')]
+          ? [
+              mapAssignment(
+                item.id,
+                item.section,
+                item.subject?.name ?? null,
+                'Subject teacher',
+                item.subjectId,
+              ),
+            ]
           : [],
       ),
       ...teacher.assistantClassSubjects.flatMap((item) =>
         item.section
-          ? [mapAssignment(`assistant-${item.id}`, item.section, item.subject?.name ?? null, 'Assistant')]
+          ? [
+              mapAssignment(
+                `assistant-${item.id}`,
+                item.section,
+                item.subject?.name ?? null,
+                'Assistant',
+                item.subjectId,
+              ),
+            ]
           : [],
       ),
     ];
@@ -646,6 +667,183 @@ export class TeachersService {
     const scored = await this.scoreOne(id, schoolId);
     if (!scored) throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
     return scored;
+  }
+
+  async overview(teacherId: string, user: AuthUser, month?: string) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const detail = await this.findOne(teacherId, user);
+    const performance = await this.performance(teacherId, user);
+    const policy = await loadTeacherAttendancePolicy(this.prisma, schoolId);
+    const monthIso = this.resolveMonthIso(month, policy.timezone);
+    const { start, end } = this.monthBounds(monthIso);
+    const marks = await this.prisma.teacherAttendance.findMany({
+      where: { schoolId, teacherId, date: { gte: start, lt: end } },
+      orderBy: { date: 'asc' },
+    });
+
+    const summary = { present: 0, late: 0, absent: 0, waiting: 0 };
+    const days = marks.map((row) => {
+      const status = row.checkedInAt
+        ? statusFromCheckIn(row.checkedInAt, policy.lateAfter, policy.absentAfter, policy.timezone)
+        : row.status;
+      if (status === AttendanceStatus.PRESENT) summary.present += 1;
+      else if (status === AttendanceStatus.LATE) summary.late += 1;
+      else if (status === AttendanceStatus.ABSENT) summary.absent += 1;
+      else summary.waiting += 1;
+      return {
+        date: row.date.toISOString().slice(0, 10),
+        status,
+        checkInTime: row.checkedInAt?.toISOString() ?? null,
+        checkOutTime: row.checkedOutAt?.toISOString() ?? null,
+        source: row.source,
+      };
+    });
+
+    return {
+      month: monthIso,
+      timezone: policy.timezone,
+      teacher: {
+        id: detail.id,
+        name: teacherDisplayName(detail.user.firstName, detail.user.lastName, detail.gender),
+        employeeCode: detail.employeeCode,
+        status: detail.status,
+        branchName: detail.branch?.name ?? null,
+      },
+      assignments: detail.assignments ?? [],
+      performance,
+      attendanceMonth: { summary, days },
+    };
+  }
+
+  async classInsights(
+    teacherId: string,
+    user: AuthUser,
+    sectionId: string,
+    subjectId: string,
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.prisma.teacherProfile.findFirst({
+      where: { id: teacherId, schoolId },
+      select: { id: true, userId: true },
+    });
+    if (!teacher) {
+      throw new NotFoundException({ code: 'TEACHER_NOT_FOUND', message: 'Teacher not found' });
+    }
+    await this.assertTeacherTeachesClass(teacherId, sectionId, subjectId, user);
+
+    const [section, subject, lessons, quizzes] = await Promise.all([
+      this.prisma.section.findFirst({
+        where: { id: sectionId, schoolId },
+        include: { grade: { select: { name: true } } },
+      }),
+      this.prisma.subject.findFirst({ where: { id: subjectId, schoolId }, select: { name: true } }),
+      this.prisma.dailyLesson.findMany({
+        where: {
+          schoolId,
+          teacherId,
+          sectionId,
+          subjectId,
+          status: { not: LessonStatus.CANCELLED },
+        },
+        orderBy: { date: 'desc' },
+        take: 40,
+        select: {
+          id: true,
+          date: true,
+          chapterName: true,
+          topicName: true,
+          status: true,
+        },
+      }),
+      this.prisma.quiz.findMany({
+        where: { schoolId, sectionId, subjectId, createdById: teacher.userId },
+        orderBy: { createdAt: 'desc' },
+        take: 40,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          publishedAt: true,
+          paperKind: true,
+          results: { select: { percentage: true } },
+          _count: { select: { attempts: true, assignments: true } },
+        },
+      }),
+    ]);
+    if (!section || !subject) {
+      throw new NotFoundException({ code: 'CLASS_NOT_FOUND', message: 'Class or subject not found' });
+    }
+
+    return {
+      className: `${section.grade.name} ${section.name}`,
+      subjectName: subject.name,
+      sectionId,
+      subjectId,
+      lessons: lessons.map((row) => ({
+        id: row.id,
+        date: row.date.toISOString().slice(0, 10),
+        title: [row.chapterName, row.topicName].filter(Boolean).join(' · ') || 'Lesson',
+        status: row.status,
+      })),
+      quizzes: quizzes.map((row) => {
+        const percentages = row.results.map((r) => Number(r.percentage));
+        const average =
+          percentages.length > 0
+            ? Number((percentages.reduce((a, b) => a + b, 0) / percentages.length).toFixed(1))
+            : null;
+        return {
+          id: row.id,
+          title: row.title,
+          status: row.status,
+          paperKind: row.paperKind,
+          publishedAt: row.publishedAt?.toISOString() ?? null,
+          attempts: row._count.attempts,
+          assigned: row._count.assignments,
+          averageScore: average,
+        };
+      }),
+    };
+  }
+
+  private resolveMonthIso(month: string | undefined, timeZone: string) {
+    if (month && /^\d{4}-\d{2}$/.test(month)) return month;
+    return zonedDateIso(new Date(), timeZone).slice(0, 7);
+  }
+
+  private monthBounds(monthIso: string) {
+    const [year, mon] = monthIso.split('-').map(Number);
+    const start = new Date(Date.UTC(year, mon - 1, 1));
+    const end = new Date(Date.UTC(year, mon, 1));
+    return { start, end };
+  }
+
+  private async assertTeacherTeachesClass(
+    teacherId: string,
+    sectionId: string,
+    subjectId: string,
+    user: AuthUser,
+  ) {
+    await this.findOne(teacherId, user);
+    const [viaClassSubject, viaAssistant, viaHomeroom] = await Promise.all([
+      this.prisma.classSubject.findFirst({
+        where: { teacherId, sectionId, subjectId },
+        select: { id: true },
+      }),
+      this.prisma.classSubject.findFirst({
+        where: { sectionId, subjectId, assistantTeacherId: teacherId },
+        select: { id: true },
+      }),
+      this.prisma.section.findFirst({
+        where: { id: sectionId, classTeacherId: teacherId },
+        select: { id: true },
+      }),
+    ]);
+    if (!viaClassSubject && !viaAssistant && !viaHomeroom) {
+      throw new ForbiddenException({
+        code: 'TEACHER_NOT_ON_CLASS',
+        message: 'This teacher is not assigned to that class and subject',
+      });
+    }
   }
 
   async scoreboard(user: AuthUser) {

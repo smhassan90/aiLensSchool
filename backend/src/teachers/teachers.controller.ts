@@ -36,6 +36,20 @@ class TeacherAttendanceQueryDto {
   date?: string;
 }
 
+class TeacherOverviewQueryDto {
+  @IsOptional()
+  @IsString()
+  month?: string;
+}
+
+class TeacherClassInsightsQueryDto {
+  @IsString()
+  sectionId!: string;
+
+  @IsString()
+  subjectId!: string;
+}
+
 @ApiTags('Teachers')
 @ApiBearerAuth()
 @Controller({ path: 'teachers', version: '1' })
@@ -93,7 +107,8 @@ export class TeachersController {
     return this.teachersService.syncTeacherCheckIn(user, dto);
   }
 
-  @Roles(RoleName.SCHOOL_ADMIN)
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @RequirePermission('VIEW_TEACHER_PROGRESS', 'MANAGE_TEACHERS')
   @Get()
   findAll(@Query() query: TeacherQueryDto, @CurrentUser() user: AuthUser) {
     return this.teachersService.findAll(user, query);
@@ -111,6 +126,28 @@ export class TeachersController {
   @Get(':id/performance')
   performance(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.teachersService.performance(id, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @RequirePermission('VIEW_TEACHER_PROGRESS', 'MANAGE_TEACHERS')
+  @Get(':id/overview')
+  overview(
+    @Param('id') id: string,
+    @Query() query: TeacherOverviewQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.teachersService.overview(id, user, query.month);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @RequirePermission('VIEW_TEACHER_PROGRESS', 'MANAGE_TEACHERS')
+  @Get(':id/class-insights')
+  classInsights(
+    @Param('id') id: string,
+    @Query() query: TeacherClassInsightsQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.teachersService.classInsights(id, user, query.sectionId, query.subjectId);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN)

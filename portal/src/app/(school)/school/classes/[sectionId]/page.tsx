@@ -147,7 +147,7 @@ export default function ClassSnapshotPage() {
             <div className="rounded-md border px-3 py-2">
               <p className="text-xs text-muted-foreground">Class teacher</p>
               {row.classTeacher ? (
-                <Link href={`/school/teachers/${row.classTeacher.id}`} className="font-medium hover:underline">
+                <Link href={`/school/teachers/${row.classTeacher.id}/overview`} className="font-medium hover:underline">
                   {teacherDisplayNameFromUser(row.classTeacher.user, row.classTeacher.gender)}
                 </Link>
               ) : (
@@ -160,7 +160,7 @@ export default function ClassSnapshotPage() {
                   <li key={item.id ?? `${item.subjectId}-${item.teacherId}`} className="flex items-center justify-between gap-3 text-sm">
                     <span>{item.subject?.name ?? "Subject"}</span>
                     {item.teacher ? (
-                      <Link href={`/school/teachers/${item.teacher.id}`} className="text-primary hover:underline">
+                      <Link href={`/school/teachers/${item.teacher.id}/overview`} className="text-primary hover:underline">
                         {teacherDisplayNameFromUser(item.teacher.user, item.teacher.gender)}
                       </Link>
                     ) : (

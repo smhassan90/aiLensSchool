@@ -77,7 +77,7 @@ export default function TeachersPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Teachers"
-        description="Add, update, or mark a teacher inactive. Open a row to see full details."
+        description="Open a teacher for their 360° overview — classes, attendance, lessons, and quizzes."
         actions={
           can("MANAGE_TEACHERS") ? (
             <div className="flex flex-wrap gap-2">
@@ -148,11 +148,11 @@ export default function TeachersPage() {
                   key={teacher.id}
                   className="cursor-pointer"
                   tabIndex={0}
-                  onClick={() => router.push(`/school/teachers/${teacher.id}`)}
+                  onClick={() => router.push(`/school/teachers/${teacher.id}/overview`)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      router.push(`/school/teachers/${teacher.id}`);
+                      router.push(`/school/teachers/${teacher.id}/overview`);
                     }
                   }}
                 >

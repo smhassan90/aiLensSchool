@@ -57,6 +57,57 @@ export interface PerformanceCriterion {
   why: string;
 }
 
+export type TeacherOverview = {
+  month: string;
+  timezone: string;
+  teacher: {
+    id: string;
+    name: string;
+    employeeCode: string;
+    status: string;
+    branchName: string | null;
+  };
+  assignments: Array<{
+    id: string;
+    sectionId: string | null;
+    subjectId: string | null;
+    className: string;
+    classNumber?: number | null;
+    sectionName?: string | null;
+    subject: string | null;
+    role: "Class teacher" | "Subject teacher" | "Assistant";
+  }>;
+  performance: TeacherScoreRow;
+  attendanceMonth: {
+    summary: { present: number; late: number; absent: number; waiting: number };
+    days: Array<{
+      date: string;
+      status: string;
+      checkInTime: string | null;
+      checkOutTime: string | null;
+      source: string | null;
+    }>;
+  };
+};
+
+export type TeacherClassInsights = {
+  className: string;
+  subjectName: string;
+  sectionId: string;
+  subjectId: string;
+  lessons: Array<{ id: string; date: string; title: string; status: string }>;
+  quizzes: Array<{
+    id: string;
+    title: string;
+    status: string;
+    paperKind: string;
+    publishedAt: string | null;
+    attempts: number;
+    assigned: number;
+    averageScore: number | null;
+  }>;
+};
+
 export interface TeacherScoreRow {
   teacher: { id: string; name: string };
   total: number;
@@ -177,6 +228,16 @@ export const teachersService = {
 
   performance(id: string) {
     return apiClient<TeacherScoreRow>(`/teachers/${id}/performance`);
+  },
+
+  overview(id: string, month?: string) {
+    return apiClient<TeacherOverview>(`/teachers/${id}/overview${buildQuery({ month })}`);
+  },
+
+  classInsights(id: string, sectionId: string, subjectId: string) {
+    return apiClient<TeacherClassInsights>(
+      `/teachers/${id}/class-insights${buildQuery({ sectionId, subjectId })}`,
+    );
   },
 
   scoreboard() {
