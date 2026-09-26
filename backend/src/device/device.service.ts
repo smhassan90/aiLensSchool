@@ -267,6 +267,26 @@ export class DeviceService {
     return { deleted: true };
   }
 
+  async clearSyncedUsers(user: AuthUser, id: string) {
+    await this.getDevice(user, id);
+    return this.prisma.$transaction(async (tx) => {
+      const pending = await tx.pendingBiometricAttendanceLog.deleteMany({
+        where: { deviceConfigId: id },
+      });
+      const mappings = await tx.biometricDeviceUserMapping.deleteMany({
+        where: { deviceConfigId: id },
+      });
+      const users = await tx.biometricDeviceUser.deleteMany({
+        where: { deviceConfigId: id },
+      });
+      return {
+        deletedUsers: users.count,
+        deletedMappings: mappings.count,
+        deletedPendingPunches: pending.count,
+      };
+    });
+  }
+
   async testDevice(user: AuthUser, id: string) {
     const device = await this.getDevice(user, id);
     return this.zkt.testConnection(device.ipAddress, device.port);

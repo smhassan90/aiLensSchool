@@ -88,6 +88,12 @@ export const deviceService = {
   remove: (id: string) => apiClient(`/device/${id}`, { method: "DELETE" }),
   test: (id: string) => apiClient<{ ok: boolean; serialNumber?: string }>(`/device/${id}/test`, { method: "POST" }),
   syncUsers: (id: string) => apiClient(`/device/${id}/sync-users`, { method: "POST" }),
+  clearSyncedUsers: (id: string) =>
+    apiClient<{
+      deletedUsers: number;
+      deletedMappings: number;
+      deletedPendingPunches: number;
+    }>(`/device/${id}/clear-synced-users`, { method: "POST" }),
   syncAttendance: (id: string, startDate?: string, endDate?: string) =>
     apiClient(`/device/${id}/sync-attendance${buildQuery({ startDate, endDate })}`, { method: "POST" }),
   mappingCandidates: (id: string) => apiClient<MappingCandidates>(`/device/${id}/mapping-candidates`),

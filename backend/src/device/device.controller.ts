@@ -117,6 +117,11 @@ export class DeviceController {
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
   @RequirePermission('MANAGE_BIOMETRIC_DEVICES')
+  @Post(':id/clear-synced-users')
+  clearSyncedUsers(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.deviceService.clearSyncedUsers(user, id);
+  }
+
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
   @RequirePermission('MANAGE_BIOMETRIC_DEVICES')
   @Post(':id/request-full-sync')

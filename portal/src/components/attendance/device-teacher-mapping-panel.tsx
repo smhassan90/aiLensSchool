@@ -26,6 +26,7 @@ export function DeviceTeacherMappingPanel({ setupHref, showSetupHint = false }: 
   const queryClient = useQueryClient();
   const canView = can("VIEW_BIOMETRIC_DEVICES") || can("MANAGE_TEACHERS");
   const canManage = can("MANAGE_BIOMETRIC_DEVICES") || can("MANAGE_TEACHERS");
+  const canClearSyncedUsers = can("MANAGE_BIOMETRIC_DEVICES");
 
   const devices = useQuery({
     queryKey: ["biometric-devices"],
@@ -55,6 +56,25 @@ export function DeviceTeacherMappingPanel({ setupHref, showSetupHint = false }: 
           err instanceof ApiClientError
             ? err.message
             : "Cloud API cannot reach the LAN device. Use the Python edge agent.",
+        variant: "error",
+      }),
+  });
+
+  const clearSyncedUsers = useMutation({
+    mutationFn: (id: string) => deviceService.clearSyncedUsers(id),
+    onSuccess: (res) => {
+      toast({
+        title: "Synced users cleared",
+        description: `Removed ${res.deletedUsers} user(s), ${res.deletedMappings} mapping(s), ${res.deletedPendingPunches} pending punch(es). Run the edge agent or Sync users to load the current list from the terminal.`,
+        variant: "success",
+      });
+      queryClient.invalidateQueries({ queryKey: ["biometric-devices"] });
+      queryClient.invalidateQueries({ queryKey: ["device-mapping-candidates"] });
+    },
+    onError: (err) =>
+      toast({
+        title: "Could not clear synced users",
+        description: err instanceof ApiClientError ? err.message : "",
         variant: "error",
       }),
   });
@@ -166,6 +186,23 @@ export function DeviceTeacherMappingPanel({ setupHref, showSetupHint = false }: 
                   >
                     Sync attendance
                   </Button>
+                  {canClearSyncedUsers ? (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={clearSyncedUsers.isPending}
+                      onClick={() => {
+                        const ok = window.confirm(
+                          `Clear all users synced from "${device.name}" in HawkNexa?\n\nThis removes device users, teacher mappings, and pending punches for this terminal in the cloud. It does not delete users on the physical terminal or past teacher attendance records.\n\nThen run run-edge-sync.bat (user sync) or Sync users to import the current list.`,
+                        );
+                        if (ok) clearSyncedUsers.mutate(device.id);
+                      }}
+                    >
+                      {clearSyncedUsers.isPending && clearSyncedUsers.variables === device.id
+                        ? "Clearing…"
+                        : "Clear synced users"}
+                    </Button>
+                  ) : null}
                 </div>
               ) : null}
             </CardHeader>
