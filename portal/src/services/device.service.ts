@@ -50,6 +50,13 @@ export type MappingCandidates = {
     teacherName: string;
     deviceUserName: string | null;
   }>;
+  mappedPairs: Array<{
+    deviceUserId: string;
+    deviceUserName: string | null;
+    teacherId: string;
+    teacherName: string;
+    employeeCode: string;
+  }>;
   pendingCounts: Record<string, number>;
 };
 

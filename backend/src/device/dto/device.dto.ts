@@ -181,10 +181,11 @@ export class MappingRowDto {
 }
 
 export class ConfirmMappingsDto {
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => MappingRowDto)
-  mappings!: MappingRowDto[];
+  mappings?: MappingRowDto[];
 }
 
 export class TeacherAttendanceHistoryQueryDto extends PaginationDto {

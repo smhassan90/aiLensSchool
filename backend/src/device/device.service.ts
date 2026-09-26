@@ -365,7 +365,10 @@ export class DeviceService {
   async mappingCandidates(user: AuthUser, deviceId: string) {
     const schoolId = this.requireSchool(user);
     await this.getDevice(user, deviceId);
+    return this.loadMappingCandidates(deviceId, schoolId);
+  }
 
+  private async loadMappingCandidates(deviceId: string, schoolId: string) {
     const [deviceUsers, mappings, teachers, pendingGroups] = await Promise.all([
       this.prisma.biometricDeviceUser.findMany({ where: { deviceConfigId: deviceId } }),
       this.prisma.biometricDeviceUserMapping.findMany({
@@ -393,6 +396,16 @@ export class DeviceService {
     const pendingByUser = new Map(pendingGroups.map((g) => [g.deviceUserId, g._count._all]));
 
     const candidates = this.biometricAttendance.filterMappingCandidates(deviceUsers);
+    const deviceUserById = new Map(candidates.map((u) => [u.deviceUserId, u]));
+
+    const teacherRows = teachers.map((t) => ({
+      id: t.id,
+      name: teacherDisplayName(t.user.firstName, t.user.lastName, t.gender),
+      employeeCode: t.employeeCode,
+      normalizedName: normalizeTeacherName(t.user.firstName, t.user.lastName),
+    }));
+    const teacherById = new Map(teacherRows.map((t) => [t.id, t]));
+
     const unmappedDeviceUsers = candidates
       .filter((u) => !mappedDeviceUsers.has(u.deviceUserId))
       .map((u) => ({
@@ -402,16 +415,39 @@ export class DeviceService {
         pendingCount: pendingByUser.get(u.deviceUserId) ?? 0,
       }));
 
-    const teacherRows = teachers.map((t) => ({
-      id: t.id,
-      name: teacherDisplayName(t.user.firstName, t.user.lastName, t.gender),
-      employeeCode: t.employeeCode,
-      normalizedName: normalizeTeacherName(t.user.firstName, t.user.lastName),
-    }));
-
     const unmappedTeachers = teacherRows.filter((t) => !mappedTeachers.has(t.id));
 
-    const suggestions = unmappedDeviceUsers
+    const suggestions = this.buildNameMatchSuggestions(unmappedDeviceUsers, unmappedTeachers);
+
+    const mappedPairs = mappings.map((m) => {
+      const deviceUser = deviceUserById.get(m.deviceUserId);
+      const teacher = teacherById.get(m.teacherId);
+      return {
+        deviceUserId: m.deviceUserId,
+        deviceUserName: deviceUser?.deviceUserName ?? null,
+        teacherId: m.teacherId,
+        teacherName: teacher?.name ?? 'Teacher',
+        employeeCode: teacher?.employeeCode ?? '',
+      };
+    });
+
+    return {
+      unmappedDeviceUsers,
+      unmappedTeachers: unmappedTeachers.map(({ normalizedName: _n, ...rest }) => rest),
+      suggestions,
+      mappedPairs,
+      pendingCounts: Object.fromEntries(pendingByUser),
+    };
+  }
+
+  private buildNameMatchSuggestions(
+    unmappedDeviceUsers: Array<{
+      deviceUserId: string;
+      deviceUserName?: string | null;
+    }>,
+    unmappedTeachers: Array<{ id: string; name: string; normalizedName: string }>,
+  ) {
+    return unmappedDeviceUsers
       .map((deviceUser) => {
         const normalizedDeviceName = deviceUser.deviceUserName?.trim().replace(/\s+/g, ' ').toLowerCase();
         if (!normalizedDeviceName) return null;
@@ -425,13 +461,6 @@ export class DeviceService {
         };
       })
       .filter((row): row is NonNullable<typeof row> => Boolean(row));
-
-    return {
-      unmappedDeviceUsers,
-      unmappedTeachers: unmappedTeachers.map(({ normalizedName: _n, ...rest }) => rest),
-      suggestions,
-      pendingCounts: Object.fromEntries(pendingByUser),
-    };
   }
 
   async confirmMappings(
@@ -441,12 +470,17 @@ export class DeviceService {
   ) {
     const schoolId = this.requireSchool(user);
     await this.getDevice(user, deviceId);
-    if (!mappings.length) {
+    let rows = mappings;
+    if (!rows.length) {
+      const { suggestions } = await this.loadMappingCandidates(deviceId, schoolId);
+      rows = suggestions.map((s) => ({ deviceUserId: s.deviceUserId, teacherId: s.teacherId }));
+    }
+    if (!rows.length) {
       throw new BadRequestException({ code: 'MAPPINGS_REQUIRED', message: 'Provide at least one mapping' });
     }
 
     let pendingApplied = 0;
-    for (const row of mappings) {
+    for (const row of rows) {
       const deviceUser = await this.prisma.biometricDeviceUser.findUnique({
         where: { deviceConfigId_deviceUserId: { deviceConfigId: deviceId, deviceUserId: row.deviceUserId } },
       });
@@ -479,7 +513,7 @@ export class DeviceService {
       );
       pendingApplied += replay.applied;
     }
-    return { mappings: mappings.length, pendingPunchesApplied: pendingApplied };
+    return { mappings: rows.length, pendingPunchesApplied: pendingApplied };
   }
 
   async listMappings(user: AuthUser, deviceId: string) {

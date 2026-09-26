@@ -155,7 +155,7 @@ export class DeviceController {
     @Param('id') id: string,
     @Body() dto: ConfirmMappingsDto,
   ) {
-    return this.deviceService.confirmMappings(user, id, dto.mappings);
+    return this.deviceService.confirmMappings(user, id, dto.mappings ?? []);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)

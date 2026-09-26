@@ -18,11 +18,17 @@ export class ZktService {
     private readonly biometricAttendance: BiometricAttendanceService,
   ) {}
 
-  private async loadZkLib(): Promise<{ default: new (ip: string, port: number, timeout: number) => ZkLibInstance }> {
+  private async loadZkLib(): Promise<new (ip: string, port: number, timeout: number) => ZkLibInstance> {
     try {
       const mod = await import('node-zklib' as `${string}`);
-      return mod as { default: new (ip: string, port: number, timeout: number) => ZkLibInstance };
-    } catch {
+      // ESM: { default: ZKLib }. CJS (compiled require): module.exports is the class — no .default.
+      const ctor = (mod as { default?: unknown }).default ?? mod;
+      if (typeof ctor !== 'function') {
+        throw new Error('Invalid node-zklib export');
+      }
+      return ctor as new (ip: string, port: number, timeout: number) => ZkLibInstance;
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) throw error;
       throw new ServiceUnavailableException({
         code: 'ZKLIB_UNAVAILABLE',
         message:
@@ -32,7 +38,7 @@ export class ZktService {
   }
 
   async testConnection(ipAddress: string, port: number) {
-    const ZkLib = (await this.loadZkLib()).default;
+    const ZkLib = await this.loadZkLib();
     const zk = new ZkLib(ipAddress, port, 10000);
     try {
       await zk.createSocket();
@@ -52,7 +58,7 @@ export class ZktService {
     const device = await this.prisma.biometricDeviceConfig.findUnique({ where: { id: deviceConfigId } });
     if (!device) throw new ServiceUnavailableException({ code: 'DEVICE_NOT_FOUND', message: 'Device not found' });
 
-    const ZkLib = (await this.loadZkLib()).default;
+    const ZkLib = await this.loadZkLib();
     const zk = new ZkLib(device.ipAddress, device.port, 10000);
     await zk.createSocket();
     const rawUsers = await zk.getUsers();
@@ -74,7 +80,7 @@ export class ZktService {
     if (!device) throw new ServiceUnavailableException({ code: 'DEVICE_NOT_FOUND', message: 'Device not found' });
 
     const policy = await loadTeacherAttendancePolicy(this.prisma, device.schoolId);
-    const ZkLib = (await this.loadZkLib()).default;
+    const ZkLib = await this.loadZkLib();
     const zk = new ZkLib(device.ipAddress, device.port, 10000);
     await zk.createSocket();
     const rawLogs = await zk.getAttendances();
