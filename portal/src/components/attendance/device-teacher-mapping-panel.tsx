@@ -65,7 +65,7 @@ export function DeviceTeacherMappingPanel({ setupHref, showSetupHint = false }: 
     onSuccess: (res) => {
       toast({
         title: "Synced users cleared",
-        description: `Removed ${res.deletedUsers} user(s), ${res.deletedMappings} mapping(s), ${res.deletedPendingPunches} pending punch(es). Restart run-edge-sync.bat on the laptop (it uploads users on startup), or run: run-edge-sync.bat --sync-users`,
+        description: `Removed ${res.deletedUsers} user(s), ${res.deletedMappings} mapping(s), ${res.deletedPendingPunches} pending punch(es). Keep run-edge-sync.bat running — it refreshes the user list from the terminal every cycle.`,
         variant: "success",
       });
       queryClient.invalidateQueries({ queryKey: ["biometric-devices"] });

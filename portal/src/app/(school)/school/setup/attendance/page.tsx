@@ -245,7 +245,7 @@ export default function SetupAttendancePage() {
       toast({
         title: "Full sync queued",
         description:
-          "On the laptop: stop and run run-edge-sync.bat. That run will refresh users from the terminal and re-upload all attendance punches (not just users).",
+          "On the laptop: stop and run run-edge-sync.bat to re-upload all attendance punches. Users from the terminal sync automatically every cycle while the agent runs.",
         variant: "success",
       });
     },

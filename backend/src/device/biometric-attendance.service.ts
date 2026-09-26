@@ -43,32 +43,54 @@ export class BiometricAttendanceService {
     deviceConfigId: string,
     users: Array<{ deviceUserId: string; deviceUserName?: string; deviceBadgeId?: string }>,
   ) {
-    const ops = users.map((user) =>
-      this.prisma.biometricDeviceUser.upsert({
-        where: {
-          deviceConfigId_deviceUserId: {
-            deviceConfigId,
-            deviceUserId: user.deviceUserId,
+    const rows = users.filter((u) => String(u.deviceUserId ?? '').trim());
+    const deviceUserIds = rows.map((u) => String(u.deviceUserId).trim());
+
+    return this.prisma.$transaction(async (tx) => {
+      for (const user of rows) {
+        const deviceUserId = String(user.deviceUserId).trim();
+        await tx.biometricDeviceUser.upsert({
+          where: {
+            deviceConfigId_deviceUserId: {
+              deviceConfigId,
+              deviceUserId,
+            },
           },
-        },
-        create: {
-          deviceConfigId,
-          deviceUserId: user.deviceUserId,
-          deviceUserName: user.deviceUserName ?? null,
-          deviceBadgeId: user.deviceBadgeId ?? null,
-        },
-        update: {
-          deviceUserName: user.deviceUserName ?? null,
-          deviceBadgeId: user.deviceBadgeId ?? null,
-        },
-      }),
-    );
-    await this.prisma.$transaction(ops);
-    await this.prisma.biometricDeviceConfig.update({
-      where: { id: deviceConfigId },
-      data: { lastSyncAt: new Date() },
+          create: {
+            deviceConfigId,
+            deviceUserId,
+            deviceUserName: user.deviceUserName ?? null,
+            deviceBadgeId: user.deviceBadgeId ?? null,
+          },
+          update: {
+            deviceUserName: user.deviceUserName ?? null,
+            deviceBadgeId: user.deviceBadgeId ?? null,
+          },
+        });
+      }
+
+      let removed = 0;
+      if (deviceUserIds.length > 0) {
+        const staleMappings = await tx.biometricDeviceUserMapping.deleteMany({
+          where: { deviceConfigId, deviceUserId: { notIn: deviceUserIds } },
+        });
+        await tx.pendingBiometricAttendanceLog.deleteMany({
+          where: { deviceConfigId, deviceUserId: { notIn: deviceUserIds } },
+        });
+        const staleUsers = await tx.biometricDeviceUser.deleteMany({
+          where: { deviceConfigId, deviceUserId: { notIn: deviceUserIds } },
+        });
+        removed = staleUsers.count;
+        void staleMappings;
+      }
+
+      await tx.biometricDeviceConfig.update({
+        where: { id: deviceConfigId },
+        data: { lastSyncAt: new Date() },
+      });
+
+      return { upserted: rows.length, removed };
     });
-    return { upserted: users.length };
   }
 
   normalizeLogs(
