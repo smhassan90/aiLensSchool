@@ -23,7 +23,6 @@ import { ArrowLeft } from "lucide-react";
 const schema = z.object({
   firstName: z.string().min(1, "Required"),
   lastName: z.string().min(1, "Required"),
-  email: z.string().email("Valid email required"),
   phone: z.string().optional(),
   password: z.string().min(8, "Minimum 8 characters"),
   branchId: z.string().min(1, "Select a branch"),
@@ -59,8 +58,16 @@ export default function NewTeacherPage() {
         ...values,
         employeeCode: values.employeeCode?.trim() || undefined,
       }),
-    onSuccess: () => {
-      toast({ title: "Teacher created", variant: "success" });
+    onSuccess: (created) => {
+      toast({
+        title: "Teacher created",
+        description: created.username
+          ? `Login username: ${created.username}`
+          : created.employeeCode
+            ? `Employee code: ${created.employeeCode}`
+            : undefined,
+        variant: "success",
+      });
       queryClient.invalidateQueries({ queryKey: ["teacher-attendance"] });
       queryClient.invalidateQueries({ queryKey: ["device-mapping-candidates"] });
       queryClient.invalidateQueries({ queryKey: ["teacher-attendance-teachers"] });
@@ -101,7 +108,10 @@ export default function NewTeacherPage() {
           <Card>
             <CardHeader>
               <CardTitle>Teacher Details</CardTitle>
-              <CardDescription>Account and employment information</CardDescription>
+              <CardDescription>
+                A unique login username is generated from your school code and employee ID. Teachers sign in
+                with that username, not an email address.
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -115,11 +125,6 @@ export default function NewTeacherPage() {
                 {errors.lastName && <p className="text-sm text-destructive">{errors.lastName.message}</p>}
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" {...register("email")} />
-                {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
                 <Input id="phone" {...register("phone")} />
               </div>

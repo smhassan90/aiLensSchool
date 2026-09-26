@@ -1,7 +1,6 @@
 import {
   IsArray,
   IsDateString,
-  IsEmail,
   IsEnum,
   IsOptional,
   IsString,
@@ -49,10 +48,6 @@ export class CreateTeacherDto {
   @IsOptional()
   @IsEnum(Gender)
   gender?: Gender;
-
-  @ApiProperty()
-  @IsEmail()
-  email!: string;
 
   @ApiPropertyOptional()
   @IsOptional()

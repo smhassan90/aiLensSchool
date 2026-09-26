@@ -15,6 +15,7 @@ import { MemoryCacheService } from '../common/services/memory-cache.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
+import { buildTeacherUsername, teacherLocalEmail } from './teacher-accounts';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import { FAST_AI_PROVIDER, AiProvider } from '../ai/providers/ai.provider';
 import { hasStaffPermission } from '../common/permissions';
@@ -53,21 +54,12 @@ export class TeachersService {
 
   async create(dto: CreateTeacherDto, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
-    const email = dto.email.toLowerCase();
 
     const branch = await this.prisma.branch.findFirst({
       where: { id: dto.branchId, schoolId },
     });
     if (!branch) {
       throw new NotFoundException({ code: 'BRANCH_NOT_FOUND', message: 'Branch not found' });
-    }
-
-    const existingUser = await this.prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      throw new ConflictException({
-        code: 'EMAIL_EXISTS',
-        message: 'Email already registered',
-      });
     }
 
     const teacherRole = await this.prisma.role.findUnique({ where: { name: RoleName.TEACHER } });
@@ -99,10 +91,19 @@ export class TeachersService {
         });
       }
 
+      const schoolCode = school?.code ?? 'SCH';
+      let username = buildTeacherUsername(schoolCode, employeeCode);
+      let attempt = 0;
+      while (await tx.user.findUnique({ where: { username } })) {
+        attempt += 1;
+        username = buildTeacherUsername(schoolCode, employeeCode, attempt);
+      }
+      const email = teacherLocalEmail(username, schoolCode);
+
       const teacherUser = await tx.user.create({
         data: {
           email,
-          username: email.split('@')[0],
+          username,
           passwordHash,
           firstName: dto.firstName,
           lastName: (dto.lastName ?? '').trim(),
@@ -178,6 +179,7 @@ export class TeachersService {
     return {
       id: result.profile.id,
       userId: result.user.id,
+      username: result.user.username,
       email: result.user.email,
       employeeCode: result.profile.employeeCode,
       branchId: result.profile.branchId,

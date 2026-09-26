@@ -30,7 +30,6 @@ function mapClassAssignment(
 export interface CreateTeacherPayload {
   firstName: string;
   lastName: string;
-  email: string;
   phone?: string;
   password: string;
   branchId: string;
@@ -239,7 +238,9 @@ export const teachersService = {
   },
 
   create(payload: CreateTeacherPayload) {
-    return apiClient<Teacher>("/teachers", {
+    return apiClient<
+      Teacher & { username?: string | null; employeeCode?: string }
+    >("/teachers", {
       method: "POST",
       body: JSON.stringify(payload),
     });
