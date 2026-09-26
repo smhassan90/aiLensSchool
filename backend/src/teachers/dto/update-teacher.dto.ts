@@ -1,4 +1,6 @@
-import { IsDateString, IsEmail, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsEmail, IsEnum, IsOptional, IsString, ValidateIf } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { emptyStringToUndefined } from '../../common/dto/transforms';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Gender, TeacherStatus } from '@prisma/client';
 
@@ -19,11 +21,14 @@ export class UpdateTeacherDto {
   gender?: Gender | null;
 
   @ApiPropertyOptional()
+  @Transform(emptyStringToUndefined)
   @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsEmail()
   email?: string;
 
   @ApiPropertyOptional()
+  @Transform(emptyStringToUndefined)
   @IsOptional()
   @IsString()
   phone?: string;
@@ -39,6 +44,7 @@ export class UpdateTeacherDto {
   employeeCode?: string;
 
   @ApiPropertyOptional()
+  @Transform(emptyStringToUndefined)
   @IsOptional()
   @IsDateString()
   hireDate?: string;

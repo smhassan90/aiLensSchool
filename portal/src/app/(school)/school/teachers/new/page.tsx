@@ -53,11 +53,21 @@ export default function NewTeacherPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: (values: FormValues) =>
-      teachersService.create({
-        ...values,
-        employeeCode: values.employeeCode?.trim() || undefined,
-      }),
+    mutationFn: (values: FormValues) => {
+      const phone = values.phone?.trim();
+      const employeeCode = values.employeeCode?.trim();
+      const hireDate = values.hireDate?.trim();
+      return teachersService.create({
+        firstName: values.firstName.trim(),
+        lastName: values.lastName.trim(),
+        password: values.password,
+        branchId: values.branchId,
+        status: values.status,
+        ...(phone ? { phone } : {}),
+        ...(employeeCode ? { employeeCode } : {}),
+        ...(hireDate ? { hireDate } : {}),
+      });
+    },
     onSuccess: (created) => {
       toast({
         title: "Teacher created",
@@ -103,7 +113,7 @@ export default function NewTeacherPage() {
       ) : (
         <form
           onSubmit={handleSubmit((v) => mutation.mutate(v))}
-          className="mx-auto max-w-2xl"
+          className="mx-auto max-w-3xl space-y-6"
         >
           <Card>
             <CardHeader>
@@ -115,31 +125,23 @@ export default function NewTeacherPage() {
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName">First name</Label>
                 <Input id="firstName" {...register("firstName")} />
                 {errors.firstName && <p className="text-sm text-destructive">{errors.firstName.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastName">Last name</Label>
                 <Input id="lastName" {...register("lastName")} />
                 {errors.lastName && <p className="text-sm text-destructive">{errors.lastName.message}</p>}
               </div>
-              <div className="space-y-2 sm:col-span-2">
+              <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" {...register("phone")} />
+                <Input id="phone" type="tel" autoComplete="tel" {...register("phone")} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" {...register("password")} />
+                <Input id="password" type="password" autoComplete="new-password" {...register("password")} />
                 {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="employeeCode">Employee code (optional)</Label>
-                <Input id="employeeCode" {...register("employeeCode")} placeholder="Leave blank for SCHOOL-0001 style ID" />
-                {errors.employeeCode && <p className="text-sm text-destructive">{errors.employeeCode.message}</p>}
-                <p className="text-xs text-muted-foreground">
-                  Used for biometric devices and attendance. Blank assigns the next code with your school prefix.
-                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="branchId">Branch</Label>
@@ -152,10 +154,6 @@ export default function NewTeacherPage() {
                 {errors.branchId && <p className="text-sm text-destructive">{errors.branchId.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="hireDate">Hire Date</Label>
-                <Input id="hireDate" type="date" {...register("hireDate")} />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
                 <Select id="status" {...register("status")}>
                   <option value="ACTIVE">Active</option>
@@ -163,10 +161,27 @@ export default function NewTeacherPage() {
                   <option value="ON_LEAVE">On leave</option>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="hireDate">Hire date</Label>
+                <Input id="hireDate" type="date" {...register("hireDate")} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="employeeCode">Employee code (optional)</Label>
+                <Input
+                  id="employeeCode"
+                  {...register("employeeCode")}
+                  placeholder="Leave blank for SCHOOL-0001 style ID"
+                />
+                {errors.employeeCode && <p className="text-sm text-destructive">{errors.employeeCode.message}</p>}
+              </div>
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                Employee code is used for biometric devices and attendance. Leave blank to assign the next code
+                with your school prefix.
+              </p>
             </CardContent>
           </Card>
 
-          <div className="mt-6 flex justify-end gap-3">
+          <div className="flex justify-end gap-3">
             <Link href="/school/teachers">
               <Button type="button" variant="outline">Cancel</Button>
             </Link>

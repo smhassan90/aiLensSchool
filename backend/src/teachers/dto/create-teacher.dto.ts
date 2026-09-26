@@ -1,13 +1,16 @@
 import {
   IsArray,
   IsDateString,
+  IsEmail,
   IsEnum,
   IsOptional,
   IsString,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { emptyStringToUndefined } from '../../common/dto/transforms';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Gender, TeacherStatus } from '@prisma/client';
 
@@ -49,7 +52,16 @@ export class CreateTeacherDto {
   @IsEnum(Gender)
   gender?: Gender;
 
+  /** Ignored on create; accepted so older clients sending a blank email do not fail validation. */
+  @ApiPropertyOptional({ deprecated: true })
+  @Transform(emptyStringToUndefined)
+  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsEmail()
+  email?: string;
+
   @ApiPropertyOptional()
+  @Transform(emptyStringToUndefined)
   @IsOptional()
   @IsString()
   phone?: string;
@@ -64,11 +76,13 @@ export class CreateTeacherDto {
   branchId!: string;
 
   @ApiPropertyOptional({ description: 'Leave blank to auto-generate e.g. SCHOOLCODE-0001' })
+  @Transform(emptyStringToUndefined)
   @IsOptional()
   @IsString()
   employeeCode?: string;
 
   @ApiPropertyOptional()
+  @Transform(emptyStringToUndefined)
   @IsOptional()
   @IsDateString()
   hireDate?: string;
