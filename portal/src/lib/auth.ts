@@ -28,15 +28,25 @@ export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
+let storedUserSnapshot: string | null | undefined;
+let storedUserCached: AuthUser | null = null;
+
+/** Stable reference between storage updates — required for useSyncExternalStore. */
 export function getStoredUser(): AuthUser | null {
   if (typeof window === "undefined") return null;
   const raw = localStorage.getItem(USER_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as AuthUser;
-  } catch {
+  if (raw === storedUserSnapshot) return storedUserCached;
+  storedUserSnapshot = raw;
+  if (!raw) {
+    storedUserCached = null;
     return null;
   }
+  try {
+    storedUserCached = JSON.parse(raw) as AuthUser;
+  } catch {
+    storedUserCached = null;
+  }
+  return storedUserCached;
 }
 
 export function setAuthSession(data: LoginResponse): void {
