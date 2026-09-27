@@ -8,6 +8,10 @@ export function teacherLocalEmail(username: string, schoolCode: string): string 
   return `${username}@${slugPart(schoolCode) || 'school'}.teacher.local`;
 }
 
+export function staffLocalEmail(username: string, schoolCode: string): string {
+  return `${username}@${slugPart(schoolCode) || 'school'}.staff.local`;
+}
+
 /** Login username: school code + mobile digits, e.g. tps.032123234543 (same pattern as parent app). */
 export function buildTeacherUsername(
   schoolCode: string,

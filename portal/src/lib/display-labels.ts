@@ -13,6 +13,10 @@ const STATUS_LABELS: Record<string, string> = {
   REJECTED: "Rejected",
   ACTIVE: "Active",
   INACTIVE: "Inactive",
+  ON_LEAVE: "On leave",
+  PAID: "Paid",
+  UNPAID: "Unpaid",
+  PARTIAL: "Partially paid",
 };
 
 const ROLE_LABELS: Record<RoleName, string> = {

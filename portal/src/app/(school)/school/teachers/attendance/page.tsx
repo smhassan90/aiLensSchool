@@ -135,7 +135,7 @@ export default function TeacherAttendancePage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Teacher attendance"
-        description="Desk check-in for today, history reports, and ZKTeco device sync."
+        description="Desk check-in for today, history reports, and fingerprint terminal sync."
       />
       <TeacherAttendanceTabs />
       {!can("MANAGE_TEACHERS") ? (

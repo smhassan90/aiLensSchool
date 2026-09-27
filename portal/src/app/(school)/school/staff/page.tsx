@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { AccessDenied } from "@/components/layout/access-denied";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { staffService } from "@/services/school-ops.service";
 import type { StaffPermission } from "@/lib/types";
 import { useToast } from "@/providers/toast-provider";
+import { useAuth } from "@/providers/auth-provider";
+import { friendlyApiErrorMessage, formatRolesList } from "@/lib/display-labels";
+import type { RoleName } from "@/lib/types";
 
 const STAFF_ROLES = [
   {
@@ -36,6 +40,7 @@ const STAFF_ROLES = [
 ] as const;
 
 export default function StaffPage() {
+  const { can } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const catalog = useQuery({ queryKey: ["staff-permissions"], queryFn: () => staffService.permissions() });
@@ -51,7 +56,8 @@ export default function StaffPage() {
     mutationFn: (payload: {
       firstName: string;
       lastName: string;
-      email: string;
+      email?: string;
+      phone: string;
       password: string;
     }) =>
       staffService.create({
@@ -60,23 +66,27 @@ export default function StaffPage() {
         role: "PRINCIPAL",
         permissions,
       }),
-    onSuccess: () => {
-      toast({ title: "Account created", variant: "success" });
+    onSuccess: (data: { username?: string | null }) => {
+      const login = data?.username ? ` Sign-in username: ${data.username}` : "";
+      toast({ title: "Account created", description: login.trim() || undefined, variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["staff"] });
     },
-    onError: (err: Error) => toast({ title: "Could not create", description: err.message, variant: "error" }),
+    onError: (err: Error) =>
+      toast({ title: "Could not create", description: friendlyApiErrorMessage(err), variant: "error" }),
   });
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     const data = new FormData(form);
+    const email = String(data.get("email") ?? "").trim();
     create.mutate(
       {
         firstName: String(data.get("firstName") ?? ""),
         lastName: String(data.get("lastName") ?? ""),
-        email: String(data.get("email") ?? ""),
+        phone: String(data.get("phone") ?? ""),
         password: String(data.get("password") ?? ""),
+        ...(email ? { email } : {}),
       },
       { onSuccess: () => form.reset() },
     );
@@ -86,11 +96,19 @@ export default function StaffPage() {
     setPermissions((prev) => (prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]));
   };
 
+  if (!can("MANAGE_STAFF")) {
+    return (
+      <AccessDenied
+        description="Only the main school admin can create staff logins. If you need access, contact your administrator."
+      />
+    );
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Staff access"
-        description="Pick a role, then tick only what they need."
+        description="Pick a role, then tick only what they need. Staff sign in with the school username created from their mobile number."
       />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -101,7 +119,17 @@ export default function StaffPage() {
                 <div><Label>First name</Label><Input name="firstName" required /></div>
                 <div><Label>Last name</Label><Input name="lastName" required /></div>
               </div>
-              <div><Label>Email</Label><Input name="email" type="email" required /></div>
+              <div>
+                <Label>Mobile number</Label>
+                <Input name="phone" type="tel" autoComplete="tel" required placeholder="e.g. 03001234567" />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Used to generate their login username (same style as teachers).
+                </p>
+              </div>
+              <div>
+                <Label>Email (optional)</Label>
+                <Input name="email" type="email" placeholder="Only if they use email elsewhere" />
+              </div>
               <div><Label>Password</Label><Input name="password" type="password" minLength={6} required /></div>
               <div>
                 <Label>Role</Label>
@@ -148,7 +176,11 @@ export default function StaffPage() {
             {(staff.data?.items ?? []).map((person) => (
               <div key={person.id} className="rounded-md border p-3">
                 <p className="font-medium">{person.firstName} {person.lastName}</p>
-                <p className="text-muted-foreground">{person.email} · {person.roles.join(", ")}</p>
+                <p className="text-muted-foreground">
+                  {person.username ?? person.email}
+                  {" · "}
+                  {formatRolesList(person.roles as RoleName[])}
+                </p>
               </div>
             ))}
           </CardContent>

@@ -9,6 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { expensesService } from "@/services/school-ops.service";
 import { useToast } from "@/providers/toast-provider";
+import { useAuth } from "@/providers/auth-provider";
+import { AccessDenied } from "@/components/layout/access-denied";
+import { formatStatusLabel } from "@/lib/display-labels";
 
 const CATEGORIES = [
   ["TEACHER_SALARY", "Teacher salary"],
@@ -24,9 +27,15 @@ const CATEGORIES = [
 ];
 
 export default function ExpensesPage() {
+  const { can } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const list = useQuery({ queryKey: ["expenses"], queryFn: () => expensesService.list() });
+  const allowed = can("MANAGE_EXPENSES");
+  const list = useQuery({
+    queryKey: ["expenses"],
+    queryFn: () => expensesService.list(),
+    enabled: allowed,
+  });
   const create = useMutation({
     mutationFn: (form: HTMLFormElement) => {
       const data = new FormData(form);
@@ -51,6 +60,14 @@ export default function ExpensesPage() {
     create.mutate(e.currentTarget);
     e.currentTarget.reset();
   };
+
+  if (!allowed) {
+    return (
+      <AccessDenied
+        description="Your account cannot record salaries and bills. Ask the school admin for finance access."
+      />
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -81,7 +98,11 @@ export default function ExpensesPage() {
           <Card key={row.id}><CardContent className="flex items-center justify-between p-4">
             <div>
               <p className="font-medium">{row.title}</p>
-              <p className="text-xs text-muted-foreground">{row.category.replaceAll("_", " ")} · {row.recurrence.replaceAll("_", " ")}</p>
+              <p className="text-xs text-muted-foreground">
+                {CATEGORIES.find(([value]) => value === row.category)?.[1] ?? formatStatusLabel(row.category)}
+                {" · "}
+                {row.recurrence === "ONE_TIME" ? "One time" : formatStatusLabel(row.recurrence)}
+              </p>
             </div>
             <p className="font-semibold">{Number(row.amount)}</p>
           </CardContent></Card>

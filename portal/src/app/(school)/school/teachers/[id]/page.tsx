@@ -25,6 +25,7 @@ import { useAuth } from "@/providers/auth-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { ArrowLeft } from "lucide-react";
 import { gradeClassLabel, gradeClassNumber } from "@/lib/utils";
+import { formatStatusLabel } from "@/lib/display-labels";
 
 const schema = z.object({
   firstName: z.string().min(1, "Required"),
@@ -219,7 +220,7 @@ export default function TeacherDetailsPage() {
       />
 
       <div className="mb-4 flex items-center gap-2">
-        <Badge variant={row.status === "ACTIVE" ? "success" : "secondary"}>{row.status.replaceAll("_", " ")}</Badge>
+        <Badge variant={row.status === "ACTIVE" ? "success" : "secondary"}>{formatStatusLabel(row.status)}</Badge>
         <span className="text-sm text-slate-500">{row.branch?.name ?? "No branch"}</span>
       </div>
 

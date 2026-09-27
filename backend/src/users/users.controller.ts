@@ -31,16 +31,16 @@ class CreateStaffDto {
   @IsString()
   lastName!: string;
 
+  @IsOptional()
   @IsEmail()
-  email!: string;
+  email?: string;
 
   @IsString()
   @MinLength(6)
   password!: string;
 
-  @IsOptional()
   @IsString()
-  phone?: string;
+  phone!: string;
 
   @IsOptional()
   @IsString()

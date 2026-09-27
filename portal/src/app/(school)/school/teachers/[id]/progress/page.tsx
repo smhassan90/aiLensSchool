@@ -13,6 +13,7 @@ import { PageLoader } from "@/components/layout/page-loader";
 import { AiWait } from "@/components/layout/ai-wait";
 import { CriterionBars, scoreTextClass } from "@/components/teachers/teacher-score-visuals";
 import { cn } from "@/lib/utils";
+import { formatStatusLabel } from "@/lib/display-labels";
 import { useAuth } from "@/providers/auth-provider";
 
 export default function TeacherProgressPage() {
@@ -124,7 +125,7 @@ export default function TeacherProgressPage() {
         <Card className="mb-6 border-teal-200 bg-teal-50/60">
           <CardHeader>
             <p className="text-xs uppercase tracking-wide text-teal-800">
-              {coach.coaching.verdict.replaceAll("_", " ")}
+              {formatStatusLabel(coach.coaching.verdict)}
             </p>
             <CardTitle>{coach.coaching.headline}</CardTitle>
           </CardHeader>

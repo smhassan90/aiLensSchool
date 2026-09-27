@@ -143,7 +143,7 @@ function DeviceMappingCard({
         description:
           err instanceof ApiClientError
             ? err.message
-            : "Use the edge sync agent when the API is cloud-hosted.",
+            : "Use the school attendance sync tool when the server is hosted in the cloud.",
         variant: "error",
       }),
   });
@@ -343,7 +343,7 @@ function DeviceMappingCard({
                 <p className="text-sm text-muted-foreground">
                   {mappedPairs.length > 0
                     ? "No unmapped device users on this terminal."
-                    : "No device users yet. Run the edge sync agent or Sync users after enrolling teachers on the terminal."}
+                    : "No device users yet. Run the attendance sync tool or sync users after enrolling teachers on the terminal."}
                 </p>
               ) : (
                 <>

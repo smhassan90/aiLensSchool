@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { Prisma, RoleName, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
@@ -7,6 +7,12 @@ import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { parsePermissions, PRINCIPAL_DEFAULT_PERMISSIONS, StaffPermission } from '../common/permissions';
 import { AuditService } from '../audit/audit.service';
+import {
+  buildTeacherUsername,
+  normalizeTeacherPhoneDigits,
+  schoolPhonesMatch,
+  staffLocalEmail,
+} from '../teachers/teacher-accounts';
 
 @Injectable()
 export class UsersService {
@@ -99,20 +105,23 @@ export class UsersService {
     dto: {
       firstName: string;
       lastName: string;
-      email: string;
+      email?: string;
       password: string;
-      phone?: string;
+      phone: string;
       title?: string;
       role?: RoleName;
       permissions?: StaffPermission[];
     },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
-    const email = dto.email.toLowerCase();
-    const existing = await this.prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      throw new ConflictException({ code: 'EMAIL_EXISTS', message: 'Email already registered' });
+    const phone = dto.phone.trim();
+    if (normalizeTeacherPhoneDigits(phone).length < 7) {
+      throw new BadRequestException({
+        code: 'PHONE_INVALID',
+        message: 'Enter a valid mobile number (at least 7 digits)',
+      });
     }
+
     const roleName = RoleName.PRINCIPAL;
     const role = await this.prisma.role.upsert({
       where: { name: roleName },
@@ -121,14 +130,41 @@ export class UsersService {
     });
     const permissions = parsePermissions(dto.permissions?.length ? dto.permissions : PRINCIPAL_DEFAULT_PERMISSIONS);
     const created = await this.prisma.$transaction(async (tx) => {
+      const school = await tx.school.findUnique({ where: { id: schoolId }, select: { code: true } });
+      const schoolCode = school?.code ?? 'SCH';
+
+      const usersWithPhone = await tx.user.findMany({
+        where: { schoolId, phone: { not: null } },
+        select: { phone: true },
+      });
+      if (usersWithPhone.some((row) => schoolPhonesMatch(row.phone, phone))) {
+        throw new ConflictException({
+          code: 'PHONE_EXISTS_IN_SCHOOL',
+          message: 'This phone number is already used at your school',
+        });
+      }
+
+      let username = buildTeacherUsername(schoolCode, phone);
+      let attempt = 0;
+      while (await tx.user.findUnique({ where: { username } })) {
+        attempt += 1;
+        username = buildTeacherUsername(schoolCode, phone, attempt);
+      }
+
+      const email = (dto.email?.trim().toLowerCase() || staffLocalEmail(username, schoolCode));
+      const existingEmail = await tx.user.findUnique({ where: { email } });
+      if (existingEmail) {
+        throw new ConflictException({ code: 'EMAIL_EXISTS', message: 'Email already registered' });
+      }
+
       const staff = await tx.user.create({
         data: {
           email,
-          username: email.split('@')[0],
+          username,
           passwordHash: await bcrypt.hash(dto.password, 12),
           firstName: dto.firstName,
           lastName: dto.lastName,
-          phone: dto.phone,
+          phone,
           schoolId,
           status: UserStatus.ACTIVE,
           permissions,

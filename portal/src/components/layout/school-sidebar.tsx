@@ -67,7 +67,7 @@ const mainNav: Array<{
   { href: "/school/teachers", label: "Teachers", icon: UserSquare2 },
   { href: "/school/teachers/attendance", label: "Attendance", icon: ClipboardCheck },
   { href: "/school/exams", label: "Exams", icon: Trophy, permission: "MANAGE_EXAMS" },
-  { href: "/school/submitted-exam-papers", label: "Exam papers", icon: FileText },
+  { href: "/school/submitted-exam-papers", label: "Review exam papers", icon: FileText },
   { href: "/school/announcements", label: "Notifications", icon: Megaphone },
   { href: "/school/day-off-requests", label: "Day-off requests", icon: CalendarDays },
   { href: "/school/student-photos", label: "Student photos", icon: UserSquare2 },

@@ -92,8 +92,8 @@ const setupSections: SetupSection[] = [
       },
       {
         href: "/school/submitted-exam-papers",
-        title: "Exam papers",
-        description: "Papers teachers submitted for printout — open to print for the class",
+        title: "Review exam papers",
+        description: "Approve teacher submissions and print papers for class",
         icon: FileText,
       },
     ],
@@ -117,8 +117,8 @@ const setupSections: SetupSection[] = [
       },
       {
         href: "/school/setup/attendance",
-        title: "Attendance (biometric)",
-        description: "ZKTeco terminals, edge sync settings, and agent bootstrap",
+        title: "Attendance terminals",
+        description: "Connect fingerprint machines and the school sync tool for automatic teacher attendance",
         icon: ClipboardCheck,
         permission: "MANAGE_TEACHERS",
       },

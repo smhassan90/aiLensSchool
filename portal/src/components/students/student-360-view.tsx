@@ -12,6 +12,7 @@ import { personFullName, teacherDisplayNameFromUser } from "@/lib/person-name";
 import { assetUrl } from "@/lib/api-client";
 import { cn, formatDate } from "@/lib/utils";
 import { formatStatusLabel } from "@/lib/display-labels";
+import { useAuth } from "@/providers/auth-provider";
 import type { ReportCard } from "@/lib/types";
 import {
   ArrowLeft,
@@ -267,6 +268,8 @@ export function Student360View({
   allowPhotoUpload?: boolean;
   photoUploadInvalidateKeys?: string[][];
 }) {
+  const { can } = useAuth();
+  const canCollectFees = can("VIEW_FINANCE");
   const student = data.student;
   const photo = assetUrl(student.photoUrl);
   const fullName = personFullName(student.firstName, student.lastName);
@@ -463,14 +466,14 @@ export function Student360View({
               <Link href={`/school/students/${studentId}`}>
                 <Button className="bg-amber-300 text-teal-950 hover:bg-amber-200">Open full profile</Button>
               </Link>
-            ) : (
+            ) : canCollectFees ? (
               <Link href={`/school/fees?studentId=${studentId}`}>
                 <Button className="bg-amber-300 text-teal-950 hover:bg-amber-200">
                   <Wallet className="h-4 w-4" />
                   Collect fees
                 </Button>
               </Link>
-            )}
+            ) : null}
           </div>
         </div>
       </section>
@@ -550,9 +553,11 @@ export function Student360View({
               title="Fees"
               icon={Wallet}
               action={
-                <Link href={`/school/fees?studentId=${studentId}`}>
-                  <Button className="shadow-sm">Collect fees</Button>
-                </Link>
+                canCollectFees ? (
+                  <Link href={`/school/fees?studentId=${studentId}`}>
+                    <Button className="shadow-sm">Collect fees</Button>
+                  </Link>
+                ) : undefined
               }
             >
               <div className="mb-5 grid gap-4 sm:grid-cols-3">
@@ -573,16 +578,25 @@ export function Student360View({
                       key={item.id}
                       className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.4)]"
                     >
-                      <Link
-                        href={`/school/fees?studentId=${studentId}`}
-                        className="min-w-0 text-left hover:underline"
-                      >
-                        <span className="font-medium text-slate-900">{item.periodLabel}</span>
-                        <span className="ml-2 text-slate-500">
-                          {formatPkr(item.paidAmount)}/{formatPkr(item.amount)} · {formatStatusLabel(item.status)}
-                        </span>
-                      </Link>
-                      {item.status !== "PAID" && onMarkPaid ? (
+                      {canCollectFees ? (
+                        <Link
+                          href={`/school/fees?studentId=${studentId}`}
+                          className="min-w-0 text-left hover:underline"
+                        >
+                          <span className="font-medium text-slate-900">{item.periodLabel}</span>
+                          <span className="ml-2 text-slate-500">
+                            {formatPkr(item.paidAmount)}/{formatPkr(item.amount)} · {formatStatusLabel(item.status)}
+                          </span>
+                        </Link>
+                      ) : (
+                        <div className="min-w-0 text-left">
+                          <span className="font-medium text-slate-900">{item.periodLabel}</span>
+                          <span className="ml-2 text-slate-500">
+                            {formatPkr(item.paidAmount)}/{formatPkr(item.amount)} · {formatStatusLabel(item.status)}
+                          </span>
+                        </div>
+                      )}
+                      {item.status !== "PAID" && onMarkPaid && canCollectFees ? (
                         <Button
                           size="sm"
                           variant="secondary"

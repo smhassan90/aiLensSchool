@@ -47,7 +47,7 @@ export default function SubmittedExamPapersPage() {
   if (overview.isLoading && !data) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <PageHeader title="Exam papers" />
+        <PageHeader title="Review exam papers" />
         <PageLoader variant="page" task="exams" />
       </div>
     );
@@ -56,8 +56,8 @@ export default function SubmittedExamPapersPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="Exam papers"
-        description="Track submissions, approve pending papers (exams setup access), and print approved papers for class."
+        title="Review exam papers"
+        description="See what teachers submitted, approve papers waiting for you, and open approved papers for printing."
       />
 
       <div className="mb-6 grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">

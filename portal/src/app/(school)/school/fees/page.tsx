@@ -24,12 +24,15 @@ import { feeBelongsToThisMonth, dueDateIsoForPeriod, currentMonthLabel, monthPer
 import { cn } from "@/lib/utils";
 import type { FeeReceipt } from "@/lib/types";
 import { Search, Wallet, MessageCircle, Printer } from "lucide-react";
+import { useAuth } from "@/providers/auth-provider";
+import { AccessDenied } from "@/components/layout/access-denied";
 
 function round2(value: number) {
   return Number(value.toFixed(2));
 }
 
 export default function FeesPage() {
+  const { can } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -350,6 +353,14 @@ export default function FeesPage() {
     const phone = receipt.parents.find((parent) => parent.phone)?.phone ?? "";
     return phone ? whatsappUrl(phone, receiptWhatsAppText(receipt)) : "";
   }, [receipt]);
+
+  if (!can("VIEW_FINANCE")) {
+    return (
+      <AccessDenied
+        description="Your account cannot collect fees. Ask the school admin for finance access."
+      />
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 print:p-0">

@@ -9,6 +9,7 @@ export const staffService = {
     return apiClient<Paginated<{
       id: string;
       email: string;
+      username?: string | null;
       firstName: string;
       lastName: string;
       roles: string[];
@@ -18,14 +19,17 @@ export const staffService = {
   create(payload: {
     firstName: string;
     lastName: string;
-    email: string;
+    email?: string;
     password: string;
-    phone?: string;
+    phone: string;
     title?: string;
     role?: "PRINCIPAL";
     permissions: StaffPermission[];
   }) {
-    return apiClient("/users/staff", { method: "POST", body: JSON.stringify(payload) });
+    return apiClient<{ username?: string | null }>("/users/staff", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 };
 
