@@ -2,9 +2,10 @@ import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChildHeader } from '@/components/ChildHeader';
+import { imagesAssets } from '@/assets/imagesAssets';
+import { ScreenTitleHeader } from '@/components/StudentScreenShell';
+import { StudentViewingBar } from '@/components/StudentViewingBar';
 import { Card, EmptyState, ErrorState, LoadingState, textStyles } from '@/components/ui';
 import { ProgressBar, toneColor } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
@@ -61,8 +62,10 @@ export default function QuizResultsScreen() {
   return (
     <>
       <Stack.Screen options={{ title: 'Quiz results' }} />
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <StudentViewingBar />
         <FlatList
+          style={styles.list}
           contentContainerStyle={styles.content}
           data={rows}
           keyExtractor={(item) => item.id}
@@ -73,7 +76,7 @@ export default function QuizResultsScreen() {
           }}
           ListHeaderComponent={
             <>
-              <ChildHeader />
+              <ScreenTitleHeader eyebrow="Marks" title="Quiz results" />
               <View style={styles.summary}>
                 <Text style={styles.summaryLabel}>Quiz average</Text>
                 {average != null ? (
@@ -104,7 +107,7 @@ export default function QuizResultsScreen() {
             <Card>
               <View style={styles.cardHeader}>
                 <View style={styles.iconWrap}>
-                  <Ionicons name="ribbon-outline" size={18} color={toneColor(item.percentage)} />
+                  <imagesAssets.ribbon size={18} color={toneColor(item.percentage)} />
                 </View>
                 <View style={styles.cardBody}>
                   <Text style={textStyles.cardTitle} numberOfLines={2}>
@@ -131,7 +134,8 @@ export default function QuizResultsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.slate50 },
+  safe: { flex: 1, backgroundColor: colors.white },
+  list: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.md, paddingBottom: spacing.xl, flexGrow: 1 },
   summary: {
     backgroundColor: colors.white,

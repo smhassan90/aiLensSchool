@@ -28,7 +28,7 @@ interface QuizEditorActionsProps {
   listQueryKey: unknown[];
 }
 
-function questionPayload(quiz: Quiz, forSubmit = false) {
+function questionPayload(quiz: Quiz) {
   return [...(quiz.questions ?? [])]
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     .map((q, index) => ({
@@ -36,7 +36,13 @@ function questionPayload(quiz: Quiz, forSubmit = false) {
       included: q.included,
       marks: Number(q.marks),
       order: index,
-      ...(forSubmit ? {} : { questionText: q.questionText }),
+      questionText: q.questionText,
+      correctAnswer: q.correctAnswer,
+      type: q.type,
+      options: q.options?.map((opt) => ({
+        optionText: opt.optionText,
+        isCorrect: opt.isCorrect,
+      })),
     }));
 }
 

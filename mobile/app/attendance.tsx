@@ -3,7 +3,8 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChildHeader } from '@/components/ChildHeader';
+import { ScreenTitleHeader } from '@/components/StudentScreenShell';
+import { StudentViewingBar } from '@/components/StudentViewingBar';
 import { EmptyState, ErrorState, LoadingState, textStyles } from '@/components/ui';
 import { ProgressBar, toneColor } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
@@ -84,9 +85,10 @@ export default function AttendanceScreen() {
   return (
     <>
       <Stack.Screen options={{ title: 'Attendance' }} />
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
-        <ScrollView contentContainerStyle={styles.content}>
-          <ChildHeader />
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <StudentViewingBar />
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+          <ScreenTitleHeader eyebrow="Attendance" title="Last 30 days" />
 
           <View style={styles.summary}>
             <Text style={styles.summaryTitle}>Last 30 days</Text>
@@ -155,7 +157,8 @@ function SummaryChip({ label, value, color }: { label: string; value: number; co
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.slate50 },
+  safe: { flex: 1, backgroundColor: colors.white },
+  scroll: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.md, paddingBottom: spacing.xl },
   summary: {
     backgroundColor: colors.white,

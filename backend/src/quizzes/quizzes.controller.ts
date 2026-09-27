@@ -5,6 +5,7 @@ import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { QuizzesService } from './quizzes.service';
 import {
   AddQuizQuestionDto,
+  GenerateMoreQuizQuestionsDto,
   GenerateQuizDto,
   PublishQuizDto,
   RejectExamPaperDto,
@@ -62,6 +63,17 @@ export class QuizzesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.quizzesService.findOne(id, user, studentId);
+  }
+
+  @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)
+  @Post(':id/generate-more')
+  @HttpCode(HttpStatus.OK)
+  generateMore(
+    @Param('id') id: string,
+    @Body() dto: GenerateMoreQuizQuestionsDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.quizzesService.generateMoreQuestions(id, dto, user);
   }
 
   @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)

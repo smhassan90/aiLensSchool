@@ -394,9 +394,14 @@ export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admi
 
         ) : isDraft ? (
 
-          <div className="mt-6 print:hidden">
+          <div className="mt-6 space-y-4 print:hidden">
 
-            {questions}
+            <ExamQuestionEditor
+              quizId={quizId}
+              quiz={quiz}
+              onChange={updateQuiz}
+              allowGenerateMore
+            />
 
             <QuizEditorActions
 

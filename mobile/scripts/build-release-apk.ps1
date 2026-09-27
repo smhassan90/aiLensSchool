@@ -14,9 +14,19 @@ if (-not $env:ANDROID_HOME) {
 
 $env:NODE_ENV = "production"
 
+# Most phones use arm64; single-ABI builds are much faster and avoid long-path CMake issues on Windows.
+$gradleProps = Join-Path $androidDir "gradle.properties"
+if (Test-Path $gradleProps) {
+  $props = Get-Content $gradleProps -Raw
+  if ($props -notmatch 'reactNativeArchitectures=arm64-v8a') {
+    $props = $props -replace 'reactNativeArchitectures=.*', 'reactNativeArchitectures=arm64-v8a'
+    Set-Content -Path $gradleProps -Value $props -NoNewline
+  }
+}
+
 Push-Location $androidDir
 try {
-  .\gradlew.bat assembleRelease
+  .\gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a
   if ($LASTEXITCODE -ne 0) {
     throw "Gradle assembleRelease failed with exit code $LASTEXITCODE"
   }

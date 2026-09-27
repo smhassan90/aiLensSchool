@@ -1,23 +1,22 @@
+import type { ReactElement } from 'react';
 import { ColorValue, StyleSheet, View } from 'react-native';
 import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { imagesAssets, ImageAssetProps } from '@/assets/imagesAssets';
 import { colors, fontSizes, radii, shadows, typography } from '@/constants/theme';
 
-type TabIconName = keyof typeof Ionicons.glyphMap;
-
 function TabIcon({
-  name,
+  render,
   color,
   size,
 }: {
-  name: TabIconName;
+  render: (props: ImageAssetProps) => ReactElement;
   color: ColorValue;
   size: number;
 }) {
   return (
     <View style={styles.iconWrap}>
-      <Ionicons name={name} color={color} size={size} />
+      {render({ size, color: String(color) })}
     </View>
   );
 }
@@ -63,8 +62,8 @@ export default function TabsLayout() {
         name="home"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name={focused ? 'home' : 'home-outline'} color={color} size={22} />
+          tabBarIcon: ({ color }) => (
+            <TabIcon render={imagesAssets.home} color={color} size={22} />
           ),
         }}
       />
@@ -72,8 +71,8 @@ export default function TabsLayout() {
         name="diary"
         options={{
           title: 'Diary',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name={focused ? 'book' : 'book-outline'} color={color} size={22} />
+          tabBarIcon: ({ color }) => (
+            <TabIcon render={imagesAssets.book} color={color} size={22} />
           ),
         }}
       />
@@ -81,12 +80,8 @@ export default function TabsLayout() {
         name="homework"
         options={{
           title: 'Homework',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              name={focused ? 'document-text' : 'document-text-outline'}
-              color={color}
-              size={22}
-            />
+          tabBarIcon: ({ color }) => (
+            <TabIcon render={imagesAssets.document} color={color} size={22} />
           ),
         }}
       />
@@ -94,12 +89,8 @@ export default function TabsLayout() {
         name="quizzes"
         options={{
           title: 'Quizzes',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              name={focused ? 'help-circle' : 'help-circle-outline'}
-              color={color}
-              size={22}
-            />
+          tabBarIcon: ({ color }) => (
+            <TabIcon render={imagesAssets.helpCircle} color={color} size={22} />
           ),
         }}
       />
@@ -107,8 +98,8 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name={focused ? 'person' : 'person-outline'} color={color} size={22} />
+          tabBarIcon: ({ color }) => (
+            <TabIcon render={imagesAssets.person} color={color} size={22} />
           ),
         }}
       />

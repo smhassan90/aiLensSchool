@@ -191,6 +191,45 @@ export class GenerateQuizDto {
   examPaperAssignmentId?: string;
 }
 
+export class GenerateMoreQuizQuestionsDto {
+  @ApiPropertyOptional({ description: 'Total questions when using quick generate' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  questionCount?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  quickGenerate?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  mcqCount?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  fillBlankCount?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  trueFalseCount?: number;
+}
+
 export class RejectExamPaperDto {
   @ApiProperty()
   @IsString()
@@ -233,6 +272,13 @@ class UpdateQuestionDto {
   @IsInt()
   @Min(0)
   order?: number;
+
+  @ApiPropertyOptional({ type: [QuizOptionInputDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => QuizOptionInputDto)
+  options?: QuizOptionInputDto[];
 }
 
 class QuizOptionInputDto {

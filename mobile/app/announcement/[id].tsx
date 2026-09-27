@@ -1,19 +1,26 @@
+import { useEffect } from 'react';
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui';
+import { useAnnouncementRead } from '@/hooks/useAnnouncementRead';
 import { colors, spacing } from '@/constants/theme';
 import { fetchAnnouncementById } from '@/services/announcements.service';
 
 export default function AnnouncementDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { markRead } = useAnnouncementRead();
 
   const query = useQuery({
     queryKey: ['announcement', id],
     queryFn: () => fetchAnnouncementById(id!),
     enabled: !!id,
   });
+
+  useEffect(() => {
+    if (id) markRead(id).catch(() => undefined);
+  }, [id, markRead]);
 
   if (query.isLoading) return <LoadingState message="Loading announcement…" />;
   if (query.isError || !query.data) {

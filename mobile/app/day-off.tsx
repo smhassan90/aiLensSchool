@@ -1,7 +1,8 @@
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChildHeader } from '@/components/ChildHeader';
+import { ScreenTitleHeader } from '@/components/StudentScreenShell';
+import { StudentViewingBar } from '@/components/StudentViewingBar';
 import { Badge, Card, EmptyState, ErrorState, LoadingState } from '@/components/ui';
 import { useChild } from '@/providers/ChildProvider';
 import { colors, spacing, typography } from '@/constants/theme';
@@ -48,10 +49,10 @@ export default function DayOffScreen() {
   if (!studentId) return <EmptyState title="Select a child" />;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <ChildHeader />
-        <Text style={styles.title}>Request a day off</Text>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <StudentViewingBar />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <ScreenTitleHeader eyebrow="Absence request" title="Request a day off" />
         <Text style={styles.hint}>Send a request before the day begins. Approved requests help the teacher understand an absence.</Text>
         <Card>
           <Text style={styles.label}>Start date (YYYY-MM-DD)</Text>
@@ -103,9 +104,9 @@ export default function DayOffScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.slate50 },
+  safe: { flex: 1, backgroundColor: colors.white },
+  scroll: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.md },
-  title: { color: colors.slate900, fontFamily: typography.family, fontSize: 26, fontWeight: typography.semibold, marginTop: spacing.md },
   hint: { color: colors.slate600, fontFamily: typography.family, fontSize: 14, lineHeight: 21, marginVertical: spacing.sm },
   label: { color: colors.slate600, fontFamily: typography.family, fontSize: 13, marginTop: spacing.sm },
   input: { borderColor: colors.slate200, borderRadius: 10, borderWidth: 1, color: colors.slate800, fontFamily: typography.family, marginTop: 4, padding: spacing.sm },

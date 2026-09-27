@@ -70,6 +70,7 @@ export interface Student {
   lastName: string;
   studentCode: string;
   status: string;
+  photoUrl?: string | null;
   branch?: { id: string; name: string };
   enrollments?: StudentEnrollment[];
 }

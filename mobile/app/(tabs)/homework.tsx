@@ -1,12 +1,11 @@
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChildHeader } from '@/components/ChildHeader';
+import { imagesAssets } from '@/assets/imagesAssets';
+import { StudentScreenShell, studentScreenContentStyle } from '@/components/StudentScreenShell';
 import { Badge, Card, EmptyState, ErrorState, LoadingState, textStyles } from '@/components/ui';
 import { useChild } from '@/providers/ChildProvider';
-import { colors, fontSizes, spacing, tabBarClearance, typography } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import {
   fetchHomework,
   getHomeworkListStatus,
@@ -26,24 +25,14 @@ export default function HomeworkTabScreen() {
 
   if (childLoading) return <LoadingState message="Loading…" />;
   if (!studentId) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <EmptyState title="Select a child" />
-      </SafeAreaView>
-    );
+    return <EmptyState title="Select a child" />;
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <StudentScreenShell eyebrow="Keep learning" title="Homework">
       <FlatList
-        contentContainerStyle={styles.content}
-        ListHeaderComponent={
-          <>
-            <Text style={styles.eyebrow}>KEEP LEARNING</Text>
-            <Text style={styles.title}>Homework</Text>
-            <ChildHeader />
-          </>
-        }
+        style={styles.list}
+        contentContainerStyle={studentScreenContentStyle}
         data={query.data?.items ?? []}
         keyExtractor={(item) => item.id}
         refreshing={query.isRefetching}
@@ -63,7 +52,7 @@ export default function HomeworkTabScreen() {
             <Card onPress={() => router.push(`/homework/${item.id}`)}>
               <View style={styles.cardHeader}>
                 <View style={styles.iconWrap}>
-                  <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+                  <imagesAssets.document size={18} color={colors.primary} />
                 </View>
                 <Text style={textStyles.cardTitle} numberOfLines={2}>
                   {item.title}
@@ -78,27 +67,12 @@ export default function HomeworkTabScreen() {
           );
         }}
       />
-    </SafeAreaView>
+    </StudentScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.md, paddingBottom: tabBarClearance, flexGrow: 1 },
-  eyebrow: {
-    fontSize: fontSizes.caption,
-    fontWeight: typography.medium,
-    letterSpacing: 1,
-    color: colors.primary,
-  },
-  title: {
-    fontSize: fontSizes.title,
-    fontFamily: typography.family,
-    fontWeight: typography.semibold,
-    color: colors.slate900,
-    marginTop: 2,
-    marginBottom: spacing.md,
-  },
+  list: { flex: 1 },
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: 4 },
   iconWrap: {
     width: 34,

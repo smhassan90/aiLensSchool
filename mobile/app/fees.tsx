@@ -3,7 +3,8 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Href, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChildHeader } from '@/components/ChildHeader';
+import { ScreenTitleHeader } from '@/components/StudentScreenShell';
+import { StudentViewingBar } from '@/components/StudentViewingBar';
 import { Badge, Card, EmptyState, ErrorState, LoadingState } from '@/components/ui';
 import { ProgressBar } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
@@ -54,12 +55,14 @@ export default function FeesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <StudentViewingBar />
       <FlatList
+        style={styles.list}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <>
-            <ChildHeader />
+            <ScreenTitleHeader eyebrow="Family billing" title="Fees" />
             <Text style={styles.note}>
               Fees are view-only in the app. Pay at the school office unless your school says
               otherwise.
@@ -145,7 +148,8 @@ export default function FeesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.slate50 },
+  safe: { flex: 1, backgroundColor: colors.white },
+  list: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.md, flexGrow: 1 },
   note: {
     fontFamily: typography.family,

@@ -40,6 +40,15 @@ export interface UpdateQuizQuestionPayload {
   correctAnswer?: string;
   type?: string;
   order?: number;
+  options?: Array<{ optionText: string; isCorrect?: boolean }>;
+}
+
+export interface GenerateMoreQuizPayload {
+  questionCount?: number;
+  quickGenerate?: boolean;
+  mcqCount?: number;
+  fillBlankCount?: number;
+  trueFalseCount?: number;
 }
 
 export interface AddQuizQuestionPayload {
@@ -75,6 +84,13 @@ export const quizzesService = {
 
   addQuestion(id: string, payload: AddQuizQuestionPayload) {
     return apiClient<Quiz>(`/quizzes/${id}/questions`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  generateMore(id: string, payload: GenerateMoreQuizPayload) {
+    return apiClient<Quiz>(`/quizzes/${id}/generate-more`, {
       method: "POST",
       body: JSON.stringify(payload),
     });

@@ -1,11 +1,10 @@
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChildHeader } from '@/components/ChildHeader';
+import { StudentScreenShell, studentScreenContentStyle } from '@/components/StudentScreenShell';
 import { Card, EmptyState, ErrorState, LoadingState, SectionBlock, textStyles } from '@/components/ui';
 import { useChild } from '@/providers/ChildProvider';
-import { colors, fontSizes, spacing, tabBarClearance, typography } from '@/constants/theme';
+import { colors, fontSizes, spacing, typography } from '@/constants/theme';
 import { fetchRecentLessons } from '@/services/lessons.service';
 import { fetchHomeDiaries } from '@/services/parent-records.service';
 import { HomeDiary, LessonSummary } from '@/types/api';
@@ -32,20 +31,12 @@ export default function DiaryScreen() {
 
   if (childLoading) return <LoadingState message="Loading…" />;
   if (!studentId) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <EmptyState title="Select a child" subtitle="Choose a child to view their diary." />
-      </SafeAreaView>
-    );
+    return <EmptyState title="Select a child" subtitle="Choose a child to view their diary." />;
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.eyebrow}>CLASSROOM NOTES</Text>
-        <Text style={styles.title}>School diary</Text>
-        <ChildHeader />
-
+    <StudentScreenShell eyebrow="Classroom notes" title="School diary">
+      <ScrollView contentContainerStyle={[studentScreenContentStyle, styles.scroll]}>
         <SectionBlock title="Recent lessons" accent={colors.sky}>
           {lessonsQuery.isLoading ? (
             <LoadingState message="Loading lessons…" />
@@ -85,27 +76,12 @@ export default function DiaryScreen() {
           )}
         </SectionBlock>
       </ScrollView>
-    </SafeAreaView>
+    </StudentScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.md, paddingBottom: tabBarClearance },
-  eyebrow: {
-    fontSize: fontSizes.caption,
-    fontWeight: typography.medium,
-    letterSpacing: 1,
-    color: colors.primary,
-  },
-  title: {
-    fontSize: fontSizes.title,
-    fontFamily: typography.family,
-    fontWeight: typography.semibold,
-    color: colors.slate900,
-    marginTop: 2,
-    marginBottom: spacing.md,
-  },
+  scroll: { paddingTop: spacing.sm },
   note: {
     fontSize: fontSizes.body,
     color: colors.slate600,

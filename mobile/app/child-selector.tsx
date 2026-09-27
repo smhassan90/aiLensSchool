@@ -1,6 +1,7 @@
-import { FlatList, Pressable, StyleSheet, Text } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StudentAvatar } from '@/components/StudentAvatar';
 import { useChild } from '@/providers/ChildProvider';
 import { colors, radii, spacing } from '@/constants/theme';
 import { LoadingState } from '@/components/ui';
@@ -27,15 +28,22 @@ export default function ChildSelectorScreen() {
                 router.back();
               }}
             >
-              <Text style={styles.name}>
-                {item.student.firstName} {item.student.lastName}
-              </Text>
-              <Text style={styles.meta}>
-                {enrollment
-                  ? `${enrollment.grade.name} · ${enrollment.section.name}`
-                  : item.student.studentCode}
-              </Text>
-              <Text style={styles.relationship}>{item.relationship}{item.isPrimary ? ' · Primary' : ''}</Text>
+              <View style={styles.row}>
+                <StudentAvatar student={item.student} size={48} />
+                <View style={styles.textWrap}>
+                  <Text style={styles.name}>
+                    {item.student.firstName} {item.student.lastName}
+                  </Text>
+                  <Text style={styles.meta}>
+                    {enrollment
+                      ? `${enrollment.grade.name} · ${enrollment.section.name}`
+                      : item.student.studentCode}
+                  </Text>
+                  <Text style={styles.relationship}>
+                    {item.relationship}{item.isPrimary ? ' · Primary' : ''}
+                  </Text>
+                </View>
+              </View>
             </Pressable>
           );
         }}
@@ -58,10 +66,12 @@ const styles = StyleSheet.create({
   },
   cardActive: {
     borderColor: colors.primary,
-    backgroundColor: '#f0fdfa',
+    backgroundColor: colors.accentSoft,
   },
-  name: { fontSize: 18, fontWeight: '700', color: colors.slate800 },
-  meta: { color: colors.slate500, marginTop: 4 },
-  relationship: { color: colors.primary, marginTop: spacing.sm, fontWeight: '600' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  textWrap: { flex: 1 },
+  name: { fontSize: 17, fontWeight: '600', color: colors.slate900 },
+  meta: { fontSize: 13, color: colors.slate600, marginTop: 2 },
+  relationship: { fontSize: 12, color: colors.slate500, marginTop: 4 },
   empty: { textAlign: 'center', color: colors.slate500, marginTop: spacing.lg },
 });

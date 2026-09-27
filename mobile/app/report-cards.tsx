@@ -1,7 +1,8 @@
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChildHeader } from '@/components/ChildHeader';
+import { ScreenTitleHeader } from '@/components/StudentScreenShell';
+import { StudentViewingBar } from '@/components/StudentViewingBar';
 import { Card, EmptyState, ErrorState, LoadingState } from '@/components/ui';
 import { useChild } from '@/providers/ChildProvider';
 import { colors, spacing } from '@/constants/theme';
@@ -28,10 +29,12 @@ export default function ReportCardsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <StudentViewingBar />
       <FlatList
+        style={styles.list}
         contentContainerStyle={styles.content}
-        ListHeaderComponent={<ChildHeader />}
+        ListHeaderComponent={<ScreenTitleHeader eyebrow="Academics" title="Report cards" />}
         data={query.data?.items ?? []}
         keyExtractor={(item) => item.id}
         refreshing={query.isRefetching}
@@ -69,7 +72,8 @@ export default function ReportCardsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.slate50 },
+  safe: { flex: 1, backgroundColor: colors.white },
+  list: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.md, flexGrow: 1 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800 },
   cardMeta: { fontSize: 13, color: colors.slate500, marginTop: 4 },

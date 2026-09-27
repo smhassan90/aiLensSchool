@@ -1,13 +1,12 @@
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChildHeader } from '@/components/ChildHeader';
+import { imagesAssets } from '@/assets/imagesAssets';
+import { StudentScreenShell, studentScreenContentStyle } from '@/components/StudentScreenShell';
 import { Badge, Card, EmptyState, ErrorState, LoadingState, textStyles } from '@/components/ui';
 import { ProgressBar, toneColor } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
-import { colors, fontSizes, radii, spacing, tabBarClearance, typography } from '@/constants/theme';
+import { colors, fontSizes, radii, spacing, typography } from '@/constants/theme';
 import { formatDateTime } from '@/lib/format';
 import { filterAccessibleQuizzes } from '@/lib/quiz-visibility';
 import { fetchQuizzes, isQuizNew } from '@/services/quizzes.service';
@@ -32,11 +31,7 @@ export default function QuizzesTabScreen() {
 
   if (childLoading) return <LoadingState message="Loading…" />;
   if (!studentId) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <EmptyState title="Select a child" />
-      </SafeAreaView>
-    );
+    return <EmptyState title="Select a child" />;
   }
 
   const resultsByQuiz = new Map<string, QuizResult>(
@@ -47,37 +42,35 @@ export default function QuizzesTabScreen() {
   const visibleQuizzes = filterAccessibleQuizzes(query.data?.items ?? [], resultsByQuiz);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <StudentScreenShell
+      eyebrow="Test your knowledge"
+      title="Quizzes"
+      header={
+        <Text style={[textStyles.caption, styles.subtitle]}>
+          Published quizzes for {selectedChild?.firstName ?? 'this student'}.
+        </Text>
+      }
+    >
       <FlatList
-        contentContainerStyle={styles.content}
+        style={styles.list}
+        contentContainerStyle={studentScreenContentStyle}
         ListHeaderComponent={
-          <>
-            <Text style={styles.eyebrow}>TEST YOUR KNOWLEDGE</Text>
-            <Text style={styles.title}>Quizzes</Text>
-            <ChildHeader />
-            <Text style={textStyles.caption}>
-              Published quizzes for {selectedChild?.firstName ?? 'this child'}.
-            </Text>
-            {average != null ? (
-              <View style={styles.snapshot}>
-                <View style={styles.snapshotTop}>
-                  <Text style={textStyles.caption}>Average score</Text>
-                  <Text
-                    style={styles.viewAll}
-                    onPress={() => router.push('/quiz-results')}
-                  >
-                    View all marks
-                  </Text>
-                </View>
-                <View style={styles.snapshotRow}>
-                  <Text style={[styles.snapshotValue, { color: toneColor(average) }]}>{average}%</Text>
-                  <View style={styles.snapshotBar}>
-                    <ProgressBar value={average} height={8} />
-                  </View>
+          average != null ? (
+            <View style={styles.snapshot}>
+              <View style={styles.snapshotTop}>
+                <Text style={textStyles.caption}>Average score</Text>
+                <Text style={styles.viewAll} onPress={() => router.push('/quiz-results')}>
+                  View all marks
+                </Text>
+              </View>
+              <View style={styles.snapshotRow}>
+                <Text style={[styles.snapshotValue, { color: toneColor(average) }]}>{average}%</Text>
+                <View style={styles.snapshotBar}>
+                  <ProgressBar value={average} height={8} />
                 </View>
               </View>
-            ) : null}
-          </>
+            </View>
+          ) : null
         }
         data={visibleQuizzes}
         keyExtractor={(item) => item.id}
@@ -104,7 +97,7 @@ export default function QuizzesTabScreen() {
             <Card onPress={() => router.push(`/quiz/${item.id}`)}>
               <View style={styles.row}>
                 <View style={styles.iconWrap}>
-                  <Ionicons name="bulb-outline" size={18} color={colors.warning} />
+                  <imagesAssets.bulb size={18} color={colors.warning} />
                 </View>
                 <Text style={textStyles.cardTitle} numberOfLines={2}>
                   {item.title}
@@ -133,34 +126,19 @@ export default function QuizzesTabScreen() {
           );
         }}
       />
-    </SafeAreaView>
+    </StudentScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.md, paddingBottom: tabBarClearance, flexGrow: 1 },
-  eyebrow: {
-    fontSize: fontSizes.caption,
-    fontWeight: typography.medium,
-    letterSpacing: 1,
-    color: colors.primary,
-  },
-  title: {
-    fontSize: fontSizes.title,
-    fontFamily: typography.family,
-    fontWeight: typography.semibold,
-    color: colors.slate900,
-    marginTop: 2,
-    marginBottom: spacing.sm,
-  },
+  list: { flex: 1 },
+  subtitle: { marginTop: spacing.xs },
   snapshot: {
     backgroundColor: colors.white,
     borderRadius: radii.lg,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.slate100,
-    marginTop: spacing.sm,
     marginBottom: spacing.md,
   },
   snapshotTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChildHeader } from '@/components/ChildHeader';
+import { imagesAssets, ImageAssetProps } from '@/assets/imagesAssets';
+import { StudentViewingBar } from '@/components/StudentViewingBar';
 import { useAuth } from '@/providers/AuthProvider';
 import { getDisplayName } from '@/lib/auth';
 import { changePasswordRequest, ApiError } from '@/lib/api';
@@ -44,21 +44,23 @@ export default function ProfileTabScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.accountBand}>
+        <View style={styles.brandAccent} />
         <Text style={styles.eyebrow}>YOUR ACCOUNT</Text>
         <Text style={styles.title}>{getDisplayName(user)}</Text>
         <Text style={styles.email}>{user?.username ?? user?.email}</Text>
-        {user?.school ? <Text style={styles.meta}>{user.school.name}</Text> : null}
-
-        <ChildHeader />
+        {user?.school ? <Text style={styles.schoolName}>{user.school.name}</Text> : null}
+      </View>
+      <StudentViewingBar />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
 
         <Text style={styles.sectionLabel}>Family tools</Text>
         <View style={styles.quickGrid}>
-          <QuickLink icon="wallet-outline" label="Fees" onPress={() => router.push('/fees')} />
-          <QuickLink icon="calendar-outline" label="Day off" onPress={() => router.push('/day-off')} />
-          <QuickLink icon="ribbon-outline" label="Report cards" onPress={() => router.push('/report-cards')} />
-          <QuickLink icon="notifications-outline" label="Alerts" onPress={() => router.push('/(tabs)/notifications')} />
-          <QuickLink icon="megaphone-outline" label="News" onPress={() => router.push('/announcements')} />
+          <QuickLink icon={imagesAssets.wallet} label="Fees" onPress={() => router.push('/fees')} />
+          <QuickLink icon={imagesAssets.calendar} label="Day off" onPress={() => router.push('/day-off')} />
+          <QuickLink icon={imagesAssets.ribbon} label="Report cards" onPress={() => router.push('/report-cards')} />
+          <QuickLink icon={imagesAssets.bell} label="Alerts" onPress={() => router.push('/(tabs)/notifications')} />
+          <QuickLink icon={imagesAssets.megaphone} label="News" onPress={() => router.push('/announcements')} />
         </View>
 
         <View style={styles.card}>
@@ -117,14 +119,14 @@ function QuickLink({
   label,
   onPress,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: (props: ImageAssetProps) => ReactElement;
   label: string;
   onPress: () => void;
 }) {
   return (
     <Pressable style={styles.quick} onPress={onPress}>
       <View style={styles.quickIcon}>
-        <Ionicons name={icon} size={20} color={colors.primary} />
+        {icon({ size: 20, color: colors.primary })}
       </View>
       <Text style={styles.quickText}>{label}</Text>
     </Pressable>
@@ -132,7 +134,30 @@ function QuickLink({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.slate50 },
+  safe: { flex: 1, backgroundColor: colors.white },
+  accountBand: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.slate100,
+  },
+  brandAccent: {
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    marginBottom: spacing.sm,
+    width: 48,
+  },
+  schoolName: {
+    fontFamily: typography.family,
+    fontSize: 15,
+    fontWeight: typography.semibold,
+    color: colors.slate800,
+    marginTop: spacing.sm,
+  },
+  scroll: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.md, paddingBottom: 110 },
   eyebrow: {
     fontFamily: typography.family,
@@ -149,7 +174,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   email: { fontFamily: typography.family, color: colors.slate600, marginTop: spacing.xs },
-  meta: { fontFamily: typography.family, color: colors.slate500, marginTop: spacing.sm },
   sectionLabel: {
     fontFamily: typography.family,
     fontSize: 15,

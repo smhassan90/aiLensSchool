@@ -23,6 +23,7 @@ import { ParentsService } from '../parents/parents.service';
 import { NotificationService } from '../notifications/notifications.service';
 import {
   AddQuizQuestionDto,
+  GenerateMoreQuizQuestionsDto,
   GenerateQuizDto,
   PublishQuizDto,
   SubmitExamPaperDto,
@@ -459,6 +460,134 @@ export class QuizzesService {
     return this.findOne(quiz.id, user);
   }
 
+  async generateMoreQuestions(id: string, dto: GenerateMoreQuizQuestionsDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        schoolId: true,
+        status: true,
+        paperKind: true,
+        sectionId: true,
+        subjectId: true,
+        lessonDateFrom: true,
+        lessonDateTo: true,
+        difficulty: true,
+        questions: { select: { order: true }, orderBy: { order: 'desc' }, take: 1 },
+        subject: { select: { name: true } },
+      },
+    });
+    if (!quiz) {
+      throw new NotFoundException({ code: 'QUIZ_NOT_FOUND', message: 'Quiz not found' });
+    }
+    this.tenant.assertSchoolAccess(user, quiz.schoolId);
+    if (quiz.status !== QuizStatus.DRAFT) {
+      throw new BadRequestException({
+        code: 'QUIZ_NOT_DRAFT',
+        message: 'Only draft quizzes can be edited',
+      });
+    }
+    if (isExamPaperKind(quiz.paperKind)) {
+      throw new BadRequestException({
+        code: 'EXAM_PAPER_NO_APPEND',
+        message: 'Use custom questions to extend an exam paper draft',
+      });
+    }
+
+    const topicSummaries = await this.topicSummariesFromStoredQuiz({
+      schoolId: quiz.schoolId,
+      sectionId: quiz.sectionId,
+      subjectId: quiz.subjectId,
+      lessonDateFrom: quiz.lessonDateFrom,
+      lessonDateTo: quiz.lessonDateTo,
+    });
+
+    const customTotal =
+      (dto.mcqCount ?? 0) + (dto.fillBlankCount ?? 0) + (dto.trueFalseCount ?? 0);
+    if (dto.quickGenerate === false && customTotal < 1) {
+      throw new BadRequestException({
+        code: 'QUESTION_MIX_REQUIRED',
+        message: 'Choose question counts, or use Quick generate',
+      });
+    }
+
+    const aiQuiz = await this.quizGeneration.generate({
+      schoolId,
+      userId: user.id,
+      lessonSummaries: topicSummaries,
+      subjectName: quiz.subject?.name,
+      questionCount: dto.questionCount,
+      quickGenerate: dto.quickGenerate ?? true,
+      examPaper: false,
+      difficulty: quiz.difficulty ?? undefined,
+      mcqCount: dto.mcqCount,
+      fillBlankCount: dto.fillBlankCount,
+      trueFalseCount: dto.trueFalseCount,
+    });
+
+    const startOrder = (quiz.questions[0]?.order ?? -1) + 1;
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        for (let i = 0; i < aiQuiz.questions.length; i++) {
+          const q = normalizeGeneratedQuestion(aiQuiz.questions[i]);
+          const isChoice = q.type === 'MCQ' || q.type === 'TRUE_FALSE';
+          const isFillBlank = q.type === 'FILL_IN_THE_BLANK';
+          const hasMarkedOption = Boolean(q.options?.some((opt) => opt.isCorrect));
+          if (
+            !q.correctAnswer?.trim() ||
+            (!isChoice && !isFillBlank) ||
+            (isChoice && !hasMarkedOption)
+          ) {
+            throw new BadRequestException({
+              code: 'QUIZ_ANSWER_REQUIRED',
+              message:
+                'Generated questions must be auto-gradable (multiple choice, fill in the blank, or true/false). Please try again.',
+            });
+          }
+          const question = await tx.quizQuestion.create({
+            data: {
+              quizId: id,
+              type: q.type as QuestionType,
+              questionText: q.questionText,
+              marks: Number(q.marks) || 1,
+              correctAnswer: (q.correctAnswer ?? '').trim(),
+              order: startOrder + i,
+              source: QuestionSource.AI,
+              included: true,
+            },
+          });
+          if (q.options?.length) {
+            await tx.quizOption.createMany({
+              data: q.options
+                .map((opt, idx) => ({
+                  questionId: question.id,
+                  optionText: opt.optionText.trim(),
+                  isCorrect: Boolean(opt.isCorrect),
+                  order: idx,
+                }))
+                .filter((opt) => opt.optionText),
+            });
+          }
+        }
+        await this.recalculateQuizMarksInTx(tx, id);
+      },
+      { maxWait: 15_000, timeout: 60_000 },
+    );
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: 'QUIZ_QUESTIONS_APPENDED',
+      entityType: 'Quiz',
+      entityId: id,
+      metadata: { addedCount: aiQuiz.questions.length },
+    });
+
+    return this.findQuizForEdit(id, user);
+  }
+
   async updateQuestions(id: string, dto: UpdateQuizQuestionsDto, user: AuthUser) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id },
@@ -582,12 +711,7 @@ export class QuizzesService {
   }
 
   private async recalculateQuizMarks(quizId: string) {
-    const questions = await this.prisma.quizQuestion.findMany({
-      where: { quizId, included: true },
-      select: { marks: true },
-    });
-    const totalMarks = questions.reduce((sum, q) => sum + Number(q.marks), 0);
-    await this.prisma.quiz.update({ where: { id: quizId }, data: { totalMarks } });
+    await this.recalculateQuizMarksInTx(this.prisma, quizId);
   }
 
   async publish(id: string, dto: PublishQuizDto, user: AuthUser) {
@@ -908,21 +1032,91 @@ export class QuizzesService {
     tx: Prisma.TransactionClient,
     questions: UpdateQuizQuestionsDto['questions'],
   ) {
-    await Promise.all(
-      questions.map((q) =>
-        tx.quizQuestion.update({
-          where: { id: q.id },
-          data: {
-            ...(q.included !== undefined ? { included: q.included } : {}),
-            ...(q.questionText !== undefined ? { questionText: q.questionText } : {}),
-            ...(q.marks !== undefined ? { marks: q.marks } : {}),
-            ...(q.correctAnswer !== undefined ? { correctAnswer: q.correctAnswer } : {}),
-            ...(q.type !== undefined ? { type: q.type } : {}),
-            ...(q.order !== undefined ? { order: q.order } : {}),
-          },
-        }),
-      ),
-    );
+    for (const q of questions) {
+      await tx.quizQuestion.update({
+        where: { id: q.id },
+        data: {
+          ...(q.included !== undefined ? { included: q.included } : {}),
+          ...(q.questionText !== undefined ? { questionText: q.questionText } : {}),
+          ...(q.marks !== undefined ? { marks: q.marks } : {}),
+          ...(q.correctAnswer !== undefined ? { correctAnswer: q.correctAnswer } : {}),
+          ...(q.type !== undefined ? { type: q.type } : {}),
+          ...(q.order !== undefined ? { order: q.order } : {}),
+        },
+      });
+      if (q.options !== undefined) {
+        await tx.quizOption.deleteMany({ where: { questionId: q.id } });
+        const rows = q.options
+          .map((opt, idx) => ({
+            questionId: q.id,
+            optionText: opt.optionText.trim(),
+            isCorrect: Boolean(opt.isCorrect),
+            order: idx,
+          }))
+          .filter((opt) => opt.optionText);
+        if (rows.length) {
+          await tx.quizOption.createMany({ data: rows });
+        }
+      }
+    }
+  }
+
+  private async topicSummariesFromStoredQuiz(quiz: {
+    schoolId: string;
+    sectionId: string;
+    subjectId: string;
+    lessonDateFrom: Date | null;
+    lessonDateTo: Date | null;
+  }): Promise<string[]> {
+    if (!quiz.lessonDateFrom || !quiz.lessonDateTo) {
+      throw new BadRequestException({
+        code: 'QUIZ_TOPICS_UNAVAILABLE',
+        message:
+          'This draft has no linked lesson dates. Add questions manually or create a new quiz from homework topics.',
+      });
+    }
+    const lessons = await this.prisma.dailyLesson.findMany({
+      where: {
+        schoolId: quiz.schoolId,
+        sectionId: quiz.sectionId,
+        subjectId: quiz.subjectId,
+        status: LessonStatus.CONFIRMED,
+        date: {
+          gte: quiz.lessonDateFrom,
+          lte: quiz.lessonDateTo,
+        },
+      },
+      select: {
+        date: true,
+        topicName: true,
+        chapterName: true,
+        aiSummary: true,
+        concepts: { select: { name: true }, take: 12 },
+      },
+      orderBy: { date: 'asc' },
+    });
+    if (!lessons.length) {
+      throw new BadRequestException({
+        code: 'NO_CONFIRMED_LECTURES',
+        message: 'No confirmed lessons found for this quiz. Add questions manually.',
+      });
+    }
+    return lessons.map((l) => {
+      const concepts = l.concepts.map((c) => c.name).filter(Boolean);
+      const body = concepts.length
+        ? `Key points: ${concepts.join('; ')}`
+        : this.slimTopicText(l.aiSummary ?? l.topicName ?? l.chapterName ?? 'Lesson');
+      return `${l.date.toISOString().slice(0, 10)}: ${l.topicName ?? l.chapterName ?? 'Lesson'}\n${body}`;
+    });
+  }
+
+  private async recalculateQuizMarksInTx(tx: Prisma.TransactionClient, quizId: string) {
+    const questions = await tx.quizQuestion.findMany({
+      where: { quizId, included: true },
+      select: { marks: true },
+    });
+    const totalMarks = questions.reduce((sum, q) => sum + Number(q.marks), 0);
+    await tx.quiz.update({ where: { id: quizId }, data: { totalMarks } });
   }
 
   private async findQuizForEdit(id: string, user: AuthUser) {
