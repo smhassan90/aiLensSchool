@@ -11,7 +11,13 @@ function publicApiUrl() {
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    optimizePackageImports: ["lucide-react", "@tanstack/react-query"],
+    optimizePackageImports: [
+      "lucide-react",
+      "@tanstack/react-query",
+      "react-hook-form",
+      "zod",
+    ],
+    optimizeCss: true,
   },
   images: {
     formats: ["image/avif", "image/webp"],

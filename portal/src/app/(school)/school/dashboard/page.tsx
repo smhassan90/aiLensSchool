@@ -1,13 +1,21 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { dashboardService } from "@/services/dashboard.service";
-import { PageLoader } from "@/components/layout/page-loader";
+import { DetailPageSkeleton } from "@/components/layout/detail-page-skeleton";
 import { useAuth } from "@/providers/auth-provider";
-import { TeacherProgressPanel } from "@/components/teachers/teacher-progress-panel";
+
+const TeacherProgressPanel = dynamic(
+  () =>
+    import("@/components/teachers/teacher-progress-panel").then((m) => ({
+      default: m.TeacherProgressPanel,
+    })),
+  { ssr: false },
+);
 import { formatPkr } from "@/lib/money";
 import { personFullName } from "@/lib/person-name";
 import { cn, formatDate } from "@/lib/utils";
@@ -147,7 +155,7 @@ export default function SchoolDashboardPage() {
   if (dashboard.isLoading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <PageLoader variant="page" phrases={["Counting students", "Checking fees", "Almost ready"]} />
+        <DetailPageSkeleton titleWidth="12rem" />
       </div>
     );
   }

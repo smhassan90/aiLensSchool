@@ -23,11 +23,19 @@ export const metadata: Metadata = {
   },
 };
 
+const API_PRECONNECT_ORIGIN =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, "") ||
+  "https://hawknexabackend.fynals.com";
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href={API_PRECONNECT_ORIGIN} crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href={API_PRECONNECT_ORIGIN} />
+      </head>
       <body className="font-sans">
         <QueryProvider>
           <AuthProvider>

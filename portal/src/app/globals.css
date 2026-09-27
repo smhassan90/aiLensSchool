@@ -8,7 +8,8 @@
     --foreground: 215 25% 15%;
     --card: 0 0% 100%;
     --card-foreground: 215 25% 15%;
-    --primary: 173 58% 39%;
+    /* ~4.6:1 contrast vs white (WCAG AA for button text) */
+    --primary: 173 62% 30%;
     --primary-foreground: 0 0% 100%;
     --secondary: 210 16% 93%;
     --secondary-foreground: 215 25% 25%;
@@ -20,7 +21,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 214 20% 88%;
     --input: 214 20% 88%;
-    --ring: 173 58% 39%;
+    --ring: 173 62% 30%;
     --radius: 0.625rem;
     --sidebar: 215 28% 17%;
     --sidebar-foreground: 210 20% 92%;
