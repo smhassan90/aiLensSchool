@@ -1042,11 +1042,19 @@ export class FeesService {
     const feeStructureSelect = { id: true, name: true, frequency: true, kind: true } as const;
     const range = monthRange();
     const periodLabel = range.label;
+    const feeInclude = {
+      feeStructure: { select: feeStructureSelect },
+      payments: {
+        orderBy: { paidAt: 'desc' as const },
+        take: 1,
+        select: { id: true, receiptNumber: true, paidAt: true },
+      },
+    };
     let fees = year
       ? await this.prisma.studentFee.findMany({
           where: { studentId: student.id, academicYearId: year.id },
           orderBy: { dueDate: 'asc' },
-          include: { feeStructure: { select: feeStructureSelect } },
+          include: feeInclude,
         })
       : [];
 
@@ -1058,7 +1066,7 @@ export class FeesService {
           OR: [{ periodLabel }, { dueDate: { gte: range.start, lt: range.end } }],
         },
         orderBy: { dueDate: 'asc' },
-        include: { feeStructure: { select: feeStructureSelect } },
+        include: feeInclude,
       });
       const seen = new Set(fees.map((fee) => fee.id));
       for (const fee of extra) {
@@ -1075,6 +1083,7 @@ export class FeesService {
     const unpaidThisMonth = thisMonthBills.filter((fee) => outstandingOf(fee) > 0.009);
     const currentBill = pickThisMonthBill(fees);
     const alreadyPaid = thisMonthBills.length > 0 && unpaidThisMonth.length === 0;
+    const paidThisMonthBill = thisMonthBills.find((fee) => outstandingOf(fee) <= 0.009);
     const policy = await this.readPolicy(schoolId);
     const lateFeeOf = (fee: {
       dueDate?: Date | string | null;
@@ -1111,6 +1120,7 @@ export class FeesService {
         billedAmount: currentBill ? money(currentBill.amount) : tuitionDefault,
         paidAmount: currentBill ? money(currentBill.paidAmount) : 0,
         alreadyPaid,
+        lastPaymentId: paidThisMonthBill?.payments[0]?.id ?? null,
         label: currentBill?.feeStructure.name ?? 'Monthly tuition',
         lateFee: currentBill
           ? lateFeeOf(currentBill)
@@ -1128,6 +1138,8 @@ export class FeesService {
         status: fee.status,
         dueDate: fee.dueDate,
         lateFee: lateFeeOf(fee),
+        lastPaymentId: fee.payments[0]?.id ?? null,
+        receiptNumber: fee.payments[0]?.receiptNumber ?? null,
       })),
     };
   }

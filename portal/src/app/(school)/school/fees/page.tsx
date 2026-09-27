@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageLoader } from "@/components/layout/page-loader";
 import { FeeReceiptSheet, receiptWhatsAppText } from "@/components/fees/fee-receipt";
+import { FeeReceiptDialog } from "@/components/fees/fee-receipt-dialog";
 import { FeeMonthViews } from "@/components/fees/fee-month-views";
 import { feesService } from "@/services/fees.service";
 import { academicsService } from "@/services/academics.service";
@@ -23,7 +24,7 @@ import { formatPkr, whatsappUrl } from "@/lib/money";
 import { feeBelongsToThisMonth, dueDateIsoForPeriod, currentMonthLabel, monthPeriodOptions } from "@/lib/fees-month";
 import { cn } from "@/lib/utils";
 import type { FeeReceipt } from "@/lib/types";
-import { Search, Wallet, MessageCircle, Printer } from "lucide-react";
+import { Search, Wallet, MessageCircle, Printer, Receipt } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import { AccessDenied } from "@/components/layout/access-denied";
 
@@ -54,6 +55,8 @@ export default function FeesPage() {
   const [discount, setDiscount] = useState("0");
   const [notes, setNotes] = useState("");
   const [receipt, setReceipt] = useState<FeeReceipt | null>(null);
+  const [receiptDialogId, setReceiptDialogId] = useState<string | null>(null);
+  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [structureOpen, setStructureOpen] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false);
@@ -184,7 +187,13 @@ export default function FeesPage() {
     return "";
   }, [targetKey, stages.data, grades.data]);
 
+  const openReceipt = (paymentId: string) => {
+    setReceiptDialogId(paymentId);
+    setReceiptDialogOpen(true);
+  };
+
   const dueRows = account.data?.fees.filter((fee) => fee.balance > 0) ?? [];
+  const paidFees = account.data?.fees.filter((fee) => fee.status === "PAID" || fee.balance <= 0.009) ?? [];
   const thisMonthDue = dueRows.filter((fee) => feeBelongsToThisMonth(fee));
   const thisMonthSettled = (account.data?.fees ?? []).some(
     (fee) => feeBelongsToThisMonth(fee) && fee.balance <= 0.009,
@@ -492,14 +501,54 @@ export default function FeesPage() {
                 </p>
                 {alreadyPaidThisMonth ? (
                   <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
-                    <p className="font-medium">{account.data.suggested.periodLabel} is already paid</p>
-                    <p className="mt-1 text-emerald-900/80">
-                      {formatPkr(account.data.suggested.paidAmount ?? account.data.suggested.billedAmount)} received
-                      {account.data.suggested.billedAmount
-                        ? ` of ${formatPkr(account.data.suggested.billedAmount)}`
-                        : ""}
-                      . This month will not be billed again.
-                    </p>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium">{account.data.suggested.periodLabel} is already paid</p>
+                        <p className="mt-1 text-emerald-900/80">
+                          {formatPkr(account.data.suggested.paidAmount ?? account.data.suggested.billedAmount)} received
+                          {account.data.suggested.billedAmount
+                            ? ` of ${formatPkr(account.data.suggested.billedAmount)}`
+                            : ""}
+                          . This month will not be billed again.
+                        </p>
+                      </div>
+                      {account.data.suggested.lastPaymentId ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="border-emerald-300 bg-white text-emerald-950 hover:bg-emerald-100"
+                          onClick={() => openReceipt(account.data.suggested.lastPaymentId!)}
+                        >
+                          <Receipt className="h-4 w-4" />
+                          Receipt
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+                {paidFees.length > 0 ? (
+                  <div className="space-y-2">
+                    <Label>Paid bills</Label>
+                    {paidFees.map((fee) => (
+                      <div
+                        key={fee.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-200/80 bg-emerald-50/50 px-3 py-2 text-sm"
+                      >
+                        <span>
+                          {fee.name} · {fee.periodLabel}
+                          <Badge variant="success" className="ml-2">Paid</Badge>
+                        </span>
+                        {fee.lastPaymentId ? (
+                          <Button type="button" size="sm" variant="outline" onClick={() => openReceipt(fee.lastPaymentId!)}>
+                            <Receipt className="h-4 w-4" />
+                            Receipt
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No receipt on file</span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 ) : null}
                 {dueRows.length > 0 ? (
@@ -692,6 +741,12 @@ export default function FeesPage() {
           <FeeReceiptSheet receipt={receipt} />
         </div>
       ) : null}
+
+      <FeeReceiptDialog
+        paymentId={receiptDialogId}
+        open={receiptDialogOpen}
+        onOpenChange={setReceiptDialogOpen}
+      />
 
       <Dialog open={structureOpen} onOpenChange={setStructureOpen}>
         <DialogContent onClose={() => setStructureOpen(false)}>

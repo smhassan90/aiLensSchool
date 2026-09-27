@@ -476,7 +476,9 @@ export class StudentsService {
   }
 
   async update(id: string, dto: UpdateStudentDto, user: AuthUser) {
-    await this.findOne(id, user);
+    const existing = await this.findOne(id, user);
+    const schoolId = existing.schoolId;
+
     const scienceGroup = dto.scienceGroup?.trim();
     if (scienceGroup && scienceGroup !== 'COMPUTER' && scienceGroup !== 'BIOLOGY') {
       throw new BadRequestException({
@@ -484,14 +486,227 @@ export class StudentsService {
         message: 'Science group must be Computer or Biology',
       });
     }
-    return this.prisma.student.update({
-      where: { id },
-      data: { scienceGroup: scienceGroup || null },
-      include: {
-        branch: true,
-        enrollments: { include: { grade: true, section: true, academicYear: true } },
-        parents: { include: { parent: { include: { user: true } } } },
-      },
+
+    const studentCode = dto.studentCode?.trim();
+    const admissionNumber = dto.admissionNumber?.trim();
+    if (studentCode && studentCode !== existing.studentCode) {
+      const clash = await this.prisma.student.findFirst({
+        where: { schoolId, studentCode, NOT: { id } },
+        select: { id: true, firstName: true, lastName: true },
+      });
+      if (clash) {
+        throw new ConflictException({
+          code: 'STUDENT_CODE_EXISTS',
+          message: `Student ID "${studentCode}" is already used by ${personFullName(clash.firstName, clash.lastName)}`,
+        });
+      }
+    }
+    if (admissionNumber && admissionNumber !== existing.admissionNumber) {
+      const clash = await this.prisma.student.findFirst({
+        where: { schoolId, admissionNumber, NOT: { id } },
+        select: { id: true, firstName: true, lastName: true },
+      });
+      if (clash) {
+        throw new ConflictException({
+          code: 'ADMISSION_NUMBER_EXISTS',
+          message: `Admission number "${admissionNumber}" is already used by ${personFullName(clash.firstName, clash.lastName)}`,
+        });
+      }
+    }
+
+    const enrollmentChange =
+      dto.branchId || dto.gradeId || dto.sectionId || dto.academicYearId
+        ? {
+            branchId: dto.branchId ?? existing.branchId,
+            gradeId: dto.gradeId,
+            sectionId: dto.sectionId,
+            academicYearId: dto.academicYearId,
+          }
+        : null;
+
+    if (enrollmentChange) {
+      if (!enrollmentChange.gradeId || !enrollmentChange.sectionId || !enrollmentChange.academicYearId) {
+        throw new BadRequestException({
+          code: 'ENROLLMENT_INCOMPLETE',
+          message: 'Select branch, class, section, and academic year to change enrollment',
+        });
+      }
+      const branch = await this.prisma.branch.findFirst({
+        where: { id: enrollmentChange.branchId, schoolId },
+      });
+      if (!branch) {
+        throw new NotFoundException({ code: 'BRANCH_NOT_FOUND', message: 'Branch not found' });
+      }
+      const [grade, section, academicYear] = await Promise.all([
+        this.prisma.grade.findFirst({ where: { id: enrollmentChange.gradeId, schoolId } }),
+        this.prisma.section.findFirst({
+          where: {
+            id: enrollmentChange.sectionId,
+            schoolId,
+            branchId: enrollmentChange.branchId,
+            gradeId: enrollmentChange.gradeId,
+          },
+        }),
+        this.prisma.academicYear.findFirst({
+          where: { id: enrollmentChange.academicYearId, schoolId },
+        }),
+      ]);
+      if (!grade || !section || !academicYear) {
+        throw new NotFoundException({
+          code: 'ACADEMIC_CONTEXT_INVALID',
+          message: 'Grade, section, or academic year not found for this school',
+        });
+      }
+    }
+
+    const parentRole = await this.prisma.role.findUnique({ where: { name: RoleName.PARENT } });
+    if ((dto.father?.firstName || dto.mother?.firstName) && !parentRole) {
+      throw new ConflictException({ code: 'ROLE_MISSING', message: 'PARENT role missing' });
+    }
+
+    const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    if (!school) {
+      throw new NotFoundException({ code: 'SCHOOL_NOT_FOUND', message: 'School not found' });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.student.update({
+        where: { id },
+        data: {
+          ...(dto.firstName !== undefined ? { firstName: dto.firstName.trim() } : {}),
+          ...(dto.lastName !== undefined ? { lastName: sanitizeLastName(dto.lastName) } : {}),
+          ...(studentCode !== undefined ? { studentCode } : {}),
+          ...(admissionNumber !== undefined ? { admissionNumber } : {}),
+          ...(dto.dateOfBirth !== undefined
+            ? { dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null }
+            : {}),
+          ...(dto.gender !== undefined ? { gender: dto.gender ?? null } : {}),
+          ...(dto.address !== undefined ? { address: dto.address?.trim() || null } : {}),
+          ...(dto.scienceGroup !== undefined ? { scienceGroup: scienceGroup || null } : {}),
+          ...(enrollmentChange ? { branchId: enrollmentChange.branchId } : {}),
+        },
+      });
+
+      if (enrollmentChange) {
+        const active = existing.enrollments.find((e) => e.status === EnrollmentStatus.ACTIVE);
+        if (active) {
+          await tx.studentEnrollment.update({
+            where: { id: active.id },
+            data: {
+              academicYearId: enrollmentChange.academicYearId!,
+              gradeId: enrollmentChange.gradeId!,
+              sectionId: enrollmentChange.sectionId!,
+            },
+          });
+        } else {
+          await tx.studentEnrollment.create({
+            data: {
+              studentId: id,
+              academicYearId: enrollmentChange.academicYearId!,
+              gradeId: enrollmentChange.gradeId!,
+              sectionId: enrollmentChange.sectionId!,
+              enrollmentDate: new Date(),
+              status: EnrollmentStatus.ACTIVE,
+            },
+          });
+        }
+      }
+
+      const studentLastName =
+        dto.lastName !== undefined ? sanitizeLastName(dto.lastName) : sanitizeLastName(existing.lastName);
+
+      if (dto.father?.firstName?.trim() && parentRole) {
+        await this.syncParentOnUpdate(tx, {
+          schoolId,
+          schoolCode: school.code,
+          studentId: id,
+          studentCode: studentCode ?? existing.studentCode,
+          studentLastName,
+          parentRoleId: parentRole.id,
+          relationship: ParentRelationship.FATHER,
+          input: dto.father,
+          existingParents: existing.parents,
+        });
+      }
+      if (dto.mother?.firstName?.trim() && parentRole) {
+        await this.syncParentOnUpdate(tx, {
+          schoolId,
+          schoolCode: school.code,
+          studentId: id,
+          studentCode: studentCode ?? existing.studentCode,
+          studentLastName,
+          parentRoleId: parentRole.id,
+          relationship: ParentRelationship.MOTHER,
+          input: dto.mother,
+          existingParents: existing.parents,
+        });
+      }
+    });
+
+    this.invalidateSchoolHttpCache(schoolId);
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      branchId: dto.branchId ?? existing.branchId,
+      action: 'STUDENT_UPDATED',
+      entityType: 'Student',
+      entityId: id,
+    });
+
+    return this.findOne(id, user);
+  }
+
+  private async syncParentOnUpdate(
+    tx: Prisma.TransactionClient,
+    args: {
+      schoolId: string;
+      schoolCode: string;
+      studentId: string;
+      studentCode: string;
+      studentLastName: string;
+      parentRoleId: string;
+      relationship: ParentRelationship;
+      input: CreateParentInlineDto;
+      existingParents: Array<{
+        relationship: ParentRelationship;
+        parent: { id: string; userId: string; user: { id: string } };
+      }>;
+    },
+  ) {
+    const link = args.existingParents.find((p) => p.relationship === args.relationship);
+    const lastName = sanitizeLastName(args.input.lastName) || args.studentLastName;
+    const email = args.input.email?.trim().toLowerCase();
+    const phone = args.input.phone?.trim();
+
+    if (link) {
+      await tx.user.update({
+        where: { id: link.parent.user.id },
+        data: {
+          firstName: args.input.firstName.trim(),
+          lastName,
+          ...(email ? { email } : {}),
+          ...(phone !== undefined ? { phone: phone || null } : {}),
+        },
+      });
+      if (phone !== undefined) {
+        await tx.parentProfile.update({
+          where: { id: link.parent.id },
+          data: { phone: phone || null },
+        });
+      }
+      return;
+    }
+
+    await this.upsertParentAccount(tx, {
+      schoolId: args.schoolId,
+      schoolCode: args.schoolCode,
+      studentId: args.studentId,
+      studentCode: args.studentCode,
+      studentLastName: args.studentLastName,
+      parentRoleId: args.parentRoleId,
+      relationship: args.relationship,
+      input: args.input,
     });
   }
 

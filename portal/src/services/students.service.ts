@@ -41,6 +41,10 @@ export interface CreateStudentResult {
   credentials: ParentCredential[];
 }
 
+export type UpdateStudentPayload = Omit<Partial<CreateStudentPayload>, "scienceGroup"> & {
+  scienceGroup?: string | null;
+};
+
 export const studentsService = {
   listPhotoAssets() {
     return apiClient<Array<{
@@ -103,7 +107,7 @@ export const studentsService = {
     return apiClient<Student>(`/students/${id}`);
   },
 
-  update(id: string, payload: { scienceGroup?: string | null }) {
+  update(id: string, payload: UpdateStudentPayload) {
     return apiClient<Student>(`/students/${id}`, {
       method: "PATCH",
       body: JSON.stringify(payload),

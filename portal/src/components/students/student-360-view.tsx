@@ -23,6 +23,7 @@ import {
   FileText,
   GraduationCap,
   KeyRound,
+  Pencil,
   Printer,
   Sparkles,
   Wallet,
@@ -251,6 +252,7 @@ export function Student360View({
   allowPhotoUpload = false,
   photoUploadInvalidateKeys = [],
   printIdCardHref,
+  editHref,
 }: {
   data: Student360Data;
   studentId: string;
@@ -271,6 +273,8 @@ export function Student360View({
   photoUploadInvalidateKeys?: string[][];
   /** When set, shows a header action that opens the school ID card print screen for this student. */
   printIdCardHref?: string;
+  /** School admin: open the edit student form. */
+  editHref?: string;
 }) {
   const { can } = useAuth();
   const canCollectFees = can("VIEW_FINANCE");
@@ -455,6 +459,17 @@ export function Student360View({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {editHref ? (
+              <Link href={editHref}>
+                <Button
+                  variant="outline"
+                  className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit information
+                </Button>
+              </Link>
+            ) : null}
             {printIdCardHref ? (
               <Link href={printIdCardHref}>
                 <Button

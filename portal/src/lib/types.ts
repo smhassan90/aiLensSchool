@@ -103,8 +103,15 @@ export interface StudentParentLink {
   relationship?: string;
   isPrimary?: boolean;
   parent?: {
+    id?: string;
     phone?: string;
-    user?: { firstName: string; lastName: string; email?: string; phone?: string };
+    user?: {
+      firstName: string;
+      lastName: string;
+      email?: string;
+      phone?: string;
+      username?: string;
+    };
   };
 }
 
@@ -118,7 +125,10 @@ export interface Student {
   photoUrl?: string | null;
   address?: string | null;
   scienceGroup?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
   branch?: { id: string; name: string };
+  branchId?: string;
   grade?: { id: string; name: string; level?: number };
   section?: {
     id: string;
@@ -555,6 +565,7 @@ export interface FeeAccount {
     billedAmount: number;
     paidAmount?: number;
     alreadyPaid?: boolean;
+    lastPaymentId?: string | null;
     label: string;
     lateFee?: { amount: number; overdue: boolean; waived: boolean; charged: boolean };
   };
@@ -573,6 +584,8 @@ export interface FeeAccount {
     status: string;
     dueDate: string;
     lateFee?: { amount: number; overdue: boolean; waived: boolean; charged: boolean };
+    lastPaymentId?: string | null;
+    receiptNumber?: string | null;
   }>;
 }
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { FeeReceiptDialog } from "@/components/fees/fee-receipt-dialog";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ import { formatPkr } from "@/lib/money";
 import { personFullName, studentMatchesQuery } from "@/lib/person-name";
 import { formatDateTime } from "@/lib/utils";
 import type { StudentFee } from "@/lib/types";
-import { Wallet } from "lucide-react";
+import { Receipt, Wallet } from "lucide-react";
 
 function classLabel(section?: { name: string; grade?: { name: string } | null } | null) {
   if (!section) return "—";
@@ -54,6 +55,8 @@ export function FeeMonthViews({
   collectHref: (studentId: string) => string;
 }) {
   const [search, setSearch] = useState("");
+  const [receiptPaymentId, setReceiptPaymentId] = useState<string | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   const sections = useQuery({
     queryKey: ["sections"],
@@ -156,6 +159,10 @@ export function FeeMonthViews({
           monthLabel={monthLabel}
           hasFilters={hasFilters}
           collectHref={collectHref}
+          onViewReceipt={(paymentId) => {
+            setReceiptPaymentId(paymentId);
+            setReceiptOpen(true);
+          }}
         />
       ) : (
         <DueTables
@@ -170,6 +177,11 @@ export function FeeMonthViews({
           collectHref={collectHref}
         />
       )}
+      <FeeReceiptDialog
+        paymentId={receiptPaymentId}
+        open={receiptOpen}
+        onOpenChange={setReceiptOpen}
+      />
     </div>
   );
 }
@@ -182,6 +194,7 @@ function CollectedTable({
   monthLabel,
   hasFilters,
   collectHref,
+  onViewReceipt,
 }: {
   loading: boolean;
   items: Array<{
@@ -203,6 +216,7 @@ function CollectedTable({
   monthLabel?: string;
   hasFilters: boolean;
   collectHref: (studentId: string) => string;
+  onViewReceipt: (paymentId: string) => void;
 }) {
   return (
     <div className="rounded-lg border bg-card">
@@ -263,11 +277,10 @@ function CollectedTable({
                       <Button size="sm">Collect remaining</Button>
                     </Link>
                   ) : (
-                    <Link href={collectHref(row.studentFee.student.id)}>
-                      <Button size="sm" variant="ghost">
-                        Account
-                      </Button>
-                    </Link>
+                    <Button type="button" size="sm" variant="outline" onClick={() => onViewReceipt(row.id)}>
+                      <Receipt className="h-4 w-4" />
+                      Receipt
+                    </Button>
                   )}
                 </TableCell>
               </TableRow>

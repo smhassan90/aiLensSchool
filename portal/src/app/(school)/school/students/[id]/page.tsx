@@ -90,6 +90,7 @@ export default function Student360Page() {
         backHref="/school/students"
         backLabel="All students"
         printIdCardHref={`/school/id-cards?studentId=${params.id}`}
+        editHref={`/school/students/${params.id}/edit`}
         allowPhotoUpload
         onMarkPaid={(id) => markPaid.mutate(id)}
         markPaidPending={markPaid.isPending}
