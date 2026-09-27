@@ -480,7 +480,7 @@ export function ExamQuestionEditor({
             <Sparkles className="h-4 w-4" />
             {generatingMore ? "Generating…" : "Generate more questions"}
           </Button>
-          {generatingMore ? <AiWait label="Writing new questions…" /> : null}
+          {generatingMore ? <AiWait kind="quiz" variant="panel" /> : null}
         </div>
       ) : null}
 

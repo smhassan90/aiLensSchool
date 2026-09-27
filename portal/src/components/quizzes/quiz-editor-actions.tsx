@@ -129,7 +129,8 @@ export function QuizEditorActions({
       if (includedCount === 0) {
         throw new Error("Include at least one question before submitting");
       }
-      return quizzesService.submitPaper(quizId, questionPayload(quiz, true));
+      await quizzesService.updateQuestions(quizId, questionPayload(quiz));
+      return quizzesService.submitPaper(quizId);
     },
     onSuccess: () => {
       toast({ title: "Submitted for review", description: "School admin will review and approve your paper.", variant: "success" });

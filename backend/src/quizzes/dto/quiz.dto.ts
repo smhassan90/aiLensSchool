@@ -236,6 +236,17 @@ export class RejectExamPaperDto {
   reason!: string;
 }
 
+class QuizOptionInputDto {
+  @ApiProperty()
+  @IsString()
+  optionText!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isCorrect?: boolean;
+}
+
 class UpdateQuestionDto {
   @ApiProperty()
   @IsString()
@@ -279,17 +290,6 @@ class UpdateQuestionDto {
   @ValidateNested({ each: true })
   @Type(() => QuizOptionInputDto)
   options?: QuizOptionInputDto[];
-}
-
-class QuizOptionInputDto {
-  @ApiProperty()
-  @IsString()
-  optionText!: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsBoolean()
-  isCorrect?: boolean;
 }
 
 export class AddQuizQuestionDto {
