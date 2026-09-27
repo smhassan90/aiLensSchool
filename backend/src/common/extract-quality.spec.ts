@@ -1,9 +1,11 @@
 import {
   englishOnlyFromMixedOcr,
   isGarbledRtlOcr,
+  isPoorLessonOcr,
   isUsableLessonOcr,
   looksLikeMangledRtlOcr,
 } from './extract-quality';
+import { looksLikeGarbledLatinOcr } from './garbled-latin-ocr';
 
 describe('extract-quality RTL OCR', () => {
   const mangledSample = `
@@ -79,5 +81,41 @@ The principle. of brotherhood is.an important aspect of Islamic society.
     expect(out).not.toMatch(/Q9 Fed/);
     expect(out).not.toMatch(/fos dir/i);
     expect(out).not.toMatch(/0A 221/);
+  });
+});
+
+describe('garbled English/Math textbook OCR', () => {
+  const mathPage = `
+Missing Numbers |
+1 in the given series ol
+y bers are the numbers that have been Loge Sill 2 BE
+Missing wm 3 iyi differences among them. ho ober: IB
+a quar WO! 5 stated as finding similar changes :
+re misng terms in the specific series and, places: be
+9 F' 4 Missing Flashcards
+Paste number flashcards E
+10 on the board in sequence. &
+Miss out a few. Ask children
+to read and complete the missing sequence.
+Provide duldren with fake money
+`;
+
+  const cleanEnglish = `
+Missing Numbers
+Missing numbers are the numbers that have been missed in the given series.
+Paste number flashcards on the board in sequence. Miss out a few. Ask children
+to read and complete the missing sequence.
+`;
+
+  it('flags decorative-font math pages as poor OCR', () => {
+    expect(looksLikeGarbledLatinOcr(mathPage)).toBe(true);
+    expect(isPoorLessonOcr(mathPage)).toBe(true);
+    expect(isUsableLessonOcr(mathPage)).toBe(false);
+  });
+
+  it('keeps clean English textbook OCR usable', () => {
+    expect(looksLikeGarbledLatinOcr(cleanEnglish)).toBe(false);
+    expect(isPoorLessonOcr(cleanEnglish)).toBe(false);
+    expect(isUsableLessonOcr(cleanEnglish)).toBe(true);
   });
 });

@@ -1,3 +1,5 @@
+import { looksLikeGarbledLatinOcr } from './garbled-latin-ocr';
+
 const FAKE_EXTRACT =
   /transcribe every word|transcribe the attached|keep english as english|keep every urdu|original unicode script|not latin letters|preserve quran|return chapter,?\s*topic|textbook photos for|textbook page photo|photos were not saved|photographed textbook page|original photos were not saved|read the attached|content from the photos|content taken from \d+ photographed|could not read this lesson yet/i;
 
@@ -105,12 +107,30 @@ export function isGarbledRtlOcr(text: string | undefined | null): boolean {
   return false;
 }
 
+/**
+ * OCR too weak to trust without AI photo reading (any subject: English, Math, Urdu, Arabic).
+ */
+export function isPoorLessonOcr(
+  text: string | undefined | null,
+  options?: { expectArabicScript?: boolean },
+): boolean {
+  const value = (text ?? '').trim();
+  if (!value) return true;
+  if (isFakeExtractText(value)) return true;
+  if (isGarbledRtlOcr(value)) return true;
+  if (options?.expectArabicScript && countArabicScriptChars(value) < 20 && compactTextLength(value) >= 72) {
+    return true;
+  }
+  if (looksLikeGarbledLatinOcr(value)) return true;
+  return false;
+}
+
 export function isUsableLessonOcr(
   text: string | undefined | null,
   options?: { expectArabicScript?: boolean },
 ): boolean {
   if (!looksLikeRealLessonText(text)) return false;
-  if (isGarbledRtlOcr(text)) return false;
+  if (isPoorLessonOcr(text, options)) return false;
   if (options?.expectArabicScript) {
     if (countArabicScriptChars(text ?? '') < 20) return false;
   }
@@ -209,7 +229,7 @@ export function englishOnlyFromMixedOcr(text: string | undefined | null): string
 /** Prefer the full page over a short AI rewrite. */
 export function longestRealLessonText(...texts: Array<string | undefined | null>): string {
   const real = texts.filter(
-    (text): text is string => looksLikeRealLessonText(text) && !isGarbledRtlOcr(text),
+    (text): text is string => looksLikeRealLessonText(text) && !isPoorLessonOcr(text),
   );
   if (!real.length) return texts.find((text) => (text ?? '').trim())?.trim() ?? '';
   return real.sort((a, b) => compactTextLength(b) - compactTextLength(a))[0];

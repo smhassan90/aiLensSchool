@@ -1,5 +1,7 @@
 "use client";
 
+import { looksLikeGarbledLatinOcr } from "@lesson-ocr-quality/garbled-latin-ocr";
+
 /**
  * Browser Tesseract cannot reliably read Nastaliq Urdu.
  * For Islamiat/Urdu/Arabic pages, skip client OCR and let the server use vision.
@@ -138,6 +140,7 @@ export async function readPagesInBrowser(files: File[], subjectName?: string): P
     const joined = pages.filter(Boolean).join("\n\n").trim();
     // Mixed English+Urdu pages: eng OCR mangles Arabic — let the server use vision.
     if (looksLikeMangledRtlOcr(joined)) return "";
+    if (looksLikeGarbledLatinOcr(joined)) return "";
     return joined;
   } finally {
     await Promise.all(workers.map((w) => w.terminate()));

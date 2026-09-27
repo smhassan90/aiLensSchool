@@ -40,6 +40,7 @@ import {
   englishOnlyFromMixedOcr,
   isFakeExtractText,
   isGarbledRtlOcr,
+  isPoorLessonOcr,
   isUsableLessonOcr,
   longestRealLessonText,
   looksLikeMangledRtlOcr,
@@ -275,8 +276,9 @@ export class LessonsService {
       expectArabicScript: expectsArabicScript,
     });
     const uploadedMangledRtl = isGarbledRtlOcr(uploadedText);
-    // Skip local Tesseract when Urdu/Arabic is expected or browser OCR mangled RTL script.
-    const preferVisionOcr = (expectsArabicScript || uploadedMangledRtl) && canVision;
+    const uploadedPoor = isPoorLessonOcr(uploadedText, { expectArabicScript: expectsArabicScript });
+    // Skip local Tesseract when script/OCR quality is poor and vision can transcribe the photo.
+    const preferVisionOcr = (expectsArabicScript || uploadedMangledRtl || uploadedPoor) && canVision;
     const ocrText = uploadedLooksUsable
       ? uploadedText
       : preferVisionOcr
@@ -288,7 +290,7 @@ export class LessonsService {
     if (
       !preferVisionOcr &&
       files.length &&
-      (isGarbledRtlOcr(resolvedOcr) ||
+      (isPoorLessonOcr(resolvedOcr, { expectArabicScript: expectsArabicScript }) ||
         (/Qur['’]?an|Hadith|ترجمہ|سورۃ/i.test(resolvedOcr) &&
           countArabicScriptChars(resolvedOcr) < 20))
     ) {
@@ -312,24 +314,28 @@ export class LessonsService {
       });
     }
     const images = this.toLessonImages(files);
-    const ocrGarbled = isGarbledRtlOcr(resolvedOcr);
+    const ocrGarbled = isPoorLessonOcr(resolvedOcr, { expectArabicScript: expectsArabicScript });
     const ocrMissingScript =
       expectsArabicScript &&
       looksLikeRealLessonText(resolvedOcr) &&
       !ARABIC_SCRIPT_RE.test(resolvedOcr);
-    const needsRtlVision = expectsArabicScript || uploadedMangledRtl || ocrGarbled;
+    const needsPhotoVision = expectsArabicScript || uploadedMangledRtl || ocrGarbled;
     const ocrThin =
-      isFakeExtractText(resolvedOcr) || ocrMissingScript || ocrGarbled || (needsRtlVision && canVision);
-    if (ocrGarbled || (needsRtlVision && canVision && !uploadedLooksUsable)) {
+      isFakeExtractText(resolvedOcr) || ocrMissingScript || ocrGarbled || (needsPhotoVision && canVision);
+    if (ocrGarbled || (needsPhotoVision && canVision && !uploadedLooksUsable)) {
       this.logger.warn(
-        `Using vision transcription for ${subject.name} (garbled=${ocrGarbled}, arabicSubject=${expectsArabicScript})`,
+        `Using vision transcription for ${subject.name} (poorOcr=${ocrGarbled}, arabicSubject=${expectsArabicScript})`,
       );
     }
-    if (needsRtlVision && !canVision && (ocrGarbled || ocrMissingScript || isFakeExtractText(resolvedOcr))) {
+    if (
+      needsPhotoVision &&
+      !canVision &&
+      (ocrGarbled || ocrMissingScript || isFakeExtractText(resolvedOcr))
+    ) {
       throw new BadRequestException({
-        code: 'URDU_VISION_REQUIRED',
+        code: 'PHOTO_VISION_REQUIRED',
         message:
-          'Pages with Urdu/Arabic need AI photo reading. Set CURSOR_API_KEY or OPENAI_API_KEY on the backend, then try again.',
+          'This page needs AI photo reading (English, Math, Urdu, or Arabic). Set CURSOR_API_KEY or OPENAI_API_KEY on the backend, then try again.',
       });
     }
     const usableOcr = isUsableLessonOcr(resolvedOcr, {
@@ -346,7 +352,7 @@ export class LessonsService {
     // Still run AI when vision is required (Urdu/Arabic/mixed) or OCR is thin/garbled.
     let polished;
     let usedEnglishFallback = false;
-    const canTrustLocalOcr = usableOcr && !ocrThin && !needsRtlVision;
+    const canTrustLocalOcr = usableOcr && !ocrThin && !needsPhotoVision;
     if (canTrustLocalOcr) {
       polished = {
         chapterName: local.chapterName,
@@ -362,7 +368,7 @@ export class LessonsService {
           userId: user.id,
           sourceText: usableOcr
             ? resolvedOcr
-            : `Transcribe the attached ${subject.name} textbook page photo(s) for ${grade.name}. Keep English as English. Keep every Urdu/Arabic line in original Unicode script (not Latin letters). Preserve Quran/Hadith quotations and citations. Keep every paragraph.`,
+            : `Transcribe the attached ${subject.name} textbook page photo(s) for ${grade.name}. Copy every heading, paragraph, number, and activity instruction accurately. Keep English as English. Keep every Urdu/Arabic line in original Unicode script (not Latin letters). Preserve Quran/Hadith quotations and citations.`,
           subjectName: subject.name,
           gradeName: grade.name,
           images: ocrThin && canVision ? images : undefined,
@@ -419,12 +425,12 @@ export class LessonsService {
       usedEnglishFallback ||
       isUsableLessonOcr(polished.summary, { expectArabicScript: expectsArabicScript }) ||
       (looksLikeRealLessonText(polished.summary) &&
-        needsRtlVision &&
+        needsPhotoVision &&
         ARABIC_SCRIPT_RE.test(polished.summary) &&
-        !isGarbledRtlOcr(polished.summary)) ||
-      (needsRtlVision &&
+        !isPoorLessonOcr(polished.summary, { expectArabicScript: expectsArabicScript })) ||
+      (needsPhotoVision &&
         looksLikeRealLessonText(polished.summary) &&
-        !isGarbledRtlOcr(polished.summary));
+        !isPoorLessonOcr(polished.summary, { expectArabicScript: expectsArabicScript }));
     if (ocrThin && !polishedLooksReal) {
       throw new BadRequestException({
         code: 'PAGE_TEXT_UNREADABLE',
