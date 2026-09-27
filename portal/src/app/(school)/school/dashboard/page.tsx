@@ -7,15 +7,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { dashboardService } from "@/services/dashboard.service";
 import { DetailPageSkeleton } from "@/components/layout/detail-page-skeleton";
+import { DeferUntilIdle } from "@/components/layout/defer-until-idle";
 import { useAuth } from "@/providers/auth-provider";
-
-const TeacherProgressPanel = dynamic(
-  () =>
-    import("@/components/teachers/teacher-progress-panel").then((m) => ({
-      default: m.TeacherProgressPanel,
-    })),
-  { ssr: false },
-);
 import { formatPkr } from "@/lib/money";
 import { personFullName } from "@/lib/person-name";
 import { cn, formatDate } from "@/lib/utils";
@@ -30,6 +23,14 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+
+const TeacherProgressPanel = dynamic(
+  () =>
+    import("@/components/teachers/teacher-progress-panel").then((m) => ({
+      default: m.TeacherProgressPanel,
+    })),
+  { ssr: false },
+);
 
 function greeting() {
   const hour = new Date().getHours();
@@ -115,13 +116,20 @@ function Panel({
   title,
   action,
   children,
+  className,
 }: {
   title: string;
   action?: React.ReactNode;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <section
+      className={cn(
+        "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm",
+        className,
+      )}
+    >
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
         <h2 className="font-display text-lg text-slate-900">{title}</h2>
         {action}
@@ -166,7 +174,7 @@ export default function SchoolDashboardPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">{todayLabel()}</p>
-            <h1 className="mt-1 font-display text-lg text-slate-900">
+            <h1 className="mt-1 font-display text-xl font-semibold text-slate-900 sm:text-lg">
               {greeting()}
               {user?.firstName ? `, ${personFullName(user.firstName, user.lastName)}` : ""}
             </h1>
@@ -245,10 +253,22 @@ export default function SchoolDashboardPage() {
         />
       </div>
 
-      {can("VIEW_TEACHER_PROGRESS") ? <TeacherProgressPanel /> : null}
+      {can("VIEW_TEACHER_PROGRESS") ? (
+        <DeferUntilIdle
+          placeholder={
+            <div
+              className="h-[7.25rem] rounded-2xl border border-slate-200 bg-white shadow-sm"
+              aria-hidden
+            />
+          }
+        >
+          <TeacherProgressPanel />
+        </DeferUntilIdle>
+      ) : null}
 
       {examSubmissions?.focusExam ? (
         <Panel
+          className="min-h-[12rem]"
           title="Exam paper submissions"
           action={
             <Link href="/school/submitted-exam-papers" className="text-sm font-medium text-teal-700 hover:underline">

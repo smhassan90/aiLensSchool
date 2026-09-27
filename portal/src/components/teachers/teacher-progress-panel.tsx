@@ -6,7 +6,7 @@ import { Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PageLoader } from "@/components/layout/page-loader";
+import { Skeleton } from "@/components/ui/skeleton";
 import { teachersService, type TeacherCoaching } from "@/services/teachers.service";
 import { ExpandableTeacherRow } from "@/components/teachers/teacher-expand-row";
 
@@ -52,7 +52,11 @@ export function TeacherProgressPanel() {
       {open ? (
         <CardContent className="space-y-4">
           {board.isLoading ? (
-            <PageLoader variant="panel" phrases={["Ranking teachers"]} />
+            <div className="space-y-3" aria-busy="true" aria-label="Loading teacher ranking">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </div>
           ) : (
             <>
               <Input

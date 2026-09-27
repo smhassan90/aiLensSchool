@@ -47,40 +47,42 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div
-        className="fixed inset-x-3 bottom-4 z-[100] flex max-w-sm flex-col gap-2 sm:inset-x-auto sm:right-4"
-        aria-label="Notifications"
-      >
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            role={t.variant === "error" ? "alert" : "status"}
-            aria-live={t.variant === "error" ? "assertive" : "polite"}
-            className={cn(
-              "rounded-lg border bg-card p-4 shadow-lg animate-in slide-in-from-right",
-              t.variant === "success" && "border-primary/30",
-              t.variant === "error" && "border-destructive/30",
-            )}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-sm font-medium">{t.title}</p>
-                {t.description ? (
-                  <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
-                ) : null}
+      {toasts.length > 0 ? (
+        <div
+          role="region"
+          aria-label="Notifications"
+          className="fixed inset-x-3 bottom-4 z-[100] flex max-w-sm flex-col gap-2 sm:inset-x-auto sm:right-4"
+        >
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              role={t.variant === "error" ? "alert" : "status"}
+              className={cn(
+                "rounded-lg border bg-card p-4 shadow-lg animate-in slide-in-from-right",
+                t.variant === "success" && "border-primary/30",
+                t.variant === "error" && "border-destructive/30",
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium">{t.title}</p>
+                  {t.description ? (
+                    <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => dismiss(t.id)}
+                  className="rounded p-1 text-muted-foreground hover:bg-muted"
+                  aria-label={`Dismiss: ${t.title}`}
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => dismiss(t.id)}
-                className="rounded p-1 text-muted-foreground hover:bg-muted"
-                aria-label={`Dismiss: ${t.title}`}
-              >
-                <X className="h-4 w-4" aria-hidden />
-              </button>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : null}
     </ToastContext.Provider>
   );
 }
