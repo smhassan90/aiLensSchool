@@ -54,7 +54,7 @@ Prefer testing the listed key points; do not invent unrelated chapters.
 IMPORTANT: Every question must be auto-gradable. Never create open-ended, short-essay, or "explain in your own words" questions.
 Allowed types: MCQ, FILL_IN_THE_BLANK, TRUE_FALSE.
 Every question MUST include correctAnswer. For MCQ and TRUE_FALSE mark exactly one option isCorrect true.
-FILL_IN_THE_BLANK must use _____ and a short exact correctAnswer (1-4 words) so the app can match the typed answer.
+FILL_IN_THE_BLANK must use _____ and a single-word correctAnswer only (one word or number; no spaces).
 Return ONLY valid JSON matching:
 {
   "title": string,
@@ -93,8 +93,10 @@ Return JSON:
 Rules:
 - Create 4-8 auto-gradable questions only. Never open-ended or essay tasks.
 - MCQ: exactly 4 options, exactly one isCorrect true, correctAnswer = that option text.
-- FILL_IN_THE_BLANK: short exact correctAnswer (1-4 words).
+- FILL_IN_THE_BLANK: one _____ blank; correctAnswer must be exactly ONE word (letters or a number; no spaces).
 - TRUE_FALSE: correctAnswer TRUE or FALSE with matching options.
+- Mathematics / Math subjects: include at least 4 MCQ practice exercises (addition, subtraction, counting, patterns, or short word problems from the lesson). Each MCQ must have exactly 4 options labeled "A) …", "B) …", "C) …", "D) …" with exactly one correct.
+- Other subjects: mix MCQ, TRUE_FALSE, and FILL_IN_THE_BLANK as appropriate.
 - "description" is student-facing: numbered question texts ONLY (no answers).
 - "answerKey" is teacher-facing: numbered correct answers matching description.
 - "questions" must include correctAnswer for every item so the app can mark submissions.`;

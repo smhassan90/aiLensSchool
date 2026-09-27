@@ -65,7 +65,11 @@ export class HomeworkService {
       }
     }
 
-    const questions = this.resolveQuestions(dto);
+    const subject = await this.prisma.subject.findFirst({
+      where: { id: dto.subjectId, schoolId },
+      select: { name: true },
+    });
+    const questions = this.resolveQuestions(dto, subject?.name);
     const homework = await this.prisma.homework.create({
       data: {
         schoolId,
@@ -120,9 +124,9 @@ export class HomeworkService {
     return homework;
   }
 
-  private resolveQuestions(dto: CreateHomeworkDto): HomeworkQuestionItem[] {
+  private resolveQuestions(dto: CreateHomeworkDto, subjectName?: string): HomeworkQuestionItem[] {
     if (Array.isArray(dto.questionsJson) && dto.questionsJson.length) {
-      return buildHomeworkQuestions(dto.questionsJson as never, []);
+      return buildHomeworkQuestions(dto.questionsJson as never, [], { subjectName });
     }
     return [];
   }

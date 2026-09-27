@@ -16,6 +16,7 @@ import {
   TEACHER_COACH_PROMPT,
 } from '../prompts';
 import { difficultyInstruction, mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
+import { isMathSubject } from '../../homework/homework-questions';
 import { parseModelJson } from '../parse-model-json';
 
 interface OpenAiChatResponse {
@@ -154,6 +155,9 @@ export class OpenAiProvider implements AiProvider {
         `Subject: ${input.subjectName ?? 'General'}`,
         input.gradeName ? `Grade: ${input.gradeName}` : '',
         input.styleInstruction ? `Teacher style instruction: ${input.styleInstruction}` : '',
+        isMathSubject(input.subjectName)
+          ? 'Mathematics: include at least 4 MCQ numeracy exercises. Each MCQ must use options A), B), C), D).'
+          : '',
         '',
         input.lessonSummary,
       ]

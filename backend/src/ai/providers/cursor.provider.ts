@@ -204,6 +204,9 @@ export class CursorProvider implements AiProvider {
           `Subject: ${input.subjectName ?? 'General'}`,
           input.gradeName ? `Grade: ${input.gradeName}` : '',
           input.styleInstruction ? `Teacher style instruction: ${input.styleInstruction}` : '',
+          isMathScienceSubjectName(input.subjectName)
+            ? 'Mathematics: include at least 4 MCQ numeracy exercises. Each MCQ must use options A), B), C), D).'
+            : '',
           '',
           input.lessonSummary.length > 2500
             ? `${input.lessonSummary.slice(0, 2500).trim()}…`

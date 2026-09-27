@@ -2,7 +2,7 @@
 
 export function isMathScienceSubjectName(name?: string | null): boolean {
   const n = (name ?? '').toLowerCase();
-  return /\b(?:math|mathematics|algebra|geometry|calculus|physics|chemistry|biology|science|statistics)\b/.test(
+  return /\b(?:math|maths|mathematics|algebra|geometry|calculus|physics|chemistry|biology|science|statistics|numeracy|arithmetic)\b/.test(
     n,
   );
 }

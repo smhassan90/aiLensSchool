@@ -9,7 +9,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Hawk Nexa',
   slug: 'sms-parent',
-  version: '1.0.2',
+  version: '1.0.3',
   orientation: 'portrait',
   scheme: 'smsparent',
   userInterfaceStyle: 'light',
@@ -25,7 +25,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#ffffff',
     },
     package: 'com.hawknexa.student',
-    versionCode: 10,
+    versionCode: 11,
     ...(existsSync(googleServicesResolved) ? { googleServicesFile: googleServicesPath } : {}),
   },
   web: {
@@ -33,6 +33,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     output: 'static',
   },
   plugins: [
+    './plugins/withAndroidUploadSigning.cjs',
     'expo-router',
     'expo-secure-store',
     'expo-notifications',

@@ -296,10 +296,9 @@ export class DocumentsService {
     const dueDate =
       dto.dueDate ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    const questions = buildHomeworkQuestions(
-      generated.questions as never,
-      keyPoints,
-    );
+    const questions = buildHomeworkQuestions(generated.questions as never, keyPoints, {
+      subjectName: lesson.subject.name,
+    });
 
     return {
       lessonId: lesson.id,
@@ -416,7 +415,9 @@ export class DocumentsService {
       subjectName: subject.name,
     });
 
-    const questions = buildHomeworkQuestions(generated.questions as never, []);
+    const questions = buildHomeworkQuestions(generated.questions as never, [], {
+      subjectName: subject.name,
+    });
     const homework = await this.prisma.homework.create({
       data: {
         schoolId,
