@@ -85,7 +85,7 @@ export default function QuizResultScreen() {
                   left={answers.filter((answer: QuizAnswer) => answer.isCorrect).length}
                   right={answers.filter((answer: QuizAnswer) => !answer.isCorrect).length}
                   leftLabel="Correct"
-                  rightLabel="Review"
+                  rightLabel="Incorrect"
                 />
               </View>
             ) : null}
@@ -103,15 +103,13 @@ export default function QuizResultScreen() {
                     {index + 1}. {answer.question?.questionText ?? 'Question'}
                   </Text>
                   <Badge
-                    label={answer.isCorrect ? 'Correct' : 'Review'}
+                    label={answer.isCorrect ? 'Correct' : 'Incorrect'}
                     tone={answer.isCorrect ? 'success' : 'warning'}
                   />
                 </View>
                 <Text style={styles.meta}>Your child’s answer: {answer.answerText ?? '—'}</Text>
-                {!answer.isCorrect ? (
-                  <Text style={styles.meta}>
-                    This answer needs review. Correct answers are kept with the school.
-                  </Text>
+                {!answer.isCorrect && answer.question?.correctAnswer ? (
+                  <Text style={styles.meta}>Correct answer: {answer.question.correctAnswer}</Text>
                 ) : null}
               </View>
             ))}

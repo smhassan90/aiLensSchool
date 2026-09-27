@@ -80,7 +80,7 @@ describe('sanitizeGeneratedQuiz', () => {
         },
         {
           type: 'FILL_IN_THE_BLANK',
-          questionText: 'Write a paragraph about the water cycle.',
+          questionText: 'Write a paragraph about the water cycle _____.',
           marks: 5,
           correctAnswer:
             'Students should explain evaporation, condensation, precipitation and collection in several sentences.',

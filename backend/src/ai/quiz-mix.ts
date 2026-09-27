@@ -124,7 +124,7 @@ export function quizMixInstructions(mix: ResolvedQuizMix): string {
     return `Quick generate: about ${mix.questionCount} questions.
 Use ONLY auto-gradable types the system can mark itself:
 - MCQ = choose the best answer. Exactly 4 options, exactly one isCorrect true. Set correctAnswer to that option text.
-- FILL_IN_THE_BLANK = a sentence with _____ and a short exact correctAnswer (1-4 words, a fact/word/number the app can match).
+- FILL_IN_THE_BLANK = a sentence with one _____ blank and a single-word correctAnswer (one word only; letters or a number; app matches case-insensitively).
 - TRUE_FALSE = statement; correctAnswer must be TRUE or FALSE; include two options TRUE/FALSE with exactly one isCorrect.
 Never create SHORT_ANSWER, open-ended, or essay questions. Do not ask students to explain, describe, or write a paragraph.
 Every question MUST include correctAnswer.`;
@@ -136,7 +136,7 @@ Cover ALL provided lectures. Do not invent unrelated chapters.
 Generate EXACTLY ${mix.questionCount} questions, in this order (each group is a section: Section A, Section B, etc.):
 - ${mix.mcqCount} MCQ questions (type MCQ). Section A. Each MUST have 4 options, exactly one isCorrect, and correctAnswer set. Section total ${mix.mcqMarks} marks.
 - ${mix.trueFalseCount} true/false questions (type TRUE_FALSE). Section B. correctAnswer must be TRUE or FALSE. Section total ${mix.trueFalseMarks} marks.
-${mix.fillBlankCount ? `- ${mix.fillBlankCount} fill-in-the-blank questions (type FILL_IN_THE_BLANK). Section C. Section total ${mix.fillBlankMarks} marks.` : ''}
+${mix.fillBlankCount ? `- ${mix.fillBlankCount} fill-in-the-blank questions (type FILL_IN_THE_BLANK). One _____ per question; correctAnswer must be exactly one word. Section C. Section total ${mix.fillBlankMarks} marks.` : ''}
 - ${mix.shortAnswerCount} short-answer questions (type SHORT_ANSWER). Brief answers (2-4 lines). Include model correctAnswer. Section total ${mix.shortAnswerMarks} marks.
 - ${mix.longAnswerCount} long-answer questions (type LONG_ANSWER). Extended answers (paragraph). Include model correctAnswer. Section total ${mix.longAnswerMarks} marks.
 Skip a type if its count is 0.
@@ -145,7 +145,7 @@ Set each question's marks so the section totals match exactly.`;
 
   return `Generate EXACTLY ${mix.questionCount} AUTO-GRADABLE questions, in this order:
 - ${mix.mcqCount} choose-the-best-answer questions (type MCQ). Each MUST have 4 options, exactly one isCorrect true, and correctAnswer set.
-- ${mix.fillBlankCount} fill-in-the-blank questions (type FILL_IN_THE_BLANK). Put _____ in the question and set a short exact correctAnswer (1-4 words).
+- ${mix.fillBlankCount} fill-in-the-blank questions (type FILL_IN_THE_BLANK). One _____ per question; correctAnswer must be exactly one word (no spaces).
 - ${mix.trueFalseCount} true/false questions (type TRUE_FALSE). correctAnswer must be TRUE or FALSE with matching options.
 Skip a type if its count is 0.
 Never create SHORT_ANSWER, open-ended, or essay questions. Every question MUST include correctAnswer.`;
@@ -242,9 +242,9 @@ export function normalizeGeneratedQuestion(q: QuizQuestionOutput): QuizQuestionO
 
 function isShortExactAnswer(value: string): boolean {
   const answer = value.trim();
-  if (!answer || /\n/.test(answer)) return false;
+  if (!answer || /\n/.test(answer) || /\s/.test(answer)) return false;
   const words = answer.split(/\s+/).filter(Boolean);
-  return words.length >= 1 && words.length <= 6 && answer.length <= 80;
+  return words.length === 1 && answer.length <= 40;
 }
 
 function coerceToAutoGradable(q: QuizQuestionOutput): QuizQuestionOutput {
@@ -270,7 +270,7 @@ export function isAutoGradableQuestion(q: QuizQuestionOutput): boolean {
     return options.length >= 2 && correctCount === 1;
   }
   if (q.type === 'FILL_IN_THE_BLANK') {
-    return isShortExactAnswer(answer);
+    return isShortExactAnswer(answer) && /_____/.test(q.questionText);
   }
   return false;
 }

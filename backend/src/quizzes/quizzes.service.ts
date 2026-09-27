@@ -31,6 +31,7 @@ import {
 } from './dto/quiz.dto';
 import { examPaperLabel, EXAM_PAPER_KINDS, isExamPaperKind } from './exam-paper';
 import { paperKindFromExamName } from './exam-config-map';
+import { gradeQuizAnswer } from './quiz-grading';
 import { normalizeGeneratedQuestion, sectionLabelForQuestionType } from '../ai/quiz-mix';
 import { deadlineBlockedMessage, isDeadlineOpen } from '../academics/exam-deadlines';
 import { HeadTeachersService } from '../head-teachers/head-teachers.service';
@@ -612,6 +613,27 @@ export class QuizzesService {
       });
     }
 
+    const autoGradable = new Set<QuestionType>([
+      QuestionType.MCQ,
+      QuestionType.TRUE_FALSE,
+      QuestionType.FILL_IN_THE_BLANK,
+    ]);
+    for (const question of quiz.questions.filter((q) => q.included)) {
+      if (!autoGradable.has(question.type)) {
+        throw new BadRequestException({
+          code: 'QUIZ_MANUAL_GRADING',
+          message:
+            'Parent quizzes must use multiple choice, true/false, or single-word fill-in-the-blank only. Remove open-ended questions before publishing.',
+        });
+      }
+      if (!question.correctAnswer?.trim()) {
+        throw new BadRequestException({
+          code: 'QUIZ_ANSWER_KEY_MISSING',
+          message: 'Every question needs a saved correct answer before publishing.',
+        });
+      }
+    }
+
     const dueAt = dto.immediate ? null : dto.dueAt ? new Date(dto.dueAt) : null;
     if (dueAt && Number.isNaN(dueAt.getTime())) {
       throw new BadRequestException({
@@ -1126,15 +1148,10 @@ export class QuizzesService {
         ? question.options.find((option) => option.id === given.optionId)
         : undefined;
       const text = given?.answerText?.trim() ?? '';
-      let isCorrect = false;
-      if (question.type === QuestionType.MCQ || question.type === QuestionType.TRUE_FALSE) {
-        isCorrect = Boolean(selected?.isCorrect);
-        if (!isCorrect && text && question.correctAnswer) {
-          isCorrect = text.toLowerCase() === question.correctAnswer.trim().toLowerCase();
-        }
-      } else if (question.correctAnswer) {
-        isCorrect = text.toLowerCase() === question.correctAnswer.trim().toLowerCase();
-      }
+      const isCorrect = gradeQuizAnswer(question, {
+        optionId: given?.optionId,
+        answerText: text || selected?.optionText,
+      });
       const marksAwarded = isCorrect ? Number(question.marks) : 0;
       score += marksAwarded;
       return {
