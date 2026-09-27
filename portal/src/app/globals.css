@@ -124,7 +124,7 @@
   }
 
   @page id-card {
-    size: 86mm 58mm;
+    size: 86mm 54mm;
     margin: 0;
   }
 
@@ -173,9 +173,11 @@
     position: absolute;
     inset: 0;
     width: 86mm;
-    height: 58mm;
+    height: 54mm;
     margin: 0;
     box-shadow: none !important;
     break-inside: avoid;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }

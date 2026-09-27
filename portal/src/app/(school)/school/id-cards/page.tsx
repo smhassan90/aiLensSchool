@@ -12,8 +12,9 @@ import { PageLoader } from "@/components/layout/page-loader";
 import { StudentIdPhotoUpload } from "@/components/students/student-id-photo-upload";
 import { documentsService } from "@/services/documents.service";
 import { studentsService } from "@/services/students.service";
-import { assetUrl } from "@/lib/api-client";
 import type { IdCard, Student, StudentParentLink } from "@/lib/types";
+import { StudentIdCardPrint } from "@/components/students/student-id-card-print";
+import { personFullName } from "@/lib/person-name";
 import { IdCard as IdCardIcon, Printer, Search } from "lucide-react";
 
 function primaryParent(student?: Student) {
@@ -69,8 +70,9 @@ export default function IdCardsPage() {
   const card: IdCard | undefined = cardQuery.data?.items[0];
   const student = card?.student ?? resolvedStudent ?? undefined;
   const parent = parentDetails(primaryParent(student));
-  const photo = assetUrl(student?.photoUrl);
   const enrollment = student?.enrollments?.[0];
+  const classLabel = [enrollment?.grade?.name, enrollment?.section?.name].filter(Boolean).join(" · ");
+  const schoolName = card?.school?.name ?? "School";
 
   const runSearch = () => {
     const next = query.trim();
@@ -159,39 +161,18 @@ export default function IdCardsPage() {
         />
       ) : student ? (
         <div className="flex flex-col items-start gap-4">
-          <div
-            id="printable-id-card"
-            className="w-[86mm] overflow-hidden rounded-xl border-2 border-teal-700 bg-white text-slate-900 shadow-md"
-          >
-            <div className="bg-teal-700 px-3 py-2 text-white">
-              <p className="text-[10px] uppercase tracking-[0.16em]">{card?.school?.name ?? "HawkNexa"}</p>
-              <p className="text-xs font-medium">Student Identity Card</p>
-            </div>
-            <div className="flex gap-3 p-3">
-              <div className="h-20 w-16 shrink-0 overflow-hidden rounded-md bg-slate-100">
-                {photo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photo} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-[10px] text-slate-400">No photo</div>
-                )}
-              </div>
-              <div className="min-w-0 text-[11px] leading-4">
-                <p className="font-display text-sm font-semibold leading-5">
-                  {student.firstName} {student.lastName}
-                </p>
-                <p className="text-slate-500">{card?.cardNumber ?? student.studentCode}</p>
-                <p className="mt-1">{enrollment?.grade?.name} {enrollment?.section?.name}</p>
-                <p><span className="text-slate-500">Parent:</span> {parent.name}</p>
-                <p><span className="text-slate-500">Phone:</span> {parent.phone}</p>
-                <p className="truncate"><span className="text-slate-500">Email:</span> {parent.email}</p>
-              </div>
-            </div>
-            <div className="border-t border-teal-700/20 bg-slate-50 px-3 py-1.5 text-[10px] leading-3.5 text-slate-700">
-              <span className="font-semibold uppercase tracking-wide text-teal-800">Address </span>
-              <span className="break-words">{student.address?.trim() || "—"}</span>
-            </div>
-          </div>
+          <StudentIdCardPrint
+            schoolName={schoolName}
+            schoolLogo={card?.school?.logo}
+            schoolCity={card?.school?.city}
+            studentName={personFullName(student.firstName, student.lastName)}
+            photoUrl={student.photoUrl}
+            cardNumber={card?.cardNumber ?? student.studentCode}
+            classLabel={classLabel || undefined}
+            parentName={parent.name !== "—" ? parent.name : undefined}
+            parentPhone={parent.phone}
+            address={student.address}
+          />
 
           {resolvedStudent ? (
             <StudentIdPhotoUpload

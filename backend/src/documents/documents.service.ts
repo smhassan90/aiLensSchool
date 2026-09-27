@@ -980,7 +980,7 @@ export class DocumentsService {
               user: { select: { firstName: true, lastName: true, email: true, phone: true } },
             },
           },
-          school: { select: { name: true, code: true, city: true } },
+          school: { select: { name: true, code: true, city: true, logo: true } },
           branch: { select: { name: true } },
         },
       }),
@@ -1021,7 +1021,7 @@ export class DocumentsService {
             parents: { include: { parent: { include: { user: true } } } },
           },
         },
-        school: { select: { name: true, code: true, city: true } },
+        school: { select: { name: true, code: true, city: true, logo: true } },
         branch: { select: { name: true } },
       },
     });
@@ -1046,7 +1046,7 @@ export class DocumentsService {
       update: { generatedById: userId },
       include: {
         teacher: { include: { user: true } },
-        school: { select: { name: true, code: true, city: true } },
+        school: { select: { name: true, code: true, city: true, logo: true } },
         branch: { select: { name: true } },
       },
     });

@@ -658,7 +658,7 @@ export interface IdCard {
   holderType: string;
   student?: Student & { enrollments?: Array<{ grade?: Grade; section?: Section }> };
   teacher?: Teacher;
-  school?: { name: string; code: string; city?: string };
+  school?: { name: string; code: string; city?: string; logo?: string | null };
   branch?: { name: string };
 }
 
