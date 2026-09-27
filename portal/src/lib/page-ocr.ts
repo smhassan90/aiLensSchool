@@ -1,6 +1,6 @@
 "use client";
 
-import { looksLikeGarbledLatinOcr } from "@lesson-ocr-quality/garbled-latin-ocr";
+import { looksLikeGarbledLatinOcr } from "./garbled-latin-ocr";
 
 /**
  * Browser Tesseract cannot reliably read Nastaliq Urdu.

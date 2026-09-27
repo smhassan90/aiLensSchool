@@ -1,6 +1,6 @@
 /**
  * Heuristics for low-quality Latin (English/Math) Tesseract output.
- * Portal copy: portal/src/lib/garbled-latin-ocr.ts (keep in sync).
+ * Keep in sync with backend/src/common/garbled-latin-ocr.ts
  */
 
 const ARABIC_SCRIPT =
@@ -23,7 +23,7 @@ const COMMON_ENGLISH_WORDS = new Set(
 );
 
 function compactTextLength(text: string): number {
-  return text.replace(/\s+/g, '').length;
+  return text.replace(/\s+/g, "").length;
 }
 
 function countArabicScriptChars(text: string): number {
@@ -72,12 +72,8 @@ function latinWordLooksPlausible(word: string): boolean {
   return w.length <= 14;
 }
 
-/**
- * Decorative fonts, glare, and busy textbook layouts often produce long Latin
- * output that is not RTL-garbled but is still unusable.
- */
 export function looksLikeGarbledLatinOcr(text: string | undefined | null): boolean {
-  const value = (text ?? '').trim();
+  const value = (text ?? "").trim();
   if (compactTextLength(value) < 72) return false;
 
   const arabic = countArabicScriptChars(value);
