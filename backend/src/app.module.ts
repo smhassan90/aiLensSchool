@@ -37,6 +37,7 @@ import { InsightsModule } from './insights/insights.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { HeadTeachersModule } from './head-teachers/head-teachers.module';
 import { DeviceModule } from './device/device.module';
+import { PlatformModule } from './platform/platform.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
@@ -131,6 +132,7 @@ const queuesEnabled = areQueuesEnabled();
     DashboardModule,
     HeadTeachersModule,
     DeviceModule,
+    PlatformModule,
   ],
   controllers: [HealthController],
   providers: [

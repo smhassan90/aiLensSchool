@@ -35,12 +35,30 @@ export class AuditService {
       .catch(() => undefined);
   }
 
-  async findAll(query: PaginationDto & { schoolId?: string; action?: string }) {
+  async findAll(
+    query: PaginationDto & { schoolId?: string; action?: string; from?: string; to?: string },
+  ) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+    const createdAt: Prisma.DateTimeFilter | undefined =
+      query.from || query.to
+        ? {
+            ...(query.from ? { gte: new Date(query.from) } : {}),
+            ...(query.to
+              ? {
+                  lte: (() => {
+                    const d = new Date(query.to);
+                    d.setHours(23, 59, 59, 999);
+                    return d;
+                  })(),
+                }
+              : {}),
+          }
+        : undefined;
     const where: Prisma.AuditLogWhereInput = {
       ...(query.schoolId ? { schoolId: query.schoolId } : {}),
       ...(query.action ? { action: query.action } : {}),
+      ...(createdAt ? { createdAt } : {}),
     };
     const [items, total] = await pageQuery(
       this.prisma.auditLog.findMany({

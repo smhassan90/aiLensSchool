@@ -6,9 +6,10 @@ import { CommonModule } from '../common/common.module';
 import { AuditModule } from '../audit/audit.module';
 import { AiModule } from '../ai/ai.module';
 import { ParentsModule } from '../parents/parents.module';
+import { FilesModule } from '../files/files.module';
 
 @Module({
-  imports: [CommonModule, AuditModule, AiModule, ParentsModule],
+  imports: [CommonModule, AuditModule, AiModule, ParentsModule, FilesModule],
   providers: [LessonsService, PageOcrService],
   controllers: [LessonsController],
   exports: [LessonsService],

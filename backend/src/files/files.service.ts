@@ -14,6 +14,35 @@ export class FilesService {
     private readonly config: ConfigService,
   ) {}
 
+  /** Persist an uploaded buffer for lesson forensics (super-admin can review originals). */
+  async saveSchoolUpload(
+    schoolId: string,
+    uploadedById: string,
+    file: Express.Multer.File,
+    folder = 'lessons',
+  ) {
+    const storageEndpoint = this.config.get<string>('STORAGE_ENDPOINT');
+    if (storageEndpoint && storageEndpoint.trim() !== '') {
+      throw new BadRequestException({
+        code: 'REMOTE_STORAGE_NOT_WIRED',
+        message:
+          'Remote S3 storage is configured but not implemented in this build; clear STORAGE_ENDPOINT to use local disk',
+      });
+    }
+    const stored = await this.localStorage.save(file, `schools/${schoolId}/${folder}`);
+    return this.prisma.fileAsset.create({
+      data: {
+        schoolId,
+        uploadedById,
+        originalFilename: file.originalname,
+        mimeType: file.mimetype,
+        size: stored.size,
+        storageKey: stored.storageKey,
+        url: stored.url,
+      },
+    });
+  }
+
   async upload(file: Express.Multer.File | undefined, user: AuthUser) {
     if (!file) {
       throw new BadRequestException({

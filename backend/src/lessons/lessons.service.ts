@@ -49,6 +49,7 @@ import {
 } from '../common/extract-quality';
 import { ocrLanguagesForSubject } from './page-ocr.service';
 import { isServerlessRuntime, readEnv } from '../common/env';
+import { FilesService } from '../files/files.service';
 
 const ARABIC_SCRIPT_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
@@ -66,6 +67,7 @@ export class LessonsService {
     private readonly pageOcr: PageOcrService,
     private readonly gradeStyle: TeacherGradeStyleService,
     private readonly cache: MemoryCacheService,
+    private readonly filesService: FilesService,
   ) {}
 
   private async requireTeacherProfile(userId: string) {
@@ -498,6 +500,28 @@ export class LessonsService {
       output.concepts = applyKeyPointStyle(output.concepts, savedStyle.keyPointStyle);
     }
     const extractedText = coerceLessonDisplayText(output.summary);
+    const rawOcrArchive = (resolvedOcr ?? '').trim();
+    const pageAssets = await Promise.all(
+      files.map((file) => this.filesService.saveSchoolUpload(schoolId, user.id, file, 'lesson-pages')),
+    );
+    const sourceCreates = [
+      ...pageAssets.map((asset, index) => ({
+        type: LessonSourceType.TEXTBOOK_IMAGE,
+        fileAssetId: asset.id,
+        pageFrom: index + 1,
+      })),
+      ...(rawOcrArchive || extractedText
+        ? [
+            {
+              type: LessonSourceType.MANUAL_TEXT,
+              ocrText: rawOcrArchive || extractedText,
+              manualText: extractedText,
+              pageFrom: output.pageFrom ?? pageFrom,
+              pageTo: output.pageTo ?? pageTo,
+            },
+          ]
+        : []),
+    ];
 
     const lesson = await this.prisma.dailyLesson.create({
       data: {
@@ -517,14 +541,7 @@ export class LessonsService {
         pageFrom: output.pageFrom ?? pageFrom,
         pageTo: output.pageTo ?? pageTo,
         status: LessonStatus.READY_FOR_REVIEW,
-        sources: {
-          create: {
-            type: LessonSourceType.TEXTBOOK_IMAGE,
-            ocrText: extractedText,
-            pageFrom: output.pageFrom ?? pageFrom,
-            pageTo: output.pageTo ?? pageTo,
-          },
-        },
+        sources: sourceCreates.length ? { create: sourceCreates } : undefined,
         concepts: output.concepts.length
           ? { create: output.concepts.map((name) => ({ name })) }
           : undefined,
