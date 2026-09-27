@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
@@ -38,6 +39,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { HeadTeachersModule } from './head-teachers/head-teachers.module';
 import { DeviceModule } from './device/device.module';
 import { PlatformModule } from './platform/platform.module';
+import { ExceptionLogsModule } from './exception-logs/exception-logs.module';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
@@ -133,9 +136,11 @@ const queuesEnabled = areQueuesEnabled();
     HeadTeachersModule,
     DeviceModule,
     PlatformModule,
+    ExceptionLogsModule,
   ],
   controllers: [HealthController],
   providers: [
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },

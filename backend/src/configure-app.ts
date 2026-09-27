@@ -56,7 +56,7 @@ export async function configureNestApp(app: NestExpressApplication): Promise<voi
       transformOptions: { enableImplicitConversion: true },
     }),
   );
-  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalFilters(app.get(AllExceptionsFilter));
   app.useGlobalInterceptors(app.get(HttpCacheInterceptor), new TransformInterceptor());
 
   if (process.env.VERCEL === '1') return;

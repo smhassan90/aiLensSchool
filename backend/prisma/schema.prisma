@@ -334,6 +334,7 @@ model User {
   reviewedStudentPhotos      StudentPhotoAsset[]            @relation("StudentPhotoReviewedBy")
   reviewedDayOffRequests     ParentDayOffRequest[]          @relation("DayOffReviewedBy")
   auditLogs                  AuditLog[]
+  apiExceptionLogs           ApiExceptionLog[]
   aiRequests                 AIRequest[]
   notifications              Notification[]
   notificationPreferences    NotificationPreference[]
@@ -432,6 +433,31 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model ApiExceptionLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  schoolId   String?  @map("school_id")
+  method     String   @db.VarChar(16)
+  path       String   @db.VarChar(512)
+  statusCode Int      @map("status_code")
+  errorCode  String   @map("error_code") @db.VarChar(120)
+  message    String   @db.Text
+  details    Json?
+  userAgent  String?  @map("user_agent") @db.VarChar(512)
+  ipAddress  String?  @map("ip_address") @db.VarChar(64)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  school School? @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([statusCode])
+  @@index([schoolId])
+  @@index([userId])
+  @@index([errorCode])
+  @@map("api_exception_logs")
+}
+
 // ===================== SCHOOL =====================
 
 model School {
@@ -480,6 +506,7 @@ model School {
   products                      Product[]
   orders                        Order[]
   auditLogs                     AuditLog[]
+  apiExceptionLogs              ApiExceptionLog[]
   attendances                   Attendance[]
   teacherAttendances            TeacherAttendance[]
   feeStructures                 FeeStructure[]

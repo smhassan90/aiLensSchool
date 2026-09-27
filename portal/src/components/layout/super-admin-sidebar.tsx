@@ -11,6 +11,7 @@ import {
   Sparkles,
   Tag,
   Users,
+  AlertTriangle,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
@@ -27,6 +28,7 @@ const navItems = [
   { href: "/super-admin/pricing", label: "Pricing", icon: Tag },
   { href: "/super-admin/users", label: "Users", icon: Users },
   { href: "/super-admin/ai-usage", label: "AI Usage", icon: Sparkles },
+  { href: "/super-admin/errors", label: "API Errors", icon: AlertTriangle },
   { href: "/super-admin/audit-logs", label: "Audit Logs", icon: FileText },
   { href: "/super-admin/system", label: "System", icon: Settings },
 ];

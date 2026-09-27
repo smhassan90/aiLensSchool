@@ -3,9 +3,10 @@ import { PlatformController } from './platform.controller';
 import { PlatformService } from './platform.service';
 import { AuditModule } from '../audit/audit.module';
 import { FilesModule } from '../files/files.module';
+import { ExceptionLogsModule } from '../exception-logs/exception-logs.module';
 
 @Module({
-  imports: [AuditModule, FilesModule],
+  imports: [AuditModule, FilesModule, ExceptionLogsModule],
   controllers: [PlatformController],
   providers: [PlatformService],
 })

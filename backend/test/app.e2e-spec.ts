@@ -35,7 +35,7 @@ describe('AppController (e2e)', () => {
         transform: true,
       }),
     );
-    app.useGlobalFilters(new AllExceptionsFilter());
+    app.useGlobalFilters(app.get(AllExceptionsFilter));
     app.useGlobalInterceptors(new TransformInterceptor());
     await app.init();
   });

@@ -87,6 +87,43 @@ export const platformService = {
       ai: { items: unknown[]; total: number };
     }>(`/platform/activity${buildQuery(params ?? {})}`);
   },
+  listExceptionLogs(params?: {
+    schoolId?: string;
+    userId?: string;
+    statusCode?: number;
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return apiClient<{
+      items: Array<{
+        id: string;
+        method: string;
+        path: string;
+        statusCode: number;
+        errorCode: string;
+        message: string;
+        details: unknown;
+        userAgent: string | null;
+        ipAddress: string | null;
+        createdAt: string;
+        user: { id: string; email: string; firstName: string; lastName: string } | null;
+        school: { id: string; name: string; code: string } | null;
+      }>;
+      total: number;
+      page: number;
+      limit: number;
+    }>(`/platform/exception-logs${buildQuery(params ?? {})}`);
+  },
+
+  clearExceptionLogs(confirm = true) {
+    return apiClient<{ deleted: number }>("/platform/exception-logs", {
+      method: "DELETE",
+      body: JSON.stringify({ confirm }),
+    });
+  },
+
   purgeData(payload: { schoolId?: string; from: string; to: string; confirm: boolean }) {
     return apiClient<{ auditDeleted: number; aiDeleted: number; lessonsDeleted: number }>(
       "/platform/data-purge",
