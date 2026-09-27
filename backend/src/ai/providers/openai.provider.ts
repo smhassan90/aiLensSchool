@@ -16,6 +16,7 @@ import {
   TEACHER_COACH_PROMPT,
 } from '../prompts';
 import { difficultyInstruction, mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
+import { parseModelJson } from '../parse-model-json';
 
 interface OpenAiChatResponse {
   choices?: Array<{ message?: { content?: string } }>;
@@ -58,7 +59,7 @@ export class OpenAiProvider implements AiProvider {
       `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\nSource:\n${input.sourceText}\n\nTranscribe the full page. Do not write a short retelling.`,
       input.images,
     );
-    const parsed = LessonOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
+    const parsed = LessonOutputSchema.parse(parseModelJson(content.text));
     return {
       data: parsed,
       provider: 'openai',
@@ -83,7 +84,7 @@ export class OpenAiProvider implements AiProvider {
       mix.mode === 'exam' ? EXAM_GENERATION_PROMPT : QUIZ_GENERATION_PROMPT,
       `Subject: ${input.subjectName ?? 'General'}\n${difficultyLine ? `${difficultyLine}\n` : ''}${quizMixInstructions(mix)}\n\nLectures:\n${input.lessonSummaries.join('\n---\n')}`,
     );
-    const parsed = QuizOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
+    const parsed = QuizOutputSchema.parse(parseModelJson(content.text));
     return {
       data: parsed,
       provider: 'openai',
@@ -159,7 +160,7 @@ export class OpenAiProvider implements AiProvider {
         .filter((line) => line !== '')
         .join('\n'),
     );
-    const parsed = JSON.parse(this.extractJson(content.text)) as {
+    const parsed = parseModelJson(content.text) as {
       title: string;
       description: string;
       answerKey?: string;
@@ -203,7 +204,7 @@ export class OpenAiProvider implements AiProvider {
     }
 
     const content = await this.chat(STUDENT_ANALYSIS_PROMPT, input.resultsSummary);
-    const parsed = JSON.parse(this.extractJson(content.text)) as {
+    const parsed = parseModelJson(content.text) as {
       summary: string;
       strengths: string[];
       weaknesses: string[];
@@ -251,7 +252,7 @@ export class OpenAiProvider implements AiProvider {
     }
     try {
       const content = await this.chat(TEACHER_COACH_PROMPT, input.facts);
-      const parsed = JSON.parse(this.extractJson(content.text)) as typeof fallback;
+      const parsed = parseModelJson(content.text) as typeof fallback;
       return {
         data: parsed,
         provider: 'openai',

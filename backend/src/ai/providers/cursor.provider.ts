@@ -15,6 +15,7 @@ import {
   TEACHER_COACH_PROMPT,
 } from '../prompts';
 import { difficultyInstruction, mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
+import { parseModelJson } from '../parse-model-json';
 import { isFakeExtractText, isGarbledRtlOcr, looksLikeRealLessonText } from '../../common/extract-quality';
 import { isServerlessRuntime, readEnv } from '../../common/env';
 
@@ -76,7 +77,7 @@ export class CursorProvider implements AiProvider {
             25_000,
             'Lesson extraction',
           );
-      const parsed = LessonOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
+      const parsed = LessonOutputSchema.parse(parseModelJson(content.text));
       if (isFakeExtractText(parsed.summary) || isGarbledRtlOcr(parsed.summary)) {
         if (input.images?.length) {
           throw new Error('Cursor did not read the textbook photos as readable text');
@@ -123,7 +124,7 @@ export class CursorProvider implements AiProvider {
       mix.mode === 'exam' ? 'Exam generation' : 'Quiz generation',
     );
     try {
-      const parsed = QuizOutputSchema.parse(JSON.parse(this.extractJson(content.text)));
+      const parsed = QuizOutputSchema.parse(parseModelJson(content.text));
       return { data: parsed, ...content.meta };
     } catch {
       this.logger.error('Failed to parse quiz JSON from Cursor');
@@ -201,7 +202,7 @@ export class CursorProvider implements AiProvider {
       this.jsonTimeoutMs,
       'Homework generation',
     );
-    const parsed = JSON.parse(this.extractJson(content.text)) as {
+    const parsed = parseModelJson(content.text) as {
       title: string;
       description: string;
       answerKey?: string;
@@ -241,7 +242,7 @@ export class CursorProvider implements AiProvider {
       this.jsonTimeoutMs,
       'Student analysis',
     );
-    const parsed = JSON.parse(this.extractJson(content.text)) as {
+    const parsed = parseModelJson(content.text) as {
       summary: string;
       strengths: string[];
       weaknesses: string[];
@@ -285,7 +286,7 @@ export class CursorProvider implements AiProvider {
         this.jsonTimeoutMs,
         'Teacher coach',
       );
-      const parsed = JSON.parse(this.extractJson(content.text)) as typeof fallback;
+      const parsed = parseModelJson(content.text) as typeof fallback;
       return { data: parsed, ...content.meta };
     } catch {
       return { data: fallback, provider: 'mock', model: 'deterministic-mock', inputTokens: 0, outputTokens: 0, estimatedCost: 0 };
@@ -329,7 +330,7 @@ export class CursorProvider implements AiProvider {
     for (let index = 0; index < pageTexts.length; index++) {
       const pageText = pageTexts[index];
       try {
-        const parsed = LessonOutputSchema.parse(JSON.parse(this.extractJson(pageText)));
+        const parsed = LessonOutputSchema.parse(parseModelJson(pageText));
         if (!chapterName && parsed.chapterName) chapterName = parsed.chapterName;
         if (!topicName && parsed.topicName) topicName = parsed.topicName;
         if (parsed.summary?.trim()) {
