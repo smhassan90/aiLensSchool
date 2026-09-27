@@ -77,11 +77,12 @@ export function PageLoader({
       aria-label={lines[index] ?? "Loading"}
     >
       <Image
-        src="/brand/hawk.png"
+        src="/brand/hawk-160.webp"
         alt=""
         width={variant === "panel" ? 56 : 80}
         height={variant === "panel" ? 56 : 80}
         sizes={variant === "panel" ? "56px" : "80px"}
+        loading={variant === "screen" ? "eager" : "lazy"}
         className={cn("object-contain", variant === "panel" ? "h-14 w-14" : "h-20 w-20")}
       />
       <p

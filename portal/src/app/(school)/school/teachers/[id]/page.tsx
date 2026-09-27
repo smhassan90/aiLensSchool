@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
-import { PageLoader } from "@/components/layout/page-loader";
+import { DetailPageSkeleton } from "@/components/layout/detail-page-skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -85,9 +85,17 @@ export default function TeacherDetailsPage() {
     queryFn: () => branchesService.list({ limit: 50 }),
     enabled: canEdit,
   });
+  const needsSectionLookup = Boolean(
+    teacher.data &&
+      !(teacher.data.assignments?.length) &&
+      ((teacher.data.classSections?.length ?? 0) > 0 ||
+        (teacher.data.classSubjects?.length ?? 0) > 0 ||
+        (teacher.data.assistantClassSubjects?.length ?? 0) > 0),
+  );
   const sections = useQuery({
     queryKey: ["sections", "teacher-detail"],
     queryFn: () => academicsService.listSections({ limit: 100 }),
+    enabled: needsSectionLookup,
   });
   const sectionById = useMemo(() => {
     const map = new Map<string, Section>();
@@ -152,7 +160,7 @@ export default function TeacherDetailsPage() {
   if (teacher.isLoading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <PageLoader variant="page" phrases={["Opening teacher"]} />
+        <DetailPageSkeleton />
       </div>
     );
   }

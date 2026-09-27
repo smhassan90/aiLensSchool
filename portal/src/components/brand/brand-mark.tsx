@@ -25,7 +25,7 @@ function HawkIcon({
       )}
     >
       <Image
-        src="/brand/hawk.png"
+        src="/brand/hawk-160.webp"
         alt=""
         width={size}
         height={size}

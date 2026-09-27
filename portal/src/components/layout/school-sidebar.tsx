@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import {
   CalendarClock,
   CalendarDays,
@@ -18,7 +19,18 @@ import {
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/providers/auth-provider";
-import { GlobalSearch } from "@/components/layout/global-search";
+const GlobalSearch = dynamic(
+  () => import("@/components/layout/global-search").then((m) => ({ default: m.GlobalSearch })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-10 w-full rounded-md border border-white/15 bg-white/10"
+        aria-hidden
+      />
+    ),
+  },
+);
 import { AppShell } from "@/components/layout/app-shell";
 import { SidebarFrame, SidebarNavItem } from "@/components/layout/sidebar-frame";
 import {

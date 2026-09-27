@@ -10,6 +10,9 @@ function publicApiUrl() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    optimizePackageImports: ["lucide-react", "@tanstack/react-query"],
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     imageSizes: [16, 32, 48, 56, 64, 96, 128],

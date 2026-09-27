@@ -16,8 +16,12 @@ type PrefetchItem = {
   fn: () => Promise<unknown>;
 };
 
-const TEACHER_MENU_PREFETCH: PrefetchItem[] = [
+const TEACHER_IDLE_PREFETCH: PrefetchItem[] = [
   { key: ["teacher-dashboard"], fn: () => dashboardService.teacher() },
+];
+
+const TEACHER_MENU_PREFETCH: PrefetchItem[] = [
+  ...TEACHER_IDLE_PREFETCH,
   { key: ["teacher-classes"], fn: () => teachersService.myClasses() },
   { key: ["teacher-lessons"], fn: () => lessonsService.list({ limit: 50 }) },
   { key: ["homework"], fn: () => homeworkService.list({ limit: 50 }) },
@@ -26,16 +30,9 @@ const TEACHER_MENU_PREFETCH: PrefetchItem[] = [
   { key: ["results"], fn: () => resultsService.list({ limit: 100 }) },
 ];
 
-const SCHOOL_MENU_PREFETCH: PrefetchItem[] = [
+/** Light idle warm-up only — heavy lists are prefetched on sidebar hover (see HREF_PREFETCH). */
+const SCHOOL_IDLE_PREFETCH: PrefetchItem[] = [
   { key: ["school-dashboard"], fn: () => dashboardService.school() },
-  { key: ["sections"], fn: () => academicsService.listSections({ limit: 100 }) },
-  { key: ["subjects"], fn: () => academicsService.listSubjects({ limit: 100 }) },
-  { key: ["grades"], fn: () => academicsService.listGrades({ limit: 50 }) },
-  { key: ["academic-years"], fn: () => academicsService.listYears({ limit: 20 }) },
-  { key: ["teachers"], fn: () => teachersService.list({ limit: 50 }) },
-  { key: ["students-roster", "", "", ""], fn: () => studentsService.listAll() },
-  { key: ["homework"], fn: () => homeworkService.list({ limit: 50 }) },
-  { key: ["quizzes"], fn: () => quizzesService.list({ limit: 50 }) },
 ];
 
 const HREF_PREFETCH: Record<string, PrefetchItem[]> = {
@@ -52,15 +49,27 @@ const HREF_PREFETCH: Record<string, PrefetchItem[]> = {
     { key: ["my-exam-paper-assignments"], fn: () => academicsService.listMyExamPaperAssignments() },
   ],
   "/teacher/results": [TEACHER_MENU_PREFETCH[6]],
-  "/school/dashboard": [SCHOOL_MENU_PREFETCH[0]],
-  "/school/academics": [SCHOOL_MENU_PREFETCH[1], SCHOOL_MENU_PREFETCH[2], SCHOOL_MENU_PREFETCH[3]],
-  "/school/teachers": [SCHOOL_MENU_PREFETCH[5]],
+  "/school/dashboard": [{ key: ["school-dashboard"], fn: () => dashboardService.school() }],
+  "/school/academics": [
+    { key: ["sections"], fn: () => academicsService.listSections({ limit: 100 }) },
+    { key: ["subjects"], fn: () => academicsService.listSubjects({ limit: 100 }) },
+    { key: ["grades"], fn: () => academicsService.listGrades({ limit: 50 }) },
+  ],
+  "/school/teachers": [{ key: ["teachers"], fn: () => teachersService.list({ limit: 50 }) }],
+  "/school/students": [{ key: ["students-roster", "", "", ""], fn: () => studentsService.listAll() }],
+  "/school/homework": [
+    { key: ["homework"], fn: () => homeworkService.list({ limit: 50 }) },
+    { key: ["sections"], fn: () => academicsService.listSections({ limit: 100 }) },
+    { key: ["subjects"], fn: () => academicsService.listSubjects({ limit: 100 }) },
+  ],
+  "/school/quizzes": [
+    { key: ["quizzes"], fn: () => quizzesService.list({ limit: 50 }) },
+    { key: ["sections"], fn: () => academicsService.listSections({ limit: 100 }) },
+    { key: ["subjects"], fn: () => academicsService.listSubjects({ limit: 100 }) },
+  ],
   "/school/teachers/attendance": [
     { key: ["teacher-attendance", ""], fn: () => teachersService.listAttendance(new Date().toISOString().slice(0, 10)) },
   ],
-  "/school/students": [SCHOOL_MENU_PREFETCH[6]],
-  "/school/homework": [SCHOOL_MENU_PREFETCH[7], SCHOOL_MENU_PREFETCH[1], SCHOOL_MENU_PREFETCH[2]],
-  "/school/quizzes": [SCHOOL_MENU_PREFETCH[8], SCHOOL_MENU_PREFETCH[1], SCHOOL_MENU_PREFETCH[2]],
   "/school/submitted-exam-papers": [
     {
       key: ["school-exam-paper-submissions", "", "", "", ""],
@@ -69,14 +78,14 @@ const HREF_PREFETCH: Record<string, PrefetchItem[]> = {
   ],
 };
 
-function runWhenIdle(cb: () => void, delayMs = 400) {
+function runWhenIdle(cb: () => void, delayMs = 400, idleTimeoutMs = 2500) {
   if (typeof window === "undefined") return () => undefined;
   let idleId: number | undefined;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const ric = window.requestIdleCallback?.bind(window);
   const cic = window.cancelIdleCallback?.bind(window);
   if (ric) {
-    idleId = ric(() => cb(), { timeout: 2500 });
+    idleId = ric(() => cb(), { timeout: idleTimeoutMs });
   } else {
     timeoutId = setTimeout(cb, delayMs);
   }
@@ -113,29 +122,41 @@ async function prefetchItems(
   }
 }
 
-function useBackgroundPrefetch(items: PrefetchItem[]) {
+export function TeacherBackgroundPrefetch() {
   const queryClient = useQueryClient();
   useEffect(() => {
     const signal = { cancelled: false };
-    const cancelIdle = runWhenIdle(() => {
-      void prefetchItems(queryClient, items, { signal, gapMs: 350 });
-    });
+    const cancelIdle = runWhenIdle(
+      () => {
+        void prefetchItems(queryClient, TEACHER_IDLE_PREFETCH, { signal, gapMs: 0 });
+      },
+      1200,
+      5000,
+    );
     return () => {
       signal.cancelled = true;
       cancelIdle();
     };
-    // Prefetch lists are module-level constants; only re-run if the query client changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryClient]);
-}
-
-export function TeacherBackgroundPrefetch() {
-  useBackgroundPrefetch(TEACHER_MENU_PREFETCH);
   return null;
 }
 
 export function SchoolBackgroundPrefetch() {
-  useBackgroundPrefetch(SCHOOL_MENU_PREFETCH);
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    const signal = { cancelled: false };
+    const cancelIdle = runWhenIdle(
+      () => {
+        void prefetchItems(queryClient, SCHOOL_IDLE_PREFETCH, { signal, gapMs: 0 });
+      },
+      1200,
+      5000,
+    );
+    return () => {
+      signal.cancelled = true;
+      cancelIdle();
+    };
+  }, [queryClient]);
   return null;
 }
 
