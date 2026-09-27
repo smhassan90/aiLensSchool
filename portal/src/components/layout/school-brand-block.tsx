@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { assetUrl } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ export function SchoolBrandBlock({
 }: SchoolBrandBlockProps) {
   const logoSrc = assetUrl(schoolLogo);
   const isSidebar = size === "sidebar";
+  const logoPx = isSidebar ? 40 : 56;
 
   return (
     <div
@@ -34,9 +36,13 @@ export function SchoolBrandBlock({
       {isSidebar ? (
         <div className="flex w-full min-w-0 items-center gap-2.5">
           {logoSrc ? (
-            <img
+            <Image
               src={logoSrc}
               alt=""
+              width={logoPx}
+              height={logoPx}
+              sizes={`${logoPx}px`}
+              quality={70}
               className="h-10 w-10 shrink-0 rounded-lg border border-white/15 object-cover"
             />
           ) : (
@@ -52,9 +58,15 @@ export function SchoolBrandBlock({
       ) : (
         <>
           {logoSrc ? (
-            <img
+            <Image
               src={logoSrc}
               alt=""
+              width={logoPx}
+              height={logoPx}
+              sizes={`${logoPx}px`}
+              quality={70}
+              priority
+              fetchPriority="high"
               className="h-14 w-14 shrink-0 rounded-xl border border-border object-cover shadow-sm"
             />
           ) : (
@@ -64,7 +76,9 @@ export function SchoolBrandBlock({
           )}
           <div className="min-w-0">
             <p className="truncate text-xl font-semibold leading-tight text-foreground">{schoolName}</p>
-            {subtitle ? <p className="mt-1 truncate text-xs text-muted-foreground">{subtitle}</p> : null}
+            {subtitle ? (
+              <p className="mt-1 truncate text-xs text-muted-foreground">{subtitle}</p>
+            ) : null}
           </div>
         </>
       )}

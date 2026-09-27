@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 type BrandMarkProps = {
@@ -7,7 +8,15 @@ type BrandMarkProps = {
   subtitle?: string;
 };
 
-function HawkIcon({ size, inverted }: { size: number; inverted: boolean }) {
+function HawkIcon({
+  size,
+  inverted,
+  priority,
+}: {
+  size: number;
+  inverted: boolean;
+  priority?: boolean;
+}) {
   return (
     <span
       className={cn(
@@ -15,12 +24,13 @@ function HawkIcon({ size, inverted }: { size: number; inverted: boolean }) {
         inverted && "rounded-md bg-white p-0.5",
       )}
     >
-      {/* Same asset as /brand/icon.png and /brand/logo.png — one hawk everywhere. */}
-      <img
+      <Image
         src="/brand/hawk.png"
         alt=""
         width={size}
         height={size}
+        sizes={`${size}px`}
+        priority={priority}
         className="object-contain"
       />
     </span>
@@ -63,7 +73,7 @@ export function BrandMark({
         className,
       )}
     >
-      <HawkIcon size={isFull ? 72 : 32} inverted={inverted} />
+      <HawkIcon size={isFull ? 72 : 32} inverted={inverted} priority={isFull} />
       <div className={cn("flex flex-col", isFull ? "items-center" : "items-start min-w-0")}>
         <Wordmark inverted={inverted} size={isFull ? "lg" : "sm"} />
         {subtitle ? (

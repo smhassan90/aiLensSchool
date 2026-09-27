@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -75,9 +76,12 @@ export function PageLoader({
       aria-live="polite"
       aria-label={lines[index] ?? "Loading"}
     >
-      <img
+      <Image
         src="/brand/hawk.png"
         alt=""
+        width={variant === "panel" ? 56 : 80}
+        height={variant === "panel" ? 56 : 80}
+        sizes={variant === "panel" ? "56px" : "80px"}
         className={cn("object-contain", variant === "panel" ? "h-14 w-14" : "h-20 w-20")}
       />
       <p

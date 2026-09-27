@@ -22,6 +22,12 @@
     "tesseract.js": "^5.1.1",
     "zod": "^3.23.8"
   },
+  "browserslist": [
+    "chrome >= 92",
+    "edge >= 92",
+    "firefox >= 90",
+    "safari >= 15"
+  ],
   "devDependencies": {
     "@types/node": "^20.17.0",
     "@types/react": "^18.3.12",

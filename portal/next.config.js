@@ -10,6 +10,15 @@ function publicApiUrl() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  images: {
+    formats: ["image/avif", "image/webp"],
+    imageSizes: [16, 32, 48, 56, 64, 96, 128],
+    remotePatterns: [
+      { protocol: "https", hostname: "hawknexabackend.fynals.com", pathname: "/**" },
+      { protocol: "http", hostname: "localhost", pathname: "/**" },
+      { protocol: "http", hostname: "127.0.0.1", pathname: "/**" },
+    ],
+  },
   env: {
     NEXT_PUBLIC_API_URL: publicApiUrl(),
   },
