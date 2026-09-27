@@ -5,7 +5,10 @@ import {
   isUsableLessonOcr,
   looksLikeMangledRtlOcr,
 } from './extract-quality';
-import { looksLikeGarbledLatinOcr } from './garbled-latin-ocr';
+import {
+  looksLikeGarbledLatinOcr,
+  looksLikeIllustrationPollutedLatinOcr,
+} from './garbled-latin-ocr';
 
 describe('extract-quality RTL OCR', () => {
   const mangledSample = `
@@ -117,5 +120,47 @@ to read and complete the missing sequence.
     expect(looksLikeGarbledLatinOcr(cleanEnglish)).toBe(false);
     expect(isPoorLessonOcr(cleanEnglish)).toBe(false);
     expect(isUsableLessonOcr(cleanEnglish)).toBe(true);
+  });
+
+  const sportsTextbookOcr = `
+Page 1
+b- 1 3 a -
+L EE
+All the students will be able to: Responsible: Citizenship
+Name the games they like to play.
+Terms to master:
+Excited:
+QQ feeling or showing |
+£ Rs) 8
+|} ® 5 " 5) happiness.
+Collaboration: working together to complete a task.
+Sportsmanship: showing respect, and being kind to others while playing a game or sport.
+
+Page 2
+Unit 8 - Our Worlq Of Sp
+Hassan:
+| am very excited today. Do you know why? ;
+Sara:
+No, | don't know. Please tell me.
+Hassan: & ©
+| Because, | have a football match today! | love playing football.
+Sports are very important for living a healthy and active life.
+
+Page 3
+4 hers enjoy games like badminton, karate, chess, table tennis, ludo, or
+volleyball These are called indoor games because they are played inside
+a room or a hall.
+(<p Hon Eg pe
+Brain Buzzers
+Name any three indoor games and discuss it with your partner.
+The Importance of Collaboration
+We often play games and do activities together as a group.
+`;
+
+  it('flags colorful primary textbook pages polluted by illustration OCR', () => {
+    expect(looksLikeIllustrationPollutedLatinOcr(sportsTextbookOcr)).toBe(true);
+    expect(looksLikeGarbledLatinOcr(sportsTextbookOcr)).toBe(true);
+    expect(isPoorLessonOcr(sportsTextbookOcr)).toBe(true);
+    expect(isUsableLessonOcr(sportsTextbookOcr)).toBe(false);
   });
 });

@@ -328,11 +328,18 @@ export class LessonsService {
       looksLikeRealLessonText(resolvedOcr) &&
       !ARABIC_SCRIPT_RE.test(resolvedOcr);
     const needsPhotoVision = expectsArabicScript || uploadedMangledRtl || ocrGarbled;
+    // Colorful textbook photos: browser Tesseract often mixes art with text. When vision is
+    // available, always read the uploaded images instead of trusting local OCR.
+    const usePhotoVision = canVision && files.length > 0;
     const ocrThin =
-      isFakeExtractText(resolvedOcr) || ocrMissingScript || ocrGarbled || (needsPhotoVision && canVision);
-    if (ocrGarbled || (needsPhotoVision && canVision && !uploadedLooksUsable)) {
+      isFakeExtractText(resolvedOcr) ||
+      ocrMissingScript ||
+      ocrGarbled ||
+      usePhotoVision ||
+      (needsPhotoVision && canVision);
+    if (usePhotoVision || ocrGarbled || (needsPhotoVision && canVision && !uploadedLooksUsable)) {
       this.logger.warn(
-        `Using vision transcription for ${subject.name} (poorOcr=${ocrGarbled}, arabicSubject=${expectsArabicScript})`,
+        `Using vision transcription for ${subject.name} (photoUpload=${usePhotoVision}, poorOcr=${ocrGarbled}, arabicSubject=${expectsArabicScript})`,
       );
     }
     if (
@@ -370,16 +377,16 @@ export class LessonsService {
         teacherNotesSuggestion: local.teacherNotesSuggestion,
       };
     } else {
+      const visionTranscribePrompt = `Transcribe the attached ${subject.name} textbook page photo(s) for ${grade.name}. Copy every heading, paragraph, number, and activity instruction accurately. Keep English as English. Keep every Urdu/Arabic line in original Unicode script (not Latin letters). Preserve Quran/Hadith quotations and citations.`;
       try {
         polished = await this.lessonProcessing.process({
           schoolId,
           userId: user.id,
-          sourceText: usableOcr
-            ? resolvedOcr
-            : `Transcribe the attached ${subject.name} textbook page photo(s) for ${grade.name}. Copy every heading, paragraph, number, and activity instruction accurately. Keep English as English. Keep every Urdu/Arabic line in original Unicode script (not Latin letters). Preserve Quran/Hadith quotations and citations.`,
+          sourceText:
+            usePhotoVision || !usableOcr ? visionTranscribePrompt : resolvedOcr,
           subjectName: subject.name,
           gradeName: grade.name,
-          images: ocrThin && canVision ? images : undefined,
+          images: canVision && (usePhotoVision || ocrThin) ? images : undefined,
         });
       } catch (error) {
         const englishFallback = englishOnlyFromMixedOcr(resolvedOcr);

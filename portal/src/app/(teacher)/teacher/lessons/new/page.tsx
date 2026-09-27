@@ -18,7 +18,7 @@ import { lessonsService } from "@/services/lessons.service";
 import { teachersService } from "@/services/teachers.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
-import { readPagesInBrowser, compressPhotosForUpload } from "@/lib/page-ocr";
+import { compressPhotosForUpload } from "@/lib/page-ocr";
 import { localDateISO } from "@/lib/utils";
 import { ArrowLeft, ImagePlus, X } from "lucide-react";
 
@@ -66,12 +66,6 @@ export default function NewLessonPage() {
       if (!selectedClass.subjectId) {
         throw new Error("This class has no subject yet. Ask the school admin to add subjects.");
       }
-      let pageText = "";
-      try {
-        pageText = await readPagesInBrowser(photos, selectedClass.subjectName);
-      } catch {
-        pageText = "";
-      }
       const pages = await compressPhotosForUpload(photos);
       return lessonsService.extract({
         academicYearId: selectedClass.academicYearId,
@@ -80,7 +74,6 @@ export default function NewLessonPage() {
         subjectId: selectedClass.subjectId,
         branchId: selectedClass.branchId,
         date,
-        pageText: pageText || undefined,
         pages,
       });
     },

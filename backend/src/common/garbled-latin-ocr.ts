@@ -58,6 +58,43 @@ function looksLikeLatinGibberishLine(trimmed: string, words: string[]): boolean 
   return false;
 }
 
+/** Busy layouts: OCR reads cartoons, borders, and icons as Latin junk beside real sentences. */
+export function looksLikeIllustrationPollutedLatinOcr(text: string | undefined | null): boolean {
+  const value = (text ?? '').trim();
+  if (compactTextLength(value) < 100) return false;
+  const latin = countLatinLetters(value);
+  if (latin < 80) return false;
+
+  const weirdSymbols = (value.match(/[|£€©®@#\\¢§°^`~]/g) ?? []).length;
+  if (weirdSymbols >= 4 && weirdSymbols / latin > 0.012) return true;
+
+  const weirdTokens =
+    value.match(
+      /(?:^|\s)(?:[A-Za-z]{1,4}[|@£€©®#\\)(]{1,5}|[|@£€©®#\\)(]{1,4}[A-Za-z]{1,5}|[A-Za-z]{1,2}\s+[|@£€]\s*\d)(?=\s|$)/g,
+    ) ?? [];
+  if (weirdTokens.length >= 3) return true;
+
+  const pipeAsI = (value.match(/(?:^|\n)\s*\|\s*(?:am|I\b|[a-z]{2,})/gi) ?? []).length;
+  if (pipeAsI >= 2) return true;
+
+  const lines = value.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  let scored = 0;
+  let polluted = 0;
+  for (const line of lines) {
+    if (/^Page\s+\d+$/i.test(line)) continue;
+    const letters = countLatinLetters(line);
+    if (letters < 10) continue;
+    scored += 1;
+    const sym = (line.match(/[|£€©®@#\\<>{}]/g) ?? []).length;
+    if (sym >= 2) polluted += 1;
+    else if (sym >= 1 && letters < 45 && /[|£€©®]/.test(line)) polluted += 1;
+    else if (looksLikeLatinGibberishLine(line, line.match(/[A-Za-z]{2,}/g) ?? [])) polluted += 1;
+  }
+  if (scored >= 4 && polluted / scored >= 0.22) return true;
+
+  return false;
+}
+
 function latinWordLooksPlausible(word: string): boolean {
   const w = word.toLowerCase();
   if (w.length <= 2) return true;
@@ -86,7 +123,9 @@ export function looksLikeGarbledLatinOcr(text: string | undefined | null): boole
 
   if (countOcrJunkHits(value) >= 2) return true;
 
-  const weirdPunct = (value.match(/[|\\[\]{}<>]{1,}/g) ?? []).length;
+  if (looksLikeIllustrationPollutedLatinOcr(value)) return true;
+
+  const weirdPunct = (value.match(/[|\\[\]{}<>£€©®@#]/g) ?? []).length;
   const letterChars = Math.max(1, latin + arabic);
   if (weirdPunct >= 4 && weirdPunct / letterChars > 0.02) return true;
 
