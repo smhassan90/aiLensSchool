@@ -22,6 +22,7 @@ function mapClassAssignment(
     subjectName: item.subject?.name ?? "—",
     academicYearId: item.academicYearId,
     branchId: item.branchId,
+    studentCount: item.studentCount ?? 0,
     role: item.role,
     isClassTeacher: Boolean(item.isClassTeacher || item.role === "CLASS_TEACHER"),
   };

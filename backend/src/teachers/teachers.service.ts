@@ -712,7 +712,27 @@ export class TeachersService {
       )
     ).filter((row): row is NonNullable<typeof row> => Boolean(row));
 
-    return [...assigned, ...homerooms];
+    const rows = [...assigned, ...homerooms];
+    const sectionIds = [...new Set(rows.map((row) => row.sectionId))];
+    if (!sectionIds.length) return rows;
+
+    const enrollmentCounts = await this.prisma.studentEnrollment.groupBy({
+      by: ['sectionId'],
+      where: {
+        status: 'ACTIVE',
+        sectionId: { in: sectionIds },
+        ...(year ? { academicYearId: year.id } : {}),
+      },
+      _count: { _all: true },
+    });
+    const studentsBySection = new Map(
+      enrollmentCounts.map((row) => [row.sectionId, row._count._all]),
+    );
+
+    return rows.map((row) => ({
+      ...row,
+      studentCount: studentsBySection.get(row.sectionId) ?? 0,
+    }));
   }
 
   /** Default subject so class teachers can enter marks when the grade has none yet. */
