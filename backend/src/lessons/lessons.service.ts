@@ -1026,7 +1026,9 @@ export class LessonsService {
               gradeId: true,
               teacherId: true,
               subject: { select: { id: true, name: true } },
-              section: { select: { id: true, name: true } },
+              section: {
+                select: { id: true, name: true, grade: { select: { id: true, name: true } } },
+              },
               grade: { select: { id: true, name: true } },
               teacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
             },
@@ -1071,7 +1073,9 @@ export class LessonsService {
             gradeId: true,
             teacherId: true,
             subject: { select: { id: true, name: true } },
-            section: { select: { id: true, name: true } },
+            section: {
+              select: { id: true, name: true, grade: { select: { id: true, name: true } } },
+            },
             grade: { select: { id: true, name: true } },
             teacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
           },

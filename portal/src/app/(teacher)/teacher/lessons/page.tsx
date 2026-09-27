@@ -43,6 +43,15 @@ function canDeleteLesson(status: string) {
   return Boolean(status);
 }
 
+function classSectionLabel(lesson: {
+  grade?: { name: string } | null;
+  section?: { name: string; grade?: { name: string } | null } | null;
+}) {
+  const className = lesson.grade?.name ?? lesson.section?.grade?.name;
+  const parts = [className, lesson.section?.name].filter(Boolean);
+  return parts.length ? parts.join(" ") : "—";
+}
+
 export default function TeacherLessonsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -107,7 +116,7 @@ export default function TeacherLessonsPage() {
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Subject</TableHead>
-                <TableHead>Section</TableHead>
+                <TableHead>Class</TableHead>
                 <TableHead>Topic</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead></TableHead>
@@ -118,7 +127,7 @@ export default function TeacherLessonsPage() {
                 <TableRow key={lesson.id}>
                   <TableCell>{formatDate(lesson.date)}</TableCell>
                   <TableCell>{lesson.subject?.name ?? "—"}</TableCell>
-                  <TableCell>{lesson.section?.name ?? "—"}</TableCell>
+                  <TableCell>{classSectionLabel(lesson)}</TableCell>
                   <TableCell>{lesson.topicName ?? lesson.chapterName ?? "—"}</TableCell>
                   <TableCell>
                     <Badge variant={statusVariant(lesson.status)}>{formatStatusLabel(lesson.status)}</Badge>
