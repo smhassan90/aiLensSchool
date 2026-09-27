@@ -21,13 +21,14 @@ import { teachersService } from "@/services/teachers.service";
 import { ChevronLeft } from "lucide-react";
 import { QuizAnalysis } from "@/components/quizzes/quiz-analysis";
 import { cn } from "@/lib/utils";
+import { formatStatusLabel } from "@/lib/display-labels";
 
 function statusBadge(status: string) {
   const s = status?.toUpperCase();
   if (s === "PRESENT") return <Badge variant="success">Present</Badge>;
   if (s === "LATE") return <Badge variant="warning">Late</Badge>;
   if (s === "ABSENT") return <Badge variant="destructive">Absent</Badge>;
-  return <Badge variant="outline">{status}</Badge>;
+  return <Badge variant="outline">{formatStatusLabel(status)}</Badge>;
 }
 
 function formatTime(iso: string | null, timeZone: string) {
@@ -112,7 +113,7 @@ export function Teacher360View({
       <PageHeader
         title={data.teacher.name}
         description={[
-          "Teacher 360",
+          "Teaching overview",
           data.teacher.employeeCode,
           data.teacher.username ? `Username ${data.teacher.username}` : null,
           data.teacher.branchName,

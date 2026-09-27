@@ -337,7 +337,7 @@ export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admi
               </p>
             )}
             {paperStatus === "PENDING" && (
-              <p>Pending approval — the office is reviewing this paper. You cannot edit it now.</p>
+              <p>Pending approval — school admin is reviewing this paper. You cannot edit it now.</p>
             )}
             {paperStatus === "APPROVED" && (
               <p>Approved — you can print this paper for your class.</p>

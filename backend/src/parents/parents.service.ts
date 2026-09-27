@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { DayOffRequestStatus, EnrollmentStatus, NotificationType, Prisma } from '@prisma/client';
+import { DayOffRequestStatus, EnrollmentStatus, NotificationType, Prisma, RoleName } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -337,7 +337,7 @@ export class ParentsService {
       include: { parent: { select: { userId: true } } },
     });
     if (!request) throw new NotFoundException({ code: 'DAY_OFF_NOT_FOUND', message: 'Day-off request not found' });
-    await this.assertClassTeacherForStudent(user, request.studentId);
+    await this.assertCanReviewDayOff(user, request.studentId);
     if (request.status !== DayOffRequestStatus.PENDING) {
       throw new BadRequestException({ code: 'DAY_OFF_ALREADY_REVIEWED', message: 'This request has already been reviewed' });
     }
@@ -384,6 +384,31 @@ export class ParentsService {
         },
       },
     } satisfies Prisma.StudentWhereInput;
+  }
+
+  private async assertCanReviewDayOff(user: AuthUser, studentId: string) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    if (
+      user.roles.includes(RoleName.SCHOOL_ADMIN) ||
+      user.roles.includes(RoleName.PRINCIPAL)
+    ) {
+      const enrollment = await this.prisma.studentEnrollment.findFirst({
+        where: {
+          studentId,
+          status: EnrollmentStatus.ACTIVE,
+          student: { schoolId },
+        },
+        select: { id: true },
+      });
+      if (!enrollment) {
+        throw new ForbiddenException({
+          code: 'STUDENT_NOT_IN_SCHOOL',
+          message: 'Student not found in your school',
+        });
+      }
+      return;
+    }
+    await this.assertClassTeacherForStudent(user, studentId);
   }
 
   private async assertClassTeacherForStudent(user: AuthUser, studentId: string) {

@@ -13,6 +13,7 @@ import { authService } from "@/services/auth.service";
 import { useAuth } from "@/providers/auth-provider";
 import { getRoleRedirectPath } from "@/lib/auth";
 import { ApiClientError } from "@/lib/api-client";
+import { friendlyApiErrorMessage } from "@/lib/display-labels";
 import { useToast } from "@/providers/toast-provider";
 import type { RoleName } from "@/lib/types";
 
@@ -68,8 +69,7 @@ export function LoginForm({
       });
       router.push(redirectOverride ?? getRoleRedirectPath(data.user));
     } catch (err) {
-      const message =
-        err instanceof ApiClientError ? err.message : "Login failed. Please try again.";
+      const message = friendlyApiErrorMessage(err, "Login failed. Please try again.");
       toast({ title: "Login failed", description: message, variant: "error" });
     } finally {
       inFlight.current = false;
@@ -91,9 +91,10 @@ export function LoginForm({
               id="username"
               type="text"
               autoComplete="username"
-              placeholder="Login username"
+              placeholder="School username"
               {...register("username")}
             />
+            <p className="text-xs text-muted-foreground">Use the username from your school — not your email address.</p>
             {errors.username && (
               <p className="text-sm text-destructive">{errors.username.message}</p>
             )}

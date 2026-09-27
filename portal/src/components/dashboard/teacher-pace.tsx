@@ -163,7 +163,7 @@ export function TeacherPaceBoard({
 
   const cards = [
     {
-      href: "/teacher/lessons/new",
+      href: "/teacher/lessons",
       title: "Lectures",
       icon: BookOpen,
       tone: lessonTone,

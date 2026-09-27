@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Megaphone,
   Receipt,
+  Search,
   Settings2,
   Trophy,
   UserSquare2,
@@ -47,6 +48,7 @@ const setupPathPrefixes = [
   "/school/exam-deadline-extensions",
   "/school/results",
   "/school/attendance",
+  "/school/front-desk",
   "/school/day-off-requests",
   "/school/student-photos",
   "/school/report-cards",
@@ -61,6 +63,7 @@ const mainNav: Array<{
 }> = [
   { href: "/school/dashboard", label: "Dashboard", icon: LayoutDashboard, permission: "VIEW_DASHBOARD" },
   { href: "/school/students", label: "Students", icon: GraduationCap },
+  { href: "/school/front-desk", label: "Front desk", icon: Search, permission: "SEARCH_STUDENTS" },
   { href: "/school/teachers", label: "Teachers", icon: UserSquare2 },
   { href: "/school/teachers/attendance", label: "Attendance", icon: ClipboardCheck },
   { href: "/school/exams", label: "Exams", icon: Trophy, permission: "MANAGE_EXAMS" },

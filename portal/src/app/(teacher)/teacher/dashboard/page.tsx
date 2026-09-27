@@ -82,7 +82,7 @@ export default function TeacherDashboardPage() {
         title="Your pace"
         actions={
           <Button type="button" onClick={() => suggest.mutate()} disabled={suggest.isPending}>
-            {suggest.isPending ? "Thinking…" : "AI hint"}
+            {suggest.isPending ? "Thinking…" : "Teaching tips"}
           </Button>
         }
       />
@@ -181,7 +181,7 @@ export default function TeacherDashboardPage() {
 
       {suggest.isError ? (
         <p className="mt-4 text-sm text-destructive">
-          {suggest.error instanceof Error ? suggest.error.message : "Could not get an AI hint. Try again."}
+          {suggest.error instanceof Error ? suggest.error.message : "Could not load teaching tips. Try again."}
         </p>
       ) : null}
 
@@ -237,7 +237,7 @@ export default function TeacherDashboardPage() {
             {sortedClasses.map((cls) => (
               <Link
                 key={`${cls.sectionId}-${cls.subjectId}`}
-                href="/teacher/lessons/new"
+                href="/teacher/classes"
                 className="block rounded-md border px-3 py-2 hover:bg-muted"
               >
                 {cls.gradeName} {cls.sectionName} · {cls.subjectName}

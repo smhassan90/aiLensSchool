@@ -30,6 +30,7 @@ import { homeworkService } from "@/services/homework.service";
 import { teachersService } from "@/services/teachers.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
+import { formatStatusLabel } from "@/lib/display-labels";
 import { formatDate } from "@/lib/utils";
 import { FileQuestion, Plus } from "lucide-react";
 
@@ -191,7 +192,7 @@ export default function TeacherQuizzesPage() {
                   <TableCell>{quiz.section?.name ?? "—"}</TableCell>
                   <TableCell>
                     <Badge variant={quiz.status === "PUBLISHED" ? "success" : "secondary"}>
-                      {quiz.status}
+                      {formatStatusLabel(quiz.status)}
                     </Badge>
                   </TableCell>
                   <TableCell>{formatDate(quiz.dueAt)}</TableCell>

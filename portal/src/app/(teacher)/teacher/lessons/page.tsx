@@ -21,6 +21,7 @@ import { formatDate } from "@/lib/utils";
 import { ApiClientError } from "@/lib/api-client";
 import { useToast } from "@/providers/toast-provider";
 import { BookOpen, Plus, Trash2 } from "lucide-react";
+import { formatStatusLabel } from "@/lib/display-labels";
 
 function statusVariant(status: string) {
   switch (status) {
@@ -32,10 +33,6 @@ function statusVariant(status: string) {
     default:
       return "secondary" as const;
   }
-}
-
-function statusLabel(status: string) {
-  return status.replaceAll("_", " ");
 }
 
 function canReview(status: string) {
@@ -124,7 +121,7 @@ export default function TeacherLessonsPage() {
                   <TableCell>{lesson.section?.name ?? "—"}</TableCell>
                   <TableCell>{lesson.topicName ?? lesson.chapterName ?? "—"}</TableCell>
                   <TableCell>
-                    <Badge variant={statusVariant(lesson.status)}>{statusLabel(lesson.status)}</Badge>
+                    <Badge variant={statusVariant(lesson.status)}>{formatStatusLabel(lesson.status)}</Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-2">

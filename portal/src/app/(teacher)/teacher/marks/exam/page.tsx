@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { academicsService } from "@/services/academics.service";
 import { teachersService } from "@/services/teachers.service";
 import { useToast } from "@/providers/toast-provider";
-import { ApiClientError } from "@/lib/api-client";
+import { friendlyApiErrorMessage } from "@/lib/display-labels";
 import { formatDate, formatMarks } from "@/lib/utils";
 
 export default function TeacherExamScoresPage() {
@@ -93,18 +93,14 @@ export default function TeacherExamScoresPage() {
       toast({ title: `Saved marks for ${res.saved} students`, variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["exam-score-sheet"] });
     },
-    onError: (err: Error) => toast({ title: "Could not save", description: err.message, variant: "error" }),
+    onError: (err: Error) =>
+      toast({ title: "Could not save", description: friendlyApiErrorMessage(err), variant: "error" }),
   });
 
   const maxMarks = sheet.data?.exam.maxMarks ?? 0;
   const filledCount = Object.values(scores).filter((v) => v.trim() !== "").length;
   const canEditScores = Boolean(sheet.data?.canEnterScores);
-  const sheetErrorMessage =
-    sheet.error instanceof ApiClientError
-      ? sheet.error.message
-      : sheet.error
-        ? "Could not load the score sheet."
-        : "";
+  const sheetErrorMessage = sheet.error ? friendlyApiErrorMessage(sheet.error, "Could not load the score sheet.") : "";
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -112,12 +108,17 @@ export default function TeacherExamScoresPage() {
         title="Enter exam scores"
         description="Enter marks for every student in one grid. Save when you are done."
         actions={
-          <Link href="/teacher/marks">
-            <Button variant="outline">
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/teacher/dashboard">
+              <Button variant="outline">
+                <ArrowLeft className="h-4 w-4" />
+                Dashboard
+              </Button>
+            </Link>
+            <Link href="/teacher/marks">
+              <Button variant="outline">Class marks & reports</Button>
+            </Link>
+          </div>
         }
       />
 

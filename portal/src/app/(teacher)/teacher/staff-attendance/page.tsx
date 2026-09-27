@@ -21,13 +21,14 @@ import {
 } from "@/components/ui/table";
 import { teachersService } from "@/services/teachers.service";
 import { localDateISO } from "@/lib/utils";
+import { formatStatusLabel } from "@/lib/display-labels";
 
 function statusBadge(status: string) {
   const s = status?.toUpperCase();
   if (s === "PRESENT") return <Badge variant="success">Present</Badge>;
   if (s === "LATE") return <Badge variant="warning">Late</Badge>;
   if (s === "ABSENT") return <Badge variant="destructive">Absent</Badge>;
-  return <Badge variant="outline">{status}</Badge>;
+  return <Badge variant="outline">{formatStatusLabel(status)}</Badge>;
 }
 
 function formatTime(iso: string | null, timeZone: string) {

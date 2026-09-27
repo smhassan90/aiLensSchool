@@ -253,7 +253,7 @@ export function GenerateExamPaperDialog({
                           <PageLoader variant="panel" />
                         ) : !examConfigs.length ? (
                           <p className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
-                            No exam papers configured yet. Ask the office to set them up under Exams.
+                            No exam papers configured yet. Ask school admin to set them up under Exams.
                           </p>
                         ) : (
                           <Select id="examConfigId" {...register("examConfigId")}>

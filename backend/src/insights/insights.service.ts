@@ -74,6 +74,8 @@ export class InsightsService {
             { user: { firstName: { contains: term } } },
             { user: { lastName: { contains: term } } },
             { user: { email: { contains: term } } },
+            { user: { username: { contains: term } } },
+            { user: { phone: { contains: term } } },
           ],
         },
         take: 8,

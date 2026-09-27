@@ -192,7 +192,7 @@ export default function TeacherExamsPage() {
     },
     onSuccess: (res) => {
       toast({
-        title: "Request sent to office",
+        title: "Request sent to school admin",
         description: `You asked for ${res.days} day${res.days === 1 ? "" : "s"} for ${res.examName} · ${res.className}.`,
         variant: "success",
       });
@@ -301,7 +301,7 @@ export default function TeacherExamsPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Exam papers"
-        description="Papers are grouped by exam and sorted by class. Draft papers stay with you; after submit they go to the office for approval."
+        description="Papers are grouped by exam and sorted by class. Draft papers stay with you; after submit they go to school admin for approval."
       />
 
       <TeacherExamAssignments

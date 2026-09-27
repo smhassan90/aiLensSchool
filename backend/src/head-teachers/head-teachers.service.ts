@@ -22,6 +22,7 @@ import { SaveHeadTeacherBoardDto } from './dto/head-teachers.dto';
 import { teacherDisplayName } from '../common/utils/person-name';
 import { sectionClassLabel } from '../common/utils/section-class-label';
 import { studentSearchWhere } from '../common/utils/student-search';
+import { hasStaffPermission } from '../common/permissions';
 
 @Injectable()
 export class HeadTeachersService {
@@ -277,6 +278,9 @@ export class HeadTeachersService {
     });
     if (!quiz?.sectionId) return false;
     this.tenant.assertSchoolAccess(user, quiz.schoolId);
+    if (hasStaffPermission(user.roles, user.permissions, 'MANAGE_EXAMS')) {
+      return true;
+    }
     const sectionIds = await this.resolveSectionIds(user);
     return Boolean(sectionIds?.includes(quiz.sectionId));
   }

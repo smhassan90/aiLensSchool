@@ -446,8 +446,61 @@ export class TeachersService {
     }
 
     const nextStatus = dto.status ?? teacher.status;
-    await this.prisma.$transaction([
-      this.prisma.teacherProfile.update({
+    await this.prisma.$transaction(async (tx) => {
+      const userUpdate: Prisma.UserUpdateInput = {
+        ...(dto.firstName ? { firstName: dto.firstName } : {}),
+        ...(dto.lastName !== undefined ? { lastName: (dto.lastName ?? '').trim() } : {}),
+        ...(dto.email ? { email: dto.email.toLowerCase() } : {}),
+        status: nextStatus === TeacherStatus.ACTIVE ? UserStatus.ACTIVE : UserStatus.INACTIVE,
+      };
+
+      if (dto.phone !== undefined) {
+        const phone = dto.phone.trim();
+        if (normalizeTeacherPhoneDigits(phone).length < 7) {
+          throw new BadRequestException({
+            code: 'PHONE_INVALID',
+            message: 'Enter a valid mobile number (at least 7 digits)',
+          });
+        }
+        const current = await tx.user.findUnique({
+          where: { id: teacher.userId },
+          select: { phone: true },
+        });
+        const phoneChanged = !schoolPhonesMatch(current?.phone, phone);
+        if (phoneChanged) {
+          const usersWithPhone = await tx.user.findMany({
+            where: { schoolId, phone: { not: null }, id: { not: teacher.userId } },
+            select: { phone: true },
+          });
+          if (usersWithPhone.some((row) => schoolPhonesMatch(row.phone, phone))) {
+            throw new ConflictException({
+              code: 'PHONE_EXISTS_IN_SCHOOL',
+              message: 'This phone number is already used at your school',
+            });
+          }
+          const school = await tx.school.findUnique({
+            where: { id: schoolId },
+            select: { code: true },
+          });
+          const schoolCode = school?.code ?? 'SCH';
+          let username = buildTeacherUsername(schoolCode, phone);
+          let attempt = 0;
+          while (
+            await tx.user.findFirst({
+              where: { username, id: { not: teacher.userId } },
+              select: { id: true },
+            })
+          ) {
+            attempt += 1;
+            username = buildTeacherUsername(schoolCode, phone, attempt);
+          }
+          userUpdate.username = username;
+          userUpdate.email = teacherLocalEmail(username, schoolCode);
+        }
+        userUpdate.phone = phone;
+      }
+
+      await tx.teacherProfile.update({
         where: { id },
         data: {
           ...(dto.branchId ? { branchId: dto.branchId } : {}),
@@ -456,18 +509,12 @@ export class TeachersService {
           ...(dto.gender !== undefined ? { gender: dto.gender } : {}),
           ...(dto.status ? { status: dto.status } : {}),
         },
-      }),
-      this.prisma.user.update({
+      });
+      await tx.user.update({
         where: { id: teacher.userId },
-        data: {
-          ...(dto.firstName ? { firstName: dto.firstName } : {}),
-          ...(dto.lastName !== undefined ? { lastName: (dto.lastName ?? '').trim() } : {}),
-          ...(dto.email ? { email: dto.email.toLowerCase() } : {}),
-          ...(dto.phone !== undefined ? { phone: dto.phone || null } : {}),
-          status: nextStatus === TeacherStatus.ACTIVE ? UserStatus.ACTIVE : UserStatus.INACTIVE,
-        },
-      }),
-    ]);
+        data: userUpdate,
+      });
+    });
 
     await this.audit.log({
       actorUserId: user.id,

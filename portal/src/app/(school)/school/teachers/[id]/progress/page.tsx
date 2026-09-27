@@ -19,6 +19,7 @@ export default function TeacherProgressPage() {
   const params = useParams<{ id: string }>();
   const search = useSearchParams();
   const { can } = useAuth();
+  const allowed = can("VIEW_TEACHER_PROGRESS") || can("MANAGE_TEACHERS");
   const autoAi = search.get("ai") === "1";
   const [coach, setCoach] = useState<Awaited<ReturnType<typeof teachersService.coach>> | null>(null);
 
@@ -42,6 +43,14 @@ export default function TeacherProgressPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoAi, params.id]);
+
+  if (!allowed) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <p className="text-sm text-muted-foreground">You do not have access to teacher progress.</p>
+      </div>
+    );
+  }
 
   const facts = performance.data;
   const ranked = board.data?.teachers.find((row) => row.teacher.id === params.id);

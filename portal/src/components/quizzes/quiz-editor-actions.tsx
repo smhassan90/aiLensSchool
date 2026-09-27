@@ -126,7 +126,7 @@ export function QuizEditorActions({
       return quizzesService.submitPaper(quizId, questionPayload(quiz, true));
     },
     onSuccess: () => {
-      toast({ title: "Submitted to office", description: "The office will review and approve your paper.", variant: "success" });
+      toast({ title: "Submitted for review", description: "School admin will review and approve your paper.", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["teacher-dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["my-exam-paper-assignments"] });
       queryClient.invalidateQueries({ queryKey: ["teacher-exam-papers"] });

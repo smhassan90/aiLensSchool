@@ -89,5 +89,13 @@ export function examStatusLabel(
     }
   }
   if (status === "DRAFT") return "Draft";
-  return status?.replaceAll("_", " ") ?? "—";
+  if (!status) return "—";
+  const known: Record<string, string> = {
+    NOT_STARTED: "Not started",
+    PENDING_REVIEW: "Pending review",
+    APPROVED: "Approved",
+    PUBLISHED: "Published",
+    CLOSED: "Closed",
+  };
+  return known[status] ?? status.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }

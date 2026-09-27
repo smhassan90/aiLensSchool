@@ -20,6 +20,7 @@ import { documentsService, type HomeworkPreview } from "@/services/documents.ser
 import { homeworkService } from "@/services/homework.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
+import { formatStatusLabel } from "@/lib/display-labels";
 import { formatDate } from "@/lib/utils";
 import { ArrowLeft, CheckCircle2, RefreshCw, Trash2 } from "lucide-react";
 
@@ -346,7 +347,7 @@ export default function ReviewLessonPage() {
                     {formatDate(lesson.date)} · {lesson.subject?.name} · Section {lesson.section?.name}
                   </CardDescription>
                 </div>
-                <Badge variant="warning">{lesson.status.replaceAll("_", " ")}</Badge>
+                <Badge variant="warning">{formatStatusLabel(lesson.status)}</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">

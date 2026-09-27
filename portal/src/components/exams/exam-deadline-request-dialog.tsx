@@ -61,13 +61,13 @@ export function ExamDeadlineRequestDialog({
         <div className="space-y-4 px-5 py-5">
           {dueDate ? (
             <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-950">
-              The {kindLabel} due date was {formatDate(dueDate)}. Request the office to reopen access.
+              The {kindLabel} due date was {formatDate(dueDate)}. Request school admin to reopen access.
             </p>
           ) : null}
 
           {pendingRequest ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-              Your request for {pendingRequest.days} day{pendingRequest.days === 1 ? "" : "s"} is pending with the office.
+              Your request for {pendingRequest.days} day{pendingRequest.days === 1 ? "" : "s"} is pending with school admin.
             </p>
           ) : (
             <>

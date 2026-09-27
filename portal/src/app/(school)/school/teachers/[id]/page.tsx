@@ -261,8 +261,14 @@ export default function TeacherDetailsPage() {
               <p className="text-xs text-muted-foreground">Teachers sign in with this username, not an email address.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" disabled={!canEdit} {...form.register("phone")} />
+              <Label htmlFor="phone">Mobile number</Label>
+              <Input id="phone" type="tel" disabled={!canEdit} {...form.register("phone")} />
+              {canEdit ? (
+                <p className="text-xs text-muted-foreground">
+                  Changing the mobile updates the teacher&apos;s login username (school code + number). Must be unique in
+                  your school.
+                </p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="employeeCode">Employee code</Label>

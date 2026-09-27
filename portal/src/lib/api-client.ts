@@ -1,5 +1,6 @@
 import type { ApiErrorBody, ApiResponse } from "./types";
 import { clearAuthSession } from "./auth";
+import { friendlyApiErrorFromBody } from "./display-labels";
 
 const PRODUCTION_API_URL = "https://hawknexabackend.fynals.com/api/v1";
 const LOCAL_API_URL = "http://localhost:3001/api/v1";
@@ -47,7 +48,7 @@ export class ApiClientError extends Error {
 function getErrorMessage(error: ApiErrorBody | string | undefined): string {
   if (!error) return "An unexpected error occurred";
   if (typeof error === "string") return error;
-  return error.message ?? error.code ?? "An unexpected error occurred";
+  return friendlyApiErrorFromBody(error.code, error.message);
 }
 
 function isPublicAuthPath(path: string) {

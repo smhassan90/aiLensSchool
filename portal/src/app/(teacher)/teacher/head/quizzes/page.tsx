@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { headTeachersService } from "@/services/head-teachers.service";
 import { formatDate } from "@/lib/utils";
+import { formatStatusLabel } from "@/lib/display-labels";
 
 export default function HeadTeacherQuizzesPage() {
   const quizzes = useQuery({
@@ -45,7 +46,7 @@ export default function HeadTeacherQuizzesPage() {
           <article key={quiz.id} className="rounded-xl border bg-card p-4">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-semibold">{quiz.title}</h2>
-              <Badge variant="secondary">{quiz.status}</Badge>
+              <Badge variant="secondary">{formatStatusLabel(quiz.status)}</Badge>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {quiz.teacherName}

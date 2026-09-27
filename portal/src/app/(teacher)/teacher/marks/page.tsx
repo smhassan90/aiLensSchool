@@ -12,6 +12,8 @@ import { academicsService } from "@/services/academics.service";
 import { teachersService } from "@/services/teachers.service";
 import { documentsService } from "@/services/documents.service";
 import { useToast } from "@/providers/toast-provider";
+import { ArrowLeft } from "lucide-react";
+import { friendlyApiErrorMessage } from "@/lib/display-labels";
 
 export default function TeacherMarksPage() {
   const { toast } = useToast();
@@ -88,7 +90,8 @@ export default function TeacherMarksPage() {
       queryClient.invalidateQueries({ queryKey: ["assessments"] });
       setExamConfigId("");
     },
-    onError: (err: Error) => toast({ title: "Could not save", description: err.message, variant: "error" }),
+    onError: (err: Error) =>
+      toast({ title: "Could not save", description: friendlyApiErrorMessage(err), variant: "error" }),
   });
 
   const report = useMutation({
@@ -102,7 +105,8 @@ export default function TeacherMarksPage() {
       });
     },
     onSuccess: (res) => toast({ title: `Report cards ready for ${res.generated} students`, variant: "success" }),
-    onError: (err: Error) => toast({ title: "Could not generate", description: err.message, variant: "error" }),
+    onError: (err: Error) =>
+      toast({ title: "Could not generate", description: friendlyApiErrorMessage(err), variant: "error" }),
   });
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -131,6 +135,12 @@ export default function TeacherMarksPage() {
         description="Enter exam marks on the school paper. Generate the class progress report when the paper is complete."
         actions={
           <div className="flex flex-wrap gap-2">
+            <Link href="/teacher/marks/exam">
+              <Button variant="outline">
+                <ArrowLeft className="h-4 w-4" />
+                Tests & reports
+              </Button>
+            </Link>
             <Link href="/teacher/marks/exam">
               <Button>Enter exam scores (all students)</Button>
             </Link>

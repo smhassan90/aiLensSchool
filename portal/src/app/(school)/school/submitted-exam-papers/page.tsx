@@ -10,8 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { academicsService } from "@/services/academics.service";
 import { formatDate } from "@/lib/utils";
+import { useAuth } from "@/providers/auth-provider";
 
 export default function SubmittedExamPapersPage() {
+  const { can } = useAuth();
+  const canReview = can("MANAGE_EXAMS");
   const [examConfigId, setExamConfigId] = useState("");
   const [sectionId, setSectionId] = useState("");
   const [subjectName, setSubjectName] = useState("");
@@ -54,7 +57,7 @@ export default function SubmittedExamPapersPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Exam papers"
-        description="Print approved exam papers, set the exam date before printing, and track submission progress. Head teachers approve papers before they appear here."
+        description="Track submissions, approve pending papers (exams setup access), and print approved papers for class."
       />
 
       <div className="mb-6 grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -129,6 +132,7 @@ export default function SubmittedExamPapersPage() {
           <SubmittedExamPapersList
             papers={data?.papers ?? []}
             isLoading={overview.isFetching && !overview.isLoading}
+            canReview={canReview}
           />
         )}
       </section>
@@ -140,7 +144,7 @@ export default function SubmittedExamPapersPage() {
         {overview.isFetching && !overview.isLoading ? (
           <PageLoader variant="panel" task="exams" />
         ) : (
-          <ExamPaperTeacherSummary teachers={data?.teachers ?? []} />
+          <ExamPaperTeacherSummary teachers={data?.teachers ?? []} canReview={canReview} />
         )}
       </section>
     </div>

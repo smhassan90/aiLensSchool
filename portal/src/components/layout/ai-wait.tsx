@@ -63,10 +63,10 @@ const AI_WAIT: Record<
       "Reading the lectures you selected",
       "Building MCQs, true/false, and open-ended questions",
       "Spreading marks across each section",
-      "Writing a paper the office can print",
+      "Writing a paper school admin can print",
       "Your exam draft is almost ready",
     ],
-    hint: "Nothing is sent to the office until you review and submit.",
+    hint: "Nothing is sent to school admin until you review and submit.",
   },
   coach: {
     phrases: [

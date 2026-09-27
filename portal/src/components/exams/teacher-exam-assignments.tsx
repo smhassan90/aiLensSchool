@@ -71,7 +71,7 @@ export function TeacherExamAssignments({
       <EmptyState
         icon={<FileText className="h-10 w-10" />}
         title="No exam assignments yet"
-        description="When the office releases an exam for your classes, it will appear here grouped by exam."
+        description="When school admin releases an exam for your classes, it will appear here grouped by exam."
       />
     );
   }
@@ -160,11 +160,11 @@ export function TeacherExamAssignments({
                       {paperClosed && row.paperExtensionRequest ? (
                         <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
                           Extension request pending — you asked for {row.paperExtensionRequest.days} day
-                          {row.paperExtensionRequest.days === 1 ? "" : "s"}. The office will review it soon.
+                          {row.paperExtensionRequest.days === 1 ? "" : "s"}. School admin will review it soon.
                         </p>
                       ) : paperClosed ? (
                         <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-950">
-                          Paper submission deadline has passed. Click Generate paper to request an extension from the office.
+                          Paper submission deadline has passed. Click Generate paper to request an extension from school admin.
                         </p>
                       ) : null}
                       {row.status === "DRAFT" && row.rejectionReason ? (
@@ -174,7 +174,7 @@ export function TeacherExamAssignments({
                       ) : null}
                       {row.status === "PENDING" ? (
                         <p className="mt-1 text-xs text-muted-foreground">
-                          With the office for approval — you cannot edit until they respond.
+                          With school admin for approval — you cannot edit until they respond.
                         </p>
                       ) : null}
                       {row.status === "APPROVED" ? (
