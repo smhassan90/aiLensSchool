@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
 import { getRoleRedirectPath } from "@/lib/auth";
 import type { RoleName } from "@/lib/types";
-import { PageLoader } from "@/components/layout/page-loader";
 
 interface AuthGuardProps {
   allowedRoles: RoleName[];
@@ -31,12 +30,7 @@ export function AuthGuard({ allowedRoles, loginPath, children }: AuthGuardProps)
   }, [isLoading, isAuthenticated, hasAnyRole, allowedRoles, loginPath, router, user]);
 
   if (isLoading) {
-    return (
-      <PageLoader
-        variant="screen"
-        phrases={["Opening your workspace", "Checking your session", "Almost there"]}
-      />
-    );
+    return <div className="min-h-screen bg-background" aria-busy="true" aria-label="Loading" />;
   }
 
   if (!isAuthenticated || !hasAnyRole(allowedRoles)) {

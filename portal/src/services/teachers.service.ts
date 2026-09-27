@@ -254,7 +254,7 @@ export const teachersService = {
   },
 
   getById(id: string) {
-    return apiClient<Teacher>(`/teachers/${id}`, { cache: "no-store" });
+    return apiClient<Teacher>(`/teachers/${id}`);
   },
 
   performance(id: string) {

@@ -3,6 +3,20 @@ import type { AuthUser, LoginResponse, RoleName, StaffPermission } from "./types
 const ACCESS_TOKEN_KEY = "accessToken";
 const REFRESH_TOKEN_KEY = "refreshToken";
 const USER_KEY = "authUser";
+const AUTH_SESSION_EVENT = "auth-session-changed";
+
+function notifyAuthSessionChange() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(AUTH_SESSION_EVENT));
+}
+
+/** Lets useSyncExternalStore re-read the user after login/logout without waiting for an effect. */
+export function subscribeAuthSession(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => undefined;
+  const handler = () => onStoreChange();
+  window.addEventListener(AUTH_SESSION_EVENT, handler);
+  return () => window.removeEventListener(AUTH_SESSION_EVENT, handler);
+}
 
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -29,12 +43,14 @@ export function setAuthSession(data: LoginResponse): void {
   localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
   localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
   localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+  notifyAuthSessionChange();
 }
 
 export function clearAuthSession(): void {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  notifyAuthSessionChange();
 }
 
 export function hasRole(user: AuthUser | null, role: RoleName): boolean {

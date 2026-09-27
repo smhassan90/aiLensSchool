@@ -13,6 +13,7 @@ import { schoolsService } from "@/services/schools.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { useAuth } from "@/providers/auth-provider";
+import { writeSchoolBrandingCache } from "@/lib/school-branding-cache";
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -46,6 +47,12 @@ export default function SettingsPage() {
     onSuccess: () => {
       toast({ title: "Settings saved", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["school", schoolId] });
+      queryClient.invalidateQueries({ queryKey: ["school-branding", schoolId] });
+      writeSchoolBrandingCache(schoolId, {
+        id: schoolId,
+        name,
+        logo: school.data?.logo ?? null,
+      });
     },
     onError: (err) =>
       toast({

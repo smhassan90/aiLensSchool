@@ -23,10 +23,10 @@
     "zod": "^3.23.8"
   },
   "browserslist": [
-    "chrome >= 92",
-    "edge >= 92",
-    "firefox >= 90",
-    "safari >= 15"
+    "chrome >= 111",
+    "edge >= 111",
+    "firefox >= 111",
+    "safari >= 16.4"
   ],
   "devDependencies": {
     "@types/node": "^20.17.0",

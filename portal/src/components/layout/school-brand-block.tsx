@@ -75,7 +75,9 @@ export function SchoolBrandBlock({
             </span>
           )}
           <div className="min-w-0">
-            <p className="truncate text-xl font-semibold leading-tight text-foreground">{schoolName}</p>
+            <p className="truncate text-xl font-semibold leading-tight text-foreground" suppressHydrationWarning>
+              {schoolName}
+            </p>
             {subtitle ? (
               <p className="mt-1 truncate text-xs text-muted-foreground">{subtitle}</p>
             ) : null}

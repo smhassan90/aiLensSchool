@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { authService } from "@/services/auth.service";
+import { writeSchoolBrandingCache } from "@/lib/school-branding-cache";
+import { schoolsService } from "@/services/schools.service";
 import { useAuth } from "@/providers/auth-provider";
 import { getRoleRedirectPath } from "@/lib/auth";
 import { ApiClientError } from "@/lib/api-client";
@@ -62,6 +64,11 @@ export function LoginForm({
         expectedRole,
       });
       login(data);
+      if (data.user.schoolId) {
+        void schoolsService.getBranding().then((branding) => {
+          writeSchoolBrandingCache(data.user.schoolId!, branding);
+        });
+      }
       toast({
         title: "Welcome back",
         description: `Signed in as ${data.user.firstName}`,

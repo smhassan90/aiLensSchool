@@ -4,9 +4,8 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -18,6 +17,7 @@ import {
   hasAnyRole,
   hasPermission,
   setAuthSession,
+  subscribeAuthSession,
 } from "@/lib/auth";
 import { authService } from "@/services/auth.service";
 import type { LoginResponse, StaffPermission } from "@/lib/types";
@@ -37,17 +37,11 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    setUser(getStoredUser());
-    setIsLoading(false);
-  }, []);
+  const user = useSyncExternalStore(subscribeAuthSession, getStoredUser, () => null);
+  const isLoading = false;
 
   const login = useCallback((data: LoginResponse) => {
     setAuthSession(data);
-    setUser(data.user);
   }, []);
 
   const logout = useCallback(async () => {
@@ -60,7 +54,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // ignore logout errors
     } finally {
       clearAuthSession();
-      setUser(null);
       router.push("/login");
     }
   }, [router]);
