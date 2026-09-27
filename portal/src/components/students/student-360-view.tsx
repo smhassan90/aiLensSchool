@@ -11,6 +11,7 @@ import { formatPkr } from "@/lib/money";
 import { personFullName, teacherDisplayNameFromUser } from "@/lib/person-name";
 import { assetUrl } from "@/lib/api-client";
 import { cn, formatDate } from "@/lib/utils";
+import { formatStatusLabel } from "@/lib/display-labels";
 import type { ReportCard } from "@/lib/types";
 import {
   ArrowLeft,
@@ -333,7 +334,7 @@ export function Student360View({
           variant={student.status === "ACTIVE" ? "success" : "secondary"}
           className="px-2.5 py-1 text-sm"
         >
-          {student.status}
+          {formatStatusLabel(student.status)}
         </Badge>
       ),
       hint: "Diary, homework & reports",
@@ -536,7 +537,7 @@ export function Student360View({
                             : "warning"
                       }
                     >
-                      {row.status}
+                      {formatStatusLabel(row.status)}
                     </Badge>
                   </InteractiveRow>
                 ))}
@@ -578,7 +579,7 @@ export function Student360View({
                       >
                         <span className="font-medium text-slate-900">{item.periodLabel}</span>
                         <span className="ml-2 text-slate-500">
-                          {formatPkr(item.paidAmount)}/{formatPkr(item.amount)} · {item.status}
+                          {formatPkr(item.paidAmount)}/{formatPkr(item.amount)} · {formatStatusLabel(item.status)}
                         </span>
                       </Link>
                       {item.status !== "PAID" && onMarkPaid ? (

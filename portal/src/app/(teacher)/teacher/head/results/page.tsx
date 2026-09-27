@@ -1,21 +1,32 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLoader } from "@/components/layout/page-loader";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { headTeachersService } from "@/services/head-teachers.service";
 import { formatDate, formatMarks } from "@/lib/utils";
 
 export default function HeadTeacherResultsPage() {
+  const [sectionId, setSectionId] = useState("");
+  const assignment = useQuery({
+    queryKey: ["head-teacher-me"],
+    queryFn: () => headTeachersService.getMyAssignment(),
+  });
   const results = useQuery({
-    queryKey: ["head-teacher-results"],
-    queryFn: () => headTeachersService.listResults(),
+    queryKey: ["head-teacher-results", sectionId],
+    queryFn: () => headTeachersService.listResults({ sectionId: sectionId || undefined }),
+    enabled: Boolean(assignment.data?.sections?.length),
   });
 
-  if (results.isLoading) {
+  const sections = useMemo(() => assignment.data?.sections ?? [], [assignment.data?.sections]);
+
+  if (assignment.isLoading || results.isLoading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <PageHeader title="Results" />
@@ -40,6 +51,22 @@ export default function HeadTeacherResultsPage() {
           </Link>
         }
       />
+
+      <div className="mb-6 max-w-sm space-y-1.5">
+        <Label htmlFor="results-class-filter">Class</Label>
+        <Select
+          id="results-class-filter"
+          value={sectionId}
+          onChange={(e) => setSectionId(e.target.value)}
+        >
+          <option value="">All supervised classes</option>
+          {sections.map((section) => (
+            <option key={section.id} value={section.id}>
+              {section.classLabel}
+            </option>
+          ))}
+        </Select>
+      </div>
 
       <section className="mb-8">
         <h2 className="mb-3 text-lg font-semibold">Quiz results</h2>

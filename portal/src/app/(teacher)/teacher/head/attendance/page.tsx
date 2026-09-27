@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { headTeachersService } from "@/services/head-teachers.service";
+import { formatDate } from "@/lib/utils";
 
 export default function HeadTeacherAttendancePage() {
   const attendance = useQuery({
@@ -37,7 +38,7 @@ export default function HeadTeacherAttendancePage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Attendance overview"
-        description={data ? `Last 30 days since ${data.since}` : undefined}
+        description={data ? `Last 30 days, from ${formatDate(data.since)}` : undefined}
         actions={
           <Link href="/teacher/head">
             <Button variant="outline">
@@ -60,7 +61,7 @@ export default function HeadTeacherAttendancePage() {
                 <TableRow>
                   <TableHead>Class</TableHead>
                   <TableHead>Students</TableHead>
-                  <TableHead>Records</TableHead>
+                  <TableHead title="Days attendance was marked in this period">Days marked</TableHead>
                   <TableHead>Attendance</TableHead>
                 </TableRow>
               </TableHeader>

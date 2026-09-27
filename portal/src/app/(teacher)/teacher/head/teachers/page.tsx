@@ -42,6 +42,11 @@ export default function HeadTeacherTeachersPage() {
         }
       />
 
+      <p className="mb-6 max-w-3xl text-sm text-muted-foreground">
+        Scores reflect recent teaching activity in your supervised classes (lessons, attendance marking,
+        quizzes, and exam papers). Weights are set by your school. Rank compares teachers in this list.
+      </p>
+
       <div className="space-y-4">
         {teachers.map((row) => (
           <article key={row.teacher.id} className="rounded-xl border bg-card p-4 sm:p-5">
@@ -51,8 +56,8 @@ export default function HeadTeacherTeachersPage() {
                 <p className="text-sm text-muted-foreground">Rank #{row.rank}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Link href={`/teacher/staff/${row.teacher.id}/overview`}>
-                  <Button variant="outline" size="sm">360 overview</Button>
+                <Link href={`/teacher/staff/${row.teacher.id}/overview?from=teacher-progress`}>
+                  <Button variant="outline" size="sm">Teaching overview</Button>
                 </Link>
                 <p className={cn("text-2xl font-semibold", scoreTextClass(row.total))}>{row.total}/100</p>
               </div>

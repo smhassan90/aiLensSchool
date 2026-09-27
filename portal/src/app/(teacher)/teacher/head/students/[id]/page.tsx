@@ -9,6 +9,7 @@ import { PageLoader } from "@/components/layout/page-loader";
 import { Button } from "@/components/ui/button";
 import { Student360View } from "@/components/students/student-360-view";
 import { headTeachersService } from "@/services/head-teachers.service";
+import { personFullName } from "@/lib/person-name";
 
 export default function HeadTeacherStudent360Page() {
   const params = useParams<{ id: string }>();
@@ -29,14 +30,20 @@ export default function HeadTeacherStudent360Page() {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <p className="text-sm text-destructive">Student not found or outside your classes.</p>
+        <Link href="/teacher/head/students" className="mt-4 inline-block">
+          <Button variant="outline">Back to search</Button>
+        </Link>
       </div>
     );
   }
 
+  const studentName = personFullName(query.data.student.firstName, query.data.student.lastName);
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="Student 360"
+        title={studentName}
+        description="Student overview"
         actions={
           <Link href="/teacher/head/students">
             <Button variant="outline">

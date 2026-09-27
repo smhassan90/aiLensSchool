@@ -28,7 +28,7 @@ export default function HeadTeacherHomeworkPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Homework"
-        description="Homework assigned by teachers in your supervised classes."
+        description="Summary of homework assigned in your supervised classes. Open a teacher’s homework screen from My classes if you need to create your own."
         actions={
           <Link href="/teacher/head">
             <Button variant="outline">

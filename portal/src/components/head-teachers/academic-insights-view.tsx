@@ -22,9 +22,10 @@ import type { HeadTeacherDashboard } from "@/services/head-teachers.service";
 const exploreLinks = [
   {
     href: "/teacher/staff-attendance",
-    label: "Staff attendance & 360",
+    label: "Staff attendance & overview",
     hint: "Teacher check-in and supervised staff overview",
     icon: ClipboardCheck,
+    requiresStaffSupervision: true,
   },
   {
     href: "/teacher/head/attendance",
@@ -34,7 +35,7 @@ const exploreLinks = [
   },
   {
     href: "/teacher/head/students",
-    label: "Student search & 360",
+    label: "Student search & overview",
     hint: "Find a student and open their full picture",
     icon: GraduationCap,
   },
@@ -196,11 +197,16 @@ function StatCard({
 
 export function AcademicInsightsView({
   data,
-  overseerName,
+  signedInName,
+  supervisesStaff = false,
 }: {
   data: HeadTeacherDashboard;
-  overseerName?: string | null;
+  signedInName?: string | null;
+  supervisesStaff?: boolean;
 }) {
+  const visibleExploreLinks = exploreLinks.filter(
+    (link) => !("requiresStaffSupervision" in link && link.requiresStaffSupervision) || supervisesStaff,
+  );
   const classCount = data.sections.length;
   const yearLabel = data.academicYear?.name;
   const attendance = data.stats.attendanceRate;
@@ -268,10 +274,13 @@ export function AcademicInsightsView({
               <p className="text-xs font-semibold uppercase tracking-wide text-teal-200/90">
                 Academic insights
               </p>
+              <p className="mt-0.5 text-sm text-teal-100/80">
+                Supervise classes, students, teachers, and exam approvals
+              </p>
               <h1 className="mt-1 font-display text-xl text-white sm:text-2xl">{data.title}</h1>
               <p className="mt-1 text-sm text-teal-50/90">
                 {[
-                  overseerName ? `Oversight by ${overseerName}` : null,
+                  signedInName ? `Signed in as ${signedInName}` : null,
                   yearLabel ? `Academic year ${yearLabel}` : null,
                   `${classCount} supervised class${classCount === 1 ? "" : "es"}`,
                 ]
@@ -371,8 +380,8 @@ export function AcademicInsightsView({
 
       <Panel id="hti-explore" title="Explore" icon={Sparkles}>
         <div className="grid gap-3 sm:grid-cols-2">
-          {exploreLinks.map((link) => (
-            <InsightLinkRow key={link.href} {...link} />
+          {visibleExploreLinks.map(({ href, label, hint, icon }) => (
+            <InsightLinkRow key={href} href={href} label={label} hint={hint} icon={icon} />
           ))}
         </div>
       </Panel>

@@ -14,6 +14,7 @@ import { PageLoader } from "@/components/layout/page-loader";
 import { AiWait } from "@/components/layout/ai-wait";
 import { TeacherPaceBoard } from "@/components/dashboard/teacher-pace";
 import { cn } from "@/lib/utils";
+import { headTeachersService } from "@/services/head-teachers.service";
 
 export default function TeacherDashboardPage() {
   const [coach, setCoach] = useState<Awaited<ReturnType<typeof dashboardService.teacherCoach>> | null>(null);
@@ -28,6 +29,18 @@ export default function TeacherDashboardPage() {
     queryFn: () => academicsService.listMyExamPaperAssignments(),
     staleTime: 60_000,
   });
+  const headAssignment = useQuery({
+    queryKey: ["head-teacher-me"],
+    queryFn: () => headTeachersService.getMyAssignment(),
+    staleTime: 60_000,
+  });
+  const headDashboard = useQuery({
+    queryKey: ["head-teacher-dashboard"],
+    queryFn: () => headTeachersService.getDashboard(),
+    enabled: Boolean(headAssignment.data?.sections?.length),
+    staleTime: 60_000,
+  });
+  const papersToReview = headDashboard.data?.stats.pendingExamPapers ?? 0;
   const suggest = useMutation({
     mutationFn: () => dashboardService.teacherCoach(),
     onSuccess: setCoach,
@@ -86,6 +99,23 @@ export default function TeacherDashboardPage() {
           </Button>
         }
       />
+
+      {papersToReview > 0 ? (
+        <Link
+          href="/teacher/head/exam-papers"
+          className="mb-6 flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-violet-950 transition-colors hover:bg-violet-100"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="font-medium">
+              {papersToReview} exam paper{papersToReview === 1 ? "" : "s"} waiting for your approval
+            </p>
+            <p className="mt-0.5 text-sm text-violet-900/80">
+              Review and approve papers from teachers in your supervised classes.
+            </p>
+          </div>
+        </Link>
+      ) : null}
 
       {paperOverdue.length > 0 ? (
         <Link

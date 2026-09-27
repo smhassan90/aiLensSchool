@@ -23,6 +23,7 @@ import { teacherDisplayName } from '../common/utils/person-name';
 import { sectionClassLabel } from '../common/utils/section-class-label';
 import { studentSearchWhere } from '../common/utils/student-search';
 import { hasStaffPermission } from '../common/permissions';
+import { EXAM_PAPER_KINDS } from '../quizzes/exam-paper';
 
 @Injectable()
 export class HeadTeachersService {
@@ -357,6 +358,7 @@ export class HeadTeachersService {
           schoolId,
           sectionId: { in: sectionIds },
           reviewStatus: ExamPaperReviewStatus.PENDING_REVIEW,
+          paperKind: { in: [...EXAM_PAPER_KINDS] },
         },
       }),
       this.prisma.quiz.count({

@@ -44,16 +44,23 @@ export default function HeadTeacherQuizzesPage() {
       <div className="space-y-3">
         {(quizzes.data?.items ?? []).map((quiz) => (
           <article key={quiz.id} className="rounded-xl border bg-card p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-semibold">{quiz.title}</h2>
-              <Badge variant="secondary">{formatStatusLabel(quiz.status)}</Badge>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="font-semibold">{quiz.title}</h2>
+                  <Badge variant="secondary">{formatStatusLabel(quiz.status)}</Badge>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {quiz.teacherName}
+                  {quiz.classLabel ? ` · ${quiz.classLabel}` : ""}
+                  {quiz.subject?.name ? ` · ${quiz.subject.name}` : ""}
+                  {quiz.createdAt ? ` · ${formatDate(quiz.createdAt)}` : ""}
+                </p>
+              </div>
+              <Link href={`/teacher/quizzes/${quiz.id}`}>
+                <Button size="sm" variant="outline">View</Button>
+              </Link>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {quiz.teacherName}
-              {quiz.classLabel ? ` · ${quiz.classLabel}` : ""}
-              {quiz.subject?.name ? ` · ${quiz.subject.name}` : ""}
-              {quiz.createdAt ? ` · ${formatDate(quiz.createdAt)}` : ""}
-            </p>
           </article>
         ))}
         {!quizzes.data?.items.length ? (
