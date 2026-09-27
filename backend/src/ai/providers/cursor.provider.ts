@@ -343,9 +343,26 @@ export class CursorProvider implements AiProvider {
         }
       } catch {
         const raw = pageText.trim();
-        if (raw) {
-          summaries.push(shrunk.length > 1 ? `Page ${index + 1}\n${raw}` : raw);
+        if (!raw) continue;
+        try {
+          const recovered = LessonOutputSchema.parse(parseModelJson(raw));
+          if (!chapterName && recovered.chapterName) chapterName = recovered.chapterName;
+          if (!topicName && recovered.topicName) topicName = recovered.topicName;
+          if (recovered.summary?.trim()) {
+            summaries.push(
+              shrunk.length > 1
+                ? `Page ${index + 1}\n${recovered.summary.trim()}`
+                : recovered.summary.trim(),
+            );
+          }
+          for (const concept of recovered.concepts ?? []) {
+            if (concept && !concepts.includes(concept)) concepts.push(concept);
+          }
+          continue;
+        } catch {
+          // fall through — avoid nesting JSON blobs in summary
         }
+        summaries.push(shrunk.length > 1 ? `Page ${index + 1}\n${raw}` : raw);
       }
     }
 

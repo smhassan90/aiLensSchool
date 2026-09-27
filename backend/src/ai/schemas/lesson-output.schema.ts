@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const LessonOutputSchema = z.object({
-  chapterName: z.string().optional(),
-  topicName: z.string().optional(),
+  chapterName: z.string().nullish(),
+  topicName: z.string().nullish(),
   summary: z.string(),
   concepts: z.array(z.string()).default([]),
   pageFrom: z.number().int().optional(),

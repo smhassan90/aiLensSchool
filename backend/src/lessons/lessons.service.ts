@@ -22,6 +22,7 @@ import { LessonProcessingService } from '../ai/services/lesson-processing.servic
 import { ParentsService } from '../parents/parents.service';
 import { PageOcrService } from './page-ocr.service';
 import { deriveKeyPointsFromLesson, formatOcrLesson } from './lesson-text-formatter';
+import { coerceLessonDisplayText } from './lesson-display-text';
 import {
   CreateLessonDto,
   ExtractLessonDto,
@@ -150,17 +151,24 @@ export class LessonsService {
   ) {
     return (
       sources
-        ?.map((source) => source.ocrText?.trim() || source.manualText?.trim() || '')
+        ?.map((source) => {
+          const raw = source.ocrText?.trim() || source.manualText?.trim() || '';
+          return raw ? coerceLessonDisplayText(raw) : '';
+        })
         .filter(Boolean)
         .join('\n\n') ?? ''
     );
   }
 
   private presentLesson<
-    T extends { sources?: Array<{ ocrText?: string | null; manualText?: string | null }> },
+    T extends {
+      aiSummary?: string | null;
+      sources?: Array<{ ocrText?: string | null; manualText?: string | null }>;
+    },
   >(lesson: T) {
     return {
       ...lesson,
+      aiSummary: lesson.aiSummary ? coerceLessonDisplayText(lesson.aiSummary) : lesson.aiSummary,
       extractedText: this.extractedTextFromSources(lesson.sources),
     };
   }
@@ -482,7 +490,7 @@ export class LessonsService {
     if (savedStyle?.keyPointStyle) {
       output.concepts = applyKeyPointStyle(output.concepts, savedStyle.keyPointStyle);
     }
-    const extractedText = output.summary;
+    const extractedText = coerceLessonDisplayText(output.summary);
 
     const lesson = await this.prisma.dailyLesson.create({
       data: {
@@ -498,7 +506,7 @@ export class LessonsService {
         chapterName: output.chapterName,
         topicName: output.topicName,
         teacherNotes: teacherNotes,
-        aiSummary: output.summary,
+        aiSummary: extractedText,
         pageFrom: output.pageFrom ?? pageFrom,
         pageTo: output.pageTo ?? pageTo,
         status: LessonStatus.READY_FOR_REVIEW,
@@ -568,19 +576,20 @@ export class LessonsService {
       });
 
       if (dto.extractedText !== undefined) {
+        const normalizedExtracted = coerceLessonDisplayText(dto.extractedText);
         const source = lesson.sources[0];
         if (source) {
           await tx.lessonSource.update({
             where: { id: source.id },
-            data: { ocrText: dto.extractedText },
+            data: { ocrText: normalizedExtracted },
           });
         } else {
           await tx.lessonSource.create({
             data: {
               lessonId: id,
               type: LessonSourceType.MANUAL_TEXT,
-              ocrText: dto.extractedText,
-              manualText: dto.extractedText,
+              ocrText: normalizedExtracted,
+              manualText: normalizedExtracted,
             },
           });
         }
@@ -849,7 +858,7 @@ export class LessonsService {
           data: {
             chapterName: output.chapterName ?? lesson.chapterName,
             topicName: output.topicName ?? lesson.topicName,
-            aiSummary: output.summary,
+            aiSummary: coerceLessonDisplayText(output.summary),
             pageFrom: output.pageFrom ?? lesson.pageFrom,
             pageTo: output.pageTo ?? lesson.pageTo,
             teacherNotes: lesson.teacherNotes,

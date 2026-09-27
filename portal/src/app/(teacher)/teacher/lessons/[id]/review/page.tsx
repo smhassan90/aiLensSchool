@@ -22,6 +22,7 @@ import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { formatStatusLabel } from "@/lib/display-labels";
 import { formatDate } from "@/lib/utils";
+import { coerceLessonDisplayText } from "@/lib/lesson-display-text";
 import { ArrowLeft, CheckCircle2, RefreshCw, Trash2 } from "lucide-react";
 
 const KEY_POINT_HINTS = ["Easy words, keep it short", "Harder words, make it longer", "Make it in bullet points"];
@@ -86,7 +87,7 @@ export default function ReviewLessonPage() {
     if (!lesson) return;
     setChapterName(lesson.chapterName ?? "");
     setTopicName(lesson.topicName ?? "");
-    setExtractedText(lesson.extractedText ?? "");
+    setExtractedText(coerceLessonDisplayText(lesson.extractedText ?? ""));
     setConceptsText((lesson.concepts ?? []).map((item) => item.name).join("\n"));
     setPageFrom(lesson.pageFrom ? String(lesson.pageFrom) : "");
     setPageTo(lesson.pageTo ? String(lesson.pageTo) : "");
