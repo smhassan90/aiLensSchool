@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -33,9 +34,17 @@ function parentDetails(link?: StudentParentLink) {
 }
 
 export default function IdCardsPage() {
+  const searchParams = useSearchParams();
+  const urlStudentId = searchParams.get("studentId");
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const linkedStudent = useQuery({
+    queryKey: ["id-card-linked-student", urlStudentId],
+    queryFn: () => studentsService.getById(urlStudentId!),
+    enabled: Boolean(urlStudentId),
+  });
 
   const students = useQuery({
     queryKey: ["id-card-students", search],
@@ -49,14 +58,16 @@ export default function IdCardsPage() {
     [matches, selectedId],
   );
 
+  const resolvedStudent = selectedStudent ?? linkedStudent.data ?? null;
+
   const cardQuery = useQuery({
-    queryKey: ["id-card", selectedStudent?.id],
-    queryFn: () => documentsService.generateIdCards({ studentId: selectedStudent!.id }),
-    enabled: Boolean(selectedStudent?.id),
+    queryKey: ["id-card", resolvedStudent?.id],
+    queryFn: () => documentsService.generateIdCards({ studentId: resolvedStudent!.id }),
+    enabled: Boolean(resolvedStudent?.id),
   });
 
   const card: IdCard | undefined = cardQuery.data?.items[0];
-  const student = card?.student ?? selectedStudent ?? undefined;
+  const student = card?.student ?? resolvedStudent ?? undefined;
   const parent = parentDetails(primaryParent(student));
   const photo = assetUrl(student?.photoUrl);
   const enrollment = student?.enrollments?.[0];
@@ -124,15 +135,23 @@ export default function IdCardsPage() {
         </div>
       ) : null}
 
-      {!search ? (
+      {!search && !urlStudentId ? (
         <EmptyState
           icon={<IdCardIcon className="h-10 w-10" />}
           title="Search for a student"
           description="Enter a student ID, name, or parent phone number to open their ID card."
         />
-      ) : students.isLoading ? (
+      ) : urlStudentId && linkedStudent.isLoading ? (
+        <PageLoader variant="panel" phrases={["Opening ID card", "Almost ready"]} />
+      ) : urlStudentId && linkedStudent.isError ? (
+        <EmptyState
+          icon={<Search className="h-10 w-10" />}
+          title="Student not found"
+          description="This student may have been removed or you may not have access."
+        />
+      ) : search && students.isLoading ? (
         <PageLoader variant="panel" phrases={["Looking up the student", "Almost ready"]} />
-      ) : students.isFetched && !matches.length ? (
+      ) : search && students.isFetched && !matches.length ? (
         <EmptyState
           icon={<Search className="h-10 w-10" />}
           title="No student found"
@@ -174,14 +193,18 @@ export default function IdCardsPage() {
             </div>
           </div>
 
-          {selectedStudent ? (
+          {resolvedStudent ? (
             <StudentIdPhotoUpload
-              studentId={selectedStudent.id}
+              studentId={resolvedStudent.id}
               photoUrl={student?.photoUrl}
               firstName={student?.firstName}
               lastName={student?.lastName}
               showPreview={false}
-              invalidateKeys={[["id-card-students"], ["id-card", selectedStudent.id]]}
+              invalidateKeys={[
+                ["id-card-students"],
+                ["id-card", resolvedStudent.id],
+                ["id-card-linked-student", resolvedStudent.id],
+              ]}
               className="print:hidden"
             />
           ) : null}

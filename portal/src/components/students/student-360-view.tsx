@@ -23,6 +23,7 @@ import {
   FileText,
   GraduationCap,
   KeyRound,
+  Printer,
   Sparkles,
   Wallet,
 } from "lucide-react";
@@ -249,6 +250,7 @@ export function Student360View({
   showFullProfileLink = false,
   allowPhotoUpload = false,
   photoUploadInvalidateKeys = [],
+  printIdCardHref,
 }: {
   data: Student360Data;
   studentId: string;
@@ -267,6 +269,8 @@ export function Student360View({
   showFullProfileLink?: boolean;
   allowPhotoUpload?: boolean;
   photoUploadInvalidateKeys?: string[][];
+  /** When set, shows a header action that opens the school ID card print screen for this student. */
+  printIdCardHref?: string;
 }) {
   const { can } = useAuth();
   const canCollectFees = can("VIEW_FINANCE");
@@ -451,6 +455,17 @@ export function Student360View({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {printIdCardHref ? (
+              <Link href={printIdCardHref}>
+                <Button
+                  variant="outline"
+                  className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                >
+                  <Printer className="h-4 w-4" />
+                  Print ID card
+                </Button>
+              </Link>
+            ) : null}
             {backHref ? (
               <Link href={backHref}>
                 <Button

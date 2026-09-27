@@ -98,6 +98,11 @@ export default function ParentWalkInPage() {
               data={activeChild}
               studentId={activeChild.student.id ?? activeChild.student.studentCode}
               showFullProfileLink
+              printIdCardHref={
+                activeChild.student.id
+                  ? `/school/id-cards?studentId=${activeChild.student.id}`
+                  : undefined
+              }
             />
           ) : null}
         </div>
