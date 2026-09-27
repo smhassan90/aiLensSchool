@@ -1,4 +1,7 @@
 import { looksLikeGarbledLatinOcr } from './garbled-latin-ocr';
+import { isMathScienceSubjectName, looksLikeMathScienceLessonText } from './math-lesson-text';
+
+export { isMathScienceSubjectName, looksLikeMathScienceLessonText } from './math-lesson-text';
 
 const FAKE_EXTRACT =
   /transcribe every word|transcribe the attached|keep english as english|keep every urdu|original unicode script|not latin letters|preserve quran|return chapter,?\s*topic|textbook photos for|textbook page photo|photos were not saved|photographed textbook page|original photos were not saved|read the attached|content from the photos|content taken from \d+ photographed|could not read this lesson yet/i;
@@ -41,6 +44,7 @@ function countOcrJunkHits(text: string): number {
 export function looksLikeMangledRtlOcr(text: string | undefined | null): boolean {
   const value = (text ?? '').trim();
   if (!value) return false;
+  if (looksLikeMathScienceLessonText(value)) return false;
   const arabic = countArabicScriptChars(value);
   const junkHits = countOcrJunkHits(value);
   const citesIslamicSource =
@@ -117,6 +121,7 @@ export function isPoorLessonOcr(
   const value = (text ?? '').trim();
   if (!value) return true;
   if (isFakeExtractText(value)) return true;
+  if (looksLikeMathScienceLessonText(value)) return false;
   if (isGarbledRtlOcr(value)) return true;
   if (options?.expectArabicScript && countArabicScriptChars(value) < 20 && compactTextLength(value) >= 72) {
     return true;

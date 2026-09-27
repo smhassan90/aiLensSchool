@@ -8,6 +8,7 @@ Rules:
 - If OCR text is provided, keep every paragraph. Fix spelling and line breaks only. Do not condense, paraphrase, or omit.
 - The JSON field "summary" is the complete lesson text from the page, not an abstract. It must be as long as the source page.
 - Use clear headings, Q./A. pairs, Hadith/quotes, and Activity lines when they appear on the page.
+- For Mathematics or Science pages, copy every exercise, definition, proof step, and equation. Use Unicode set/math symbols (∪ ∩ ∈ ∅ ⊆ Δ) where printed; keep set-builder notation like {x | x ∈ A}.
 - Separate pages with a blank line and a "Page N" heading if multiple pages are present.
 - Do not mention photos, OCR, or that images were not saved.
 - concepts must be 4-8 short, complete key points from the actual page (not placeholders). Keep key points in the same script as the page when the page is Urdu/Arabic.

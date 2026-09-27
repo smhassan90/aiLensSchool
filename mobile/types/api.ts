@@ -119,13 +119,22 @@ export interface HomeworkResult {
   totalMarks: number;
   percentage: number;
   submittedAt: string;
-  answers?: Array<{
-    questionId: string;
-    optionId?: string | null;
-    answerText?: string | null;
-    isCorrect: boolean;
-    marksAwarded: number;
-  }>;
+  answers?: HomeworkResultAnswer[];
+}
+
+export interface HomeworkResultAnswer {
+  questionId: string;
+  optionId?: string | null;
+  answerText?: string | null;
+  isCorrect: boolean;
+  marksAwarded: number;
+  question?: {
+    id: string;
+    questionText: string;
+    type: string;
+    marks: number;
+    correctAnswer: string;
+  };
 }
 
 export interface Quiz {

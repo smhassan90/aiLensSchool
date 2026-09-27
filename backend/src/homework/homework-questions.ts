@@ -109,6 +109,38 @@ export function scoreHomeworkAnswers(
   return { score, totalMarks, percentage, answerRows };
 }
 
+export type HomeworkResultAnswerRow = HomeworkAnswerItem & {
+  question?: {
+    id: string;
+    questionText: string;
+    type: string;
+    marks: number;
+    correctAnswer: string;
+  };
+};
+
+export function enrichHomeworkResultAnswers(
+  questions: HomeworkQuestionItem[],
+  answerRows: HomeworkAnswerItem[],
+): HomeworkResultAnswerRow[] {
+  const byId = new Map(questions.map((q) => [q.id, q]));
+  return answerRows.map((row) => {
+    const question = byId.get(row.questionId);
+    return {
+      ...row,
+      question: question
+        ? {
+            id: question.id,
+            questionText: question.questionText,
+            type: question.type,
+            marks: question.marks,
+            correctAnswer: question.correctAnswer,
+          }
+        : undefined,
+    };
+  });
+}
+
 export function stripAnswersFromQuestions(questions: HomeworkQuestionItem[]): Array<{
   id: string;
   type: string;

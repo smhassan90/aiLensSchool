@@ -18,7 +18,9 @@ import {
   answerKeyFromQuestions,
   buildHomeworkQuestions,
   descriptionFromQuestions,
+  HomeworkAnswerItem,
   HomeworkQuestionItem,
+  enrichHomeworkResultAnswers,
   scoreHomeworkAnswers,
   stripAnswersFromQuestions,
 } from './homework-questions';
@@ -125,6 +127,24 @@ export class HomeworkService {
     return [];
   }
 
+  private parseQuestionsRaw(questionsJson: Prisma.JsonValue | null | undefined): HomeworkQuestionItem[] {
+    if (!questionsJson) return [];
+    if (Array.isArray(questionsJson)) {
+      return questionsJson as unknown as HomeworkQuestionItem[];
+    }
+    if (typeof questionsJson === 'string') {
+      try {
+        const parsed = JSON.parse(questionsJson) as unknown;
+        if (Array.isArray(parsed)) {
+          return parsed as HomeworkQuestionItem[];
+        }
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+
   private parseQuestions(questionsJson: Prisma.JsonValue | null | undefined) {
     if (!questionsJson) return [];
     if (Array.isArray(questionsJson)) {
@@ -160,7 +180,11 @@ export class HomeworkService {
     } | null,
   ) {
     const { answerKey: _answerKey, questionsJson, ...safe } = homework;
-    const questions = this.parseQuestions(questionsJson);
+    const questionsRaw = this.parseQuestionsRaw(questionsJson);
+    const questions = stripAnswersFromQuestions(questionsRaw);
+    const answerRows = Array.isArray(result?.answersJson)
+      ? (result.answersJson as unknown as HomeworkAnswerItem[])
+      : [];
     return {
       ...safe,
       questions,
@@ -171,7 +195,7 @@ export class HomeworkService {
             totalMarks: Number(result.totalMarks),
             percentage: Number(result.percentage),
             submittedAt: result.submittedAt,
-            answers: result.answersJson,
+            answers: enrichHomeworkResultAnswers(questionsRaw, answerRows),
           }
         : null,
     };
@@ -377,7 +401,7 @@ export class HomeworkService {
       totalMarks: scored.totalMarks,
       percentage: scored.percentage,
       submittedAt: result.submittedAt,
-      answers: scored.answerRows,
+      answers: enrichHomeworkResultAnswers(questions, scored.answerRows),
       title: homework.title,
     };
   }

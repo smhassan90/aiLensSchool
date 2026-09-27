@@ -16,7 +16,14 @@ import {
 } from '../prompts';
 import { difficultyInstruction, mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
 import { parseModelJson } from '../parse-model-json';
-import { isFakeExtractText, isGarbledRtlOcr, looksLikeRealLessonText } from '../../common/extract-quality';
+import {
+  isFakeExtractText,
+  isGarbledRtlOcr,
+  isMathScienceSubjectName,
+  looksLikeMangledRtlOcr,
+  looksLikeMathScienceLessonText,
+  looksLikeRealLessonText,
+} from '../../common/extract-quality';
 import { isServerlessRuntime, readEnv } from '../../common/env';
 
 /** Cost-effective Composer models only — never fall back to GPT/Claude. */
@@ -66,7 +73,7 @@ export class CursorProvider implements AiProvider {
     }
 
     const userPrompt = input.images?.length
-      ? `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\n${input.sourceText}\n\nTranscribe every word on the attached textbook page photo(s). Keep English in English. Keep Urdu/Arabic (including Quran/Hadith lines) in Unicode Arabic script — never Latin gibberish like "SNUB" or "@2 A nid)". The summary field must be the full page, not a short retelling.`
+      ? `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\n${input.sourceText}\n\nTranscribe every word on the attached textbook page photo(s). Keep English in English. Keep Urdu/Arabic (including Quran/Hadith lines) in Unicode Arabic script — never Latin gibberish like "SNUB" or "@2 A nid)". For Mathematics/Science pages, preserve every equation, set symbol (∪ ∩ ∈ ∅ ⊆), exercise number, and proof step (L.H.S / R.H.S). The summary field must be the full page, not a short retelling.`
       : `Subject: ${input.subjectName ?? 'General'}\nGrade: ${input.gradeName ?? 'N/A'}\n\nKeep this entire OCR lesson text. Do not shorten it:\n${input.sourceText}`;
 
     try {
@@ -78,7 +85,13 @@ export class CursorProvider implements AiProvider {
             'Lesson extraction',
           );
       const parsed = LessonOutputSchema.parse(parseModelJson(content.text));
-      if (isFakeExtractText(parsed.summary) || isGarbledRtlOcr(parsed.summary)) {
+      const mathLike =
+        looksLikeMathScienceLessonText(parsed.summary) ||
+        isMathScienceSubjectName(input.subjectName);
+      const summaryRejected =
+        isFakeExtractText(parsed.summary) ||
+        ((isGarbledRtlOcr(parsed.summary) || looksLikeMangledRtlOcr(parsed.summary)) && !mathLike);
+      if (summaryRejected) {
         if (input.images?.length) {
           throw new Error('Cursor did not read the textbook photos as readable text');
         }
@@ -478,8 +491,8 @@ export class CursorProvider implements AiProvider {
         : (sharpModule as unknown as (i: Buffer) => import('sharp').Sharp);
       const buffer = await sharpFn(image.buffer)
         .rotate()
-        .resize({ width: 960, height: 960, fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 55, mozjpeg: true })
+        .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 68, mozjpeg: true })
         .toBuffer();
       return {
         buffer,

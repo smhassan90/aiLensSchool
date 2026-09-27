@@ -3,6 +3,8 @@
  * Portal copy: portal/src/lib/garbled-latin-ocr.ts (keep in sync).
  */
 
+import { looksLikeMathScienceLessonText } from './math-lesson-text';
+
 const ARABIC_SCRIPT =
   /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g;
 
@@ -62,6 +64,7 @@ function looksLikeLatinGibberishLine(trimmed: string, words: string[]): boolean 
 export function looksLikeIllustrationPollutedLatinOcr(text: string | undefined | null): boolean {
   const value = (text ?? '').trim();
   if (compactTextLength(value) < 100) return false;
+  if (looksLikeMathScienceLessonText(value)) return false;
   const latin = countLatinLetters(value);
   if (latin < 80) return false;
 

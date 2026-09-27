@@ -12,6 +12,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Badge, EmptyState, ErrorState, LoadingState } from '@/components/ui';
+import { ScoreRing, SplitBar } from '@/components/visuals';
 import { useChild } from '@/providers/ChildProvider';
 import { colors, spacing } from '@/constants/theme';
 import {
@@ -21,7 +22,7 @@ import {
   homeworkStatusTone,
   submitHomework,
 } from '@/services/homework.service';
-import { HomeworkQuestion } from '@/types/api';
+import { HomeworkQuestion, HomeworkResult, HomeworkResultAnswer } from '@/types/api';
 
 function isChoiceQuestion(question: HomeworkQuestion): boolean {
   return (
@@ -40,6 +41,101 @@ function isAnswered(
   return Boolean(answer.answerText?.trim());
 }
 
+function questionTextForAnswer(
+  answer: HomeworkResultAnswer,
+  questions: HomeworkQuestion[],
+  index: number,
+): string {
+  if (answer.question?.questionText) return answer.question.questionText;
+  const match = questions.find((q) => q.id === answer.questionId);
+  return match?.questionText ?? `Question ${index + 1}`;
+}
+
+function HomeworkResultView({
+  homeworkTitle,
+  childName,
+  result,
+  questions,
+}: {
+  homeworkTitle: string;
+  childName: string;
+  result: HomeworkResult;
+  questions: HomeworkQuestion[];
+}) {
+  const percentage = Number(result.percentage);
+  const answers = result.answers ?? [];
+  const correctCount = answers.filter((a) => a.isCorrect).length;
+  const incorrectCount = answers.length - correctCount;
+
+  return (
+    <>
+      <Text style={styles.resultStudent}>{childName}</Text>
+
+      <View style={styles.scoreCard}>
+        <ScoreRing value={percentage} label="Score" />
+        <View style={styles.scoreFacts}>
+          <Text style={styles.detail}>
+            {result.score} / {result.totalMarks} marks
+          </Text>
+          <Text style={styles.detail}>
+            {correctCount} correct out of {answers.length || result.totalMarks} question
+            {answers.length === 1 ? '' : 's'}
+          </Text>
+          <Text style={styles.detail}>
+            Submitted {new Date(result.submittedAt).toLocaleString()}
+          </Text>
+          {answers.length > 0 ? (
+            <View style={styles.splitWrap}>
+              <SplitBar
+                left={correctCount}
+                right={incorrectCount}
+                leftLabel="Correct"
+                rightLabel="Incorrect"
+              />
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      {answers.length > 0 ? (
+        <View style={styles.answers}>
+          <Text style={styles.sectionTitle}>Answers</Text>
+          {answers.map((answer, index) => (
+            <View key={`${answer.questionId}-${index}`} style={styles.answerCard}>
+              <View style={styles.answerHeader}>
+                <Text style={styles.answerQuestion}>
+                  {index + 1}. {questionTextForAnswer(answer, questions, index)}
+                </Text>
+                <Badge
+                  label={answer.isCorrect ? 'Correct' : 'Incorrect'}
+                  tone={answer.isCorrect ? 'success' : 'warning'}
+                />
+              </View>
+              <Text style={styles.answerMeta}>
+                Your child’s answer: {answer.answerText?.trim() || '—'}
+              </Text>
+              {!answer.isCorrect && answer.question?.correctAnswer ? (
+                <Text style={styles.answerMeta}>
+                  Correct answer: {answer.question.correctAnswer}
+                </Text>
+              ) : null}
+              <Text style={styles.answerMarks}>
+                Marks: {answer.marksAwarded}
+                {answer.question?.marks != null ? ` / ${answer.question.marks}` : ''}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text style={styles.body}>
+          Homework submitted for {homeworkTitle}. Detailed per-question breakdown is not available
+          for this assignment.
+        </Text>
+      )}
+    </>
+  );
+}
+
 export default function HomeworkDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { selectedChildId, selectedChild } = useChild();
@@ -48,11 +144,7 @@ export default function HomeworkDetailScreen() {
   const [answers, setAnswers] = useState<Record<string, { optionId?: string; answerText?: string }>>(
     {},
   );
-  const [localResult, setLocalResult] = useState<{
-    score: number;
-    totalMarks: number;
-    percentage: number;
-  } | null>(null);
+  const [localResult, setLocalResult] = useState<HomeworkResult | null>(null);
 
   const query = useQuery({
     queryKey: ['homework', id, studentId],
@@ -79,11 +171,7 @@ export default function HomeworkDetailScreen() {
         })),
       }),
     onSuccess: (result) => {
-      setLocalResult({
-        score: Number(result.score),
-        totalMarks: Number(result.totalMarks),
-        percentage: Number(result.percentage),
-      });
+      setLocalResult(result);
       queryClient.invalidateQueries({ queryKey: ['homework', id, studentId] });
       queryClient.invalidateQueries({ queryKey: ['homework', studentId] });
       queryClient.invalidateQueries({ queryKey: ['home', 'homework', studentId] });
@@ -124,8 +212,9 @@ export default function HomeworkDetailScreen() {
   }
 
   const homework = query.data;
-  const result = localResult ?? homework.result;
+  const result = localResult ?? homework.result ?? null;
   const status = getHomeworkListStatus(homework);
+  const childName = `${selectedChild?.firstName ?? 'Your child'}${selectedChild?.lastName ? ` ${selectedChild.lastName}` : ''}`;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -137,14 +226,12 @@ export default function HomeworkDetailScreen() {
         <Badge label={homeworkStatusLabel(status)} tone={homeworkStatusTone(status)} />
 
         {result ? (
-          <View style={styles.scoreCard}>
-            <Text style={styles.scoreTitle}>
-              Score for {selectedChild?.firstName ?? 'your child'}
-            </Text>
-            <Text style={styles.score}>
-              {result.score}/{result.totalMarks} ({Number(result.percentage).toFixed(0)}%)
-            </Text>
-          </View>
+          <HomeworkResultView
+            homeworkTitle={homework.title}
+            childName={childName}
+            result={result}
+            questions={questions}
+          />
         ) : null}
 
         {questions.length > 0 && !result ? (
@@ -224,10 +311,6 @@ export default function HomeworkDetailScreen() {
             <EmptyState title="No description" />
           )
         ) : null}
-
-        {result && homework.description ? (
-          <Text style={styles.body}>{homework.description}</Text>
-        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -236,19 +319,39 @@ export default function HomeworkDetailScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.lg, gap: spacing.md },
-  title: { fontSize: 24, fontWeight: '800', color: colors.slate900 },
-  meta: { color: colors.slate500 },
+  title: { fontSize: 24, fontWeight: '800', color: colors.slate900, textAlign: 'center' },
+  meta: { color: colors.slate500, textAlign: 'center' },
   body: { fontSize: 16, lineHeight: 24, color: colors.slate700, marginTop: spacing.sm },
   section: { fontSize: 15, color: colors.slate600, lineHeight: 22 },
+  resultStudent: { color: colors.slate500, textAlign: 'center', marginTop: spacing.xs },
   scoreCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    marginTop: spacing.sm,
+  },
+  scoreFacts: { flex: 1 },
+  splitWrap: { marginTop: spacing.sm },
+  detail: { fontSize: 16, color: colors.slate700, marginTop: spacing.sm },
+  answers: { marginTop: spacing.md },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.slate800, marginBottom: spacing.sm },
+  answerCard: {
     backgroundColor: colors.white,
     borderRadius: 12,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.slate200,
+    marginBottom: spacing.sm,
   },
-  scoreTitle: { color: colors.slate500, marginBottom: 4 },
-  score: { fontSize: 22, fontWeight: '800', color: colors.primary },
+  answerHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
+  answerQuestion: { flex: 1, fontWeight: '700', color: colors.slate800 },
+  answerMeta: { color: colors.slate600, marginTop: 6, lineHeight: 20 },
+  answerMarks: { color: colors.slate500, marginTop: 4, fontSize: 13 },
   card: {
     backgroundColor: colors.white,
     borderRadius: 12,

@@ -4,6 +4,7 @@ import {
   isPoorLessonOcr,
   isUsableLessonOcr,
   looksLikeMangledRtlOcr,
+  looksLikeMathScienceLessonText,
 } from './extract-quality';
 import {
   looksLikeGarbledLatinOcr,
@@ -156,6 +157,25 @@ Name any three indoor games and discuss it with your partner.
 The Importance of Collaboration
 We often play games and do activities together as a group.
 `;
+
+  const setTheoryPage = `
+Exercise 17.2
+1. (i) A = {1,2,3,4,5,6}  B = {2,4,6,8,10}
+Find A ∪ B, B ∩ A, A - B, A Δ B.
+2. U = {1,2,3,...,10}, A = {1,2,3,4,5}, B = {1,3,5,7,9}
+3. P = {p | p ∈ E ∧ -4 < p < 6}
+7.1.2(i) Properties of Union and Intersection
+Commutative Property of Union: A ∪ B = B ∪ A
+Proof: L.H.S = A ∪ B = {x | x ∈ A or x ∈ B}
+`;
+
+  it('does not treat set-theory math pages as garbled RTL OCR', () => {
+    expect(looksLikeMathScienceLessonText(setTheoryPage)).toBe(true);
+    expect(looksLikeMangledRtlOcr(setTheoryPage)).toBe(false);
+    expect(isGarbledRtlOcr(setTheoryPage)).toBe(false);
+    expect(isPoorLessonOcr(setTheoryPage)).toBe(false);
+    expect(isUsableLessonOcr(setTheoryPage)).toBe(true);
+  });
 
   it('flags colorful primary textbook pages polluted by illustration OCR', () => {
     expect(looksLikeIllustrationPollutedLatinOcr(sportsTextbookOcr)).toBe(true);
