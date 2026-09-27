@@ -27,23 +27,25 @@ if (-not (Test-Path $keystoreFile) -or -not (Test-Path $keystoreProps)) {
   if ($LASTEXITCODE -ne 0) {
     throw "keytool failed to create upload keystore"
   }
-  @"
-storeFile=hawknexa-upload.keystore
-storePassword=$pass
-keyAlias=hawknexa-upload
-keyPassword=$pass
-"@ | Set-Content -Path $keystoreProps -Encoding UTF8
+  $propsText = @(
+    "storeFile=hawknexa-upload.keystore"
+    "storePassword=$pass"
+    "keyAlias=hawknexa-upload"
+    "keyPassword=$pass"
+  ) -join "`n"
+  Set-Content -Path $keystoreProps -Value $propsText -Encoding UTF8
   New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
   $credFile = Join-Path $releaseDir "UPLOAD_KEY_CREDENTIALS.txt"
-  @"
-Save these credentials securely. You need the same upload key for every Play Store update.
-
-Keystore file: android/app/hawknexa-upload.keystore
-Alias: hawknexa-upload
-Store password: $pass
-Key password: $pass
-"@ | Set-Content -Path $credFile -Encoding UTF8
-  Write-Host "Wrote $credFile — back up the keystore and passwords." -ForegroundColor Yellow
+  $credText = @(
+    "Save these credentials securely. You need the same upload key for every Play Store update."
+    ""
+    "Keystore file: android/app/hawknexa-upload.keystore"
+    "Alias: hawknexa-upload"
+    "Store password: $pass"
+    "Key password: $pass"
+  ) -join "`n"
+  Set-Content -Path $credFile -Value $credText -Encoding UTF8
+  Write-Host "Wrote $credFile - back up the keystore and passwords." -ForegroundColor Yellow
 }
 
 $env:NODE_ENV = "production"
