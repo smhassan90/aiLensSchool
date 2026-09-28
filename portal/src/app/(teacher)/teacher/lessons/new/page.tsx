@@ -5,8 +5,7 @@ import { AiWait } from "@/components/layout/ai-wait";
 import { LessonWizardSteps } from "@/components/lessons/lesson-wizard-steps";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -21,6 +20,8 @@ import { ApiClientError } from "@/lib/api-client";
 import { compressPhotosForUpload } from "@/lib/page-ocr";
 import { localDateISO } from "@/lib/utils";
 import { ArrowLeft, ImagePlus, X } from "lucide-react";
+import { LessonReviewWizard } from "@/components/lessons/lesson-review-wizard";
+import type { Lesson } from "@/lib/types";
 
 const MAX_PHOTOS = 10;
 const IMAGE_EXT = /\.(jpe?g|png|webp|heic|heif)$/i;
@@ -31,9 +32,10 @@ function isImageFile(file: File) {
 }
 
 export default function NewLessonPage() {
-  const router = useRouter();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [photos, setPhotos] = useState<File[]>([]);
+  const [createdLesson, setCreatedLesson] = useState<Lesson | null>(null);
   const [classKey, setClassKey] = useState("");
   const [date, setDate] = useState(() => localDateISO());
   const [formError, setFormError] = useState("");
@@ -78,7 +80,9 @@ export default function NewLessonPage() {
       });
     },
     onSuccess: (lesson) => {
-      router.push(`/teacher/lessons/${lesson.id}/review`);
+      queryClient.setQueryData(["lesson", lesson.id], lesson);
+      void queryClient.invalidateQueries({ queryKey: ["teacher-lessons"] });
+      setCreatedLesson(lesson);
     },
     onError: (err) => {
       toast({
@@ -132,6 +136,12 @@ export default function NewLessonPage() {
 
   if (classes.isLoading) {
     return <PageLoader variant="page" task="lessons" />;
+  }
+
+  if (createdLesson) {
+    return (
+      <LessonReviewWizard lessonId={createdLesson.id} initialLesson={createdLesson} />
+    );
   }
 
   return (
