@@ -183,6 +183,7 @@ export default function NewLessonPage() {
                 {classes.data?.map((cls) => (
                   <option key={`${cls.sectionId}:${cls.subjectId}`} value={`${cls.sectionId}:${cls.subjectId}`}>
                     {cls.gradeName} {cls.sectionName} — {cls.subjectName}
+                    {cls.role === "HEAD_TEACHER" ? " (head teacher)" : ""}
                   </option>
                 ))}
               </Select>

@@ -193,7 +193,7 @@ export interface TeacherClassAssignment {
   academicYearId: string;
   branchId: string;
   studentCount?: number;
-  role?: "TEACHER" | "ASSISTANT" | "CLASS_TEACHER";
+  role?: "TEACHER" | "ASSISTANT" | "CLASS_TEACHER" | "HEAD_TEACHER";
   isClassTeacher?: boolean;
   section?: { id: string; name: string; grade?: { id: string; name: string } };
   subject?: { id: string; name: string };
@@ -211,7 +211,7 @@ export interface TeacherClass {
   academicYearId: string;
   branchId: string;
   studentCount?: number;
-  role?: "TEACHER" | "ASSISTANT" | "CLASS_TEACHER";
+  role?: "TEACHER" | "ASSISTANT" | "CLASS_TEACHER" | "HEAD_TEACHER";
   isClassTeacher?: boolean;
 }
 

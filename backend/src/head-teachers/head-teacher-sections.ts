@@ -20,6 +20,16 @@ export async function resolveHeadTeacherSectionIds(
   return assignment.sections.map((row) => row.sectionId);
 }
 
+export async function teacherHeadsSection(
+  prisma: PrismaService,
+  schoolId: string,
+  userId: string,
+  sectionId: string,
+): Promise<boolean> {
+  const sectionIds = await resolveHeadTeacherSectionIds(prisma, schoolId, userId);
+  return sectionIds.includes(sectionId);
+}
+
 export function canAccessExamPaperAssignment(
   teacherId: string,
   assignment: { teacherId: string | null; sectionId: string; subjectId: string },

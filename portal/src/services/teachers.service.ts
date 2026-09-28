@@ -9,7 +9,7 @@ import type {
 
 function mapClassAssignment(
   item: TeacherClassAssignment & {
-    role?: "TEACHER" | "ASSISTANT" | "CLASS_TEACHER";
+    role?: "TEACHER" | "ASSISTANT" | "CLASS_TEACHER" | "HEAD_TEACHER";
     isClassTeacher?: boolean;
   },
 ): TeacherClass {

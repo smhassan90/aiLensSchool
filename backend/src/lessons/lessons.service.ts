@@ -20,7 +20,10 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { LessonProcessingService } from '../ai/services/lesson-processing.service';
 import { ParentsService } from '../parents/parents.service';
-import { resolveHeadTeacherSectionIds } from '../head-teachers/head-teacher-sections';
+import {
+  resolveHeadTeacherSectionIds,
+  teacherHeadsSection,
+} from '../head-teachers/head-teacher-sections';
 import { PageOcrService } from './page-ocr.service';
 import { deriveKeyPointsFromLesson, formatOcrLesson } from './lesson-text-formatter';
 import { coerceLessonDisplayText } from './lesson-display-text';
@@ -83,6 +86,8 @@ export class LessonsService {
   }
 
   private async assertTeacherAssignment(input: {
+    schoolId: string;
+    userId: string;
     teacherId: string;
     sectionId: string;
     subjectId: string;
@@ -104,6 +109,23 @@ export class LessonsService {
       select: { id: true },
     });
     if (section) return section;
+
+    const headsSection = await teacherHeadsSection(
+      this.prisma,
+      input.schoolId,
+      input.userId,
+      input.sectionId,
+    );
+    if (headsSection) {
+      const classRow = await this.prisma.classSubject.findFirst({
+        where: {
+          sectionId: input.sectionId,
+          subjectId: input.subjectId,
+          academicYearId: input.academicYearId,
+        },
+      });
+      if (classRow) return classRow;
+    }
 
     throw new ForbiddenException({
       code: 'CLASS_SUBJECT_NOT_ASSIGNED',
@@ -255,6 +277,8 @@ export class LessonsService {
     const schoolId = this.tenant.requireSchoolId(user);
     const teacher = await this.requireTeacherProfile(user.id);
     await this.assertTeacherAssignment({
+      schoolId,
+      userId: user.id,
       teacherId: teacher.id,
       sectionId: dto.sectionId,
       subjectId: dto.subjectId,
@@ -741,6 +765,8 @@ export class LessonsService {
     const schoolId = this.tenant.requireSchoolId(user);
     const teacher = await this.requireTeacherProfile(user.id);
     await this.assertTeacherAssignment({
+      schoolId,
+      userId: user.id,
       teacherId: teacher.id,
       sectionId: dto.sectionId,
       subjectId: dto.subjectId,
@@ -783,6 +809,8 @@ export class LessonsService {
     const schoolId = this.tenant.requireSchoolId(user);
     const teacher = await this.requireTeacherProfile(user.id);
     await this.assertTeacherAssignment({
+      schoolId,
+      userId: user.id,
       teacherId: teacher.id,
       sectionId: dto.sectionId,
       subjectId: dto.subjectId,
@@ -930,6 +958,8 @@ export class LessonsService {
     this.tenant.assertSchoolAccess(user, lesson.schoolId);
 
     await this.assertTeacherAssignment({
+      schoolId: lesson.schoolId,
+      userId: user.id,
       teacherId: teacher.id,
       sectionId: lesson.sectionId,
       subjectId: lesson.subjectId,

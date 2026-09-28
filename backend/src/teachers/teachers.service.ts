@@ -712,7 +712,34 @@ export class TeachersService {
       )
     ).filter((row): row is NonNullable<typeof row> => Boolean(row));
 
-    const rows = [...assigned, ...homerooms];
+    type MyClassRow = Omit<(typeof assigned)[number], 'role' | 'isClassTeacher'> & {
+      role: 'TEACHER' | 'ASSISTANT' | 'CLASS_TEACHER' | 'HEAD_TEACHER';
+      isClassTeacher: boolean;
+    };
+    let rows: MyClassRow[] = [...assigned, ...homerooms];
+    const headAssignment = await this.prisma.headTeacherAssignment.findFirst({
+      where: { schoolId, teacherId: profile.id },
+      select: { sections: { select: { sectionId: true } } },
+    });
+    const headSectionIds = headAssignment?.sections.map((row) => row.sectionId) ?? [];
+    if (headSectionIds.length && year) {
+      const headClassSubjects = await this.prisma.classSubject.findMany({
+        where: { academicYearId: year.id, sectionId: { in: headSectionIds } },
+        select: classSelect,
+      });
+      const existingKeys = new Set(rows.map((row) => `${row.sectionId}:${row.subjectId}`));
+      for (const item of headClassSubjects) {
+        const key = `${item.sectionId}:${item.subjectId}`;
+        if (existingKeys.has(key)) continue;
+        existingKeys.add(key);
+        rows.push({
+          ...item,
+          role: 'HEAD_TEACHER' as const,
+          isClassTeacher: classTeacherSectionIds.has(item.sectionId),
+        });
+      }
+    }
+
     const sectionIds = [...new Set(rows.map((row) => row.sectionId))];
     if (!sectionIds.length) return rows;
 

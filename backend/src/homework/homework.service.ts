@@ -14,6 +14,7 @@ import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { SubmitHomeworkDto } from './dto/submit-homework.dto';
 import { ParentsService } from '../parents/parents.service';
 import { NotificationService } from '../notifications/notifications.service';
+import { resolveHeadTeacherSectionIds } from '../head-teachers/head-teacher-sections';
 import {
   answerKeyFromQuestions,
   buildHomeworkQuestions,
@@ -58,10 +59,17 @@ export class HomeworkService {
         },
       });
       if (!assignment) {
-        throw new ForbiddenException({
-          code: 'CLASS_SUBJECT_NOT_ASSIGNED',
-          message: 'Teacher is not assigned to this class/subject',
-        });
+        const headSectionIds = await resolveHeadTeacherSectionIds(
+          this.prisma,
+          schoolId,
+          user.id,
+        );
+        if (!headSectionIds.includes(dto.sectionId)) {
+          throw new ForbiddenException({
+            code: 'CLASS_SUBJECT_NOT_ASSIGNED',
+            message: 'Teacher is not assigned to this class/subject',
+          });
+        }
       }
     }
 
@@ -287,13 +295,24 @@ export class HomeworkService {
     }
 
     const schoolId = this.tenant.requireSchoolId(user);
+    let teacherOwnOnly = false;
+    if (this.tenant.isTeacher(user) && !this.tenant.isSchoolAdmin(user)) {
+      if (query.sectionId) {
+        const headSectionIds = await resolveHeadTeacherSectionIds(
+          this.prisma,
+          schoolId,
+          user.id,
+        );
+        teacherOwnOnly = !headSectionIds.includes(query.sectionId);
+      } else {
+        teacherOwnOnly = true;
+      }
+    }
     const where: Prisma.HomeworkWhereInput = {
       schoolId,
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
       ...(query.subjectId ? { subjectId: query.subjectId } : {}),
-      ...(this.tenant.isTeacher(user) && !this.tenant.isSchoolAdmin(user)
-        ? { createdById: user.id }
-        : {}),
+      ...(teacherOwnOnly ? { createdById: user.id } : {}),
     };
 
     const [items, total] = await pageQuery(
