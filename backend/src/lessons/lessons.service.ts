@@ -20,6 +20,7 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import { LessonProcessingService } from '../ai/services/lesson-processing.service';
 import { ParentsService } from '../parents/parents.service';
+import { resolveHeadTeacherSectionIds } from '../head-teachers/head-teacher-sections';
 import { PageOcrService } from './page-ocr.service';
 import { deriveKeyPointsFromLesson, formatOcrLesson } from './lesson-text-formatter';
 import { coerceLessonDisplayText } from './lesson-display-text';
@@ -1067,7 +1068,19 @@ export class LessonsService {
     let teacherFilter: Prisma.DailyLessonWhereInput = {};
     if (this.tenant.isTeacher(user) && !this.tenant.isSchoolAdmin(user)) {
       const teacher = await this.requireTeacherProfile(user.id);
-      teacherFilter = { teacherId: teacher.id };
+      const headSectionIds = await resolveHeadTeacherSectionIds(
+        this.prisma,
+        schoolId,
+        user.id,
+      );
+      const headsThisClass =
+        query.sectionId && headSectionIds.includes(query.sectionId);
+      if (headsThisClass && query.subjectId) {
+        // Head teacher may build exam papers from any confirmed lectures in the class/subject.
+        teacherFilter = {};
+      } else {
+        teacherFilter = { teacherId: teacher.id };
+      }
     }
 
     const where: Prisma.DailyLessonWhereInput = {

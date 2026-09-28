@@ -84,10 +84,16 @@ export class QuizzesService {
         },
       });
       if (!classAssignment) {
-        throw new ForbiddenException({
-          code: 'CLASS_SUBJECT_NOT_ASSIGNED',
-          message: 'Teacher is not assigned to this class/subject',
-        });
+        const headSectionIds = await this.headTeachers.resolveSectionIds(user);
+        const headsSection = Boolean(
+          dto.sectionId && headSectionIds?.includes(dto.sectionId),
+        );
+        if (!headsSection) {
+          throw new ForbiddenException({
+            code: 'CLASS_SUBJECT_NOT_ASSIGNED',
+            message: 'Teacher is not assigned to this class/subject',
+          });
+        }
       }
     }
 
