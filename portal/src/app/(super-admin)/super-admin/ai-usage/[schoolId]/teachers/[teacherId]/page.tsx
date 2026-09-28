@@ -73,22 +73,26 @@ export default function TeacherAiTrailPage() {
                   Uploaded pages
                 </p>
                 <div className="flex flex-wrap gap-3">
-                  {lesson.pageImages.map((img) => (
-                    <a
-                      key={img.sourceId}
-                      href={assetUrl(img.url)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block overflow-hidden rounded-md border"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={assetUrl(img.url)}
-                        alt={img.filename}
-                        className="h-28 w-auto max-w-[10rem] object-cover"
-                      />
-                    </a>
-                  ))}
+                  {lesson.pageImages.map((img) => {
+                    const src = assetUrl(img.url);
+                    if (!src) return null;
+                    return (
+                      <a
+                        key={img.sourceId}
+                        href={src}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block overflow-hidden rounded-md border"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={src}
+                          alt={img.filename}
+                          className="h-28 w-auto max-w-[10rem] object-cover"
+                        />
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
             ) : (

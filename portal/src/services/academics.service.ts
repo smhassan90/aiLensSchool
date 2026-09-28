@@ -343,6 +343,9 @@ export const academicsService = {
         examDate: string | null;
         sectionId: string;
         subjectId: string;
+        branchId?: string;
+        academicYearId?: string;
+        headTeacherScope?: boolean;
         className: string;
         sectionName: string;
         gradeLevel: number;
