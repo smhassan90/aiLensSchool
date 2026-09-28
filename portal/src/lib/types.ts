@@ -75,6 +75,15 @@ export interface DashboardStats {
   notificationsSent?: number;
 }
 
+export interface SchoolAdminSummary {
+  id: string;
+  email: string;
+  username?: string | null;
+  firstName: string;
+  lastName: string;
+  status: string;
+}
+
 export interface School {
   id: string;
   name: string;
@@ -88,6 +97,7 @@ export interface School {
   country?: string;
   createdAt: string;
   branches?: Branch[];
+  schoolAdmins?: SchoolAdminSummary[];
   _count?: { branches: number; students: number; teachers?: number; parents?: number };
 }
 

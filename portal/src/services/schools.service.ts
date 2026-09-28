@@ -64,4 +64,15 @@ export const schoolsService = {
   uploadLogo(file: File) {
     return apiUpload<{ url: string }>("/files/upload", file);
   },
+
+  resetAdminPassword(schoolId: string) {
+    return apiClient<{
+      userId: string;
+      email: string;
+      username?: string | null;
+      name: string;
+      temporaryPassword: string;
+      mustChangePassword: boolean;
+    }>(`/schools/${schoolId}/reset-admin-password`, { method: "POST" });
+  },
 };

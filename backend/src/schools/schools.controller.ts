@@ -129,4 +129,10 @@ export class SchoolsController {
   suspend(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.schoolsService.setStatus(id, SchoolStatus.SUSPENDED, user);
   }
+
+  @Roles(RoleName.SUPER_ADMIN)
+  @Post(':id/reset-admin-password')
+  resetAdminPassword(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.schoolsService.resetSchoolAdminPassword(id, user);
+  }
 }

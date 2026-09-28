@@ -12,6 +12,7 @@ import {
   TeacherStatus,
   UserStatus,
 } from '@prisma/client';
+import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -198,7 +199,81 @@ export class SchoolsService {
       throw new NotFoundException({ code: 'SCHOOL_NOT_FOUND', message: 'School not found' });
     }
     this.tenant.assertSchoolAccess(user, school.id);
-    return school;
+    if (!user.roles.includes(RoleName.SUPER_ADMIN)) {
+      return school;
+    }
+    const schoolAdmins = await this.listSchoolAdmins(school.id);
+    return { ...school, schoolAdmins };
+  }
+
+  private async listSchoolAdmins(schoolId: string) {
+    return this.prisma.user.findMany({
+      where: {
+        schoolId,
+        roles: { some: { role: { name: RoleName.SCHOOL_ADMIN } } },
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        status: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async resetSchoolAdminPassword(schoolId: string, actor: AuthUser) {
+    await this.findOne(schoolId, actor);
+    const admin = await this.prisma.user.findFirst({
+      where: {
+        schoolId,
+        roles: { some: { role: { name: RoleName.SCHOOL_ADMIN } } },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, email: true, username: true, firstName: true, lastName: true },
+    });
+    if (!admin) {
+      throw new NotFoundException({
+        code: 'SCHOOL_ADMIN_NOT_FOUND',
+        message: 'No school admin account exists for this school',
+      });
+    }
+
+    const temporaryPassword = randomBytes(12).toString('base64url');
+    const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: admin.id },
+        data: {
+          passwordHash,
+          mustChangePassword: true,
+        },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId: admin.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    await this.audit.log({
+      actorUserId: actor.id,
+      schoolId,
+      action: 'SCHOOL_ADMIN_PASSWORD_RESET',
+      entityType: 'User',
+      entityId: admin.id,
+    });
+
+    return {
+      userId: admin.id,
+      email: admin.email,
+      username: admin.username,
+      name: `${admin.firstName} ${admin.lastName}`.trim(),
+      temporaryPassword,
+      mustChangePassword: true,
+    };
   }
 
   async getBranding(user: AuthUser) {

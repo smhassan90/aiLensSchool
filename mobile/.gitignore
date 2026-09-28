@@ -22,7 +22,15 @@ yarn.lock
 *.mobileprovision
 *.keystore
 keystore.properties
+signing/play-upload.properties
+signing/play-upload.keystore
+signing/*.jks
+signing/upload_certificate.pem
+signing/LOCAL_SIGNING_BACKUP.md
+signing/expected-upload-sha1.txt
+signing/.gen-secrets.tmp
 **/keystore.credentials.txt
+**/UPLOAD_KEY_CREDENTIALS.txt
 *.orig.*
 *.apk
 *.aab

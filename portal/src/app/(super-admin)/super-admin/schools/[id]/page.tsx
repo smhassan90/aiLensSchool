@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -21,6 +21,13 @@ import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const schema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -54,6 +61,13 @@ export default function EditSchoolPage() {
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [existingLogo, setExistingLogo] = useState<string | null>(null);
+  const [confirmResetAdmin, setConfirmResetAdmin] = useState(false);
+  const [resetResult, setResetResult] = useState<{
+    name: string;
+    email: string;
+    username?: string | null;
+    temporaryPassword: string;
+  } | null>(null);
 
   const schoolQuery = useQuery({
     queryKey: ["school", schoolId],
@@ -85,6 +99,32 @@ export default function EditSchoolPage() {
     setExistingLogo(school.logo ?? null);
     setLogoFile(null);
   }, [schoolQuery.data, reset]);
+
+  const primaryAdmin = useMemo(
+    () => schoolQuery.data?.schoolAdmins?.[0] ?? null,
+    [schoolQuery.data?.schoolAdmins],
+  );
+
+  const resetAdminPassword = useMutation({
+    mutationFn: () => schoolsService.resetAdminPassword(schoolId),
+    onSuccess: (result) => {
+      setConfirmResetAdmin(false);
+      setResetResult({
+        name: result.name,
+        email: result.email,
+        username: result.username,
+        temporaryPassword: result.temporaryPassword,
+      });
+      queryClient.invalidateQueries({ queryKey: ["school", schoolId] });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not reset password",
+        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        variant: "error",
+      });
+    },
+  });
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -221,6 +261,42 @@ export default function EditSchoolPage() {
 
         <Card>
           <CardHeader>
+            <CardTitle>School administrator</CardTitle>
+            <CardDescription>
+              Primary login for the school portal at /login (email or username + password).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {primaryAdmin ? (
+              <div className="text-sm">
+                <p className="font-medium">
+                  {primaryAdmin.firstName} {primaryAdmin.lastName}
+                </p>
+                <p className="text-muted-foreground">{primaryAdmin.email}</p>
+                {primaryAdmin.username ? (
+                  <p className="text-muted-foreground">Username: {primaryAdmin.username}</p>
+                ) : null}
+                <p className="text-muted-foreground">Status: {primaryAdmin.status}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No school admin account is linked to this school. Create one when onboarding a new
+                school, or contact engineering to assign SCHOOL_ADMIN in the database.
+              </p>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!primaryAdmin || resetAdminPassword.isPending}
+              onClick={() => setConfirmResetAdmin(true)}
+            >
+              {resetAdminPassword.isPending ? "Resetting…" : "Reset admin password"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Overview</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
@@ -254,6 +330,61 @@ export default function EditSchoolPage() {
           </Button>
         </div>
       </form>
+
+      <Dialog open={confirmResetAdmin} onOpenChange={setConfirmResetAdmin}>
+        <DialogContent onClose={() => setConfirmResetAdmin(false)}>
+          <DialogHeader>
+            <DialogTitle>Reset school admin password?</DialogTitle>
+            <DialogDescription>
+              {primaryAdmin
+                ? `Generate a new temporary password for ${primaryAdmin.firstName} ${primaryAdmin.lastName}. They must change it on next login. Existing sessions will be signed out.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmResetAdmin(false)}
+              disabled={resetAdminPassword.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={!primaryAdmin || resetAdminPassword.isPending}
+              onClick={() => resetAdminPassword.mutate()}
+            >
+              {resetAdminPassword.isPending ? "Resetting…" : "Reset password"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(resetResult)} onOpenChange={(open) => { if (!open) setResetResult(null); }}>
+        <DialogContent onClose={() => setResetResult(null)}>
+          <DialogHeader>
+            <DialogTitle>Temporary password ready</DialogTitle>
+            <DialogDescription>
+              Share this once with {resetResult?.name}. It will not be shown again.
+            </DialogDescription>
+          </DialogHeader>
+          {resetResult ? (
+            <div className="mt-4 space-y-3 rounded-md border bg-muted/40 p-4 text-sm">
+              <p>
+                Email: <span className="font-mono">{resetResult.email}</span>
+              </p>
+              {resetResult.username ? (
+                <p>
+                  Username: <span className="font-mono">{resetResult.username}</span>
+                </p>
+              ) : null}
+              <p>
+                Temporary password:{" "}
+                <span className="font-mono font-semibold">{resetResult.temporaryPassword}</span>
+              </p>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -3,8 +3,8 @@ const { withAppBuildGradle } = require('expo/config-plugins');
 const MARKER = '/* hawknexa-upload-signing */';
 
 /**
- * Release bundles use android/keystore.properties when present (Play upload key).
- * Falls back to debug keystore for local builds without credentials.
+ * Release builds require android/keystore.properties (see mobile/signing/README.md).
+ * Debug builds use debug.keystore only.
  */
 function withAndroidUploadSigning(config) {
   return withAppBuildGradle(config, (mod) => {
@@ -35,24 +35,32 @@ function withAndroidUploadSigning(config) {
             keyPassword 'android'
         }
         release {
-            if (keystorePropertiesFile.exists()) {
-                storeFile file(keystoreProperties['storeFile'])
-                storePassword keystoreProperties['storePassword']
-                keyAlias keystoreProperties['keyAlias']
-                keyPassword keystoreProperties['keyPassword']
-            } else {
-                storeFile file('debug.keystore')
-                storePassword 'android'
-                keyAlias 'androiddebugkey'
-                keyPassword 'android'
+            if (!keystorePropertiesFile.exists()) {
+                throw new GradleException(
+                    "Release signing requires android/keystore.properties. Copy mobile/signing/play-upload.properties.example and run scripts/sync-android-signing.ps1"
+                )
             }
+            def releaseStore = file(keystoreProperties['storeFile'])
+            if (!releaseStore.exists()) {
+                throw new GradleException("Release keystore not found: " + releaseStore.getAbsolutePath())
+            }
+            storeFile releaseStore
+            storePassword keystoreProperties['storePassword']
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
         }
     }`,
     );
 
     contents = contents.replace(
-      'signingConfig signingConfigs.debug',
-      'signingConfig signingConfigs.release',
+      /buildTypes \{\s*debug \{\s*signingConfig signingConfigs\.release/,
+      'buildTypes {\n        debug {\n            signingConfig signingConfigs.debug',
+    );
+
+    contents = contents.replace(
+      /release \{\s*\/\/ Caution![\s\S]*?signingConfig signingConfigs\.debug/,
+      `release {
+            signingConfig signingConfigs.release`,
     );
 
     mod.modResults.contents = contents;
