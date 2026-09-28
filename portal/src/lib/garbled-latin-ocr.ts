@@ -11,12 +11,13 @@ const OCR_JUNK =
 
 const COMMON_ENGLISH_WORDS = new Set(
   `
-  a about after all also an and are as at ask be been board but by call can children child complete
-  differences every few finding flashcards for from get has have he her him his how i in is it its
-  just like make many may me missing miss money more most my new not number numbers of on one or our
-  out page paste places provide read said sequence series she similar specific stated take than that
-  the their them then there these they this to too two up us use was we were what when which who
-  will with would you your
+  a about after all also an and are as at ask be because been board but by call can children child complete
+  cried differences do every exercise excited far few finding flashcards for friends from get go green
+  has have he her him his how i in is it its just like live love make many may me missing miss money more
+  most my new not number numbers of on one or our out page paste places playing provide questions read
+  said sea sequence series she sieve similar specific stated take than that the their them then there
+  these they think this to too travel two up us use was we went were what when where which who why will
+  with would write you your
   `
     .trim()
     .split(/\s+/),

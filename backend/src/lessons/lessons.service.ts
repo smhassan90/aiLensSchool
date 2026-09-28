@@ -350,20 +350,23 @@ export class LessonsService {
     }
     const images = this.toLessonImages(files);
     const ocrGarbled = isPoorLessonOcr(resolvedOcr, { expectArabicScript: expectsArabicScript });
+    const usableOcr = isUsableLessonOcr(resolvedOcr, {
+      expectArabicScript: expectsArabicScript || countArabicScriptChars(resolvedOcr) >= 40,
+    });
     const ocrMissingScript =
       expectsArabicScript &&
       looksLikeRealLessonText(resolvedOcr) &&
       !ARABIC_SCRIPT_RE.test(resolvedOcr);
     const needsPhotoVision = expectsArabicScript || uploadedMangledRtl || ocrGarbled;
-    // Colorful textbook photos: browser Tesseract often mixes art with text. When vision is
-    // available, always read the uploaded images instead of trusting local OCR.
-    const usePhotoVision = canVision && files.length > 0;
+    // Colorful layouts: use vision when OCR is weak — not when Tesseract already read the page well.
+    const usePhotoVision =
+      canVision && files.length > 0 && (needsPhotoVision || !usableOcr);
     const ocrThin =
       isFakeExtractText(resolvedOcr) ||
       ocrMissingScript ||
       ocrGarbled ||
-      usePhotoVision ||
-      (needsPhotoVision && canVision);
+      (usePhotoVision && !usableOcr) ||
+      (needsPhotoVision && canVision && !usableOcr);
     if (usePhotoVision || ocrGarbled || (needsPhotoVision && canVision && !uploadedLooksUsable)) {
       this.logger.warn(
         `Using vision transcription for ${subject.name} (photoUpload=${usePhotoVision}, poorOcr=${ocrGarbled}, arabicSubject=${expectsArabicScript})`,
@@ -380,9 +383,6 @@ export class LessonsService {
           'This page needs AI photo reading (English, Math, Urdu, or Arabic). Set CURSOR_API_KEY or OPENAI_API_KEY on the backend, then try again.',
       });
     }
-    const usableOcr = isUsableLessonOcr(resolvedOcr, {
-      expectArabicScript: expectsArabicScript || countArabicScriptChars(resolvedOcr) >= 40,
-    });
     const local = this.structureFromPageText(
       usableOcr ? resolvedOcr : `${subject.name} lesson`,
       subject.name,
@@ -413,11 +413,11 @@ export class LessonsService {
             usePhotoVision || !usableOcr ? visionTranscribePrompt : resolvedOcr,
           subjectName: subject.name,
           gradeName: grade.name,
-          images: canVision && (usePhotoVision || ocrThin) ? images : undefined,
+          images: canVision && usePhotoVision ? images : undefined,
         });
       } catch (error) {
         const englishFallback = englishOnlyFromMixedOcr(resolvedOcr);
-        if (compactTextLength(englishFallback) > 160) {
+        if (compactTextLength(englishFallback) > 140) {
           this.logger.warn(
             `Vision failed (${error instanceof Error ? error.message : String(error)}); using English OCR fallback`,
           );
@@ -453,7 +453,7 @@ export class LessonsService {
       const englishFallback = englishOnlyFromMixedOcr(
         longestRealLessonText(resolvedOcr, polished.summary),
       );
-      if (compactTextLength(englishFallback) > 160) {
+      if (compactTextLength(englishFallback) > 140) {
         usedEnglishFallback = true;
         polished = {
           ...polished,
@@ -463,8 +463,44 @@ export class LessonsService {
         };
       }
     }
+    if (
+      !usedEnglishFallback &&
+      usableOcr &&
+      !isUsableLessonOcr(polished.summary, { expectArabicScript: expectsArabicScript })
+    ) {
+      polished = {
+        ...polished,
+        summary: resolvedOcr,
+        concepts:
+          polished.concepts.length > 0
+            ? polished.concepts
+            : local.concepts.length
+              ? local.concepts
+              : deriveKeyPointsFromLesson(resolvedOcr),
+      };
+    }
+    if (!usedEnglishFallback) {
+      const polishUsable = isUsableLessonOcr(polished.summary, {
+        expectArabicScript: expectsArabicScript,
+      });
+      if (!polishUsable) {
+        const salvaged = englishOnlyFromMixedOcr(
+          longestRealLessonText(resolvedOcr, polished.summary),
+        );
+        if (compactTextLength(salvaged) > 140) {
+          usedEnglishFallback = true;
+          polished = {
+            ...polished,
+            summary: salvaged,
+            concepts: deriveKeyPointsFromLesson(salvaged),
+            teacherNotesSuggestion: undefined,
+          };
+        }
+      }
+    }
     const polishedLooksReal =
       usedEnglishFallback ||
+      usableOcr ||
       isUsableLessonOcr(polished.summary, { expectArabicScript: expectsArabicScript }) ||
       (looksLikeRealLessonText(polished.summary) &&
         needsPhotoVision &&
@@ -473,7 +509,10 @@ export class LessonsService {
       (needsPhotoVision &&
         looksLikeRealLessonText(polished.summary) &&
         !isPoorLessonOcr(polished.summary, { expectArabicScript: expectsArabicScript }));
-    if (ocrThin && !polishedLooksReal) {
+    const cannotReadPage =
+      !usableOcr &&
+      (ocrGarbled || ocrMissingScript || isFakeExtractText(resolvedOcr) || usePhotoVision);
+    if (cannotReadPage && !polishedLooksReal) {
       throw new BadRequestException({
         code: 'PAGE_TEXT_UNREADABLE',
         message:
