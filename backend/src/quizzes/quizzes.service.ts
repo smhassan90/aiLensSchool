@@ -128,10 +128,17 @@ export class QuizzesService {
         teacher &&
         examPaperAssignment.teacherId !== teacher.id
       ) {
-        throw new ForbiddenException({
-          code: 'EXAM_ASSIGNMENT_NOT_YOURS',
-          message: 'This exam was not assigned to you',
-        });
+        const headSectionIds = await this.headTeachers.resolveSectionIds(user);
+        const headsClass = Boolean(
+          examPaperAssignment.sectionId &&
+            headSectionIds?.includes(examPaperAssignment.sectionId),
+        );
+        if (!headsClass) {
+          throw new ForbiddenException({
+            code: 'EXAM_ASSIGNMENT_NOT_YOURS',
+            message: 'This exam was not assigned to you',
+          });
+        }
       }
       if (
         !isDeadlineOpen(

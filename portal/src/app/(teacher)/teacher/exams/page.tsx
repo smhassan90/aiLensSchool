@@ -100,17 +100,19 @@ export default function TeacherExamsPage() {
     ? `${activeAssignment.sectionId}:${activeAssignment.subjectId}`
     : form.watch("classKey");
   const selectedClass = classes.data?.find((row) => `${row.sectionId}:${row.subjectId}` === classKey);
+  const lectureSectionId = activeAssignment?.sectionId ?? selectedClass?.sectionId;
+  const lectureSubjectId = activeAssignment?.subjectId ?? selectedClass?.subjectId;
 
   const lectures = useQuery({
-    queryKey: ["exam-lectures", selectedClass?.sectionId, selectedClass?.subjectId],
+    queryKey: ["exam-lectures", lectureSectionId, lectureSubjectId],
     queryFn: () =>
       lessonsService.list({
-        sectionId: selectedClass?.sectionId,
-        subjectId: selectedClass?.subjectId,
+        sectionId: lectureSectionId!,
+        subjectId: lectureSubjectId!,
         status: "CONFIRMED",
         limit: 100,
       }),
-    enabled: Boolean(selectedClass),
+    enabled: Boolean(lectureSectionId && lectureSubjectId),
   });
 
   const selectedLessonIds = form.watch("lessonIds") ?? [];
@@ -123,8 +125,12 @@ export default function TeacherExamsPage() {
             (row) => row.sectionId === assignment.sectionId && row.subjectId === assignment.subjectId,
           )
         : classes.data?.find((row) => `${row.sectionId}:${row.subjectId}` === values.classKey);
-      if (!cls) throw new Error("Class not found");
       if (!assignment) throw new Error("This exam was not assigned to you yet");
+      const academicYearId = assignment.academicYearId ?? cls?.academicYearId;
+      const branchId = assignment.branchId ?? cls?.branchId;
+      if (!academicYearId || !branchId) {
+        throw new Error("Class details are missing for this exam. Refresh the page and try again.");
+      }
 
       const totalMarks =
         values.mcqMarks +
@@ -137,10 +143,10 @@ export default function TeacherExamsPage() {
       }
 
       return quizzesService.generate({
-        academicYearId: cls.academicYearId,
-        sectionId: cls.sectionId,
-        subjectId: cls.subjectId,
-        branchId: cls.branchId,
+        academicYearId,
+        sectionId: assignment.sectionId,
+        subjectId: assignment.subjectId,
+        branchId,
         lessonIds: values.lessonIds,
         examConfigId: assignment.examConfigId,
         examPaperAssignmentId: assignment.id,
@@ -301,7 +307,7 @@ export default function TeacherExamsPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Exam papers"
-        description="Papers are grouped by exam and sorted by class. Draft papers stay with you; after submit they go to school admin for approval."
+        description="Papers are grouped by exam and sorted by class. As head teacher you also see every subject in your supervised classes. Draft papers stay with you; after submit they go for head teacher or school admin approval."
       />
 
       <TeacherExamAssignments

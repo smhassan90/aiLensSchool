@@ -19,6 +19,9 @@ export type TeacherExamAssignment = {
   examName: string;
   sectionId: string;
   subjectId: string;
+  branchId?: string;
+  academicYearId?: string;
+  headTeacherScope?: boolean;
   className: string;
   sectionName: string;
   gradeLevel: number;
@@ -146,6 +149,9 @@ export function TeacherExamAssignments({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium text-foreground">{row.className}</p>
+                        {row.headTeacherScope ? (
+                          <Badge variant="secondary">Head teacher class</Badge>
+                        ) : null}
                         <Badge variant={teacherExamPaperStatusVariant(row.status)}>
                           <span className="inline-flex items-center gap-1">
                             {statusIcon(row.status)}

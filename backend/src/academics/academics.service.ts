@@ -37,6 +37,10 @@ import {
   parseQuestionSpec,
 } from './exam-paper-question-spec';
 import { deadlineBlockedMessage, isDeadlineOpen } from './exam-deadlines';
+import {
+  canAccessExamPaperAssignment,
+  resolveHeadTeacherSectionIds,
+} from '../head-teachers/head-teacher-sections';
 
 @Injectable()
 export class AcademicsService {
@@ -2346,6 +2350,8 @@ export class AcademicsService {
       return { assignments: [] };
     }
 
+    const headSectionIds = await resolveHeadTeacherSectionIds(this.prisma, schoolId, user.id);
+
     const classSubjects = await this.prisma.classSubject.findMany({
       where: {
         academicYearId: year.id,
@@ -2354,6 +2360,22 @@ export class AcademicsService {
       select: { sectionId: true, subjectId: true },
     });
     const teachKeys = new Set(classSubjects.map((r) => `${r.sectionId}:${r.subjectId}`));
+
+    const syncClassSubjects = [...classSubjects];
+    if (headSectionIds.length) {
+      const headClassSubjects = await this.prisma.classSubject.findMany({
+        where: { academicYearId: year.id, sectionId: { in: headSectionIds } },
+        select: { sectionId: true, subjectId: true },
+      });
+      const seen = new Set(syncClassSubjects.map((r) => `${r.sectionId}:${r.subjectId}`));
+      for (const row of headClassSubjects) {
+        const key = `${row.sectionId}:${row.subjectId}`;
+        if (!seen.has(key)) {
+          syncClassSubjects.push(row);
+          seen.add(key);
+        }
+      }
+    }
 
     const assigner = await this.prisma.examPaperAssignment.findFirst({
       where: { schoolId, releasedAt: { not: null } },
@@ -2364,33 +2386,45 @@ export class AcademicsService {
       schoolId,
       year.id,
       teacher.id,
-      classSubjects,
+      syncClassSubjects,
       assigner?.assignedById ?? user.id,
     );
+
+    const assignmentOr: Prisma.ExamPaperAssignmentWhereInput[] = [
+      { teacherId: teacher.id },
+      {
+        teacherId: null,
+        section: {
+          classSubjects: {
+            some: {
+              academicYearId: year.id,
+              OR: [{ teacherId: teacher.id }, { assistantTeacherId: teacher.id }],
+            },
+          },
+        },
+      },
+    ];
+    if (headSectionIds.length) {
+      assignmentOr.push({ sectionId: { in: headSectionIds } });
+    }
 
     const assignments = await this.prisma.examPaperAssignment.findMany({
       where: {
         schoolId,
         releasedAt: { not: null },
         examConfig: { academicYearId: year.id },
-        OR: [
-          { teacherId: teacher.id },
-          {
-            teacherId: null,
-            section: {
-              classSubjects: {
-                some: {
-                  academicYearId: year.id,
-                  OR: [{ teacherId: teacher.id }, { assistantTeacherId: teacher.id }],
-                },
-              },
-            },
-          },
-        ],
+        OR: assignmentOr,
       },
       include: {
         examConfig: { select: { id: true, name: true, startDate: true } },
-        section: { select: { id: true, name: true, grade: { select: { name: true, level: true } } } },
+        section: {
+          select: {
+            id: true,
+            name: true,
+            branchId: true,
+            grade: { select: { name: true, level: true } },
+          },
+        },
         subject: { select: { id: true, name: true } },
         quizzes: {
           where: { createdById: user.id, paperKind: { in: [...EXAM_PAPER_KINDS] } },
@@ -2413,16 +2447,8 @@ export class AcademicsService {
       ],
     });
 
-    const filtered = assignments.filter((row) => {
-      if (row.teacherId && row.teacherId !== teacher.id) return false;
-      if (!row.teacherId) {
-        return true;
-      }
-      return true;
-    });
-
-    const visibleAssignments = filtered.filter((row) =>
-      teachKeys.has(`${row.sectionId}:${row.subjectId}`),
+    const visibleAssignments = assignments.filter((row) =>
+      canAccessExamPaperAssignment(teacher.id, row, teachKeys, headSectionIds),
     );
     const pendingExtensions = await this.prisma.examDeadlineExtensionRequest.findMany({
       where: {
@@ -2487,6 +2513,10 @@ export class AcademicsService {
             examDate: row.examConfig.startDate?.toISOString().slice(0, 10) ?? null,
             sectionId: row.sectionId,
             subjectId: row.subjectId,
+            branchId: row.section.branchId,
+            academicYearId: year.id,
+            headTeacherScope: headSectionIds.includes(row.sectionId) &&
+              !teachKeys.has(`${row.sectionId}:${row.subjectId}`),
             className: `${row.section.grade.name} ${row.section.name}`,
             sectionName: row.section.name,
             gradeLevel: row.section.grade.level,
@@ -2532,9 +2562,7 @@ export class AcademicsService {
                 : null,
           };
         }),
-      pendingCount: filtered.filter((row) => {
-        const key = `${row.sectionId}:${row.subjectId}`;
-        if (!teachKeys.has(key)) return false;
+      pendingCount: visibleAssignments.filter((row) => {
         const latest = row.quizzes[0];
         const submitted =
           latest?.status === QuizStatus.CLOSED &&
@@ -2608,6 +2636,7 @@ export class AcademicsService {
     schoolId: string,
     teacherId: string,
     examConfigId: string,
+    userId?: string,
   ) {
     const exam = await this.prisma.examConfig.findFirst({
       where: { id: examConfigId, schoolId },
@@ -2625,6 +2654,9 @@ export class AcademicsService {
       select: { sectionId: true, subjectId: true },
     });
     const teachKeys = new Set(classSubjects.map((row) => `${row.sectionId}:${row.subjectId}`));
+    const headSectionIds = userId
+      ? await resolveHeadTeacherSectionIds(this.prisma, schoolId, userId)
+      : [];
 
     const assignments = await this.prisma.examPaperAssignment.findMany({
       where: {
@@ -2636,11 +2668,9 @@ export class AcademicsService {
     });
 
     return assignments
-      .filter((row) => {
-        if (row.teacherId === teacherId) return true;
-        if (row.teacherId && row.teacherId !== teacherId) return false;
-        return teachKeys.has(`${row.sectionId}:${row.subjectId}`);
-      })
+      .filter((row) =>
+        canAccessExamPaperAssignment(teacherId, row, teachKeys, headSectionIds),
+      )
       .map((row) => row.id);
   }
 
@@ -2704,7 +2734,12 @@ export class AcademicsService {
       },
       select: { id: true },
     });
-    if (!teaches && assignment.teacherId && assignment.teacherId !== teacher.id) {
+    const teachKeys = new Set<string>();
+    if (teaches) {
+      teachKeys.add(`${assignment.sectionId}:${assignment.subjectId}`);
+    }
+    const headSectionIds = await resolveHeadTeacherSectionIds(this.prisma, schoolId, user.id);
+    if (!canAccessExamPaperAssignment(teacher.id, assignment, teachKeys, headSectionIds)) {
       throw new ForbiddenException({
         code: 'NOT_YOUR_ASSIGNMENT',
         message: 'This exam is not assigned to your class',
@@ -2860,10 +2895,15 @@ export class AcademicsService {
       request.assignment.examConfigId,
       user.id,
     );
+    const extensionTeacher = await this.prisma.teacherProfile.findUnique({
+      where: { id: request.teacherId },
+      select: { userId: true },
+    });
     const assignmentIds = await this.teacherAssignmentIdsForExam(
       schoolId,
       request.teacherId,
       request.assignment.examConfigId,
+      extensionTeacher?.userId,
     );
     const { until, assignmentCount } = await this.applyDeadlineExtensionToAssignments(
       assignmentIds,
@@ -2977,9 +3017,17 @@ export class AcademicsService {
       string,
       { id: string; name: string; startDate: string | null; maxMarks: number }
     >();
+    const headSectionIds = await resolveHeadTeacherSectionIds(
+      this.prisma,
+      schoolId,
+      teacherUserId,
+    );
     for (const row of assignments) {
-      if (row.teacherId && row.teacherId !== teacher.id) continue;
-      if (!row.teacherId && !teachKeys.has(`${row.sectionId}:${row.subjectId}`)) continue;
+      if (
+        !canAccessExamPaperAssignment(teacher.id, row, teachKeys, headSectionIds)
+      ) {
+        continue;
+      }
       exams.set(row.examConfig.id, {
         id: row.examConfig.id,
         name: row.examConfig.name,
@@ -3024,6 +3072,7 @@ export class AcademicsService {
       schoolId,
       teacher.id,
       body.examConfigId,
+      user.id,
     );
     const { until, assignmentCount } = await this.applyDeadlineExtensionToAssignments(
       assignmentIds,

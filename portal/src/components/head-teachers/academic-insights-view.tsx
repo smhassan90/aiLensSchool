@@ -52,10 +52,16 @@ const exploreLinks = [
     icon: FileQuestion,
   },
   {
-    href: "/teacher/head/exam-papers",
-    label: "Exam papers",
-    hint: "Submissions waiting for your review",
+    href: "/teacher/exams",
+    label: "Generate exam papers",
+    hint: "Papers for your classes and all subjects under your head-teacher sections",
     icon: FileText,
+  },
+  {
+    href: "/teacher/head/exam-papers",
+    label: "Review exam papers",
+    hint: "Approve or reject submissions from teachers",
+    icon: ClipboardList,
   },
   {
     href: "/teacher/head/homework",
