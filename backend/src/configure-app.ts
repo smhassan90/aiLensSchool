@@ -5,7 +5,6 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { join } from 'path';
 import { Logger } from 'nestjs-pino';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
 
@@ -56,7 +55,7 @@ export async function configureNestApp(app: NestExpressApplication): Promise<voi
       transformOptions: { enableImplicitConversion: true },
     }),
   );
-  app.useGlobalFilters(app.get(AllExceptionsFilter));
+  // AllExceptionsFilter is registered via APP_FILTER in AppModule (needs DI).
   app.useGlobalInterceptors(app.get(HttpCacheInterceptor), new TransformInterceptor());
 
   if (process.env.VERCEL === '1') return;

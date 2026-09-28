@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { TransformInterceptor } from '../src/common/interceptors/transform.interceptor';
 
 /**
@@ -35,7 +34,6 @@ describe('AppController (e2e)', () => {
         transform: true,
       }),
     );
-    app.useGlobalFilters(app.get(AllExceptionsFilter));
     app.useGlobalInterceptors(new TransformInterceptor());
     await app.init();
   });
