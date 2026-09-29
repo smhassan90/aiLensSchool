@@ -36,7 +36,7 @@ export default function SubjectPacePage() {
       lessonsService.subjectPace({
         sectionId: selected!.sectionId,
         subjectId: selected!.subjectId,
-        weeks: 8,
+        academicYearId: selected!.academicYearId,
       }),
     enabled: Boolean(selected?.sectionId && selected?.subjectId),
   });
@@ -45,7 +45,7 @@ export default function SubjectPacePage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Subject pace"
-        description="How class days were spent across chapters (last 8 weeks)."
+        description="How class days were spent across chapters in this school year."
         actions={
           <Link href="/teacher/lessons">
             <Button variant="outline">

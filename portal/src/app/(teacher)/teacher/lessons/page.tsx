@@ -72,7 +72,7 @@ export default function TeacherLessonsHubPage() {
             <CardHeader>
               <PieChart className="mb-2 h-8 w-8 text-primary" />
               <CardTitle>Subject pace</CardTitle>
-              <CardDescription>See how class time spread across chapters (8 weeks).</CardDescription>
+              <CardDescription>See how class time is spread across chapters.</CardDescription>
             </CardHeader>
           </Card>
         </Link>

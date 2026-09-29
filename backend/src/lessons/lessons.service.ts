@@ -1543,12 +1543,21 @@ export class LessonsService {
 
   async getSubjectPace(
     user: AuthUser,
-    query: { sectionId: string; subjectId: string; teacherId?: string; weeks?: number },
+    query: { sectionId: string; subjectId: string; teacherId?: string; academicYearId?: string },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
-    const weeks = query.weeks ?? 8;
-    const since = new Date();
-    since.setDate(since.getDate() - weeks * 7);
+    let periodLabel = 'All logged class days';
+    let dateRange: Prisma.DateTimeFilter | undefined;
+    if (query.academicYearId) {
+      const year = await this.prisma.academicYear.findFirst({
+        where: { id: query.academicYearId, schoolId },
+        select: { name: true, startDate: true, endDate: true },
+      });
+      if (year) {
+        periodLabel = year.name;
+        dateRange = { gte: year.startDate, lte: year.endDate };
+      }
+    }
 
     let teacherId = query.teacherId;
     if (this.tenant.isTeacher(user) && !this.tenant.isSchoolAdmin(user)) {
@@ -1570,7 +1579,7 @@ export class LessonsService {
         subjectId: query.subjectId,
         recordKind: LessonRecordKind.CLASS_SESSION,
         status: LessonStatus.CONFIRMED,
-        date: { gte: since },
+        ...(dateRange ? { date: dateRange } : {}),
         ...(teacherId ? { teacherId } : {}),
       },
       select: {
@@ -1580,40 +1589,66 @@ export class LessonsService {
       },
     });
 
+    const revisionIds = new Set<string>();
+    for (const row of sessions) {
+      if (row.sessionType === ClassSessionType.REVISION && Array.isArray(row.revisionChapterIds)) {
+        for (const id of row.revisionChapterIds as string[]) {
+          if (id) revisionIds.add(id);
+        }
+      }
+    }
+    const revisionChapters = revisionIds.size
+      ? await this.prisma.dailyLesson.findMany({
+          where: { id: { in: [...revisionIds] }, schoolId },
+          select: { id: true, chapterName: true, topicName: true },
+        })
+      : [];
+    const chapterLabelById = new Map(
+      revisionChapters.map((ch) => [
+        ch.id,
+        ch.chapterName || ch.topicName || 'Chapter',
+      ]),
+    );
+
     type Slice = { label: string; days: number; chapterIds: string[] };
     const buckets = new Map<string, Slice>();
-    const bump = (label: string, chapterId?: string) => {
-      const key = label.toLowerCase();
+    const bump = (label: string, amount: number, chapterId?: string) => {
+      const key = chapterId ?? label.toLowerCase();
       const existing = buckets.get(key) ?? { label, days: 0, chapterIds: [] };
-      existing.days += 1;
+      existing.days += amount;
       if (chapterId && !existing.chapterIds.includes(chapterId)) {
         existing.chapterIds.push(chapterId);
       }
       buckets.set(key, existing);
     };
 
+    let sessionCount = 0;
     for (const row of sessions) {
+      sessionCount += 1;
       if (row.sessionType === ClassSessionType.REVISION) {
         const ids = Array.isArray(row.revisionChapterIds)
-          ? (row.revisionChapterIds as string[])
+          ? (row.revisionChapterIds as string[]).filter(Boolean)
           : [];
-        bump('Revision');
+        if (!ids.length) continue;
+        const share = 1 / ids.length;
         for (const id of ids) {
-          const slice = buckets.get('revision');
-          if (slice && !slice.chapterIds.includes(id)) slice.chapterIds.push(id);
+          const label = chapterLabelById.get(id) ?? 'Chapter';
+          bump(label, share, id);
         }
       } else {
         const label =
           row.chapterSource?.chapterName ||
           row.chapterSource?.topicName ||
           'Unlabeled chapter';
-        bump(label, row.chapterSource?.id);
+        bump(label, 1, row.chapterSource?.id);
       }
     }
 
-    const slices = Array.from(buckets.values()).sort((a, b) => b.days - a.days);
-    const totalDays = slices.reduce((sum, s) => sum + s.days, 0);
-    return { weeks, totalDays, slices };
+    const slices = Array.from(buckets.values())
+      .map((s) => ({ ...s, days: Math.round(s.days * 10) / 10 }))
+      .sort((a, b) => b.days - a.days);
+    const totalDays = Math.round(sessionCount * 10) / 10;
+    return { periodLabel, totalDays, slices };
   }
 
   async findOne(id: string, user: AuthUser) {

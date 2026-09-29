@@ -402,7 +402,6 @@ export class SubjectPaceQueryDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  weeks?: number;
+  @IsString()
+  academicYearId?: string;
 }

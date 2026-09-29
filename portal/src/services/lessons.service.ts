@@ -84,7 +84,7 @@ export interface SubjectPaceSlice {
 }
 
 export interface SubjectPace {
-  weeks: number;
+  periodLabel: string;
   totalDays: number;
   slices: SubjectPaceSlice[];
 }
@@ -170,7 +170,12 @@ export const lessonsService = {
     });
   },
 
-  subjectPace(params: { sectionId: string; subjectId: string; teacherId?: string; weeks?: number }) {
+  subjectPace(params: {
+    sectionId: string;
+    subjectId: string;
+    teacherId?: string;
+    academicYearId?: string;
+  }) {
     return apiClient<SubjectPace>(`/lessons/subject-pace${buildQuery(params)}`);
   },
 
