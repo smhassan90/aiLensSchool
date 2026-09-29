@@ -71,6 +71,10 @@ export interface CreateClassSessionPayload {
   homeworkText?: string;
   homeworkDueDate?: string;
   homeworkInstruction?: string;
+  homeworkTitle?: string;
+  homeworkDescription?: string;
+  homeworkAnswerKey?: string;
+  homeworkQuestionsJson?: unknown;
 }
 
 export interface SubjectPaceSlice {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { AiWait } from "@/components/layout/ai-wait";
+import { documentsService, type HomeworkPreview } from "@/services/documents.service";
 import { lessonsService } from "@/services/lessons.service";
 import { teachersService } from "@/services/teachers.service";
 import { useToast } from "@/providers/toast-provider";
@@ -160,6 +162,14 @@ export function TodayInClassForm({
   const [homeworkMode, setHomeworkMode] = useState<HomeworkSessionMode>("NONE");
   const [homeworkText, setHomeworkText] = useState("");
   const [homeworkDueDate, setHomeworkDueDate] = useState(() => localDateISOPlusDays(1));
+  const [homeworkInstruction, setHomeworkInstruction] = useState("");
+  const [aiHomeworkDraft, setAiHomeworkDraft] = useState<HomeworkPreview | null>(null);
+
+  useEffect(() => {
+    if (homeworkMode !== "AI") {
+      setAiHomeworkDraft(null);
+    }
+  }, [homeworkMode]);
 
   const classes = useQuery({
     queryKey: ["teacher-classes"],
@@ -203,7 +213,21 @@ export function TodayInClassForm({
         parentSummary: parentSummary.trim() || undefined,
         homeworkMode,
         homeworkText: homeworkMode === "PLAIN" ? homeworkText.trim() : undefined,
-        homeworkDueDate: homeworkMode !== "NONE" ? homeworkDueDate : undefined,
+        homeworkDueDate:
+          homeworkMode === "NONE"
+            ? undefined
+            : homeworkMode === "AI" && aiHomeworkDraft
+              ? aiHomeworkDraft.dueDate.slice(0, 10)
+              : homeworkDueDate,
+        homeworkInstruction:
+          homeworkMode === "AI" && !aiHomeworkDraft ? homeworkInstruction.trim() || undefined : undefined,
+        homeworkTitle: homeworkMode === "AI" && aiHomeworkDraft ? aiHomeworkDraft.title : undefined,
+        homeworkDescription:
+          homeworkMode === "AI" && aiHomeworkDraft ? aiHomeworkDraft.description : undefined,
+        homeworkAnswerKey:
+          homeworkMode === "AI" && aiHomeworkDraft ? aiHomeworkDraft.answerKey : undefined,
+        homeworkQuestionsJson:
+          homeworkMode === "AI" && aiHomeworkDraft ? aiHomeworkDraft.questionsJson : undefined,
         chapterSourceId:
           sessionType === "REVISION" ? undefined : chapterSourceId || undefined,
         revisionChapterIds: sessionType === "REVISION" ? revisionIds : undefined,
@@ -221,6 +245,8 @@ export function TodayInClassForm({
       setParentSummary("");
       setHomeworkMode("NONE");
       setHomeworkText("");
+      setAiHomeworkDraft(null);
+      setHomeworkInstruction("");
     },
     onError: (err) => {
       toast({
@@ -235,6 +261,37 @@ export function TodayInClassForm({
     setRevisionIds((current) =>
       current.includes(id) ? current.filter((x) => x !== id) : [...current, id],
     );
+  };
+
+  const generateAiHomework = useMutation({
+    mutationFn: () => {
+      if (!chapterSourceId) throw new Error("Select a chapter first");
+      return documentsService.previewHomework({
+        lessonId: chapterSourceId,
+        dueDate: homeworkDueDate,
+        instruction: homeworkInstruction.trim() || undefined,
+      });
+    },
+    onSuccess: (draft) => {
+      setAiHomeworkDraft(draft);
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not generate homework",
+        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        variant: "error",
+      });
+    },
+  });
+
+  const canPickAiHomework =
+    homeworkMode === "AI" &&
+    sessionType !== "REVISION" &&
+    Boolean(chapterSourceId);
+
+  const ignoreAiHomework = () => {
+    setAiHomeworkDraft(null);
+    setHomeworkMode("NONE");
   };
 
   return (
@@ -389,78 +446,182 @@ export function TodayInClassForm({
               <CardTitle>Homework for today?</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-2 sm:grid-cols-3">
-                {(
-                  [
-                    { mode: "AI" as const, label: "AI homework" },
-                    { mode: "PLAIN" as const, label: "My own words" },
-                    { mode: "NONE" as const, label: "No homework" },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.mode}
-                    type="button"
-                    onClick={() => setHomeworkMode(opt.mode)}
-                    className={cn(
-                      "rounded-lg border px-3 py-2 text-sm",
-                      homeworkMode === opt.mode ? "border-primary bg-primary/10" : "border-border",
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              {homeworkMode === "PLAIN" && (
-                <Textarea
-                  rows={4}
-                  value={homeworkText}
-                  onChange={(e) => setHomeworkText(e.target.value)}
-                  placeholder="Do page 17. Do exercise till number 15."
-                />
-              )}
-              {homeworkMode !== "NONE" && (
-                <div className="space-y-2">
-                  <Label>Due date</Label>
-                  <Input
-                    type="date"
-                    value={homeworkDueDate}
-                    onChange={(e) => setHomeworkDueDate(e.target.value)}
-                  />
+              {generateAiHomework.isPending ? (
+                <AiWait kind="homework" />
+              ) : aiHomeworkDraft ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Edit the homework below, then save today&apos;s class or ignore this draft.
+                  </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-hw-title">Title</Label>
+                    <Input
+                      id="ai-hw-title"
+                      value={aiHomeworkDraft.title}
+                      onChange={(e) =>
+                        setAiHomeworkDraft({ ...aiHomeworkDraft, title: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-hw-due">Due date</Label>
+                    <Input
+                      id="ai-hw-due"
+                      type="date"
+                      value={aiHomeworkDraft.dueDate.slice(0, 10)}
+                      onChange={(e) =>
+                        setAiHomeworkDraft({ ...aiHomeworkDraft, dueDate: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-hw-desc">Homework (for students)</Label>
+                    <Textarea
+                      id="ai-hw-desc"
+                      rows={8}
+                      value={aiHomeworkDraft.description}
+                      onChange={(e) =>
+                        setAiHomeworkDraft({ ...aiHomeworkDraft, description: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-hw-answers">Answer key (teachers only)</Label>
+                    <Textarea
+                      id="ai-hw-answers"
+                      rows={5}
+                      value={aiHomeworkDraft.answerKey ?? ""}
+                      onChange={(e) =>
+                        setAiHomeworkDraft({ ...aiHomeworkDraft, answerKey: e.target.value })
+                      }
+                    />
+                  </div>
                 </div>
-              )}
-              {homeworkMode === "AI" && sessionType === "REVISION" && (
-                <p className="text-xs text-muted-foreground">
-                  AI homework needs a single chapter — use new or continue, or choose my own words for revision.
-                </p>
+              ) : (
+                <>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {(
+                      [
+                        { mode: "AI" as const, label: "AI homework" },
+                        { mode: "PLAIN" as const, label: "My own words" },
+                        { mode: "NONE" as const, label: "No homework" },
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={opt.mode}
+                        type="button"
+                        onClick={() => setHomeworkMode(opt.mode)}
+                        className={cn(
+                          "rounded-lg border px-3 py-2 text-sm",
+                          homeworkMode === opt.mode ? "border-primary bg-primary/10" : "border-border",
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {homeworkMode === "PLAIN" && (
+                    <Textarea
+                      rows={4}
+                      value={homeworkText}
+                      onChange={(e) => setHomeworkText(e.target.value)}
+                      placeholder="Do page 17. Do exercise till number 15."
+                    />
+                  )}
+                  {homeworkMode === "AI" && sessionType === "REVISION" && (
+                    <p className="text-xs text-muted-foreground">
+                      AI homework needs a single chapter — use new or continue, or choose my own words for revision.
+                    </p>
+                  )}
+                  {homeworkMode === "AI" && sessionType !== "REVISION" && !chapterSourceId && (
+                    <p className="text-xs text-muted-foreground">Select a chapter above before generating AI homework.</p>
+                  )}
+                  {homeworkMode === "AI" && canPickAiHomework && (
+                    <div className="space-y-2">
+                      <Label htmlFor="hw-instruction">How should homework be written? (optional)</Label>
+                      <Textarea
+                        id="hw-instruction"
+                        rows={2}
+                        value={homeworkInstruction}
+                        onChange={(e) => setHomeworkInstruction(e.target.value)}
+                        placeholder="e.g. easy words, keep it short"
+                      />
+                    </div>
+                  )}
+                  {homeworkMode !== "NONE" && (
+                    <div className="space-y-2">
+                      <Label>Due date</Label>
+                      <Input
+                        type="date"
+                        value={homeworkDueDate}
+                        onChange={(e) => setHomeworkDueDate(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
-            <Button
-              disabled={save.isPending || !selected}
-              onClick={() => {
-                if (sessionType !== "REVISION" && !chapterSourceId) {
-                  toast({ title: "Select a chapter", variant: "error" });
-                  return;
-                }
-                if (sessionType === "REVISION" && !revisionIds.length) {
-                  toast({ title: "Select chapters to revise", variant: "error" });
-                  return;
-                }
-                if (homeworkMode === "PLAIN" && !homeworkText.trim()) {
-                  toast({ title: "Write homework or choose no homework", variant: "error" });
-                  return;
-                }
-                if (homeworkMode === "AI" && sessionType === "REVISION") {
-                  toast({ title: "Use my own words for revision homework", variant: "error" });
-                  return;
-                }
-                save.mutate();
-              }}
-            >
-              {save.isPending ? "Saving…" : "Save today's class"}
-            </Button>
+          <div className="flex flex-wrap justify-end gap-2">
+            {aiHomeworkDraft ? (
+              <>
+                <Button type="button" variant="outline" onClick={ignoreAiHomework}>
+                  Ignore homework
+                </Button>
+                <Button
+                  disabled={save.isPending || !selected || !aiHomeworkDraft.title.trim()}
+                  onClick={() => {
+                    if (!aiHomeworkDraft.description.trim()) {
+                      toast({ title: "Homework text is empty", variant: "error" });
+                      return;
+                    }
+                    save.mutate();
+                  }}
+                >
+                  {save.isPending ? "Saving…" : "Save today's class"}
+                </Button>
+              </>
+            ) : homeworkMode === "AI" && canPickAiHomework ? (
+              <Button
+                type="button"
+                disabled={generateAiHomework.isPending || !selected}
+                onClick={() => {
+                  if (sessionType !== "REVISION" && !chapterSourceId) {
+                    toast({ title: "Select a chapter", variant: "error" });
+                    return;
+                  }
+                  generateAiHomework.mutate();
+                }}
+              >
+                Generate AI homework
+              </Button>
+            ) : (
+              <Button
+                disabled={save.isPending || !selected || generateAiHomework.isPending}
+                onClick={() => {
+                  if (sessionType !== "REVISION" && !chapterSourceId) {
+                    toast({ title: "Select a chapter", variant: "error" });
+                    return;
+                  }
+                  if (sessionType === "REVISION" && !revisionIds.length) {
+                    toast({ title: "Select chapters to revise", variant: "error" });
+                    return;
+                  }
+                  if (homeworkMode === "PLAIN" && !homeworkText.trim()) {
+                    toast({ title: "Write homework or choose no homework", variant: "error" });
+                    return;
+                  }
+                  if (homeworkMode === "AI") {
+                    toast({ title: "Generate AI homework first", variant: "error" });
+                    return;
+                  }
+                  save.mutate();
+                }}
+              >
+                {save.isPending ? "Saving…" : "Save today's class"}
+              </Button>
+            )}
           </div>
         </>
       )}

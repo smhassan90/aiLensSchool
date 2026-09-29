@@ -365,6 +365,25 @@ export class CreateClassSessionDto {
   @IsOptional()
   @IsString()
   homeworkInstruction?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  homeworkTitle?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  homeworkDescription?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  homeworkAnswerKey?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  homeworkQuestionsJson?: unknown;
 }
 
 export class SubjectPaceQueryDto {

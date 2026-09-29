@@ -1490,29 +1490,51 @@ export class LessonsService {
           message: 'AI homework needs a chapter source',
         });
       }
-      const preview = await this.documentsService.previewHomework(
-        {
-          lessonId: chapterSource.id,
-          dueDate: dto.homeworkDueDate,
-          instruction: dto.homeworkInstruction,
-        },
-        user,
-      );
-      await this.homeworkService.create(
-        {
-          academicYearId: preview.academicYearId,
-          sectionId: preview.sectionId,
-          subjectId: preview.subjectId,
-          branchId: preview.branchId,
-          title: preview.title,
-          description: preview.description,
-          answerKey: preview.answerKey,
-          questionsJson: preview.questionsJson,
-          dueDate: preview.dueDate,
-          lessonId: session.id,
-        },
-        user,
-      );
+      const due =
+        dto.homeworkDueDate ?? new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+      const title = dto.homeworkTitle?.trim();
+      const description = dto.homeworkDescription?.trim();
+      if (title && description) {
+        await this.homeworkService.create(
+          {
+            academicYearId: dto.academicYearId,
+            sectionId: dto.sectionId,
+            subjectId: dto.subjectId,
+            branchId: dto.branchId,
+            title,
+            description,
+            answerKey: dto.homeworkAnswerKey?.trim() || undefined,
+            questionsJson: dto.homeworkQuestionsJson as unknown[] | undefined,
+            dueDate: due,
+            lessonId: session.id,
+          },
+          user,
+        );
+      } else {
+        const preview = await this.documentsService.previewHomework(
+          {
+            lessonId: chapterSource.id,
+            dueDate: dto.homeworkDueDate,
+            instruction: dto.homeworkInstruction,
+          },
+          user,
+        );
+        await this.homeworkService.create(
+          {
+            academicYearId: preview.academicYearId,
+            sectionId: preview.sectionId,
+            subjectId: preview.subjectId,
+            branchId: preview.branchId,
+            title: preview.title,
+            description: preview.description,
+            answerKey: preview.answerKey,
+            questionsJson: preview.questionsJson,
+            dueDate: preview.dueDate,
+            lessonId: session.id,
+          },
+          user,
+        );
+      }
     }
 
     this.cache.invalidatePrefix(`teacher:summary:${user.id}`);
