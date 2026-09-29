@@ -76,15 +76,15 @@ export default function TeacherClassesPage() {
             description="Contact your school admin to assign subjects and sections."
           />
         ) : (
-          <Table>
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead>Class</TableHead>
-                <TableHead>Section</TableHead>
-                <TableHead>Subject</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead className="text-right">Students</TableHead>
-                <TableHead></TableHead>
+                <TableHead className="w-[14%]">Class</TableHead>
+                <TableHead className="w-[12%]">Section</TableHead>
+                <TableHead className="w-[22%]">Subject</TableHead>
+                <TableHead className="w-[26%]">Role</TableHead>
+                <TableHead className="w-[12%]">Students</TableHead>
+                <TableHead className="w-[14%] text-right">Progress</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -97,19 +97,17 @@ export default function TeacherClassesPage() {
                 >
                   <TableCell className="font-medium">{cls.gradeName}</TableCell>
                   <TableCell>{cls.sectionName}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{cls.subjectName}</Badge>
-                  </TableCell>
+                  <TableCell className="truncate">{cls.subjectName}</TableCell>
                   <TableCell>
                     {cls.isClassTeacher ? (
-                      <Badge variant="success">Class teacher</Badge>
+                      <Badge variant="success" className="font-normal">Class teacher</Badge>
                     ) : (
-                      <Badge variant={cls.role === "ASSISTANT" ? "secondary" : "outline"}>
+                      <Badge variant={cls.role === "ASSISTANT" ? "secondary" : "outline"} className="font-normal">
                         {cls.role === "ASSISTANT" ? "Assistant" : "Subject teacher"}
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="tabular-nums">
                     <Link
                       href={rosterHref(cls)}
                       className="font-medium text-primary underline-offset-2 hover:underline"
@@ -117,11 +115,15 @@ export default function TeacherClassesPage() {
                       {cls.studentCount ?? 0}
                     </Link>
                   </TableCell>
-                  <TableCell>
-                    {cls.gradeId && (
+                  <TableCell className="text-right">
+                    {cls.gradeId ? (
                       <Link href={`/teacher/classes/${cls.gradeId}/analytics?sectionId=${cls.sectionId}`}>
-                        <Button size="sm" variant="outline">Progress</Button>
+                        <Button size="sm" variant="outline" className="min-w-[5.5rem]">
+                          Progress
+                        </Button>
                       </Link>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
                 </TableRow>
