@@ -15,15 +15,20 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import { LessonStatus, RoleName } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { LessonsService } from './lessons.service';
 import {
+  ConfirmChapterContentDto,
+  CreateChapterPasteDto,
+  CreateClassSessionDto,
   CreateLessonDto,
   ExtractLessonDto,
   RegenerateKeyPointsDto,
   ScanLessonDto,
+  SubjectPaceQueryDto,
   UpdateLessonDto,
 } from './dto/lesson.dto';
+import { LessonRecordKind } from '@prisma/client';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -49,6 +54,25 @@ class LessonListQueryDto extends PaginationDto {
   @IsOptional()
   @IsString()
   studentId?: string;
+
+  @IsOptional()
+  @IsEnum(LessonRecordKind)
+  recordKind?: LessonRecordKind;
+}
+
+class ChapterListQueryDto {
+  @IsOptional()
+  @IsString()
+  sectionId?: string;
+
+  @IsOptional()
+  @IsString()
+  subjectId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  limit?: number;
 }
 
 const IMAGE_MIME = /^image\/(jpeg|jpg|png|webp|heic|heif)$/i;
@@ -129,6 +153,81 @@ export class LessonsController {
   @Get()
   findAll(@Query() query: LessonListQueryDto, @CurrentUser() user: AuthUser) {
     return this.lessonsService.findAll(user, query);
+  }
+
+  @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)
+  @Get('subject-pace')
+  subjectPace(@Query() query: SubjectPaceQueryDto, @CurrentUser() user: AuthUser) {
+    return this.lessonsService.getSubjectPace(user, query);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Get('chapters')
+  listChapters(@Query() query: ChapterListQueryDto, @CurrentUser() user: AuthUser) {
+    return this.lessonsService.listChapters(user, query);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Post('chapters/paste')
+  createChapterPaste(@Body() dto: CreateChapterPasteDto, @CurrentUser() user: AuthUser) {
+    return this.lessonsService.createChapterFromPaste(dto, user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Post('chapters/:id/confirm-content')
+  confirmChapter(
+    @Param('id') id: string,
+    @Body() dto: ConfirmChapterContentDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.lessonsService.confirmChapterContent(id, dto, user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Patch('chapters/:id/complete')
+  completeChapter(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.lessonsService.markChapterCompleted(id, user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Post('class-sessions')
+  createClassSession(@Body() dto: CreateClassSessionDto, @CurrentUser() user: AuthUser) {
+    return this.lessonsService.createClassSession(dto, user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Post('chapters/extract')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FilesInterceptor('pages', 12, {
+      storage: memoryStorage(),
+      limits: { fileSize: 15 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const allowed =
+          IMAGE_MIME.test(file.mimetype) ||
+          (!file.mimetype && IMAGE_NAME.test(file.originalname)) ||
+          IMAGE_NAME.test(file.originalname);
+        if (!allowed) {
+          cb(
+            new BadRequestException({
+              code: 'INVALID_IMAGE',
+              message: 'Only JPEG, PNG, WebP, or HEIC photos are allowed',
+            }),
+            false,
+          );
+          return;
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  extractChapter(
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() dto: ExtractLessonDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    dto.recordKind = LessonRecordKind.CHAPTER_LIBRARY;
+    return this.lessonsService.extractFromPhotos(dto, files ?? [], user);
   }
 
   @Roles(RoleName.TEACHER)

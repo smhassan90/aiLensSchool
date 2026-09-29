@@ -8,7 +8,7 @@ import {
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { LessonSourceType, LessonStatus } from '@prisma/client';
+import { ClassSessionType, LessonRecordKind, LessonSourceType, LessonStatus } from '@prisma/client';
 
 export class CreateLessonDto {
   @ApiProperty()
@@ -161,6 +161,11 @@ export class ExtractLessonDto {
   // Multer may also place the file field on the body; ignore it so whitelist validation does not reject the request.
   @Allow()
   pages?: unknown;
+
+  @ApiPropertyOptional({ enum: LessonRecordKind })
+  @IsOptional()
+  @IsEnum(LessonRecordKind)
+  recordKind?: LessonRecordKind;
 }
 
 export class UpdateLessonDto {
@@ -224,6 +229,10 @@ export class LessonQueryDto {
   status?: LessonStatus;
 
   @IsOptional()
+  @IsEnum(LessonRecordKind)
+  recordKind?: LessonRecordKind;
+
+  @IsOptional()
   @IsString()
   sectionId?: string;
 
@@ -234,4 +243,147 @@ export class LessonQueryDto {
   @IsOptional()
   @IsString()
   studentId?: string;
+}
+
+export class CreateChapterPasteDto {
+  @ApiProperty()
+  @IsString()
+  academicYearId!: string;
+
+  @ApiProperty()
+  @IsString()
+  gradeId!: string;
+
+  @ApiProperty()
+  @IsString()
+  sectionId!: string;
+
+  @ApiProperty()
+  @IsString()
+  subjectId!: string;
+
+  @ApiProperty()
+  @IsString()
+  branchId!: string;
+
+  @ApiProperty()
+  @IsString()
+  chapterName!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  topicName?: string;
+
+  @ApiProperty()
+  @IsString()
+  contentText!: string;
+}
+
+export class ConfirmChapterContentDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  chapterName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  topicName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  contentText?: string;
+}
+
+export enum HomeworkSessionMode {
+  NONE = 'NONE',
+  PLAIN = 'PLAIN',
+  AI = 'AI',
+}
+
+export class CreateClassSessionDto {
+  @ApiProperty()
+  @IsString()
+  academicYearId!: string;
+
+  @ApiProperty()
+  @IsString()
+  gradeId!: string;
+
+  @ApiProperty()
+  @IsString()
+  sectionId!: string;
+
+  @ApiProperty()
+  @IsString()
+  subjectId!: string;
+
+  @ApiProperty()
+  @IsString()
+  branchId!: string;
+
+  @ApiProperty()
+  @IsDateString()
+  date!: string;
+
+  @ApiProperty({ enum: ClassSessionType })
+  @IsEnum(ClassSessionType)
+  sessionType!: ClassSessionType;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  chapterSourceId?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsString({ each: true })
+  revisionChapterIds?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  parentSummary?: string;
+
+  @ApiProperty({ enum: HomeworkSessionMode })
+  @IsEnum(HomeworkSessionMode)
+  homeworkMode!: HomeworkSessionMode;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  homeworkText?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  homeworkDueDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  homeworkInstruction?: string;
+}
+
+export class SubjectPaceQueryDto {
+  @ApiProperty()
+  @IsString()
+  sectionId!: string;
+
+  @ApiProperty()
+  @IsString()
+  subjectId!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  teacherId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  weeks?: number;
 }

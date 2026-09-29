@@ -1,5 +1,10 @@
 import { apiClient, apiForm, buildQuery } from "@/lib/api-client";
-import type { Lesson, Paginated } from "@/lib/types";
+import type {
+  ClassSessionType,
+  HomeworkSessionMode,
+  Lesson,
+  Paginated,
+} from "@/lib/types";
 
 export interface CreateLessonPayload {
   academicYearId: string;
@@ -40,16 +45,77 @@ export interface UpdateLessonPayload {
   concepts?: string[];
 }
 
+export interface CreateChapterPastePayload {
+  academicYearId: string;
+  gradeId: string;
+  sectionId: string;
+  subjectId: string;
+  branchId: string;
+  chapterName: string;
+  topicName?: string;
+  contentText: string;
+}
+
+export interface CreateClassSessionPayload {
+  academicYearId: string;
+  gradeId: string;
+  sectionId: string;
+  subjectId: string;
+  branchId: string;
+  date: string;
+  sessionType: ClassSessionType;
+  chapterSourceId?: string;
+  revisionChapterIds?: string[];
+  parentSummary?: string;
+  homeworkMode: HomeworkSessionMode;
+  homeworkText?: string;
+  homeworkDueDate?: string;
+  homeworkInstruction?: string;
+}
+
+export interface SubjectPaceSlice {
+  label: string;
+  days: number;
+  chapterIds: string[];
+}
+
+export interface SubjectPace {
+  weeks: number;
+  totalDays: number;
+  slices: SubjectPaceSlice[];
+}
+
+function appendExtractForm(body: FormData, payload: ExtractLessonPayload) {
+  body.append("academicYearId", payload.academicYearId);
+  body.append("gradeId", payload.gradeId);
+  body.append("sectionId", payload.sectionId);
+  body.append("subjectId", payload.subjectId);
+  body.append("branchId", payload.branchId);
+  body.append("date", payload.date);
+  if (payload.teacherNotes) body.append("teacherNotes", payload.teacherNotes);
+  if (payload.pageFrom) body.append("pageFrom", String(payload.pageFrom));
+  if (payload.pageTo) body.append("pageTo", String(payload.pageTo));
+  if (payload.pageText) body.append("pageText", payload.pageText);
+  for (const page of payload.pages) {
+    body.append("pages", page);
+  }
+}
+
 export const lessonsService = {
   list(params?: {
     page?: number;
     limit?: number;
     date?: string;
     status?: string;
+    recordKind?: string;
     sectionId?: string;
     subjectId?: string;
   }) {
     return apiClient<Paginated<Lesson>>(`/lessons${buildQuery(params ?? {})}`);
+  },
+
+  listChapters(params?: { sectionId?: string; subjectId?: string; limit?: number }) {
+    return apiClient<Lesson[]>(`/lessons/chapters${buildQuery(params ?? {})}`);
   },
 
   getById(id: string) {
@@ -65,20 +131,43 @@ export const lessonsService = {
 
   extract(payload: ExtractLessonPayload) {
     const body = new FormData();
-    body.append("academicYearId", payload.academicYearId);
-    body.append("gradeId", payload.gradeId);
-    body.append("sectionId", payload.sectionId);
-    body.append("subjectId", payload.subjectId);
-    body.append("branchId", payload.branchId);
-    body.append("date", payload.date);
-    if (payload.teacherNotes) body.append("teacherNotes", payload.teacherNotes);
-    if (payload.pageFrom) body.append("pageFrom", String(payload.pageFrom));
-    if (payload.pageTo) body.append("pageTo", String(payload.pageTo));
-    if (payload.pageText) body.append("pageText", payload.pageText);
-    for (const page of payload.pages) {
-      body.append("pages", page);
-    }
+    appendExtractForm(body, payload);
     return apiForm<Lesson>("/lessons/extract", body);
+  },
+
+  extractChapter(payload: ExtractLessonPayload) {
+    const body = new FormData();
+    appendExtractForm(body, payload);
+    return apiForm<Lesson>("/lessons/chapters/extract", body);
+  },
+
+  pasteChapter(payload: CreateChapterPastePayload) {
+    return apiClient<Lesson>("/lessons/chapters/paste", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  confirmChapter(id: string, payload: { chapterName?: string; topicName?: string; contentText?: string }) {
+    return apiClient<Lesson>(`/lessons/chapters/${id}/confirm-content`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  completeChapter(id: string) {
+    return apiClient<Lesson>(`/lessons/chapters/${id}/complete`, { method: "PATCH" });
+  },
+
+  createClassSession(payload: CreateClassSessionPayload) {
+    return apiClient<Lesson>("/lessons/class-sessions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  subjectPace(params: { sectionId: string; subjectId: string; teacherId?: string; weeks?: number }) {
+    return apiClient<SubjectPace>(`/lessons/subject-pace${buildQuery(params)}`);
   },
 
   update(id: string, payload: UpdateLessonPayload) {

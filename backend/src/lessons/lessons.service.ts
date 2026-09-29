@@ -8,6 +8,9 @@ import {
 import { ConfigService } from '@nestjs/config';
 import {
   AIRequestStatus,
+  ChapterProgressStatus,
+  ClassSessionType,
+  LessonRecordKind,
   LessonSourceType,
   LessonStatus,
   Prisma,
@@ -28,13 +31,19 @@ import { PageOcrService } from './page-ocr.service';
 import { deriveKeyPointsFromLesson, formatOcrLesson } from './lesson-text-formatter';
 import { coerceLessonDisplayText } from './lesson-display-text';
 import {
+  ConfirmChapterContentDto,
+  CreateChapterPasteDto,
+  CreateClassSessionDto,
   CreateLessonDto,
   ExtractLessonDto,
+  HomeworkSessionMode,
   LessonQueryDto,
   RegenerateKeyPointsDto,
   ScanLessonDto,
   UpdateLessonDto,
 } from './dto/lesson.dto';
+import { DocumentsService } from '../documents/documents.service';
+import { HomeworkService } from '../homework/homework.service';
 import { TeacherGradeStyleService } from '../common/services/teacher-grade-style.service';
 import { applyKeyPointStyle } from './teacher-content-style';
 import { LessonImageInput } from '../ai/providers/ai.provider';
@@ -72,6 +81,8 @@ export class LessonsService {
     private readonly gradeStyle: TeacherGradeStyleService,
     private readonly cache: MemoryCacheService,
     private readonly filesService: FilesService,
+    private readonly documentsService: DocumentsService,
+    private readonly homeworkService: HomeworkService,
   ) {}
 
   private async requireTeacherProfile(userId: string) {
@@ -587,6 +598,7 @@ export class LessonsService {
         : []),
     ];
 
+    const recordKind = dto.recordKind ?? LessonRecordKind.CLASS_SESSION;
     const lesson = await this.prisma.dailyLesson.create({
       data: {
         schoolId,
@@ -605,6 +617,10 @@ export class LessonsService {
         pageFrom: output.pageFrom ?? pageFrom,
         pageTo: output.pageTo ?? pageTo,
         status: LessonStatus.READY_FOR_REVIEW,
+        recordKind,
+        contentConfirmed: false,
+        chapterProgress:
+          recordKind === LessonRecordKind.CHAPTER_LIBRARY ? ChapterProgressStatus.IN_PROGRESS : null,
         sources: sourceCreates.length ? { create: sourceCreates } : undefined,
         concepts: output.concepts.length
           ? { create: output.concepts.map((name) => ({ name })) }
@@ -643,7 +659,12 @@ export class LessonsService {
         message: 'Only the assigned lesson teacher can update this lesson',
       });
     }
-    if (lesson.status === LessonStatus.CONFIRMED) {
+    const libraryEdit =
+      lesson.recordKind === LessonRecordKind.CHAPTER_LIBRARY &&
+      (dto.extractedText !== undefined ||
+        dto.chapterName !== undefined ||
+        dto.topicName !== undefined);
+    if (lesson.status === LessonStatus.CONFIRMED && !libraryEdit) {
       throw new BadRequestException({
         code: 'LESSON_ALREADY_CONFIRMED',
         message: 'Confirmed lessons cannot be edited',
@@ -1099,6 +1120,7 @@ export class LessonsService {
         schoolId,
         sectionId: enrollment.sectionId,
         status: LessonStatus.CONFIRMED,
+        recordKind: LessonRecordKind.CLASS_SESSION,
         ...(query.date ? { date: new Date(query.date) } : {}),
         ...(query.subjectId ? { subjectId: query.subjectId } : {}),
       };
@@ -1156,6 +1178,7 @@ export class LessonsService {
       schoolId,
       ...teacherFilter,
       ...(query.status ? { status: query.status } : {}),
+      ...(query.recordKind ? { recordKind: query.recordKind } : {}),
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
       ...(query.subjectId ? { subjectId: query.subjectId } : {}),
       ...(query.date ? { date: new Date(query.date) } : {}),
@@ -1172,6 +1195,12 @@ export class LessonsService {
             id: true,
             date: true,
             status: true,
+            recordKind: true,
+            sessionType: true,
+            contentConfirmed: true,
+            chapterProgress: true,
+            chapterSourceId: true,
+            parentSummary: true,
             topicName: true,
             chapterName: true,
             sectionId: true,
@@ -1192,6 +1221,377 @@ export class LessonsService {
     );
 
     return paginate(items, total, page, limit);
+  }
+
+  async listChapters(
+    user: AuthUser,
+    query: { sectionId?: string; subjectId?: string; limit?: number },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.requireTeacherProfile(user.id);
+    const limit = Math.min(query.limit ?? 50, 100);
+    const items = await this.prisma.dailyLesson.findMany({
+      where: {
+        schoolId,
+        teacherId: teacher.id,
+        recordKind: LessonRecordKind.CHAPTER_LIBRARY,
+        ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+        ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+      },
+      orderBy: [{ updatedAt: 'desc' }],
+      take: limit,
+      include: {
+        subject: { select: { id: true, name: true } },
+        section: { select: { id: true, name: true, grade: { select: { id: true, name: true } } } },
+        grade: { select: { id: true, name: true } },
+        sources: { select: { ocrText: true, manualText: true } },
+      },
+    });
+    return items.map((row) => this.presentLesson(row));
+  }
+
+  async createChapterFromPaste(dto: CreateChapterPasteDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.requireTeacherProfile(user.id);
+    await this.assertTeacherAssignment({
+      schoolId,
+      userId: user.id,
+      teacherId: teacher.id,
+      sectionId: dto.sectionId,
+      subjectId: dto.subjectId,
+      academicYearId: dto.academicYearId,
+    });
+    const text = coerceLessonDisplayText(dto.contentText.trim());
+    if (!text) {
+      throw new BadRequestException({
+        code: 'CONTENT_REQUIRED',
+        message: 'Paste the chapter text before saving',
+      });
+    }
+    const lesson = await this.prisma.dailyLesson.create({
+      data: {
+        schoolId,
+        branchId: dto.branchId,
+        academicYearId: dto.academicYearId,
+        gradeId: dto.gradeId,
+        sectionId: dto.sectionId,
+        subjectId: dto.subjectId,
+        teacherId: teacher.id,
+        createdById: user.id,
+        date: new Date(),
+        chapterName: dto.chapterName.trim(),
+        topicName: dto.topicName?.trim(),
+        aiSummary: text,
+        status: LessonStatus.READY_FOR_REVIEW,
+        recordKind: LessonRecordKind.CHAPTER_LIBRARY,
+        contentConfirmed: false,
+        chapterProgress: ChapterProgressStatus.IN_PROGRESS,
+        sources: {
+          create: {
+            type: LessonSourceType.MANUAL_TEXT,
+            manualText: text,
+            ocrText: text,
+          },
+        },
+      },
+    });
+    return this.loadPresented(lesson.id);
+  }
+
+  async confirmChapterContent(id: string, dto: ConfirmChapterContentDto, user: AuthUser) {
+    const teacher = await this.requireTeacherProfile(user.id);
+    const lesson = await this.prisma.dailyLesson.findUnique({
+      where: { id },
+      include: { sources: true },
+    });
+    if (!lesson || lesson.recordKind !== LessonRecordKind.CHAPTER_LIBRARY) {
+      throw new NotFoundException({ code: 'CHAPTER_NOT_FOUND', message: 'Chapter not found' });
+    }
+    this.tenant.assertSchoolAccess(user, lesson.schoolId);
+    if (lesson.teacherId !== teacher.id) {
+      throw new ForbiddenException({ code: 'LESSON_OWNER_REQUIRED', message: 'Not your chapter' });
+    }
+    const contentText =
+      dto.contentText !== undefined ? coerceLessonDisplayText(dto.contentText) : undefined;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.dailyLesson.update({
+        where: { id },
+        data: {
+          chapterName: dto.chapterName?.trim() || lesson.chapterName,
+          topicName: dto.topicName?.trim() ?? lesson.topicName,
+          aiSummary: contentText ?? lesson.aiSummary,
+          contentConfirmed: true,
+          status: LessonStatus.CONFIRMED,
+          chapterProgress: lesson.chapterProgress ?? ChapterProgressStatus.IN_PROGRESS,
+          confirmedAt: new Date(),
+        },
+      });
+      if (contentText !== undefined) {
+        const source = lesson.sources[0];
+        if (source) {
+          await tx.lessonSource.update({
+            where: { id: source.id },
+            data: { ocrText: contentText, manualText: contentText },
+          });
+        }
+      }
+    });
+    return this.loadPresented(id);
+  }
+
+  async markChapterCompleted(id: string, user: AuthUser) {
+    const teacher = await this.requireTeacherProfile(user.id);
+    const lesson = await this.prisma.dailyLesson.findUnique({ where: { id } });
+    if (!lesson || lesson.recordKind !== LessonRecordKind.CHAPTER_LIBRARY) {
+      throw new NotFoundException({ code: 'CHAPTER_NOT_FOUND', message: 'Chapter not found' });
+    }
+    if (lesson.teacherId !== teacher.id) {
+      throw new ForbiddenException({ code: 'LESSON_OWNER_REQUIRED', message: 'Not your chapter' });
+    }
+    await this.prisma.dailyLesson.update({
+      where: { id },
+      data: { chapterProgress: ChapterProgressStatus.COMPLETED },
+    });
+    return this.loadPresented(id);
+  }
+
+  async createClassSession(dto: CreateClassSessionDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.requireTeacherProfile(user.id);
+    await this.assertTeacherAssignment({
+      schoolId,
+      userId: user.id,
+      teacherId: teacher.id,
+      sectionId: dto.sectionId,
+      subjectId: dto.subjectId,
+      academicYearId: dto.academicYearId,
+    });
+
+    const sessionDate = new Date(dto.date);
+    if (Number.isNaN(sessionDate.getTime())) {
+      throw new BadRequestException({ code: 'INVALID_DATE', message: 'Invalid class date' });
+    }
+
+    let chapterSource: { id: string; chapterName: string | null; topicName: string | null } | null =
+      null;
+    if (dto.sessionType === ClassSessionType.REVISION) {
+      const ids = (dto.revisionChapterIds ?? []).filter(Boolean);
+      if (!ids.length) {
+        throw new BadRequestException({
+          code: 'REVISION_CHAPTERS_REQUIRED',
+          message: 'Select at least one chapter for revision',
+        });
+      }
+      const chapters = await this.prisma.dailyLesson.findMany({
+        where: {
+          id: { in: ids },
+          schoolId,
+          teacherId: teacher.id,
+          recordKind: LessonRecordKind.CHAPTER_LIBRARY,
+          contentConfirmed: true,
+        },
+      });
+      if (chapters.length !== ids.length) {
+        throw new BadRequestException({
+          code: 'INVALID_REVISION_CHAPTERS',
+          message: 'One or more chapters are missing or not confirmed',
+        });
+      }
+    } else {
+      if (!dto.chapterSourceId) {
+        throw new BadRequestException({
+          code: 'CHAPTER_REQUIRED',
+          message: 'Select the chapter for this class',
+        });
+      }
+      chapterSource = await this.prisma.dailyLesson.findFirst({
+        where: {
+          id: dto.chapterSourceId,
+          schoolId,
+          teacherId: teacher.id,
+          recordKind: LessonRecordKind.CHAPTER_LIBRARY,
+          contentConfirmed: true,
+        },
+        select: { id: true, chapterName: true, topicName: true },
+      });
+      if (!chapterSource) {
+        throw new BadRequestException({
+          code: 'CHAPTER_NOT_READY',
+          message: 'Chapter content must be confirmed before logging class',
+        });
+      }
+    }
+
+    const parentSummary =
+      dto.parentSummary?.trim() ||
+      (dto.sessionType === ClassSessionType.REVISION
+        ? `Revision — ${(dto.revisionChapterIds ?? []).length} chapter(s)`
+        : dto.sessionType === ClassSessionType.CONTINUATION
+          ? `Continued ${chapterSource?.chapterName ?? 'chapter'}`
+          : `New lesson — ${chapterSource?.chapterName ?? 'chapter'}`);
+
+    const session = await this.prisma.dailyLesson.create({
+      data: {
+        schoolId,
+        branchId: dto.branchId,
+        academicYearId: dto.academicYearId,
+        gradeId: dto.gradeId,
+        sectionId: dto.sectionId,
+        subjectId: dto.subjectId,
+        teacherId: teacher.id,
+        createdById: user.id,
+        date: sessionDate,
+        chapterName: chapterSource?.chapterName,
+        topicName: chapterSource?.topicName,
+        recordKind: LessonRecordKind.CLASS_SESSION,
+        sessionType: dto.sessionType,
+        chapterSourceId: chapterSource?.id,
+        revisionChapterIds:
+          dto.sessionType === ClassSessionType.REVISION
+            ? (dto.revisionChapterIds as Prisma.InputJsonValue)
+            : undefined,
+        parentSummary,
+        teacherNotes: parentSummary,
+        aiSummary: parentSummary,
+        status: LessonStatus.CONFIRMED,
+        confirmedAt: new Date(),
+        contentConfirmed: true,
+      },
+    });
+
+    if (dto.homeworkMode === HomeworkSessionMode.PLAIN) {
+      const text = dto.homeworkText?.trim();
+      if (!text) {
+        throw new BadRequestException({
+          code: 'HOMEWORK_TEXT_REQUIRED',
+          message: 'Write homework instructions or choose no homework',
+        });
+      }
+      const due =
+        dto.homeworkDueDate ?? new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+      const title = chapterSource?.chapterName ?? chapterSource?.topicName ?? 'Homework';
+      await this.homeworkService.create(
+        {
+          academicYearId: dto.academicYearId,
+          sectionId: dto.sectionId,
+          subjectId: dto.subjectId,
+          branchId: dto.branchId,
+          title,
+          description: text,
+          dueDate: due,
+          lessonId: session.id,
+        },
+        user,
+      );
+    } else if (dto.homeworkMode === HomeworkSessionMode.AI) {
+      if (!chapterSource?.id) {
+        throw new BadRequestException({
+          code: 'CHAPTER_REQUIRED_FOR_AI_HW',
+          message: 'AI homework needs a chapter source',
+        });
+      }
+      const preview = await this.documentsService.previewHomework(
+        {
+          lessonId: chapterSource.id,
+          dueDate: dto.homeworkDueDate,
+          instruction: dto.homeworkInstruction,
+        },
+        user,
+      );
+      await this.homeworkService.create(
+        {
+          academicYearId: preview.academicYearId,
+          sectionId: preview.sectionId,
+          subjectId: preview.subjectId,
+          branchId: preview.branchId,
+          title: preview.title,
+          description: preview.description,
+          answerKey: preview.answerKey,
+          questionsJson: preview.questionsJson,
+          dueDate: preview.dueDate,
+          lessonId: session.id,
+        },
+        user,
+      );
+    }
+
+    this.cache.invalidatePrefix(`teacher:summary:${user.id}`);
+    return this.loadPresented(session.id);
+  }
+
+  async getSubjectPace(
+    user: AuthUser,
+    query: { sectionId: string; subjectId: string; teacherId?: string; weeks?: number },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const weeks = query.weeks ?? 8;
+    const since = new Date();
+    since.setDate(since.getDate() - weeks * 7);
+
+    let teacherId = query.teacherId;
+    if (this.tenant.isTeacher(user) && !this.tenant.isSchoolAdmin(user)) {
+      const teacher = await this.requireTeacherProfile(user.id);
+      if (teacherId && teacherId !== teacher.id) {
+        const headIds = await resolveHeadTeacherSectionIds(this.prisma, schoolId, user.id);
+        if (!headIds.includes(query.sectionId)) {
+          throw new ForbiddenException({ code: 'FORBIDDEN', message: 'Cannot view other teachers' });
+        }
+      } else {
+        teacherId = teacher.id;
+      }
+    }
+
+    const sessions = await this.prisma.dailyLesson.findMany({
+      where: {
+        schoolId,
+        sectionId: query.sectionId,
+        subjectId: query.subjectId,
+        recordKind: LessonRecordKind.CLASS_SESSION,
+        status: LessonStatus.CONFIRMED,
+        date: { gte: since },
+        ...(teacherId ? { teacherId } : {}),
+      },
+      select: {
+        sessionType: true,
+        revisionChapterIds: true,
+        chapterSource: { select: { id: true, chapterName: true, topicName: true } },
+      },
+    });
+
+    type Slice = { label: string; days: number; chapterIds: string[] };
+    const buckets = new Map<string, Slice>();
+    const bump = (label: string, chapterId?: string) => {
+      const key = label.toLowerCase();
+      const existing = buckets.get(key) ?? { label, days: 0, chapterIds: [] };
+      existing.days += 1;
+      if (chapterId && !existing.chapterIds.includes(chapterId)) {
+        existing.chapterIds.push(chapterId);
+      }
+      buckets.set(key, existing);
+    };
+
+    for (const row of sessions) {
+      if (row.sessionType === ClassSessionType.REVISION) {
+        const ids = Array.isArray(row.revisionChapterIds)
+          ? (row.revisionChapterIds as string[])
+          : [];
+        bump('Revision');
+        for (const id of ids) {
+          const slice = buckets.get('revision');
+          if (slice && !slice.chapterIds.includes(id)) slice.chapterIds.push(id);
+        }
+      } else {
+        const label =
+          row.chapterSource?.chapterName ||
+          row.chapterSource?.topicName ||
+          'Unlabeled chapter';
+        bump(label, row.chapterSource?.id);
+      }
+    }
+
+    const slices = Array.from(buckets.values()).sort((a, b) => b.days - a.days);
+    const totalDays = slices.reduce((sum, s) => sum + s.days, 0);
+    return { weeks, totalDays, slices };
   }
 
   async findOne(id: string, user: AuthUser) {

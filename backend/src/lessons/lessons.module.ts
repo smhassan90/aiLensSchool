@@ -7,9 +7,11 @@ import { AuditModule } from '../audit/audit.module';
 import { AiModule } from '../ai/ai.module';
 import { ParentsModule } from '../parents/parents.module';
 import { FilesModule } from '../files/files.module';
+import { HomeworkModule } from '../homework/homework.module';
+import { DocumentsModule } from '../documents/documents.module';
 
 @Module({
-  imports: [CommonModule, AuditModule, AiModule, ParentsModule, FilesModule],
+  imports: [CommonModule, AuditModule, AiModule, ParentsModule, FilesModule, HomeworkModule, DocumentsModule],
   providers: [LessonsService, PageOcrService],
   controllers: [LessonsController],
   exports: [LessonsService],

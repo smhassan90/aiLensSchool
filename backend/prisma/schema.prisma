@@ -117,6 +117,22 @@ enum LessonStatus {
   CANCELLED
 }
 
+enum LessonRecordKind {
+  CHAPTER_LIBRARY
+  CLASS_SESSION
+}
+
+enum ClassSessionType {
+  NEW_LESSON
+  CONTINUATION
+  REVISION
+}
+
+enum ChapterProgressStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
 enum LessonSourceType {
   TEXTBOOK_IMAGE
   PDF
@@ -1210,6 +1226,13 @@ model DailyLesson {
   pageFrom       Int?         @map("page_from")
   pageTo         Int?         @map("page_to")
   status         LessonStatus @default(DRAFT)
+  recordKind     LessonRecordKind @default(CLASS_SESSION) @map("record_kind")
+  sessionType    ClassSessionType? @map("session_type")
+  contentConfirmed Boolean    @default(false) @map("content_confirmed")
+  chapterProgress ChapterProgressStatus? @map("chapter_progress")
+  chapterSourceId String?    @map("chapter_source_id")
+  revisionChapterIds Json?  @map("revision_chapter_ids")
+  parentSummary  String?    @map("parent_summary") @db.Text
   confirmedAt    DateTime?    @map("confirmed_at")
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
@@ -1224,6 +1247,8 @@ model DailyLesson {
   createdBy    User            @relation("LessonCreatedBy", fields: [createdById], references: [id])
   chapter      Chapter?        @relation(fields: [chapterId], references: [id])
   topic        Topic?          @relation(fields: [topicId], references: [id])
+  chapterSource DailyLesson?   @relation("ClassSessionChapterSource", fields: [chapterSourceId], references: [id], onDelete: SetNull)
+  classSessions DailyLesson[]  @relation("ClassSessionChapterSource")
   sources      LessonSource[]
   concepts     LessonConcept[]
   homework     Homework[]

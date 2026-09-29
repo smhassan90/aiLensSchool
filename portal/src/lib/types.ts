@@ -300,10 +300,22 @@ export interface Enrollment {
   academicYear?: AcademicYear;
 }
 
+export type LessonRecordKind = "CHAPTER_LIBRARY" | "CLASS_SESSION";
+export type ClassSessionType = "NEW_LESSON" | "CONTINUATION" | "REVISION";
+export type ChapterProgressStatus = "IN_PROGRESS" | "COMPLETED";
+export type HomeworkSessionMode = "NONE" | "PLAIN" | "AI";
+
 export interface Lesson {
   id: string;
   date: string;
   status: string;
+  recordKind?: LessonRecordKind;
+  sessionType?: ClassSessionType | null;
+  contentConfirmed?: boolean;
+  chapterProgress?: ChapterProgressStatus | null;
+  chapterSourceId?: string | null;
+  revisionChapterIds?: string[] | null;
+  parentSummary?: string | null;
   academicYearId?: string;
   sectionId?: string;
   subjectId?: string;
