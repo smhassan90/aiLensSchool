@@ -587,7 +587,7 @@ export function TodayInClassForm({
                 type="button"
                 disabled={generateAiHomework.isPending || !selected}
                 onClick={() => {
-                  if (sessionType !== "REVISION" && !chapterSourceId) {
+                  if (!chapterSourceId) {
                     toast({ title: "Select a chapter", variant: "error" });
                     return;
                   }
