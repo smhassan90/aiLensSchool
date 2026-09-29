@@ -13,9 +13,11 @@ import { lessonsService } from "@/services/lessons.service";
 import { teachersService } from "@/services/teachers.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
-import { localDateISO, localDateISOPlusDays } from "@/lib/utils";
+import { coerceLessonDisplayText } from "@/lib/lesson-display-text";
+import { formatDate, localDateISO, localDateISOPlusDays } from "@/lib/utils";
 import type { ClassSessionType, HomeworkSessionMode, Lesson } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 const SESSION_TYPES: { key: ClassSessionType; title: string; hint: string }[] = [
   { key: "NEW_LESSON", title: "New lesson", hint: "New material taught" },
@@ -25,6 +27,115 @@ const SESSION_TYPES: { key: ClassSessionType; title: string; hint: string }[] = 
 
 function chapterLabel(ch: Lesson) {
   return ch.chapterName || ch.topicName || "Chapter";
+}
+
+function chapterSubtitle(ch: Lesson) {
+  if (ch.chapterName && ch.topicName && ch.topicName !== ch.chapterName) {
+    return ch.topicName;
+  }
+  return null;
+}
+
+function chapterContentPreview(ch: Lesson, maxLen = 140) {
+  const raw = coerceLessonDisplayText(ch.extractedText ?? ch.aiSummary ?? "");
+  const oneLine = raw.replace(/\s+/g, " ").trim();
+  if (!oneLine) return "No preview text — open the chapter to check content.";
+  if (oneLine.length <= maxLen) return oneLine;
+  return `${oneLine.slice(0, maxLen).trim()}…`;
+}
+
+function pageRangeLabel(ch: Lesson) {
+  if (ch.pageFrom && ch.pageTo) return `Pages ${ch.pageFrom}–${ch.pageTo}`;
+  if (ch.pageFrom) return `From page ${ch.pageFrom}`;
+  return null;
+}
+
+function ChapterPickRow({
+  ch,
+  selected,
+  onSelect,
+  inputType,
+  checked,
+  onToggle,
+}: {
+  ch: Lesson;
+  selected?: boolean;
+  onSelect?: () => void;
+  inputType?: "radio" | "checkbox";
+  checked?: boolean;
+  onToggle?: () => void;
+}) {
+  const subtitle = chapterSubtitle(ch);
+  const pages = pageRangeLabel(ch);
+  const progress =
+    ch.chapterProgress === "COMPLETED"
+      ? "Completed"
+      : ch.chapterProgress === "IN_PROGRESS"
+        ? "In progress"
+        : null;
+
+  const body = (
+    <>
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold leading-snug">{chapterLabel(ch)}</p>
+          {progress && (
+            <Badge variant={ch.chapterProgress === "COMPLETED" ? "secondary" : "warning"} className="text-[10px]">
+              {progress}
+            </Badge>
+          )}
+        </div>
+        {subtitle && <p className="text-xs font-medium text-muted-foreground">{subtitle}</p>}
+        <p className="text-xs leading-relaxed text-muted-foreground" dir={/[\u0600-\u06FF]/.test(ch.extractedText ?? "") ? "rtl" : undefined}>
+          {chapterContentPreview(ch)}
+        </p>
+        <p className="text-[11px] text-muted-foreground/80">
+          {[pages, ch.date ? `Added ${formatDate(ch.date)}` : null].filter(Boolean).join(" · ")}
+        </p>
+      </div>
+    </>
+  );
+
+  if (inputType === "checkbox" && onToggle) {
+    return (
+      <label
+        className={cn(
+          "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+          checked ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/25",
+        )}
+      >
+        <input type="checkbox" className="mt-1" checked={checked} onChange={onToggle} />
+        {body}
+      </label>
+    );
+  }
+
+  if (inputType === "radio" && onSelect) {
+    return (
+      <label
+        className={cn(
+          "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+          selected ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/25",
+        )}
+      >
+        <input type="radio" name="continuation" className="mt-1" checked={selected} onChange={onSelect} />
+        {body}
+      </label>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "w-full rounded-lg border p-3 text-left transition-colors",
+        selected ? "border-primary bg-primary/10 ring-1 ring-primary/30" : "border-border hover:border-primary/30",
+      )}
+    >
+      {body}
+    </button>
+  );
 }
 
 export function TodayInClassForm({
@@ -185,7 +296,9 @@ export function TodayInClassForm({
         <Card>
           <CardHeader>
             <CardTitle>Chapter</CardTitle>
-            <CardDescription>Pick saved chapter content for this new lesson.</CardDescription>
+            <CardDescription>
+              Each card shows the chapter title and a short preview of the saved lecture text so you can pick the right one.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {!readyChapters.length ? (
@@ -196,19 +309,14 @@ export function TodayInClassForm({
                 </Link>
               </p>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <div className="space-y-2">
                 {readyChapters.map((ch) => (
-                  <button
+                  <ChapterPickRow
                     key={ch.id}
-                    type="button"
-                    onClick={() => setChapterSourceId(ch.id)}
-                    className={cn(
-                      "rounded-lg border px-3 py-2 text-sm",
-                      chapterSourceId === ch.id ? "border-primary bg-primary/10" : "border-border",
-                    )}
-                  >
-                    {chapterLabel(ch)}
-                  </button>
+                    ch={ch}
+                    selected={chapterSourceId === ch.id}
+                    onSelect={() => setChapterSourceId(ch.id)}
+                  />
                 ))}
               </div>
             )}
@@ -224,16 +332,13 @@ export function TodayInClassForm({
           <CardContent className="space-y-2">
             {inProgress.length ? (
               inProgress.map((ch) => (
-                <label key={ch.id} className="flex cursor-pointer items-center gap-2 rounded-lg border p-3">
-                  <input
-                    type="radio"
-                    name="continuation"
-                    checked={chapterSourceId === ch.id}
-                    onChange={() => setChapterSourceId(ch.id)}
-                  />
-                  <span className="text-sm font-medium">{chapterLabel(ch)}</span>
-                  <span className="text-xs text-muted-foreground">In progress</span>
-                </label>
+                <ChapterPickRow
+                  key={ch.id}
+                  ch={ch}
+                  inputType="radio"
+                  selected={chapterSourceId === ch.id}
+                  onSelect={() => setChapterSourceId(ch.id)}
+                />
               ))
             ) : (
               <p className="text-sm text-muted-foreground">No in-progress chapters. Log a new lesson first.</p>
@@ -250,14 +355,13 @@ export function TodayInClassForm({
           </CardHeader>
           <CardContent className="space-y-2">
             {readyChapters.map((ch) => (
-              <label key={ch.id} className="flex cursor-pointer items-center gap-2 rounded-lg border p-3">
-                <input
-                  type="checkbox"
-                  checked={revisionIds.includes(ch.id)}
-                  onChange={() => toggleRevision(ch.id)}
-                />
-                <span className="text-sm">{chapterLabel(ch)}</span>
-              </label>
+              <ChapterPickRow
+                key={ch.id}
+                ch={ch}
+                inputType="checkbox"
+                checked={revisionIds.includes(ch.id)}
+                onToggle={() => toggleRevision(ch.id)}
+              />
             ))}
           </CardContent>
         </Card>

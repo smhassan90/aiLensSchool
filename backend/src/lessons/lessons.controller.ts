@@ -113,7 +113,7 @@ export class LessonsController {
     },
   })
   @UseInterceptors(
-    FilesInterceptor('pages', 12, {
+    FilesInterceptor('pages', 5, {
       storage: memoryStorage(),
       limits: { fileSize: 15 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
@@ -199,7 +199,7 @@ export class LessonsController {
   @Post('chapters/extract')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
-    FilesInterceptor('pages', 12, {
+    FilesInterceptor('pages', 5, {
       storage: memoryStorage(),
       limits: { fileSize: 15 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {

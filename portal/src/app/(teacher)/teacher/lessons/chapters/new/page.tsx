@@ -22,7 +22,7 @@ import { localDateISO } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ImagePlus, X } from "lucide-react";
 
-const MAX_PHOTOS = 10;
+const MAX_PHOTOS = 5;
 const IMAGE_EXT = /\.(jpe?g|png|webp|heic|heif)$/i;
 
 function isImageFile(file: File) {
@@ -156,7 +156,9 @@ export default function NewChapterPage() {
         <Card>
           <CardHeader>
             <CardTitle>{tab === "photos" ? "Page photos" : "Paste text"}</CardTitle>
-            <CardDescription>Confirm content on the next screen before using in class.</CardDescription>
+            <CardDescription>
+              Confirm content on the next screen before using in class. You can add up to {MAX_PHOTOS} photos per upload.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -199,7 +201,17 @@ export default function NewChapterPage() {
                     onChange={(e) => {
                       const next = Array.from(e.target.files ?? []).filter(isImageFile);
                       e.target.value = "";
-                      setPhotos((c) => [...c, ...next].slice(0, MAX_PHOTOS));
+                      setPhotos((c) => {
+                        const merged = [...c, ...next];
+                        if (merged.length > MAX_PHOTOS) {
+                          toast({
+                            title: `Maximum ${MAX_PHOTOS} photos`,
+                            description: `Only the first ${MAX_PHOTOS} photos are kept.`,
+                            variant: "error",
+                          });
+                        }
+                        return merged.slice(0, MAX_PHOTOS);
+                      });
                     }}
                   />
                 </label>
