@@ -79,7 +79,7 @@ export default function SubjectPacePage() {
         <PageLoader variant="panel" task="lessons" />
       ) : pace.data ? (
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 pb-8">
             <SubjectPaceChart pace={pace.data} />
           </CardContent>
         </Card>

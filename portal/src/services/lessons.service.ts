@@ -81,6 +81,14 @@ export interface SubjectPaceSlice {
   label: string;
   days: number;
   chapterIds: string[];
+  chapterId?: string | null;
+  chapterName?: string | null;
+  topicName?: string | null;
+  chapterProgress?: string | null;
+  contentPreview?: string | null;
+  pageFrom?: number | null;
+  pageTo?: number | null;
+  addedDate?: string | null;
 }
 
 export interface SubjectPace {

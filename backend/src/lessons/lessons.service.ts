@@ -1644,9 +1644,71 @@ export class LessonsService {
       }
     }
 
-    const slices = Array.from(buckets.values())
+    const sliceRows = Array.from(buckets.values())
       .map((s) => ({ ...s, days: Math.round(s.days * 10) / 10 }))
       .sort((a, b) => b.days - a.days);
+
+    const metaIds = [
+      ...new Set(sliceRows.flatMap((s) => s.chapterIds).filter((id): id is string => Boolean(id))),
+    ];
+    const metaRows = metaIds.length
+      ? await this.prisma.dailyLesson.findMany({
+          where: { id: { in: metaIds }, schoolId },
+          select: {
+            id: true,
+            chapterName: true,
+            topicName: true,
+            chapterProgress: true,
+            aiSummary: true,
+            pageFrom: true,
+            pageTo: true,
+            date: true,
+            sources: { select: { ocrText: true, manualText: true } },
+          },
+        })
+      : [];
+    const metaById = new Map(
+      metaRows.map((row) => {
+        const text =
+          row.sources
+            .map((s) => s.ocrText?.trim() || s.manualText?.trim() || '')
+            .filter(Boolean)
+            .join('\n\n') ||
+          row.aiSummary?.trim() ||
+          '';
+        const preview = coerceLessonDisplayText(text).replace(/\s+/g, ' ').trim();
+        return [
+          row.id,
+          {
+            chapterName: row.chapterName,
+            topicName: row.topicName,
+            chapterProgress: row.chapterProgress,
+            pageFrom: row.pageFrom,
+            pageTo: row.pageTo,
+            addedDate: row.date.toISOString().slice(0, 10),
+            contentPreview:
+              preview.length > 220 ? `${preview.slice(0, 217).trim()}…` : preview || null,
+          },
+        ];
+      }),
+    );
+
+    const slices = sliceRows.map((s) => {
+      const chapterId = s.chapterIds[0] ?? null;
+      const meta = chapterId ? metaById.get(chapterId) : undefined;
+      return {
+        ...s,
+        chapterId,
+        topicName: meta?.topicName ?? null,
+        chapterName: meta?.chapterName ?? s.label,
+        chapterProgress: meta?.chapterProgress ?? null,
+        contentPreview: meta?.contentPreview ?? null,
+        pageFrom: meta?.pageFrom ?? null,
+        pageTo: meta?.pageTo ?? null,
+        addedDate: meta?.addedDate ?? null,
+      };
+    });
+
     const totalDays = Math.round(sessionCount * 10) / 10;
     return { periodLabel, totalDays, slices };
   }
