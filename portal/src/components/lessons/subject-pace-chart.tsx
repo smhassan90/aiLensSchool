@@ -59,19 +59,21 @@ function ChapterDetailPanel({
   const rtl = /[\u0600-\u06FF]/.test(preview);
 
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="mb-3 flex items-start justify-between gap-3">
+    <div className="flex h-full min-h-[280px] flex-col rounded-xl border bg-card p-4 shadow-sm">
+      <div className="mb-3 flex shrink-0 items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />
-            <h3 className="text-base font-semibold leading-snug">{chapterTitle(ch)}</h3>
+            <h3 className="line-clamp-2 text-base font-semibold leading-snug">{chapterTitle(ch)}</h3>
             {progress && (
               <Badge variant={ch.chapterProgress === "COMPLETED" ? "secondary" : "warning"} className="text-[10px]">
                 {progress}
               </Badge>
             )}
           </div>
-          {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+          <p className="line-clamp-1 min-h-[1.25rem] text-sm text-muted-foreground">
+            {subtitle ?? "\u00a0"}
+          </p>
         </div>
         <div className="shrink-0 text-right text-sm tabular-nums text-muted-foreground">
           <p className="font-semibold text-foreground">{formatDays(slice.days)} days</p>
@@ -79,19 +81,21 @@ function ChapterDetailPanel({
         </div>
       </div>
       <p
-        className="text-sm leading-relaxed text-muted-foreground"
+        className="line-clamp-4 min-h-[5.5rem] flex-1 text-sm leading-relaxed text-muted-foreground"
         dir={rtl ? "rtl" : undefined}
       >
         {preview}
       </p>
-      {meta ? <p className="mt-2 text-xs text-muted-foreground/80">{meta}</p> : null}
-      {slice.chapterId ? (
-        <div className="mt-4">
+      <p className="mt-2 line-clamp-1 min-h-[1rem] shrink-0 text-xs text-muted-foreground/80">
+        {meta ?? "\u00a0"}
+      </p>
+      <div className="mt-4 shrink-0 min-h-[2.25rem]">
+        {slice.chapterId ? (
           <Link href={`/teacher/lessons/chapters/${slice.chapterId}`}>
             <Button size="sm" variant="outline">Open lecture</Button>
           </Link>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -152,9 +156,9 @@ export function SubjectPaceChart({ pace }: { pace: SubjectPace }) {
   const circumference = 2 * Math.PI * radius;
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(240px,280px)_minmax(0,1fr)] lg:items-start">
-      <div className="flex w-full flex-col items-center gap-3 lg:sticky lg:top-6">
-        <div className="relative mx-auto" style={{ width: size, height: size }}>
+    <div className="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+      <div className="flex w-[280px] max-w-full flex-col items-center gap-3 self-start">
+        <div className="relative shrink-0" style={{ width: size, height: size }}>
           <svg
             width={size}
             height={size}
@@ -187,11 +191,14 @@ export function SubjectPaceChart({ pace }: { pace: SubjectPace }) {
                     r={radius}
                     fill="none"
                     stroke={seg.color}
-                    strokeWidth={activeKey === seg.key ? stroke + 4 : stroke}
+                    strokeWidth={stroke}
                     strokeDasharray={`${len} ${gap}`}
                     strokeDashoffset={offset}
-                    className="cursor-pointer transition-all duration-200"
-                    style={{ opacity: dimmed ? 0.3 : 1 }}
+                    className="cursor-pointer transition-opacity duration-150"
+                    style={{
+                      opacity: dimmed ? 0.3 : activeKey === seg.key ? 1 : 0.85,
+                      filter: activeKey === seg.key ? "brightness(1.05)" : undefined,
+                    }}
                     onMouseEnter={() => setActiveKey(seg.key)}
                     onClick={() => openChapter(seg)}
                     role="button"
@@ -207,27 +214,29 @@ export function SubjectPaceChart({ pace }: { pace: SubjectPace }) {
           </svg>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
             {active ? (
-              <>
+              <div className="flex h-[5.5rem] flex-col items-center justify-center">
                 <p className="text-3xl font-bold tabular-nums leading-none">{formatDays(active.days)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">class days</p>
-                <p className="mt-2 line-clamp-2 text-sm font-medium leading-snug">{active.label}</p>
-              </>
+                <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-snug">{active.label}</p>
+              </div>
             ) : null}
           </div>
         </div>
-        <p className="max-w-[240px] text-center text-xs text-muted-foreground">
+        <p className="min-h-[2.5rem] max-w-[240px] text-center text-xs text-muted-foreground">
           {pace.periodLabel} · {formatDays(pace.totalDays)} class day
           {pace.totalDays === 1 ? "" : "s"} logged
         </p>
-        <p className="max-w-[240px] text-center text-[11px] text-muted-foreground/80">
+        <p className="min-h-[2rem] max-w-[240px] text-center text-[11px] text-muted-foreground/80">
           Hover for preview · click a segment to open the lecture
         </p>
       </div>
 
       <div className="flex min-w-0 flex-col gap-4">
-        {active ? (
-          <ChapterDetailPanel slice={active} pct={active.pct} color={active.color} />
-        ) : null}
+        <div className="h-[280px] shrink-0">
+          {active ? (
+            <ChapterDetailPanel slice={active} pct={active.pct} color={active.color} />
+          ) : null}
+        </div>
 
         <ul className="space-y-2">
           {segments.map((seg) => {
