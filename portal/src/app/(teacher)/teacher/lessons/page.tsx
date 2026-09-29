@@ -5,12 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLoader } from "@/components/layout/page-loader";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { lessonsService } from "@/services/lessons.service";
 import { teachersService } from "@/services/teachers.service";
 import { formatDate } from "@/lib/utils";
-import { BookOpen, CalendarCheck, Library, PieChart } from "lucide-react";
+import { CalendarCheck, Library, PieChart } from "lucide-react";
 
 export default function TeacherLessonsHubPage() {
   const classes = useQuery({
@@ -96,43 +95,7 @@ export default function TeacherLessonsHubPage() {
         </Card>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Chapter library</CardTitle>
-              <CardDescription>Confirmed content you can reuse.</CardDescription>
-            </div>
-            <Link href="/teacher/lessons/chapters/new">
-              <Button size="sm" variant="outline">Add</Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {chapters.isLoading ? (
-              <PageLoader variant="panel" task="lessons" />
-            ) : !chapters.data?.length ? (
-              <p className="text-sm text-muted-foreground">No chapters yet. Add one chapter at a time (~3 pages).</p>
-            ) : (
-              <ul className="space-y-2">
-                {chapters.data.map((ch) => (
-                  <li key={ch.id}>
-                    <Link
-                      href={`/teacher/lessons/chapters/${ch.id}`}
-                      className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm hover:bg-muted/50"
-                    >
-                      <span>{ch.chapterName ?? ch.topicName ?? "Chapter"}</span>
-                      <Badge variant={ch.contentConfirmed ? "success" : "warning"}>
-                        {ch.contentConfirmed ? "Ready" : "Confirm content"}
-                      </Badge>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
+      <Card>
           <CardHeader>
             <CardTitle>Recent class days</CardTitle>
           </CardHeader>
@@ -154,13 +117,7 @@ export default function TeacherLessonsHubPage() {
               </ul>
             )}
           </CardContent>
-        </Card>
-      </div>
-
-      <p className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
-        <BookOpen className="h-4 w-4" />
-        Legacy upload flow is replaced: use chapter library + today in class.
-      </p>
+      </Card>
     </div>
   );
 }
