@@ -11,7 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
-type ToastVariant = "default" | "success" | "error";
+type ToastVariant = "default" | "success" | "error" | "warning";
 
 interface Toast {
   id: string;
@@ -61,6 +61,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 "rounded-lg border bg-card p-4 shadow-lg animate-in slide-in-from-right",
                 t.variant === "success" && "border-primary/30",
                 t.variant === "error" && "border-destructive/30",
+                t.variant === "warning" && "border-amber-500/40 bg-amber-50/90 dark:bg-amber-950/40",
               )}
             >
               <div className="flex items-start justify-between gap-2">

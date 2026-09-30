@@ -117,8 +117,8 @@ export interface AssignTeacherPayload {
   subjectId: string;
   academicYearId: string;
   branchId: string;
-  teacherId?: string;
-  assistantTeacherId?: string;
+  teacherId?: string | null;
+  assistantTeacherId?: string | null;
 }
 
 export const academicsService = {
@@ -240,6 +240,7 @@ export const academicsService = {
     sectionId?: string;
     academicYearId?: string;
     gradeId?: string;
+    teacherId?: string;
   }) {
     return apiClient<Paginated<ClassSubject>>(`/academics/class-subjects${buildQuery(params ?? {})}`);
   },

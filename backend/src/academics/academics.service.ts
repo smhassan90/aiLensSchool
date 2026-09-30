@@ -218,7 +218,14 @@ export class AcademicsService {
       academicYear: { select: { id: true, name: true } },
       teacher: teacherSelect,
       assistantTeacher: teacherSelect,
-      section: { select: { id: true, name: true } },
+      section: {
+        select: {
+          id: true,
+          name: true,
+          gradeId: true,
+          grade: { select: { id: true, name: true, level: true } },
+        },
+      },
     };
   }
 
@@ -859,7 +866,7 @@ export class AcademicsService {
         assistantTeacherId: dto.assistantTeacherId,
       },
       update: {
-        teacherId: dto.teacherId,
+        teacherId: dto.teacherId ?? null,
         assistantTeacherId: dto.assistantTeacherId ?? null,
         branchId: dto.branchId,
       },
@@ -879,7 +886,12 @@ export class AcademicsService {
 
   async listClassSubjects(
     user: AuthUser,
-    query: PaginationDto & { sectionId?: string; academicYearId?: string; gradeId?: string },
+    query: PaginationDto & {
+      sectionId?: string;
+      academicYearId?: string;
+      gradeId?: string;
+      teacherId?: string;
+    },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
     const page = query.page ?? 1;
@@ -889,6 +901,11 @@ export class AcademicsService {
       section: { schoolId, ...(query.gradeId ? { gradeId: query.gradeId } : {}) },
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
       ...(yearId ? { academicYearId: yearId } : {}),
+      ...(query.teacherId
+        ? {
+            OR: [{ teacherId: query.teacherId }, { assistantTeacherId: query.teacherId }],
+          }
+        : {}),
     };
     const [items, total] = await pageQuery(
       (skip, take) =>

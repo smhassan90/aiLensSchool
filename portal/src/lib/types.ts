@@ -166,13 +166,23 @@ export interface Teacher {
   branch?: { id: string; name: string };
   classSubjects?: Array<{
     id: string;
-    subject?: { name: string };
-    section?: { id: string; name: string; grade?: { name: string; level?: number } };
+    sectionId?: string;
+    subjectId?: string;
+    academicYearId?: string;
+    branchId?: string;
+    subject?: { id?: string; name: string };
+    section?: { id: string; name: string; grade?: { id?: string; name: string; level?: number } };
+    academicYear?: { id: string; name: string };
   }>;
   assistantClassSubjects?: Array<{
     id: string;
-    subject?: { name: string };
-    section?: { id: string; name: string; grade?: { name: string; level?: number } };
+    sectionId?: string;
+    subjectId?: string;
+    academicYearId?: string;
+    branchId?: string;
+    subject?: { id?: string; name: string };
+    section?: { id: string; name: string; grade?: { id?: string; name: string; level?: number } };
+    academicYear?: { id: string; name: string };
   }>;
   classSections?: Array<{ id: string; name: string; grade?: { name: string; level?: number } }>;
   assignments?: Array<{

@@ -244,10 +244,11 @@ export class AssignClassSubjectDto {
   @IsString()
   branchId!: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true, description: 'Pass null to remove the primary teacher' })
   @IsOptional()
+  @ValidateIf((_, value) => value !== null)
   @IsString()
-  teacherId?: string;
+  teacherId?: string | null;
 
   @ApiPropertyOptional({ description: 'Optional assistant teacher for this class/subject' })
   @IsOptional()

@@ -26,6 +26,9 @@ import { ApiClientError } from "@/lib/api-client";
 import { ArrowLeft } from "lucide-react";
 import { gradeClassLabel, gradeClassNumber } from "@/lib/utils";
 import { formatStatusLabel } from "@/lib/display-labels";
+import { TeacherSubjectAssignmentsPanel } from "@/components/teachers/teacher-subject-assignments-panel";
+import { TeacherResetPasswordDialog } from "@/components/teachers/teacher-reset-password-dialog";
+import { teacherHasActiveAssignments } from "@/lib/teacher-assignments";
 
 const schema = z.object({
   firstName: z.string().min(1, "Required"),
@@ -144,8 +147,17 @@ export default function TeacherDetailsPage() {
         gender: values.gender || undefined,
         status: values.status,
       }),
-    onSuccess: () => {
-      toast({ title: "Teacher updated", variant: "success" });
+    onSuccess: (_, values) => {
+      if (values.status === "INACTIVE" && teacher.data && teacherHasActiveAssignments(teacher.data)) {
+        toast({
+          title: "Teacher deactivated",
+          description:
+            "This teacher still has class or subject assignments. Reassign them on Teaching assignments or their profile.",
+          variant: "warning",
+        });
+      } else {
+        toast({ title: "Teacher updated", variant: "success" });
+      }
       queryClient.invalidateQueries({ queryKey: ["teacher", params.id] });
       queryClient.invalidateQueries({ queryKey: ["teachers"] });
     },
@@ -222,6 +234,12 @@ export default function TeacherDetailsPage() {
               <Link href={`/school/teachers/${params.id}/progress`}>
                 <Button variant="outline">AI progress</Button>
               </Link>
+            ) : null}
+            {canEdit ? (
+              <TeacherResetPasswordDialog
+                teacherId={params.id}
+                teacherName={teacherDisplayNameFromUser(row.user, row.gender)}
+              />
             ) : null}
           </div>
         }
@@ -319,42 +337,9 @@ export default function TeacherDetailsPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Classes</CardTitle>
-            <CardDescription>Class name on top. Section, subject, and role below.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {classes.length === 0 ? (
-              <p className="text-sm text-slate-500">No classes assigned yet.</p>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {classes.map((item) => {
-                  const heading = classHeadingFor(item, sectionById);
-                  return (
-                    <div key={item.id} className="rounded-xl border border-slate-200 px-3 py-2.5">
-                      {heading ? (
-                        item.sectionId ? (
-                          <Link
-                            href={`/school/classes/${item.sectionId}`}
-                            className="font-medium text-slate-900 hover:underline"
-                          >
-                            {heading}
-                          </Link>
-                        ) : (
-                          <p className="font-medium text-slate-900">{heading}</p>
-                        )
-                      ) : null}
-                      <p className={heading ? "mt-0.5 text-sm text-slate-600" : "text-sm text-slate-600"}>
-                        {[item.sectionName, item.subject, item.role].filter(Boolean).join(" · ")}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {canEdit || classes.length ? (
+          <TeacherSubjectAssignmentsPanel teacher={row} teacherId={params.id} canManage={canEdit} />
+        ) : null}
 
         {canEdit ? (
           <div className="flex justify-end gap-2">

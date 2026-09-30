@@ -66,6 +66,10 @@ class ClassSubjectQueryDto extends PaginationDto {
   @IsOptional()
   @IsString()
   gradeId?: string;
+
+  @IsOptional()
+  @IsString()
+  teacherId?: string;
 }
 
 @ApiTags('Academics')
@@ -188,7 +192,7 @@ export class AcademicsController {
   }
 
   @Roles(RoleName.SCHOOL_ADMIN)
-  @RequirePermission('MANAGE_CLASSES')
+  @RequirePermission('MANAGE_CLASSES', 'MANAGE_TEACHERS')
   @Post('class-subjects')
   assignClassSubject(@Body() dto: AssignClassSubjectDto, @CurrentUser() user: AuthUser) {
     return this.academicsService.assignClassSubject(dto, user);

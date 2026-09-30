@@ -6,11 +6,23 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/providers/auth-provider";
 import { ArrowLeft } from "lucide-react";
 import { Teacher360View } from "@/components/teachers/teacher-360-view";
+import { TeacherResetPasswordDialog } from "@/components/teachers/teacher-reset-password-dialog";
+import { useQuery } from "@tanstack/react-query";
+import { teachersService } from "@/services/teachers.service";
+import { teacherDisplayNameFromUser } from "@/lib/person-name";
 
 export default function TeacherOverviewPage() {
   const params = useParams<{ id: string }>();
   const { can } = useAuth();
   const allowed = can("VIEW_TEACHER_PROGRESS") || can("MANAGE_TEACHERS");
+  const teacherMeta = useQuery({
+    queryKey: ["teacher", params.id, "meta"],
+    queryFn: () => teachersService.getById(params.id),
+    enabled: allowed && can("MANAGE_TEACHERS") && Boolean(params.id),
+  });
+  const teacherName = teacherMeta.data
+    ? teacherDisplayNameFromUser(teacherMeta.data.user, teacherMeta.data.gender)
+    : "Teacher";
 
   if (!allowed) {
     return (
@@ -33,9 +45,12 @@ export default function TeacherOverviewPage() {
               </Button>
             </Link>
             {can("MANAGE_TEACHERS") ? (
-              <Link href={`/school/teachers/${params.id}`}>
-                <Button variant="outline">Edit profile</Button>
-              </Link>
+              <>
+                <Link href={`/school/teachers/${params.id}`}>
+                  <Button variant="outline">Edit profile</Button>
+                </Link>
+                <TeacherResetPasswordDialog teacherId={params.id} teacherName={teacherName} />
+              </>
             ) : null}
             <Link href={`/school/teachers/${params.id}/progress`}>
               <Button variant="outline">AI progress</Button>

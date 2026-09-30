@@ -34,6 +34,7 @@ import { UserSquare2, Plus } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import type { Teacher } from "@/lib/types";
 import { formatStatusLabel } from "@/lib/display-labels";
+import { teacherHasActiveAssignments } from "@/lib/teacher-assignments";
 
 type ResetResult = {
   teacherId: string;
@@ -62,16 +63,36 @@ export default function TeachersPage() {
     queryFn: () => teachersService.list({ limit: 100, status: status || undefined }),
   });
 
+  const deactivateDetail = useQuery({
+    queryKey: ["teacher", statusConfirm?.teacher.id, "deactivate-check"],
+    queryFn: () => teachersService.getById(statusConfirm!.teacher.id),
+    enabled: Boolean(statusConfirm?.nextStatus === "INACTIVE" && statusConfirm?.teacher.id),
+  });
+
   const setTeacherStatus = useMutation({
     mutationFn: ({ teacherId, nextStatus }: { teacherId: string; nextStatus: "ACTIVE" | "INACTIVE" }) =>
       teachersService.update(teacherId, { status: nextStatus }),
     onSuccess: (_, { nextStatus }) => {
+      const detail = deactivateDetail.data;
       setStatusConfirm(null);
       queryClient.invalidateQueries({ queryKey: ["teachers"] });
-      toast({
-        title: nextStatus === "INACTIVE" ? "Teacher marked inactive" : "Teacher reactivated",
-        variant: "success",
-      });
+      if (
+        nextStatus === "INACTIVE" &&
+        detail &&
+        teacherHasActiveAssignments(detail)
+      ) {
+        toast({
+          title: "Teacher deactivated",
+          description:
+            "They still have class or subject assignments. Reassign those subjects before relying on a replacement teacher.",
+          variant: "warning",
+        });
+      } else {
+        toast({
+          title: nextStatus === "INACTIVE" ? "Teacher marked inactive" : "Teacher reactivated",
+          variant: "success",
+        });
+      }
     },
     onError: (err) =>
       toast({
@@ -108,6 +129,9 @@ export default function TeachersPage() {
         actions={
           can("MANAGE_TEACHERS") ? (
             <div className="flex flex-wrap gap-2">
+              <Link href="/school/teachers/teaching-assignments">
+                <Button variant="outline">Teaching assignments</Button>
+              </Link>
               <Link href="/school/teachers/head-teachers">
                 <Button variant="outline">Head teachers</Button>
               </Link>
@@ -262,7 +286,11 @@ export default function TeachersPage() {
             <DialogDescription>
               {statusConfirm
                 ? statusConfirm.nextStatus === "INACTIVE"
-                  ? `${teacherDisplayNameFromUser(statusConfirm.teacher.user, statusConfirm.teacher.gender)} will not be able to sign in. Their classes and history stay on record.`
+                  ? `${teacherDisplayNameFromUser(statusConfirm.teacher.user, statusConfirm.teacher.gender)} will not be able to sign in. Their classes and history stay on record.${
+                      deactivateDetail.data && teacherHasActiveAssignments(deactivateDetail.data)
+                        ? " This teacher still has subjects or classes assigned — you should reassign them soon."
+                        : ""
+                    }`
                   : `${teacherDisplayNameFromUser(statusConfirm.teacher.user, statusConfirm.teacher.gender)} can sign in again.`
                 : null}
             </DialogDescription>
