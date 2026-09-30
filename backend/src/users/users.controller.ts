@@ -44,6 +44,10 @@ class CreateStaffDto {
 
   @IsOptional()
   @IsString()
+  employeeCode?: string;
+
+  @IsOptional()
+  @IsString()
   title?: string;
 
   @IsOptional()

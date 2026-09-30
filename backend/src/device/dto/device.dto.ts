@@ -176,8 +176,13 @@ export class MappingRowDto {
   @IsString()
   deviceUserId!: string;
 
+  @IsOptional()
   @IsString()
-  teacherId!: string;
+  teacherId?: string;
+
+  @IsOptional()
+  @IsString()
+  staffUserId?: string;
 }
 
 export class ConfirmMappingsDto {
@@ -213,6 +218,40 @@ export class TeacherAttendanceHistoryQueryDto extends PaginationDto {
 export class ManualAttendanceDto {
   @IsString()
   teacherId!: string;
+
+  @IsString()
+  date!: string;
+
+  @IsOptional()
+  @IsString()
+  time?: string;
+}
+
+export class StaffAttendanceHistoryQueryDto extends PaginationDto {
+  @IsOptional()
+  @IsString()
+  staffUserId?: string;
+
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortOrder?: 'asc' | 'desc';
+}
+
+export class ManualStaffAttendanceDto {
+  @IsString()
+  staffUserId!: string;
 
   @IsString()
   date!: string;

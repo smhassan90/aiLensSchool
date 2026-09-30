@@ -35,6 +35,7 @@ const schema = z.object({
   academicYearId: z.string().min(1, "Select an academic year"),
   address: z.string().optional(),
   scienceGroup: z.string().optional(),
+  status: z.enum(["ACTIVE", "INACTIVE", "WITHDRAWN", "GRADUATED"]),
   fatherFirstName: z.string().optional(),
   fatherLastName: z.string().optional(),
   fatherPhone: z.string().optional(),
@@ -79,6 +80,7 @@ function valuesFromStudent(student: Student): FormValues {
     academicYearId: enrollment?.academicYearId ?? enrollment?.academicYear?.id ?? "",
     address: student.address ?? "",
     scienceGroup: student.scienceGroup ?? "",
+    status: (student.status as FormValues["status"]) || "ACTIVE",
     fatherFirstName: father?.parent?.user?.firstName ?? "",
     fatherLastName: father?.parent?.user?.lastName ?? "",
     fatherPhone: father?.parent?.phone || father?.parent?.user?.phone || "",
@@ -150,6 +152,7 @@ export default function EditStudentPage() {
         academicYearId: values.academicYearId,
         address: values.address?.trim() || undefined,
         scienceGroup: values.scienceGroup || undefined,
+        status: values.status,
         father: values.fatherFirstName?.trim()
           ? {
               firstName: values.fatherFirstName.trim(),
@@ -251,6 +254,18 @@ export default function EditStudentPage() {
                 <option value="FEMALE">Female</option>
                 <option value="OTHER">Other</option>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select id="status" {...register("status")}>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+                <option value="WITHDRAWN">Withdrawn</option>
+                <option value="GRADUATED">Graduated</option>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Inactive students stay on record but are usually excluded when you filter the roster by Active.
+              </p>
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="address">Home address</Label>

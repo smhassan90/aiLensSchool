@@ -186,6 +186,69 @@ export async function finalizeTeacherAbsences(
   return { finalized: missing.length, policy };
 }
 
+export async function reconcileStaffAttendanceStatusesForDay(
+  prisma: PrismaService,
+  schoolId: string,
+  dateIso: string,
+) {
+  const policy = await loadTeacherAttendancePolicy(prisma, schoolId);
+  const day = dateFromIso(dateIso);
+  const rows = await prisma.staffAttendance.findMany({
+    where: { schoolId, date: day, checkedInAt: { not: null } },
+    select: { id: true, checkedInAt: true, status: true },
+  });
+  let updated = 0;
+  for (const row of rows) {
+    if (!row.checkedInAt) continue;
+    const next = statusFromCheckIn(
+      row.checkedInAt,
+      policy.lateAfter,
+      policy.absentAfter,
+      policy.timezone,
+    );
+    if (row.status !== next) {
+      await prisma.staffAttendance.update({ where: { id: row.id }, data: { status: next } });
+      updated += 1;
+    }
+  }
+  return { updated, policy };
+}
+
+export async function finalizeStaffAbsences(
+  prisma: PrismaService,
+  schoolId: string,
+  dateIso: string,
+  staffUserIds: string[],
+  now = new Date(),
+) {
+  const policy = await loadTeacherAttendancePolicy(prisma, schoolId);
+  if (!shouldFinalizeAbsences(dateIso, now, policy.timezone, policy.absentAfter)) {
+    return { finalized: 0, policy };
+  }
+
+  const day = dateFromIso(dateIso);
+  const existing = await prisma.staffAttendance.findMany({
+    where: { schoolId, date: day },
+    select: { userId: true },
+  });
+  const have = new Set(existing.map((row) => row.userId));
+  const missing = staffUserIds.filter((id) => !have.has(id));
+  if (missing.length) {
+    await prisma.staffAttendance.createMany({
+      data: missing.map((userId) => ({
+        schoolId,
+        userId,
+        date: day,
+        status: AttendanceStatus.ABSENT,
+        source: 'SYSTEM',
+      })),
+      skipDuplicates: true,
+    });
+  }
+  await reconcileStaffAttendanceStatusesForDay(prisma, schoolId, dateIso);
+  return { finalized: missing.length, policy };
+}
+
 export function earliestPunch(existing: Date | null | undefined, incoming: Date): Date {
   if (!existing) return incoming;
   return existing <= incoming ? existing : incoming;

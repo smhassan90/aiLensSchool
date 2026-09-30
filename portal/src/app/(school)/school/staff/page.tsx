@@ -59,6 +59,7 @@ export default function StaffPage() {
       email?: string;
       phone: string;
       password: string;
+      employeeCode?: string;
     }) =>
       staffService.create({
         ...payload,
@@ -80,6 +81,7 @@ export default function StaffPage() {
     const form = e.currentTarget;
     const data = new FormData(form);
     const email = String(data.get("email") ?? "").trim();
+    const employeeCode = String(data.get("employeeCode") ?? "").trim();
     create.mutate(
       {
         firstName: String(data.get("firstName") ?? ""),
@@ -87,6 +89,7 @@ export default function StaffPage() {
         phone: String(data.get("phone") ?? ""),
         password: String(data.get("password") ?? ""),
         ...(email ? { email } : {}),
+        ...(employeeCode ? { employeeCode } : {}),
       },
       { onSuccess: () => form.reset() },
     );
@@ -129,6 +132,10 @@ export default function StaffPage() {
               <div>
                 <Label>Email (optional)</Label>
                 <Input name="email" type="email" placeholder="Only if they use email elsewhere" />
+              </div>
+              <div>
+                <Label>Employee code (optional)</Label>
+                <Input name="employeeCode" placeholder="Same as terminal user ID for fingerprint mapping" />
               </div>
               <div><Label>Password</Label><Input name="password" type="password" minLength={6} required /></div>
               <div>

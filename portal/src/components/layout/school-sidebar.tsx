@@ -97,7 +97,12 @@ function isActivePath(pathname: string, href: string, matchSetup?: boolean) {
   if (href === "/school/dashboard" && pathname.startsWith("/school/classes")) return true;
   if (href === "/school/teachers" && pathname.startsWith("/school/teachers/attendance")) return false;
   if (href === "/school/teachers/attendance") {
-    return pathname === href || pathname.startsWith(`${href}/`) || pathname.startsWith("/school/setup/attendance");
+    return (
+      pathname === href ||
+      pathname.startsWith(`${href}/`) ||
+      pathname.startsWith("/school/setup/attendance") ||
+      pathname.startsWith("/school/staff/attendance")
+    );
   }
   if (!pathname.startsWith(`${href}/`)) return false;
   if (href === "/school/fees" && pathname.startsWith("/school/fees")) return true;
@@ -118,7 +123,8 @@ export function SchoolSidebar() {
       return (
         can("MANAGE_TEACHERS") ||
         can("VIEW_TEACHER_ATTENDANCE_HISTORY") ||
-        can("VIEW_BIOMETRIC_DEVICES")
+        can("VIEW_BIOMETRIC_DEVICES") ||
+        can("MANAGE_STAFF")
       );
     }
     return !item.permission || can(item.permission);

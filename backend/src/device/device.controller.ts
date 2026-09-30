@@ -10,6 +10,8 @@ import {
   ConfirmMappingsDto,
   CreateDeviceDto,
   ManualAttendanceDto,
+  ManualStaffAttendanceDto,
+  StaffAttendanceHistoryQueryDto,
   TeacherAttendanceHistoryQueryDto,
   UpdateAttendanceSetupDto,
   UpdateDeviceDto,
@@ -216,5 +218,53 @@ export class TeacherAttendanceReportController {
   @Post('manual-check-out')
   manualCheckOut(@CurrentUser() user: AuthUser, @Body() dto: ManualAttendanceDto) {
     return this.deviceService.manualCheckOut(user, dto);
+  }
+}
+
+class StaffAttendanceDayQueryDto {
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+}
+
+@ApiTags('Staff attendance')
+@ApiBearerAuth()
+@Controller({ path: 'staff-attendance', version: '1' })
+export class StaffAttendanceReportController {
+  constructor(private readonly deviceService: DeviceService) {}
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @RequirePermission('VIEW_TEACHER_ATTENDANCE_HISTORY', 'MANAGE_STAFF')
+  @Get('day')
+  day(@CurrentUser() user: AuthUser, @Query() query: StaffAttendanceDayQueryDto) {
+    return this.deviceService.listStaffAttendance(user, query.date);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @RequirePermission('VIEW_TEACHER_ATTENDANCE_HISTORY', 'MANAGE_STAFF')
+  @Get()
+  history(@CurrentUser() user: AuthUser, @Query() query: StaffAttendanceHistoryQueryDto) {
+    return this.deviceService.listStaffAttendanceHistory(user, query);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @RequirePermission('VIEW_TEACHER_ATTENDANCE_HISTORY', 'MANAGE_STAFF')
+  @Get('members')
+  members(@CurrentUser() user: AuthUser) {
+    return this.deviceService.listStaffDropdown(user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @RequirePermission('MANAGE_TEACHER_ATTENDANCE', 'MANAGE_STAFF')
+  @Post('manual-check-in')
+  manualCheckIn(@CurrentUser() user: AuthUser, @Body() dto: ManualStaffAttendanceDto) {
+    return this.deviceService.manualStaffCheckIn(user, dto);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL)
+  @RequirePermission('MANAGE_TEACHER_ATTENDANCE', 'MANAGE_STAFF')
+  @Post('manual-check-out')
+  manualCheckOut(@CurrentUser() user: AuthUser, @Body() dto: ManualStaffAttendanceDto) {
+    return this.deviceService.manualStaffCheckOut(user, dto);
   }
 }

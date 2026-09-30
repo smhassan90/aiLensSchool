@@ -5,7 +5,7 @@ import { PageLoader } from "@/components/layout/page-loader";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ import { useToast } from "@/providers/toast-provider";
 import { UserSquare2, Plus } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import type { Teacher } from "@/lib/types";
+import { formatStatusLabel } from "@/lib/display-labels";
 
 type ResetResult = {
   teacherId: string;
@@ -41,17 +42,43 @@ type ResetResult = {
   name: string;
 };
 
+type StatusConfirm = {
+  teacher: Teacher;
+  nextStatus: "ACTIVE" | "INACTIVE";
+};
+
 export default function TeachersPage() {
   const router = useRouter();
   const { can } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [confirmTeacher, setConfirmTeacher] = useState<Teacher | null>(null);
+  const [statusConfirm, setStatusConfirm] = useState<StatusConfirm | null>(null);
   const [resetResult, setResetResult] = useState<ResetResult | null>(null);
   const [status, setStatus] = useState("");
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["teachers", status],
     queryFn: () => teachersService.list({ limit: 100, status: status || undefined }),
+  });
+
+  const setTeacherStatus = useMutation({
+    mutationFn: ({ teacherId, nextStatus }: { teacherId: string; nextStatus: "ACTIVE" | "INACTIVE" }) =>
+      teachersService.update(teacherId, { status: nextStatus }),
+    onSuccess: (_, { nextStatus }) => {
+      setStatusConfirm(null);
+      queryClient.invalidateQueries({ queryKey: ["teachers"] });
+      toast({
+        title: nextStatus === "INACTIVE" ? "Teacher marked inactive" : "Teacher reactivated",
+        variant: "success",
+      });
+    },
+    onError: (err) =>
+      toast({
+        title: "Could not update status",
+        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        variant: "error",
+      }),
   });
 
   const reset = useMutation({
@@ -167,12 +194,45 @@ export default function TeachersPage() {
                   <TableCell>{teacher.branch?.name ?? "—"}</TableCell>
                   <TableCell>
                     <Badge variant={teacher.status === "ACTIVE" ? "success" : "secondary"}>
-                      {teacher.status}
+                      {formatStatusLabel(teacher.status)}
                     </Badge>
                   </TableCell>
                   {can("MANAGE_TEACHERS") ? (
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            router.push(`/school/teachers/${teacher.id}`);
+                          }}
+                        >
+                          Edit profile
+                        </Button>
+                        {teacher.status === "INACTIVE" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setStatusConfirm({ teacher, nextStatus: "ACTIVE" });
+                            }}
+                          >
+                            Activate
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setStatusConfirm({ teacher, nextStatus: "INACTIVE" });
+                            }}
+                          >
+                            Deactivate
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -192,6 +252,40 @@ export default function TeachersPage() {
           </Table>
         )}
       </div>
+
+      <Dialog open={Boolean(statusConfirm)} onOpenChange={(open) => { if (!open) setStatusConfirm(null); }}>
+        <DialogContent onClose={() => setStatusConfirm(null)}>
+          <DialogHeader>
+            <DialogTitle>
+              {statusConfirm?.nextStatus === "INACTIVE" ? "Deactivate teacher?" : "Reactivate teacher?"}
+            </DialogTitle>
+            <DialogDescription>
+              {statusConfirm
+                ? statusConfirm.nextStatus === "INACTIVE"
+                  ? `${teacherDisplayNameFromUser(statusConfirm.teacher.user, statusConfirm.teacher.gender)} will not be able to sign in. Their classes and history stay on record.`
+                  : `${teacherDisplayNameFromUser(statusConfirm.teacher.user, statusConfirm.teacher.gender)} can sign in again.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setStatusConfirm(null)} disabled={setTeacherStatus.isPending}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!statusConfirm || setTeacherStatus.isPending}
+              onClick={() =>
+                statusConfirm &&
+                setTeacherStatus.mutate({
+                  teacherId: statusConfirm.teacher.id,
+                  nextStatus: statusConfirm.nextStatus,
+                })
+              }
+            >
+              {setTeacherStatus.isPending ? "Saving…" : statusConfirm?.nextStatus === "INACTIVE" ? "Deactivate" : "Activate"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(confirmTeacher)} onOpenChange={(open) => { if (!open) setConfirmTeacher(null); }}>
         <DialogContent onClose={() => setConfirmTeacher(null)}>

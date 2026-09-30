@@ -43,6 +43,7 @@ export interface CreateStudentResult {
 
 export type UpdateStudentPayload = Omit<Partial<CreateStudentPayload>, "scienceGroup"> & {
   scienceGroup?: string | null;
+  status?: "ACTIVE" | "INACTIVE" | "WITHDRAWN" | "GRADUATED";
 };
 
 export const studentsService = {

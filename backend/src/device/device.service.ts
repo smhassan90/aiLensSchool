@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, TeacherStatus } from '@prisma/client';
+import { AttendanceStatus, Prisma, TeacherStatus } from '@prisma/client';
 import type { Prisma as PrismaTypes } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { TenantService } from '../common/services/tenant.service';
@@ -27,6 +27,11 @@ import {
   mergeEdgeSyncIntoMetadata,
   readEdgeSyncFromMetadata,
 } from './edge-sync-settings';
+import { listSchoolStaffForAttendance, staffDisplayName } from './staff-attendance.util';
+import {
+  finalizeStaffAbsences,
+  reconcileStaffAttendanceStatusesForDay,
+} from '../teachers/teacher-checkin';
 
 @Injectable()
 export class DeviceService {
@@ -374,11 +379,11 @@ export class DeviceService {
   }
 
   private async loadMappingCandidates(deviceId: string, schoolId: string) {
-    const [deviceUsers, mappings, teachers, pendingGroups] = await Promise.all([
+    const [deviceUsers, mappings, teachers, staffUsers, pendingGroups] = await Promise.all([
       this.prisma.biometricDeviceUser.findMany({ where: { deviceConfigId: deviceId } }),
       this.prisma.biometricDeviceUserMapping.findMany({
         where: { deviceConfigId: deviceId, isActive: true },
-        select: { id: true, deviceUserId: true, teacherId: true },
+        select: { id: true, deviceUserId: true, teacherId: true, staffUserId: true },
       }),
       this.prisma.teacherProfile.findMany({
         where: { schoolId, status: TeacherStatus.ACTIVE },
@@ -389,6 +394,7 @@ export class DeviceService {
           user: { select: { firstName: true, lastName: true } },
         },
       }),
+      listSchoolStaffForAttendance(this.prisma, schoolId),
       this.prisma.pendingBiometricAttendanceLog.groupBy({
         by: ['deviceUserId'],
         where: { deviceConfigId: deviceId },
@@ -397,7 +403,8 @@ export class DeviceService {
     ]);
 
     const mappedDeviceUsers = new Set(mappings.map((m) => m.deviceUserId));
-    const mappedTeachers = new Set(mappings.map((m) => m.teacherId));
+    const mappedTeachers = new Set(mappings.map((m) => m.teacherId).filter(Boolean) as string[]);
+    const mappedStaff = new Set(mappings.map((m) => m.staffUserId).filter(Boolean) as string[]);
     const pendingByUser = new Map(pendingGroups.map((g) => [g.deviceUserId, g._count._all]));
 
     const candidates = this.biometricAttendance.filterMappingCandidates(deviceUsers);
@@ -411,6 +418,14 @@ export class DeviceService {
     }));
     const teacherById = new Map(teacherRows.map((t) => [t.id, t]));
 
+    const staffRows = staffUsers.map((s) => ({
+      id: s.id,
+      name: staffDisplayName(s),
+      employeeCode: s.employeeCode ?? '',
+      normalizedName: normalizeTeacherName(s.firstName, s.lastName),
+    }));
+    const staffById = new Map(staffRows.map((s) => [s.id, s]));
+
     const unmappedDeviceUsers = candidates
       .filter((u) => !mappedDeviceUsers.has(u.deviceUserId))
       .map((u) => ({
@@ -421,32 +436,134 @@ export class DeviceService {
       }));
 
     const unmappedTeachers = teacherRows.filter((t) => !mappedTeachers.has(t.id));
+    const unmappedStaff = staffRows.filter((s) => !mappedStaff.has(s.id));
 
-    const suggestions = this.buildNameMatchSuggestions(unmappedDeviceUsers, unmappedTeachers);
+    const teacherSuggestions = this.buildNameMatchSuggestions(unmappedDeviceUsers, unmappedTeachers).map(
+      (row) => ({
+        deviceUserId: row.deviceUserId,
+        teacherId: row.teacherId,
+        staffUserId: undefined as string | undefined,
+        personName: row.teacherName,
+        deviceUserName: row.deviceUserName,
+      }),
+    );
+    const staffSuggestions = this.buildStaffNameMatchSuggestions(unmappedDeviceUsers, unmappedStaff);
+    const codeSuggestions = this.buildEmployeeCodeSuggestions(
+      unmappedDeviceUsers,
+      unmappedTeachers,
+      unmappedStaff,
+    );
+    const suggestions = [...teacherSuggestions, ...staffSuggestions, ...codeSuggestions];
 
     const mappedPairs = mappings.map((m) => {
       const deviceUser = deviceUserById.get(m.deviceUserId);
-      const teacher = teacherById.get(m.teacherId);
+      if (m.teacherId) {
+        const teacher = teacherById.get(m.teacherId);
+        return {
+          mappingId: m.id,
+          deviceUserId: m.deviceUserId,
+          deviceUserName: deviceUser?.deviceUserName ?? null,
+          personType: 'teacher' as const,
+          teacherId: m.teacherId,
+          staffUserId: null,
+          personName: teacher?.name ?? 'Teacher',
+          employeeCode: teacher?.employeeCode ?? '',
+        };
+      }
+      const staff = m.staffUserId ? staffById.get(m.staffUserId) : undefined;
       return {
         mappingId: m.id,
         deviceUserId: m.deviceUserId,
         deviceUserName: deviceUser?.deviceUserName ?? null,
-        teacherId: m.teacherId,
-        teacherName: teacher?.name ?? 'Teacher',
-        employeeCode: teacher?.employeeCode ?? '',
+        personType: 'staff' as const,
+        teacherId: null,
+        staffUserId: m.staffUserId,
+        personName: staff?.name ?? 'Staff',
+        employeeCode: staff?.employeeCode ?? '',
       };
     });
 
     const teacherOptions = teacherRows.map(({ normalizedName: _n, ...rest }) => rest);
+    const staffOptions = staffRows.map(({ normalizedName: _n, ...rest }) => rest);
 
     return {
       unmappedDeviceUsers,
       unmappedTeachers: unmappedTeachers.map(({ normalizedName: _n, ...rest }) => rest),
+      unmappedStaff: unmappedStaff.map(({ normalizedName: _n, ...rest }) => rest),
       allTeachers: teacherOptions,
+      allStaff: staffOptions,
       suggestions,
       mappedPairs,
       pendingCounts: Object.fromEntries(pendingByUser),
     };
+  }
+
+  private buildStaffNameMatchSuggestions(
+    unmappedDeviceUsers: Array<{ deviceUserId: string; deviceUserName?: string | null }>,
+    unmappedStaff: Array<{ id: string; name: string; normalizedName: string }>,
+  ) {
+    return unmappedDeviceUsers
+      .map((deviceUser) => {
+        const normalizedDeviceName = deviceUser.deviceUserName?.trim().replace(/\s+/g, ' ').toLowerCase();
+        if (!normalizedDeviceName) return null;
+        const matches = unmappedStaff.filter((s) => s.normalizedName === normalizedDeviceName);
+        if (matches.length !== 1) return null;
+        return {
+          deviceUserId: deviceUser.deviceUserId,
+          teacherId: undefined as string | undefined,
+          staffUserId: matches[0].id,
+          personName: matches[0].name,
+          deviceUserName: deviceUser.deviceUserName ?? null,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => Boolean(row));
+  }
+
+  private buildEmployeeCodeSuggestions(
+    unmappedDeviceUsers: Array<{ deviceUserId: string; deviceUserName?: string | null }>,
+    unmappedTeachers: Array<{ id: string; name: string; employeeCode: string }>,
+    unmappedStaff: Array<{ id: string; name: string; employeeCode: string }>,
+  ) {
+    const teacherByCode = new Map(
+      unmappedTeachers.filter((t) => t.employeeCode).map((t) => [t.employeeCode.trim(), t]),
+    );
+    const staffByCode = new Map(
+      unmappedStaff.filter((s) => s.employeeCode).map((s) => [s.employeeCode.trim(), s]),
+    );
+    const usedDeviceUsers = new Set<string>();
+    const rows: Array<{
+      deviceUserId: string;
+      teacherId?: string;
+      staffUserId?: string;
+      personName: string;
+      deviceUserName: string | null;
+    }> = [];
+
+    for (const deviceUser of unmappedDeviceUsers) {
+      const key = String(deviceUser.deviceUserId).trim();
+      const teacher = teacherByCode.get(key);
+      if (teacher && !usedDeviceUsers.has(deviceUser.deviceUserId)) {
+        usedDeviceUsers.add(deviceUser.deviceUserId);
+        rows.push({
+          deviceUserId: deviceUser.deviceUserId,
+          teacherId: teacher.id,
+          personName: teacher.name,
+          deviceUserName: deviceUser.deviceUserName ?? null,
+        });
+        continue;
+      }
+      const staff = staffByCode.get(key);
+      if (staff && !usedDeviceUsers.has(deviceUser.deviceUserId)) {
+        usedDeviceUsers.add(deviceUser.deviceUserId);
+        rows.push({
+          deviceUserId: deviceUser.deviceUserId,
+          staffUserId: staff.id,
+          personName: staff.name,
+          deviceUserName: deviceUser.deviceUserName ?? null,
+        });
+      }
+    }
+    return rows;
   }
 
   private buildNameMatchSuggestions(
@@ -475,14 +592,18 @@ export class DeviceService {
   async confirmMappings(
     user: AuthUser,
     deviceId: string,
-    mappings: Array<{ deviceUserId: string; teacherId: string }>,
+    mappings: Array<{ deviceUserId: string; teacherId?: string; staffUserId?: string }>,
   ) {
     const schoolId = this.requireSchool(user);
     await this.getDevice(user, deviceId);
-    let rows = mappings;
+    let rows = mappings.filter((row) => row.teacherId || row.staffUserId);
     if (!rows.length) {
       const { suggestions } = await this.loadMappingCandidates(deviceId, schoolId);
-      rows = suggestions.map((s) => ({ deviceUserId: s.deviceUserId, teacherId: s.teacherId }));
+      rows = suggestions.map((s) => ({
+        deviceUserId: s.deviceUserId,
+        teacherId: s.teacherId,
+        staffUserId: s.staffUserId,
+      }));
     }
     if (!rows.length) {
       throw new BadRequestException({ code: 'MAPPINGS_REQUIRED', message: 'Provide at least one mapping' });
@@ -490,6 +611,14 @@ export class DeviceService {
 
     let pendingApplied = 0;
     for (const row of rows) {
+      if (row.teacherId && row.staffUserId) {
+        throw new BadRequestException({
+          code: 'MAPPING_AMBIGUOUS',
+          message: 'Map each device user to either a teacher or staff member, not both',
+        });
+      }
+      if (!row.teacherId && !row.staffUserId) continue;
+
       const deviceUser = await this.prisma.biometricDeviceUser.findUnique({
         where: { deviceConfigId_deviceUserId: { deviceConfigId: deviceId, deviceUserId: row.deviceUserId } },
       });
@@ -499,28 +628,46 @@ export class DeviceService {
         },
         create: {
           deviceConfigId: deviceId,
-          teacherId: row.teacherId,
+          teacherId: row.teacherId ?? null,
+          staffUserId: row.staffUserId ?? null,
           deviceUserId: row.deviceUserId,
           deviceUserName: deviceUser?.deviceUserName ?? null,
         },
         update: {
-          teacherId: row.teacherId,
+          teacherId: row.teacherId ?? null,
+          staffUserId: row.staffUserId ?? null,
           isActive: true,
           deviceUserName: deviceUser?.deviceUserName ?? null,
         },
       });
-      const teacher = await this.prisma.teacherProfile.findFirst({
-        where: { id: row.teacherId, schoolId },
-      });
-      if (!teacher) {
-        throw new BadRequestException({ code: 'TEACHER_NOT_IN_SCHOOL', message: 'Teacher not in this school' });
+
+      if (row.teacherId) {
+        const teacher = await this.prisma.teacherProfile.findFirst({
+          where: { id: row.teacherId, schoolId },
+        });
+        if (!teacher) {
+          throw new BadRequestException({ code: 'TEACHER_NOT_IN_SCHOOL', message: 'Teacher not in this school' });
+        }
+        const replay = await this.biometricAttendance.replayPendingForMapping(
+          deviceId,
+          row.deviceUserId,
+          row.teacherId,
+        );
+        pendingApplied += replay.applied;
+      } else if (row.staffUserId) {
+        const staff = await this.prisma.user.findFirst({
+          where: { id: row.staffUserId, schoolId },
+        });
+        if (!staff) {
+          throw new BadRequestException({ code: 'STAFF_NOT_IN_SCHOOL', message: 'Staff member not in this school' });
+        }
+        const replay = await this.biometricAttendance.replayPendingForStaffMapping(
+          deviceId,
+          row.deviceUserId,
+          row.staffUserId,
+        );
+        pendingApplied += replay.applied;
       }
-      const replay = await this.biometricAttendance.replayPendingForMapping(
-        deviceId,
-        row.deviceUserId,
-        row.teacherId,
-      );
-      pendingApplied += replay.applied;
     }
     return { mappings: rows.length, pendingPunchesApplied: pendingApplied };
   }
@@ -729,5 +876,185 @@ export class DeviceService {
 
   async pendingCountByDevice(schoolId: string, deviceId: string) {
     return this.prisma.pendingBiometricAttendanceLog.count({ where: { deviceConfigId: deviceId, schoolId } });
+  }
+
+  async listStaffAttendance(user: AuthUser, date?: string) {
+    const schoolId = this.requireSchool(user);
+    const policy = await loadTeacherAttendancePolicy(this.prisma, schoolId);
+    const dateIso = date || zonedDateIso(new Date(), policy.timezone);
+    const staffUsers = await listSchoolStaffForAttendance(this.prisma, schoolId);
+    await finalizeStaffAbsences(
+      this.prisma,
+      schoolId,
+      dateIso,
+      staffUsers.map((row) => row.id),
+    );
+    await reconcileStaffAttendanceStatusesForDay(this.prisma, schoolId, dateIso);
+    const day = dateFromIso(dateIso);
+    const marks = await this.prisma.staffAttendance.findMany({
+      where: { schoolId, date: day },
+      select: {
+        userId: true,
+        status: true,
+        checkedInAt: true,
+        checkedOutAt: true,
+        source: true,
+      },
+    });
+    const byUser = new Map(marks.map((row) => [row.userId, row]));
+    const rows = staffUsers.map((person) => {
+      const mark = byUser.get(person.id);
+      return {
+        staffUserId: person.id,
+        name: staffDisplayName(person),
+        employeeCode: person.employeeCode ?? '',
+        status: mark?.checkedInAt
+          ? statusFromCheckIn(
+              mark.checkedInAt,
+              policy.lateAfter,
+              policy.absentAfter,
+              policy.timezone,
+            )
+          : (mark?.status ?? null),
+        checkedInAt: mark?.checkedInAt?.toISOString() ?? null,
+        checkedOutAt: mark?.checkedOutAt?.toISOString() ?? null,
+        source: mark?.source ?? null,
+      };
+    });
+    const summary = {
+      present: rows.filter((row) => row.status === AttendanceStatus.PRESENT).length,
+      late: rows.filter((row) => row.status === AttendanceStatus.LATE).length,
+      absent: rows.filter((row) => row.status === AttendanceStatus.ABSENT).length,
+      waiting: rows.filter((row) => row.status == null).length,
+    };
+    return { date: dateIso, policy, staff: rows, summary };
+  }
+
+  async listStaffAttendanceHistory(
+    user: AuthUser,
+    query: {
+      staffUserId?: string;
+      startDate?: string;
+      endDate?: string;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
+    },
+  ) {
+    const schoolId = this.requireSchool(user);
+    const policy = await loadTeacherAttendancePolicy(this.prisma, schoolId);
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const sortOrder = query.sortOrder ?? 'desc';
+
+    const where: {
+      schoolId: string;
+      userId?: string;
+      date?: { gte?: Date; lte?: Date };
+    } = { schoolId };
+    if (query.staffUserId) where.userId = query.staffUserId;
+    if (query.startDate || query.endDate) {
+      where.date = {};
+      if (query.startDate) where.date.gte = dateFromIso(query.startDate);
+      if (query.endDate) where.date.lte = dateFromIso(query.endDate);
+    }
+
+    const orderBy: Prisma.StaffAttendanceOrderByWithRelationInput[] =
+      query.sortBy === 'staff'
+        ? [{ user: { firstName: sortOrder } }, { date: sortOrder }]
+        : [{ date: sortOrder }, { user: { firstName: 'asc' } }];
+
+    const [rows, total] = await pageQuery(
+      (skip, take) =>
+        this.prisma.staffAttendance.findMany({
+          where,
+          skip,
+          take,
+          orderBy,
+          include: {
+            user: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
+          },
+        }),
+      () => this.prisma.staffAttendance.count({ where }),
+      page,
+      limit,
+    );
+
+    const data = rows.map((row) => ({
+      date: row.date.toISOString().slice(0, 10),
+      staff: {
+        id: row.user.id,
+        name: staffDisplayName(row.user),
+        employeeCode: row.user.employeeCode ?? '',
+      },
+      checkInTime: row.checkedInAt?.toISOString() ?? null,
+      checkOutTime: row.checkedOutAt?.toISOString() ?? null,
+      status: row.checkedInAt
+        ? statusFromCheckIn(
+            row.checkedInAt,
+            policy.lateAfter,
+            policy.absentAfter,
+            policy.timezone,
+          )
+        : row.status,
+      source: row.source,
+    }));
+
+    return { data, timezone: policy.timezone, ...paginate(data, total, page, limit) };
+  }
+
+  async listStaffDropdown(user: AuthUser) {
+    const schoolId = this.requireSchool(user);
+    const staffUsers = await listSchoolStaffForAttendance(this.prisma, schoolId);
+    return staffUsers.map((row) => ({
+      id: row.id,
+      name: staffDisplayName(row),
+      employeeCode: row.employeeCode ?? '',
+    }));
+  }
+
+  async manualStaffCheckIn(user: AuthUser, input: { staffUserId: string; date: string; time?: string }) {
+    const schoolId = this.requireSchool(user);
+    const instant = input.time ? new Date(input.time) : new Date(`${input.date}T12:00:00.000Z`);
+    await this.biometricAttendance.applyPunchToStaffAttendance({
+      schoolId,
+      userId: input.staffUserId,
+      punch: { deviceUserId: 'manual', recordTime: instant, direction: 'in' },
+      deviceUserId: 'manual',
+    });
+    const day = dateFromIso(input.date);
+    const row = await this.prisma.staffAttendance.findUnique({
+      where: { userId_date: { userId: input.staffUserId, date: day } },
+    });
+    if (row) {
+      await this.prisma.staffAttendance.update({
+        where: { id: row.id },
+        data: { source: 'ADMIN', recordedById: user.id },
+      });
+    }
+    return { ok: true };
+  }
+
+  async manualStaffCheckOut(user: AuthUser, input: { staffUserId: string; date: string; time?: string }) {
+    const schoolId = this.requireSchool(user);
+    const instant = input.time ? new Date(input.time) : new Date(`${input.date}T18:00:00.000Z`);
+    await this.biometricAttendance.applyPunchToStaffAttendance({
+      schoolId,
+      userId: input.staffUserId,
+      punch: { deviceUserId: 'manual', recordTime: instant, direction: 'out' },
+      deviceUserId: 'manual',
+    });
+    const day = dateFromIso(input.date);
+    const row = await this.prisma.staffAttendance.findUnique({
+      where: { userId_date: { userId: input.staffUserId, date: day } },
+    });
+    if (row) {
+      await this.prisma.staffAttendance.update({
+        where: { id: row.id },
+        data: { source: 'ADMIN', recordedById: user.id },
+      });
+    }
+    return { ok: true };
   }
 }

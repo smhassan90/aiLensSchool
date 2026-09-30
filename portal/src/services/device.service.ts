@@ -44,19 +44,24 @@ export type MappingCandidates = {
     pendingCount: number;
   }>;
   unmappedTeachers: Array<{ id: string; name: string; employeeCode: string }>;
+  unmappedStaff: Array<{ id: string; name: string; employeeCode: string }>;
   allTeachers: Array<{ id: string; name: string; employeeCode: string }>;
+  allStaff: Array<{ id: string; name: string; employeeCode: string }>;
   suggestions: Array<{
     deviceUserId: string;
-    teacherId: string;
-    teacherName: string;
+    teacherId?: string;
+    staffUserId?: string;
+    personName: string;
     deviceUserName: string | null;
   }>;
   mappedPairs: Array<{
     mappingId: string;
     deviceUserId: string;
     deviceUserName: string | null;
-    teacherId: string;
-    teacherName: string;
+    personType: "teacher" | "staff";
+    teacherId: string | null;
+    staffUserId: string | null;
+    personName: string;
     employeeCode: string;
   }>;
   pendingCounts: Record<string, number>;
@@ -108,7 +113,10 @@ export const deviceService = {
   mappingCandidates: (id: string) => apiClient<MappingCandidates>(`/device/${id}/mapping-candidates`),
   requestFullSync: (id: string) =>
     apiClient(`/device/${id}/request-full-sync`, { method: "POST" }),
-  confirmMappings: (id: string, mappings: Array<{ deviceUserId: string; teacherId: string }>) =>
+  confirmMappings: (
+    id: string,
+    mappings: Array<{ deviceUserId: string; teacherId?: string; staffUserId?: string }>,
+  ) =>
     apiClient<{ mappings: number; pendingPunchesApplied: number }>(`/device/${id}/mappings/confirm`, {
       method: "POST",
       body: JSON.stringify({ mappings }),

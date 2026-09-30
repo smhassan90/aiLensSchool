@@ -108,6 +108,7 @@ export class UsersService {
       email?: string;
       password: string;
       phone: string;
+      employeeCode?: string;
       title?: string;
       role?: RoleName;
       permissions?: StaffPermission[];
@@ -157,6 +158,20 @@ export class UsersService {
         throw new ConflictException({ code: 'EMAIL_EXISTS', message: 'Email already registered' });
       }
 
+      const employeeCode = dto.employeeCode?.trim() || null;
+      if (employeeCode) {
+        const taken = await tx.user.findFirst({
+          where: { schoolId, employeeCode },
+          select: { id: true },
+        });
+        if (taken) {
+          throw new ConflictException({
+            code: 'EMPLOYEE_CODE_EXISTS',
+            message: 'Employee code already used at this school',
+          });
+        }
+      }
+
       const staff = await tx.user.create({
         data: {
           email,
@@ -165,6 +180,7 @@ export class UsersService {
           firstName: dto.firstName,
           lastName: dto.lastName,
           phone,
+          employeeCode,
           schoolId,
           status: UserStatus.ACTIVE,
           permissions,

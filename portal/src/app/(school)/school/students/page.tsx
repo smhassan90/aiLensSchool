@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,15 +21,34 @@ import {
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageLoader } from "@/components/layout/page-loader";
 import { studentsService } from "@/services/students.service";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useToast } from "@/providers/toast-provider";
+import { ApiClientError } from "@/lib/api-client";
+import { formatStatusLabel } from "@/lib/display-labels";
+import type { Student } from "@/lib/types";
 import { academicsService } from "@/services/academics.service";
 import { teachersService } from "@/services/teachers.service";
 import { personFullName, studentMatchesQuery, teacherDisplayNameFromUser } from "@/lib/person-name";
 import { GraduationCap, Plus } from "lucide-react";
 
+type StudentStatusConfirm = {
+  student: Student;
+  nextStatus: "ACTIVE" | "INACTIVE";
+};
+
 export default function StudentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [statusConfirm, setStatusConfirm] = useState<StudentStatusConfirm | null>(null);
   const sectionId = searchParams.get("sectionId") ?? "";
   const teacherId = searchParams.get("teacherId") ?? "";
   const status = searchParams.get("status") ?? "";
@@ -49,6 +68,26 @@ export default function StudentsPage() {
   const teachers = useQuery({
     queryKey: ["teachers"],
     queryFn: () => teachersService.list({ limit: 100 }),
+  });
+
+  const setStudentStatus = useMutation({
+    mutationFn: ({ studentId, nextStatus }: { studentId: string; nextStatus: "ACTIVE" | "INACTIVE" }) =>
+      studentsService.update(studentId, { status: nextStatus }),
+    onSuccess: (_, { nextStatus }) => {
+      setStatusConfirm(null);
+      queryClient.invalidateQueries({ queryKey: ["students-roster"] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      toast({
+        title: nextStatus === "INACTIVE" ? "Student marked inactive" : "Student reactivated",
+        variant: "success",
+      });
+    },
+    onError: (err) =>
+      toast({
+        title: "Could not update status",
+        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        variant: "error",
+      }),
   });
 
   const { data, isLoading, isError, error } = useQuery({
@@ -281,7 +320,7 @@ export default function StudentsPage() {
                 <TableHead>Class teacher</TableHead>
                 <TableHead>Branch</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead></TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -325,13 +364,55 @@ export default function StudentsPage() {
                   <TableCell>{student.branch?.name ?? "—"}</TableCell>
                   <TableCell>
                     <Badge variant={student.status === "ACTIVE" ? "success" : "secondary"}>
-                      {student.status}
+                      {formatStatusLabel(student.status)}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    <Button size="sm" variant="outline">
-                      360 view
-                    </Button>
+                  <TableCell className="text-right">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          router.push(`/school/students/${student.id}/edit`);
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      {student.status === "INACTIVE" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setStatusConfirm({ student, nextStatus: "ACTIVE" });
+                          }}
+                        >
+                          Activate
+                        </Button>
+                      ) : student.status === "ACTIVE" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setStatusConfirm({ student, nextStatus: "INACTIVE" });
+                          }}
+                        >
+                          Deactivate
+                        </Button>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          router.push(`/school/students/${student.id}`);
+                        }}
+                      >
+                        360 view
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -339,6 +420,40 @@ export default function StudentsPage() {
           </Table>
         )}
       </div>
+
+      <Dialog open={Boolean(statusConfirm)} onOpenChange={(open) => { if (!open) setStatusConfirm(null); }}>
+        <DialogContent onClose={() => setStatusConfirm(null)}>
+          <DialogHeader>
+            <DialogTitle>
+              {statusConfirm?.nextStatus === "INACTIVE" ? "Deactivate student?" : "Reactivate student?"}
+            </DialogTitle>
+            <DialogDescription>
+              {statusConfirm
+                ? statusConfirm.nextStatus === "INACTIVE"
+                  ? `${personFullName(statusConfirm.student.firstName, statusConfirm.student.lastName)} stays on record but is treated as inactive in rosters and reports.`
+                  : `${personFullName(statusConfirm.student.firstName, statusConfirm.student.lastName)} will show as active again.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setStatusConfirm(null)} disabled={setStudentStatus.isPending}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!statusConfirm || setStudentStatus.isPending}
+              onClick={() =>
+                statusConfirm &&
+                setStudentStatus.mutate({
+                  studentId: statusConfirm.student.id,
+                  nextStatus: statusConfirm.nextStatus,
+                })
+              }
+            >
+              {setStudentStatus.isPending ? "Saving…" : statusConfirm?.nextStatus === "INACTIVE" ? "Deactivate" : "Activate"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

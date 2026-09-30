@@ -1,5 +1,9 @@
 import { Module } from '@nestjs/common';
-import { DeviceController, TeacherAttendanceReportController } from './device.controller';
+import {
+  DeviceController,
+  StaffAttendanceReportController,
+  TeacherAttendanceReportController,
+} from './device.controller';
 import { DeviceOfflineController } from './device-offline.controller';
 import { DeviceService } from './device.service';
 import { BiometricAttendanceService } from './biometric-attendance.service';
@@ -8,7 +12,12 @@ import { ZktService } from './zkt.service';
 import { SchoolSyncKeyGuard } from './school-sync-key.guard';
 
 @Module({
-  controllers: [DeviceController, DeviceOfflineController, TeacherAttendanceReportController],
+  controllers: [
+    DeviceController,
+    DeviceOfflineController,
+    TeacherAttendanceReportController,
+    StaffAttendanceReportController,
+  ],
   providers: [
     DeviceService,
     BiometricAttendanceService,

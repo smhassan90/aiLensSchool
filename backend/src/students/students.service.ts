@@ -583,6 +583,7 @@ export class StudentsService {
           ...(dto.gender !== undefined ? { gender: dto.gender ?? null } : {}),
           ...(dto.address !== undefined ? { address: dto.address?.trim() || null } : {}),
           ...(dto.scienceGroup !== undefined ? { scienceGroup: scienceGroup || null } : {}),
+          ...(dto.status !== undefined ? { status: dto.status } : {}),
           ...(enrollmentChange ? { branchId: enrollmentChange.branchId } : {}),
         },
       });

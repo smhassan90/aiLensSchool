@@ -135,17 +135,27 @@ export class BiometricAttendanceService {
 
     const mappings = await this.prisma.biometricDeviceUserMapping.findMany({
       where: { deviceConfigId: input.deviceConfigId, isActive: true },
-      select: { deviceUserId: true, teacherId: true },
+      select: { deviceUserId: true, teacherId: true, staffUserId: true },
     });
-    const teacherByDeviceUser = new Map(mappings.map((m) => [m.deviceUserId, m.teacherId]));
+    const targetByDeviceUser = new Map<
+      string,
+      { kind: 'teacher' | 'staff'; id: string }
+    >();
+    for (const m of mappings) {
+      if (m.teacherId) {
+        targetByDeviceUser.set(m.deviceUserId, { kind: 'teacher', id: m.teacherId });
+      } else if (m.staffUserId) {
+        targetByDeviceUser.set(m.deviceUserId, { kind: 'staff', id: m.staffUserId });
+      }
+    }
 
     let applied = 0;
     let pending = 0;
     let skipped = 0;
 
     for (const punch of punches) {
-      const teacherId = teacherByDeviceUser.get(punch.deviceUserId);
-      if (!teacherId) {
+      const target = targetByDeviceUser.get(punch.deviceUserId);
+      if (!target?.id) {
         try {
           await this.prisma.pendingBiometricAttendanceLog.create({
             data: {
@@ -167,13 +177,23 @@ export class BiometricAttendanceService {
         }
         continue;
       }
-      await this.applyPunchToAttendance({
-        schoolId: input.schoolId,
-        teacherId,
-        punch,
-        deviceUserId: punch.deviceUserId,
-        deviceSerialNumber: input.deviceSerialNumber ?? null,
-      });
+      if (target.kind === 'teacher') {
+        await this.applyPunchToAttendance({
+          schoolId: input.schoolId,
+          teacherId: target.id,
+          punch,
+          deviceUserId: punch.deviceUserId,
+          deviceSerialNumber: input.deviceSerialNumber ?? null,
+        });
+      } else {
+        await this.applyPunchToStaffAttendance({
+          schoolId: input.schoolId,
+          userId: target.id,
+          punch,
+          deviceUserId: punch.deviceUserId,
+          deviceSerialNumber: input.deviceSerialNumber ?? null,
+        });
+      }
       applied += 1;
     }
 
@@ -260,6 +280,80 @@ export class BiometricAttendanceService {
     });
   }
 
+  async applyPunchToStaffAttendance(input: {
+    schoolId: string;
+    userId: string;
+    punch: NormalizedPunch;
+    deviceUserId: string;
+    deviceSerialNumber?: string | null;
+  }) {
+    const policy = await loadTeacherAttendancePolicy(this.prisma, input.schoolId);
+    const dateIso = zonedDateIso(input.punch.recordTime, policy.timezone);
+    const day = dateFromIso(dateIso);
+
+    const existing = await this.prisma.staffAttendance.findUnique({
+      where: { userId_date: { userId: input.userId, date: day } },
+    });
+
+    if (input.punch.direction === 'in') {
+      const checkedInAt = earliestPunch(existing?.checkedInAt, input.punch.recordTime);
+      const status = statusFromCheckIn(
+        checkedInAt,
+        policy.lateAfter,
+        policy.absentAfter,
+        policy.timezone,
+      );
+      await this.prisma.staffAttendance.upsert({
+        where: { userId_date: { userId: input.userId, date: day } },
+        create: {
+          schoolId: input.schoolId,
+          userId: input.userId,
+          date: day,
+          status,
+          checkedInAt,
+          source: 'MACHINE',
+          deviceUserId: input.deviceUserId,
+          deviceSerialNumber: input.deviceSerialNumber ?? null,
+        },
+        update: {
+          status,
+          checkedInAt,
+          source: 'MACHINE',
+          deviceUserId: existing?.deviceUserId ?? input.deviceUserId,
+          deviceSerialNumber: input.deviceSerialNumber ?? existing?.deviceSerialNumber ?? null,
+        },
+      });
+      return;
+    }
+
+    const checkedOutAt = latestPunch(existing?.checkedOutAt, input.punch.recordTime);
+    if (!existing) {
+      await this.prisma.staffAttendance.create({
+        data: {
+          schoolId: input.schoolId,
+          userId: input.userId,
+          date: day,
+          status: AttendanceStatus.PRESENT,
+          checkedOutAt,
+          source: 'MACHINE',
+          deviceUserId: input.deviceUserId,
+          deviceSerialNumber: input.deviceSerialNumber ?? null,
+        },
+      });
+      return;
+    }
+
+    await this.prisma.staffAttendance.update({
+      where: { userId_date: { userId: input.userId, date: day } },
+      data: {
+        checkedOutAt,
+        source: existing.source === 'SYSTEM' ? 'MACHINE' : existing.source,
+        deviceUserId: existing.deviceUserId ?? input.deviceUserId,
+        deviceSerialNumber: input.deviceSerialNumber ?? existing.deviceSerialNumber ?? null,
+      },
+    });
+  }
+
   async replayPendingForMapping(deviceConfigId: string, deviceUserId: string, teacherId: string) {
     const device = await this.prisma.biometricDeviceConfig.findUnique({
       where: { id: deviceConfigId },
@@ -293,6 +387,39 @@ export class BiometricAttendanceService {
     return { applied };
   }
 
+  async replayPendingForStaffMapping(deviceConfigId: string, deviceUserId: string, staffUserId: string) {
+    const device = await this.prisma.biometricDeviceConfig.findUnique({
+      where: { id: deviceConfigId },
+      select: { schoolId: true, serialNumber: true },
+    });
+    if (!device) return { applied: 0 };
+
+    const pending = await this.prisma.pendingBiometricAttendanceLog.findMany({
+      where: { deviceConfigId, deviceUserId },
+      orderBy: { recordTime: 'asc' },
+    });
+
+    let applied = 0;
+    for (const row of pending) {
+      const direction = punchDirectionFromRaw(row.punchType, row.punchState) ?? 'in';
+      await this.applyPunchToStaffAttendance({
+        schoolId: device.schoolId,
+        userId: staffUserId,
+        punch: { deviceUserId, recordTime: row.recordTime, direction },
+        deviceUserId,
+        deviceSerialNumber: device.serialNumber,
+      });
+      applied += 1;
+    }
+
+    if (pending.length) {
+      await this.prisma.pendingBiometricAttendanceLog.deleteMany({
+        where: { deviceConfigId, deviceUserId },
+      });
+    }
+    return { applied };
+  }
+
   async runAutoCheckoutPolicy(schoolId: string): Promise<number> {
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
@@ -301,19 +428,29 @@ export class BiometricAttendanceService {
     const hours = school?.autoCheckoutHours ?? 24;
     const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-    const openRows = await this.prisma.teacherAttendance.findMany({
-      where: {
-        schoolId,
-        checkedOutAt: null,
-        checkedInAt: { not: null, lte: cutoff },
-      },
-      select: { id: true, checkedInAt: true },
-    });
+    const [teacherOpen, staffOpen] = await Promise.all([
+      this.prisma.teacherAttendance.findMany({
+        where: {
+          schoolId,
+          checkedOutAt: null,
+          checkedInAt: { not: null, lte: cutoff },
+        },
+        select: { id: true, checkedInAt: true },
+      }),
+      this.prisma.staffAttendance.findMany({
+        where: {
+          schoolId,
+          checkedOutAt: null,
+          checkedInAt: { not: null, lte: cutoff },
+        },
+        select: { id: true, checkedInAt: true },
+      }),
+    ]);
 
-    if (!openRows.length) return 0;
+    if (!teacherOpen.length && !staffOpen.length) return 0;
 
-    await this.prisma.$transaction(
-      openRows.map((row) =>
+    await this.prisma.$transaction([
+      ...teacherOpen.map((row) =>
         this.prisma.teacherAttendance.update({
           where: { id: row.id },
           data: {
@@ -321,8 +458,16 @@ export class BiometricAttendanceService {
           },
         }),
       ),
-    );
-    return openRows.length;
+      ...staffOpen.map((row) =>
+        this.prisma.staffAttendance.update({
+          where: { id: row.id },
+          data: {
+            checkedOutAt: new Date((row.checkedInAt?.getTime() ?? Date.now()) + hours * 60 * 60 * 1000),
+          },
+        }),
+      ),
+    ]);
+    return teacherOpen.length + staffOpen.length;
   }
 
   filterMappingCandidates(

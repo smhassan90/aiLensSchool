@@ -332,6 +332,7 @@ model User {
   firstName          String     @map("first_name")
   lastName           String     @map("last_name")
   phone              String?
+  employeeCode       String?    @map("employee_code") @db.VarChar(40)
   status             UserStatus @default(ACTIVE)
   schoolId           String?    @map("school_id")
   mustChangePassword Boolean    @default(false) @map("must_change_password")
@@ -370,7 +371,11 @@ model User {
   recordedExpenses           Expense[]                      @relation("ExpenseRecordedBy")
   recordedAssessments        AssessmentMark[]               @relation("AssessmentRecordedBy")
   recordedTeacherAttendance  TeacherAttendance[]            @relation("TeacherAttendanceRecordedBy")
+  staffAttendances           StaffAttendance[]              @relation("StaffAttendanceUser")
+  recordedStaffAttendance    StaffAttendance[]              @relation("StaffAttendanceRecordedBy")
+  biometricStaffMappings     BiometricDeviceUserMapping[]   @relation("BiometricStaffMapping")
 
+  @@unique([schoolId, employeeCode])
   @@index([schoolId])
   @@index([status])
   @@map("users")
@@ -525,6 +530,7 @@ model School {
   apiExceptionLogs              ApiExceptionLog[]
   attendances                   Attendance[]
   teacherAttendances            TeacherAttendance[]
+  staffAttendances              StaffAttendance[]
   feeStructures                 FeeStructure[]
   studentFees                   StudentFee[]
   homeDiaries                   HomeDiary[]
@@ -1598,6 +1604,34 @@ model TeacherAttendance {
   @@map("teacher_attendances")
 }
 
+model StaffAttendance {
+  id                 String           @id @default(uuid())
+  schoolId           String           @map("school_id")
+  userId             String           @map("user_id")
+  date               DateTime         @db.Date
+  status             AttendanceStatus
+  notes              String?
+  checkedInAt        DateTime?        @map("checked_in_at")
+  checkedOutAt       DateTime?        @map("checked_out_at")
+  source             String           @default("ADMIN") @map("source") @db.VarChar(20)
+  deviceUserId       String?          @map("device_user_id") @db.VarChar(80)
+  deviceSerialNumber String?          @map("device_serial_number") @db.VarChar(80)
+  recordedById       String?          @map("recorded_by_id")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  school     School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user       User   @relation("StaffAttendanceUser", fields: [userId], references: [id], onDelete: Cascade)
+  recordedBy User?  @relation("StaffAttendanceRecordedBy", fields: [recordedById], references: [id])
+
+  @@unique([userId, date])
+  @@index([schoolId])
+  @@index([userId])
+  @@index([date])
+  @@index([checkedInAt])
+  @@map("staff_attendances")
+}
+
 model BiometricDeviceConfig {
   id                  String    @id @default(uuid())
   schoolId            String    @map("school_id")
@@ -1643,7 +1677,8 @@ model BiometricDeviceUser {
 model BiometricDeviceUserMapping {
   id             String   @id @default(uuid())
   deviceConfigId String   @map("device_config_id")
-  teacherId      String   @map("teacher_id")
+  teacherId      String?  @map("teacher_id")
+  staffUserId    String?  @map("staff_user_id")
   deviceUserId   String   @map("device_user_id") @db.VarChar(80)
   deviceUserName String?  @map("device_user_name") @db.VarChar(120)
   isActive       Boolean  @default(true) @map("is_active")
@@ -1651,12 +1686,15 @@ model BiometricDeviceUserMapping {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   deviceConfig BiometricDeviceConfig @relation(fields: [deviceConfigId], references: [id], onDelete: Cascade)
-  teacher      TeacherProfile        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacher      TeacherProfile?       @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  staffUser    User?                 @relation("BiometricStaffMapping", fields: [staffUserId], references: [id], onDelete: Cascade)
 
   @@unique([deviceConfigId, deviceUserId])
   @@unique([deviceConfigId, teacherId])
+  @@unique([deviceConfigId, staffUserId], map: "bio_map_config_staff_user")
   @@index([deviceConfigId])
   @@index([teacherId])
+  @@index([staffUserId])
   @@map("biometric_device_user_mappings")
 }
 

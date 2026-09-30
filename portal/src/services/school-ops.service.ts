@@ -23,6 +23,7 @@ export const staffService = {
     password: string;
     phone: string;
     title?: string;
+    employeeCode?: string;
     role?: "PRINCIPAL";
     permissions: StaffPermission[];
   }) {

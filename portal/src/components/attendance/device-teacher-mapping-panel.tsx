@@ -27,7 +27,28 @@ type Props = {
   showSetupHint?: boolean;
 };
 
-type MappingRow = { deviceUserId: string; teacherId: string };
+type MappingRow = { deviceUserId: string; teacherId?: string; staffUserId?: string };
+
+function draftKeyForSuggestion(s: {
+  teacherId?: string;
+  staffUserId?: string;
+}) {
+  if (s.teacherId) return `teacher:${s.teacherId}`;
+  if (s.staffUserId) return `staff:${s.staffUserId}`;
+  return "";
+}
+
+function parseDraftValue(value: string): MappingRow | null {
+  if (value.startsWith("teacher:")) {
+    const teacherId = value.slice("teacher:".length);
+    return teacherId ? { deviceUserId: "", teacherId } : null;
+  }
+  if (value.startsWith("staff:")) {
+    const staffUserId = value.slice("staff:".length);
+    return staffUserId ? { deviceUserId: "", staffUserId } : null;
+  }
+  return null;
+}
 
 function buildMappingsToSave(
   unmapped: Array<{ deviceUserId: string }>,
@@ -36,42 +57,41 @@ function buildMappingsToSave(
 ): MappingRow[] {
   return unmapped
     .map((user) => {
-      const teacherId = draft[user.deviceUserId] ?? suggestionMap[user.deviceUserId] ?? "";
-      return teacherId ? { deviceUserId: user.deviceUserId, teacherId } : null;
+      const raw = draft[user.deviceUserId] ?? suggestionMap[user.deviceUserId] ?? "";
+      const parsed = parseDraftValue(raw);
+      if (!parsed?.teacherId && !parsed?.staffUserId) return null;
+      return {
+        deviceUserId: user.deviceUserId,
+        teacherId: parsed.teacherId,
+        staffUserId: parsed.staffUserId,
+      };
     })
     .filter((row): row is MappingRow => row !== null);
 }
 
-function teachersSelectableForDeviceUser(
+function peopleSelectableForDeviceUser(
   deviceUserId: string,
   allTeachers: Array<{ id: string; name: string; employeeCode: string }>,
-  mappedPairs: Array<{ teacherId: string; deviceUserId: string }>,
-  suggestions: Array<{ deviceUserId: string; teacherId: string; teacherName: string }>,
-  suggestionMap: Record<string, string>,
+  allStaff: Array<{ id: string; name: string; employeeCode: string }>,
+  mappedPairs: Array<{ teacherId: string | null; staffUserId: string | null; deviceUserId: string }>,
 ) {
-  const teacherMappedToDevice = new Map(mappedPairs.map((m) => [m.teacherId, m.deviceUserId]));
-  const byId = new Map<string, { id: string; name: string; employeeCode: string }>();
+  const teacherMappedToDevice = new Map(
+    mappedPairs.filter((m) => m.teacherId).map((m) => [m.teacherId!, m.deviceUserId]),
+  );
+  const staffMappedToDevice = new Map(
+    mappedPairs.filter((m) => m.staffUserId).map((m) => [m.staffUserId!, m.deviceUserId]),
+  );
 
-  for (const teacher of allTeachers) {
+  const teachers = allTeachers.filter((teacher) => {
     const mappedDevice = teacherMappedToDevice.get(teacher.id);
-    if (mappedDevice === undefined || mappedDevice === deviceUserId) {
-      byId.set(teacher.id, teacher);
-    }
-  }
+    return mappedDevice === undefined || mappedDevice === deviceUserId;
+  });
+  const staff = allStaff.filter((person) => {
+    const mappedDevice = staffMappedToDevice.get(person.id);
+    return mappedDevice === undefined || mappedDevice === deviceUserId;
+  });
 
-  const suggestedId = suggestionMap[deviceUserId];
-  if (suggestedId && !byId.has(suggestedId)) {
-    const sug = suggestions.find((s) => s.deviceUserId === deviceUserId);
-    if (sug) {
-      byId.set(sug.teacherId, {
-        id: sug.teacherId,
-        name: sug.teacherName,
-        employeeCode: "",
-      });
-    }
-  }
-
-  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  return { teachers, staff };
 }
 
 function DeviceMappingCard({
@@ -151,7 +171,8 @@ function DeviceMappingCard({
   const suggestionMap = useMemo(() => {
     const map: Record<string, string> = {};
     for (const row of candidates.data?.suggestions ?? []) {
-      map[row.deviceUserId] = row.teacherId;
+      const key = draftKeyForSuggestion(row);
+      if (key) map[row.deviceUserId] = key;
     }
     return map;
   }, [candidates.data?.suggestions]);
@@ -168,8 +189,9 @@ function DeviceMappingCard({
       let changed = false;
       const next = { ...prev };
       for (const row of suggestions) {
-        if (!next[row.deviceUserId]) {
-          next[row.deviceUserId] = row.teacherId;
+        const key = draftKeyForSuggestion(row);
+        if (key && !next[row.deviceUserId]) {
+          next[row.deviceUserId] = key;
           changed = true;
         }
       }
@@ -270,9 +292,9 @@ function DeviceMappingCard({
       {canManage ? (
         <CardContent className="space-y-4 border-t pt-4">
           <div>
-            <h3 className="text-sm font-medium">Map device users to teachers</h3>
+            <h3 className="text-sm font-medium">Map device users to teachers or staff</h3>
             <p className="text-xs text-muted-foreground">
-              Match each terminal user to a teacher. Pending punches apply when you save mappings.
+              Match each terminal user to a teacher or office staff member. Pending punches apply when you save mappings.
             </p>
           </div>
 
@@ -292,7 +314,7 @@ function DeviceMappingCard({
                       <TableHeader>
                         <TableRow>
                           <TableHead>Device user</TableHead>
-                          <TableHead>Teacher</TableHead>
+                          <TableHead>Person</TableHead>
                           {canManage ? <TableHead className="w-[100px] text-right">Action</TableHead> : null}
                         </TableRow>
                       </TableHeader>
@@ -306,10 +328,15 @@ function DeviceMappingCard({
                               <div className="text-xs text-muted-foreground">ID {row.deviceUserId}</div>
                             </TableCell>
                             <TableCell>
-                              {row.teacherName}
-                              {row.employeeCode ? (
-                                <span className="text-muted-foreground"> · {row.employeeCode}</span>
-                              ) : null}
+                              <span className="text-xs uppercase text-muted-foreground">
+                                {row.personType === "staff" ? "Staff" : "Teacher"}
+                              </span>
+                              <div>
+                                {row.personName}
+                                {row.employeeCode ? (
+                                  <span className="text-muted-foreground"> · {row.employeeCode}</span>
+                                ) : null}
+                              </div>
                             </TableCell>
                             {canManage ? (
                               <TableCell className="text-right">
@@ -320,7 +347,7 @@ function DeviceMappingCard({
                                   disabled={unmapTeacher.isPending}
                                   onClick={() => {
                                     const ok = window.confirm(
-                                      `Remove mapping for "${row.deviceUserName || row.deviceUserId}" → ${row.teacherName}?\n\nThe device user will appear in the list below so you can map them to another teacher.`,
+                                      `Remove mapping for "${row.deviceUserName || row.deviceUserId}" → ${row.personName}?\n\nThe device user will appear in the list below so you can map them again.`,
                                     );
                                     if (ok) unmapTeacher.mutate(row.mappingId);
                                   }}
@@ -359,14 +386,13 @@ function DeviceMappingCard({
                   <TableBody>
                     {unmapped.map((user) => {
                       const value = draft[user.deviceUserId] ?? suggestionMap[user.deviceUserId] ?? "";
-                      const teacherOptions = teachersSelectableForDeviceUser(
+                      const { teachers: teacherOptions, staff: staffOptions } = peopleSelectableForDeviceUser(
                         user.deviceUserId,
                         candidates.data?.allTeachers ??
                           candidates.data?.unmappedTeachers ??
                           [],
+                        candidates.data?.allStaff ?? candidates.data?.unmappedStaff ?? [],
                         mappedPairs,
-                        suggestions,
-                        suggestionMap,
                       );
                       const isSuggested = Boolean(suggestionMap[user.deviceUserId]);
                       return (
@@ -378,7 +404,7 @@ function DeviceMappingCard({
                             <div className="text-xs text-muted-foreground">
                               ID {user.deviceUserId}
                               {isSuggested ? (
-                                <span className="ml-2 text-primary">Name match</span>
+                                <span className="ml-2 text-primary">Suggested match</span>
                               ) : null}
                             </div>
                           </TableCell>
@@ -386,11 +412,11 @@ function DeviceMappingCard({
                             {user.pendingCount ? user.pendingCount : "—"}
                           </TableCell>
                           <TableCell>
-                            <Label className="sr-only" htmlFor={`teacher-${device.id}-${user.deviceUserId}`}>
-                              Teacher for {user.deviceUserName || user.deviceUserId}
+                            <Label className="sr-only" htmlFor={`person-${device.id}-${user.deviceUserId}`}>
+                              Person for {user.deviceUserName || user.deviceUserId}
                             </Label>
                             <Select
-                              id={`teacher-${device.id}-${user.deviceUserId}`}
+                              id={`person-${device.id}-${user.deviceUserId}`}
                               value={value}
                               onChange={(e) =>
                                 setDraft((prev) => ({
@@ -399,12 +425,25 @@ function DeviceMappingCard({
                                 }))
                               }
                             >
-                              <option value="">Select teacher</option>
-                              {teacherOptions.map((t) => (
-                                <option key={t.id} value={t.id}>
-                                  {t.employeeCode ? `${t.name} · ${t.employeeCode}` : t.name}
-                                </option>
-                              ))}
+                              <option value="">Select teacher or staff</option>
+                              {teacherOptions.length ? (
+                                <optgroup label="Teachers">
+                                  {teacherOptions.map((t) => (
+                                    <option key={`t-${t.id}`} value={`teacher:${t.id}`}>
+                                      {t.employeeCode ? `${t.name} · ${t.employeeCode}` : t.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              ) : null}
+                              {staffOptions.length ? (
+                                <optgroup label="Staff">
+                                  {staffOptions.map((s) => (
+                                    <option key={`s-${s.id}`} value={`staff:${s.id}`}>
+                                      {s.employeeCode ? `${s.name} · ${s.employeeCode}` : s.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              ) : null}
                             </Select>
                           </TableCell>
                         </TableRow>

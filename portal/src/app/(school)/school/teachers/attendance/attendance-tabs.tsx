@@ -22,21 +22,35 @@ export function TeacherAttendanceTabs() {
   const canBiometric = can("VIEW_BIOMETRIC_DEVICES") || can("MANAGE_TEACHERS");
   const canToday = can("MANAGE_TEACHERS");
   const canHistory = can("VIEW_TEACHER_ATTENDANCE_HISTORY") || can("MANAGE_TEACHERS");
+  const canStaff =
+    can("VIEW_TEACHER_ATTENDANCE_HISTORY") || can("MANAGE_STAFF") || can("MANAGE_TEACHERS");
 
   const setupPath = pathname.startsWith("/school/setup/attendance");
+  const staffPath = pathname.startsWith("/school/staff/attendance");
   const setupTab = setupPath ? searchParams.get("tab") : null;
 
   const tabs: TabDef[] = [
     {
       href: "/school/teachers/attendance",
-      label: "Today",
+      label: "Teachers today",
       exact: true,
       visible: canToday,
     },
     {
       href: "/school/teachers/attendance/history",
-      label: "History",
+      label: "Teacher history",
       visible: canHistory,
+    },
+    {
+      href: "/school/staff/attendance",
+      label: "Staff today",
+      exact: true,
+      visible: canStaff,
+    },
+    {
+      href: "/school/staff/attendance/history",
+      label: "Staff history",
+      visible: canStaff,
     },
     {
       href: "/school/teachers/attendance/devices",
@@ -45,7 +59,7 @@ export function TeacherAttendanceTabs() {
     },
     {
       href: "/school/setup/attendance?tab=mapping",
-      label: "Map teachers",
+      label: "Map staff & teachers",
       setupTab: "mapping",
       visible: canBiometric,
     },
@@ -72,7 +86,9 @@ export function TeacherAttendanceTabs() {
           ? setupPath && (setupTab === tab.setupTab || (!setupTab && tab.setupTab === "mapping"))
           : tab.exact
             ? pathname === tab.href
-            : pathname.startsWith(tab.href);
+            : tab.href.startsWith("/school/staff/attendance")
+              ? staffPath && pathname.startsWith(tab.href)
+              : pathname.startsWith(tab.href);
         return (
           <Link
             key={tab.href}
