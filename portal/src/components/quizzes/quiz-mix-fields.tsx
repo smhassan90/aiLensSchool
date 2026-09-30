@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { OptionalNumberInput } from "@/components/ui/optional-number-input";
 import { Label } from "@/components/ui/label";
 
 type QuizMixFieldsProps = {
@@ -29,14 +29,7 @@ function CountField({
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        type="number"
-        min={0}
-        max={20}
-        value={value}
-        onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
-      />
+      <OptionalNumberInput id={id} min={0} max={20} value={value} onChange={onChange} />
     </div>
   );
 }

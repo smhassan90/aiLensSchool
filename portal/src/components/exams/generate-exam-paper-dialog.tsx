@@ -5,7 +5,6 @@ import { PageLoader } from "@/components/layout/page-loader";
 import { AiWait } from "@/components/layout/ai-wait";
 import { DifficultySlider } from "@/components/exams/difficulty-slider";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import {
@@ -16,6 +15,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatDate, formatMarks } from "@/lib/utils";
+import { OptionalNumberInput } from "@/components/ui/optional-number-input";
+import { totalMarksFromSpec } from "@/lib/exam-paper-question-spec";
 
 export type GenerateExamPaperFormValues = {
   examConfigId?: string;
@@ -82,27 +83,26 @@ function QuestionMixRow({
       </div>
       <div className="space-y-1.5">
         <Label htmlFor={countId} className="text-xs text-muted-foreground">Questions</Label>
-        <Input
+        <OptionalNumberInput
           id={countId}
-          type="number"
           min={0}
           max={20}
           value={count}
           disabled={locked}
-          onChange={(e) => onCount(Math.max(0, Number(e.target.value) || 0))}
+          onChange={onCount}
           className="h-9"
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor={marksId} className="text-xs text-muted-foreground">Marks</Label>
-        <Input
+        <Label htmlFor={marksId} className="text-xs text-muted-foreground">Marks each</Label>
+        <OptionalNumberInput
           id={marksId}
-          type="number"
           min={0}
-          max={200}
+          max={50}
+          allowDecimal
           value={marks}
           disabled={locked}
-          onChange={(e) => onMarks(Math.max(0, Number(e.target.value) || 0))}
+          onChange={onMarks}
           className="h-9"
         />
       </div>
@@ -168,12 +168,20 @@ export function GenerateExamPaperDialog({
   const totals = {
     questions:
       Number(mcqCount) + Number(fillBlankCount) + Number(trueFalseCount) + Number(shortAnswerCount) + Number(longAnswerCount),
-    marks:
-      Number(mcqMarks) + Number(fillBlankMarks) + Number(trueFalseMarks) + Number(shortAnswerMarks) + Number(longAnswerMarks),
+    marks: totalMarksFromSpec({
+      mcqCount: Number(mcqCount),
+      fillBlankCount: Number(fillBlankCount),
+      trueFalseCount: Number(trueFalseCount),
+      shortAnswerCount: Number(shortAnswerCount),
+      longAnswerCount: Number(longAnswerCount),
+      mcqMarks: Number(mcqMarks),
+      fillBlankMarks: Number(fillBlankMarks),
+      trueFalseMarks: Number(trueFalseMarks),
+      shortAnswerMarks: Number(shortAnswerMarks),
+      longAnswerMarks: Number(longAnswerMarks),
+    }),
   };
   const openQuestionCount = Number(shortAnswerCount) + Number(longAnswerCount);
-  const marksMismatch =
-    requiredMarks != null && Math.round(totals.marks * 10) !== Math.round(requiredMarks * 10);
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isGenerating && onOpenChange(next)}>
@@ -186,8 +194,8 @@ export function GenerateExamPaperDialog({
             <DialogTitle>Generate exam paper</DialogTitle>
             <DialogDescription>
               {assignment
-                ? `Generate ${assignment.examName} for ${assignment.className} · ${assignment.subjectName}. Total marks must be ${assignment.maxMarks}.`
-                : "Choose lectures and set marks per question type. The system will draft the paper in sections for your review."}
+                ? `Generate ${assignment.examName} for ${assignment.className} · ${assignment.subjectName}. Target total when you submit: ${assignment.maxMarks} marks.`
+                : "Choose lectures, question counts, and marks per question. You can edit and add more before submitting."}
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -212,10 +220,11 @@ export function GenerateExamPaperDialog({
                         {assignment.className} · {assignment.subjectName}
                       </p>
                       <p className="mt-1 text-muted-foreground">
-                        Submit by {formatDate(assignment.submissionDueAt)} · {assignment.maxMarks} marks required
+                        Submit by {formatDate(assignment.submissionDueAt)} · {assignment.maxMarks} marks when approved
                       </p>
                       <p className="mt-2 text-xs text-muted-foreground">
-                        You choose the question types and counts. Section marks must add up to {assignment.maxMarks}.
+                        Set how many questions and marks each. After generation you can add or edit questions; included
+                        marks must equal {assignment.maxMarks} before you submit for approval.
                       </p>
                     </div>
                   ) : (
@@ -336,13 +345,13 @@ export function GenerateExamPaperDialog({
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Question mix</h3>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Choose how many questions of each type to include and set marks per section.
+                    For each type: number of questions × marks each = section total (e.g. 10 questions × 1 mark = 10 marks).
                   </p>
                 </div>
                 <div className="hidden grid-cols-[1fr_5.5rem_5.5rem] gap-3 px-0 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground sm:grid">
                   <span>Type</span>
                   <span>Questions</span>
-                  <span>Marks</span>
+                  <span>Marks each</span>
                 </div>
                 <QuestionMixRow
                   label="Multiple choice"
@@ -401,16 +410,17 @@ export function GenerateExamPaperDialog({
             </div>
 
             <div className="border-t bg-muted/20 px-4 py-4 sm:px-6">
-              <div className={`mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-sm ${marksMismatch ? "border-amber-300 bg-amber-50" : "bg-background"}`}>
-                <span className="text-muted-foreground">Paper total</span>
-                <span className={`font-semibold ${marksMismatch ? "text-amber-900" : "text-foreground"}`}>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2.5 text-sm">
+                <span className="text-muted-foreground">Draft total from this mix</span>
+                <span className="font-semibold text-foreground">
                   {totals.questions} questions · {formatMarks(totals.marks)} marks
-                  {requiredMarks != null ? ` (required ${requiredMarks})` : ""}
+                  {requiredMarks != null ? ` (submit target ${requiredMarks})` : ""}
                 </span>
               </div>
-              {marksMismatch ? (
-                <p className="mb-3 text-sm text-amber-800">
-                  Section marks must add up to exactly {requiredMarks} before you can generate the paper.
+              {requiredMarks != null && totals.marks !== requiredMarks ? (
+                <p className="mb-3 text-sm text-muted-foreground">
+                  You can generate now and adjust included questions later. Submit for approval only when included marks
+                  equal {requiredMarks}.
                 </p>
               ) : null}
               {!selectedLessonIds.length ? (
@@ -424,7 +434,7 @@ export function GenerateExamPaperDialog({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={marksMismatch || openQuestionCount > 20 || selectedLessonIds.length === 0}
+                  disabled={openQuestionCount > 20 || selectedLessonIds.length === 0 || totals.questions < 1}
                 >
                   Generate paper
                 </Button>

@@ -114,7 +114,7 @@ export class GenerateQuizDto {
   @Max(20)
   longAnswerCount?: number;
 
-  @ApiPropertyOptional({ description: 'Total marks for the MCQ section' })
+  @ApiPropertyOptional({ description: 'Marks per MCQ question on exam papers' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -122,7 +122,7 @@ export class GenerateQuizDto {
   @Max(200)
   mcqMarks?: number;
 
-  @ApiPropertyOptional({ description: 'Total marks for the true/false section' })
+  @ApiPropertyOptional({ description: 'Marks per true/false question on exam papers' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -130,7 +130,7 @@ export class GenerateQuizDto {
   @Max(200)
   trueFalseMarks?: number;
 
-  @ApiPropertyOptional({ description: 'Total marks for the fill-in-the-blank section' })
+  @ApiPropertyOptional({ description: 'Marks per fill-in-the-blank question on exam papers' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -146,7 +146,7 @@ export class GenerateQuizDto {
   @Max(200)
   openEndedMarks?: number;
 
-  @ApiPropertyOptional({ description: 'Total marks for short-answer questions' })
+  @ApiPropertyOptional({ description: 'Marks per short-answer question on exam papers' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -154,7 +154,7 @@ export class GenerateQuizDto {
   @Max(200)
   shortAnswerMarks?: number;
 
-  @ApiPropertyOptional({ description: 'Total marks for long-answer questions' })
+  @ApiPropertyOptional({ description: 'Marks per long-answer question on exam papers' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

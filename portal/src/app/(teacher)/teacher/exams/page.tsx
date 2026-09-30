@@ -16,7 +16,7 @@ import { academicsService } from "@/services/academics.service";
 import { quizzesService } from "@/services/quizzes.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
-import { buildQuestionSpecForMarks } from "@/lib/exam-paper-question-spec";
+import { buildQuestionSpecForMarks, defaultQuestionSpec } from "@/lib/exam-paper-question-spec";
 
 const schema = z
   .object({
@@ -57,16 +57,7 @@ const defaultValues: FormValues = {
   classKey: "",
   difficulty: 3,
   lessonIds: [],
-  mcqCount: 8,
-  fillBlankCount: 3,
-  trueFalseCount: 5,
-  shortAnswerCount: 3,
-  longAnswerCount: 1,
-  mcqMarks: 16,
-  fillBlankMarks: 6,
-  trueFalseMarks: 5,
-  shortAnswerMarks: 12,
-  longAnswerMarks: 8,
+  ...defaultQuestionSpec,
 };
 
 export default function TeacherExamsPage() {
@@ -130,16 +121,6 @@ export default function TeacherExamsPage() {
       const branchId = assignment.branchId ?? cls?.branchId;
       if (!academicYearId || !branchId) {
         throw new Error("Class details are missing for this exam. Refresh the page and try again.");
-      }
-
-      const totalMarks =
-        values.mcqMarks +
-        values.fillBlankMarks +
-        values.trueFalseMarks +
-        values.shortAnswerMarks +
-        values.longAnswerMarks;
-      if (totalMarks !== assignment.maxMarks) {
-        throw new Error(`Section marks must add up to exactly ${assignment.maxMarks}.`);
       }
 
       return quizzesService.generate({

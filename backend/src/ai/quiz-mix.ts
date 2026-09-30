@@ -91,12 +91,14 @@ export function resolveQuizMix(input: QuizMixRequest): ResolvedQuizMix {
     return {
       mode: 'exam',
       ...mix,
-      mcqMarks: marksOf(input.mcqMarks, mix.mcqCount),
-      trueFalseMarks: marksOf(input.trueFalseMarks, mix.trueFalseCount),
-      openEndedMarks: marksOf(input.openEndedMarks, mix.openEndedCount * 5 || 0),
-      shortAnswerMarks: marksOf(input.shortAnswerMarks ?? input.openEndedMarks, mix.shortAnswerCount * 3 || 0),
-      longAnswerMarks: marksOf(input.longAnswerMarks, mix.longAnswerCount * 8 || 0),
-      fillBlankMarks: marksOf(input.fillBlankMarks, mix.fillBlankCount),
+      mcqMarks: mix.mcqCount ? marksOf(input.mcqMarks, 1) : 0,
+      trueFalseMarks: mix.trueFalseCount ? marksOf(input.trueFalseMarks, 1) : 0,
+      openEndedMarks: mix.openEndedCount ? marksOf(input.openEndedMarks, 3) : 0,
+      shortAnswerMarks: mix.shortAnswerCount
+        ? marksOf(input.shortAnswerMarks ?? input.openEndedMarks, 3)
+        : 0,
+      longAnswerMarks: mix.longAnswerCount ? marksOf(input.longAnswerMarks, 5) : 0,
+      fillBlankMarks: mix.fillBlankCount ? marksOf(input.fillBlankMarks, 1) : 0,
     };
   }
 
@@ -131,16 +133,21 @@ Every question MUST include correctAnswer.`;
   }
 
   if (mix.mode === 'exam') {
+    const mcqSectionMarks = mix.mcqCount * mix.mcqMarks;
+    const tfSectionMarks = mix.trueFalseCount * mix.trueFalseMarks;
+    const fillSectionMarks = mix.fillBlankCount * mix.fillBlankMarks;
+    const shortSectionMarks = mix.shortAnswerCount * mix.shortAnswerMarks;
+    const longSectionMarks = mix.longAnswerCount * mix.longAnswerMarks;
     return `This is a formal written exam paper for printout, not an app quiz.
 Cover ALL provided lectures. Do not invent unrelated chapters.
 Generate EXACTLY ${mix.questionCount} questions, in this order (each group is a section: Section A, Section B, etc.):
-- ${mix.mcqCount} MCQ questions (type MCQ). Section A. Each MUST have 4 options, exactly one isCorrect, and correctAnswer set. Section total ${mix.mcqMarks} marks.
-- ${mix.trueFalseCount} true/false questions (type TRUE_FALSE). Section B. correctAnswer must be TRUE or FALSE. Section total ${mix.trueFalseMarks} marks.
-${mix.fillBlankCount ? `- ${mix.fillBlankCount} fill-in-the-blank questions (type FILL_IN_THE_BLANK). One _____ per question; correctAnswer must be exactly one word. Section C. Section total ${mix.fillBlankMarks} marks.` : ''}
-- ${mix.shortAnswerCount} short-answer questions (type SHORT_ANSWER). Brief answers (2-4 lines). Include model correctAnswer. Section total ${mix.shortAnswerMarks} marks.
-- ${mix.longAnswerCount} long-answer questions (type LONG_ANSWER). Extended answers (paragraph). Include model correctAnswer. Section total ${mix.longAnswerMarks} marks.
+- ${mix.mcqCount} MCQ questions (type MCQ). Section A. Each MUST have 4 options, exactly one isCorrect, and correctAnswer set. Each question is worth ${mix.mcqMarks} marks (section total ${mcqSectionMarks}).
+- ${mix.trueFalseCount} true/false questions (type TRUE_FALSE). Section B. correctAnswer must be TRUE or FALSE. Each question is worth ${mix.trueFalseMarks} marks (section total ${tfSectionMarks}).
+${mix.fillBlankCount ? `- ${mix.fillBlankCount} fill-in-the-blank questions (type FILL_IN_THE_BLANK). One _____ per question; correctAnswer must be exactly one word. Each question is worth ${mix.fillBlankMarks} marks (section total ${fillSectionMarks}).` : ''}
+- ${mix.shortAnswerCount} short-answer questions (type SHORT_ANSWER). Brief answers (2-4 lines). Include model correctAnswer. Each question is worth ${mix.shortAnswerMarks} marks (section total ${shortSectionMarks}).
+- ${mix.longAnswerCount} long-answer questions (type LONG_ANSWER). Extended answers (paragraph). Include model correctAnswer. Each question is worth ${mix.longAnswerMarks} marks (section total ${longSectionMarks}).
 Skip a type if its count is 0.
-Set each question's marks so the section totals match exactly.`;
+Set marks on every question to the per-question value for its section (do not split section totals across questions).`;
   }
 
   return `Generate EXACTLY ${mix.questionCount} AUTO-GRADABLE questions, in this order:
@@ -288,15 +295,10 @@ export function sanitizeGeneratedQuiz(quiz: QuizOutput): QuizOutput {
   return { ...quiz, questions };
 }
 
-function distributeMarks(questions: QuizQuestionOutput[], totalMarks: number): QuizQuestionOutput[] {
-  if (!questions.length || totalMarks <= 0) return questions;
-  const base = Math.floor((totalMarks / questions.length) * 100) / 100;
-  let used = 0;
-  return questions.map((question, index) => {
-    const marks = index === questions.length - 1 ? Math.round((totalMarks - used) * 100) / 100 : base;
-    used += marks;
-    return { ...question, marks: Math.max(0.5, marks) };
-  });
+function applyMarksEach(questions: QuizQuestionOutput[], marksEach: number): QuizQuestionOutput[] {
+  if (!questions.length) return questions;
+  const each = marksEach > 0 ? marksEach : 1;
+  return questions.map((question) => ({ ...question, marks: each }));
 }
 
 export function sectionLabelForQuestionType(
@@ -317,23 +319,23 @@ export function sanitizeGeneratedExam(quiz: QuizOutput, mix: Extract<ResolvedQui
       ['MCQ', 'TRUE_FALSE', 'SHORT_ANSWER', 'LONG_ANSWER', 'FILL_IN_THE_BLANK'].includes(question.type),
     );
 
-  const mcqs = distributeMarks(
+  const mcqs = applyMarksEach(
     questions.filter((question) => question.type === 'MCQ'),
     mix.mcqMarks,
   );
-  const trueFalse = distributeMarks(
+  const trueFalse = applyMarksEach(
     questions.filter((question) => question.type === 'TRUE_FALSE'),
     mix.trueFalseMarks,
   );
-  const fillBlanks = distributeMarks(
+  const fillBlanks = applyMarksEach(
     questions.filter((question) => question.type === 'FILL_IN_THE_BLANK'),
     mix.fillBlankMarks,
   );
-  const shortAnswers = distributeMarks(
+  const shortAnswers = applyMarksEach(
     questions.filter((question) => question.type === 'SHORT_ANSWER'),
     mix.shortAnswerMarks || mix.openEndedMarks,
   );
-  const longAnswers = distributeMarks(
+  const longAnswers = applyMarksEach(
     questions.filter((question) => question.type === 'LONG_ANSWER'),
     mix.longAnswerMarks,
   );

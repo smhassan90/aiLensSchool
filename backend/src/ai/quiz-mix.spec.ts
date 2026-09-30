@@ -11,7 +11,7 @@ describe('resolveQuizMix', () => {
     expect(resolveQuizMix({})).toEqual({ mode: 'quick', questionCount: 8 });
   });
 
-  it('builds an exam mix with open-ended questions and section marks', () => {
+  it('builds an exam mix with per-question marks', () => {
     expect(
       resolveQuizMix({
         examPaper: true,
@@ -123,7 +123,7 @@ describe('sanitizeGeneratedQuiz', () => {
 });
 
 describe('sanitizeGeneratedExam', () => {
-  it('keeps open-ended questions on exam papers and applies section marks', () => {
+  it('keeps open-ended questions on exam papers and applies marks per question', () => {
     const quiz = sanitizeGeneratedExam(
       {
         title: 'Mid term',
@@ -155,16 +155,16 @@ describe('sanitizeGeneratedExam', () => {
         longAnswerCount: 0,
         openEndedCount: 1,
         questionCount: 2,
-        mcqMarks: 10,
+        mcqMarks: 2,
         trueFalseMarks: 0,
-        openEndedMarks: 15,
-        shortAnswerMarks: 15,
+        openEndedMarks: 5,
+        shortAnswerMarks: 5,
         longAnswerMarks: 0,
         fillBlankMarks: 0,
       },
     );
     expect(quiz.questions.map((q) => q.type)).toEqual(['MCQ', 'SHORT_ANSWER']);
-    expect(quiz.questions[0].marks).toBe(10);
-    expect(quiz.questions[1].marks).toBe(15);
+    expect(quiz.questions[0].marks).toBe(2);
+    expect(quiz.questions[1].marks).toBe(5);
   });
 });
