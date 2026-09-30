@@ -55,18 +55,19 @@ function buildMappingsToSave(
   draft: Record<string, string>,
   suggestionMap: Record<string, string>,
 ): MappingRow[] {
-  return unmapped
-    .map((user) => {
-      const raw = draft[user.deviceUserId] ?? suggestionMap[user.deviceUserId] ?? "";
-      const parsed = parseDraftValue(raw);
-      if (!parsed?.teacherId && !parsed?.staffUserId) return null;
-      return {
-        deviceUserId: user.deviceUserId,
-        teacherId: parsed.teacherId,
-        staffUserId: parsed.staffUserId,
-      };
-    })
-    .filter((row): row is MappingRow => row !== null);
+  const rows: MappingRow[] = [];
+  for (const user of unmapped) {
+    const raw = draft[user.deviceUserId] ?? suggestionMap[user.deviceUserId] ?? "";
+    const parsed = parseDraftValue(raw);
+    if (!parsed) continue;
+    if (!parsed.teacherId && !parsed.staffUserId) continue;
+    rows.push({
+      deviceUserId: user.deviceUserId,
+      ...(parsed.teacherId ? { teacherId: parsed.teacherId } : {}),
+      ...(parsed.staffUserId ? { staffUserId: parsed.staffUserId } : {}),
+    });
+  }
+  return rows;
 }
 
 function peopleSelectableForDeviceUser(
