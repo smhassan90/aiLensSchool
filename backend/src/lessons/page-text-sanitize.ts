@@ -1,4 +1,8 @@
-import { countLatinLetters, englishOnlyFromMixedOcr } from '../common/extract-quality';
+import {
+  countArabicScriptChars,
+  countLatinLetters,
+  englishOnlyFromMixedOcr,
+} from '../common/extract-quality';
 import { looksLikeGarbledLatinOcr } from '../common/garbled-latin-ocr';
 
 const SIDEBAR_ACTIVITY =
@@ -98,4 +102,18 @@ export function pageTextNeedsVisionRetry(text: string): boolean {
 
 export function filterCompiledLessonText(text: string): string {
   return filterPageTextForLessonAssembly(text);
+}
+
+/** After OCR/vision — reject pages that are still unusable (ask teacher to re-upload). */
+export function isPagePhotoTextReadable(text: string | undefined | null): boolean {
+  const value = (text ?? '').trim();
+  const arabic = countArabicScriptChars(value);
+  const minLen = arabic >= 30 ? 28 : 48;
+  if (value.length < minLen) return false;
+  if (looksLikeGarbledLatinOcr(value) && value.length < 220 && arabic < 40) return false;
+  const blocks = value.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
+  const good = blocks.filter((b) => !isSuspectParagraph(b));
+  if (good.length === 0) return false;
+  if (good.join(' ').replace(/\s+/g, ' ').split(' ').length < 8) return false;
+  return true;
 }

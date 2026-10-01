@@ -76,8 +76,10 @@ import { FilesService } from '../files/files.service';
 import {
   filterCompiledLessonText,
   filterPageTextForLessonAssembly,
+  isPagePhotoTextReadable,
   pageTextNeedsVisionRetry,
 } from './page-text-sanitize';
+import { prepareLessonPagePhoto } from './page-image-prep';
 
 const ARABIC_SCRIPT_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
@@ -381,10 +383,19 @@ export class LessonsService {
       if (!pageTextNeedsVisionRetry(current)) continue;
       try {
         const buffer = await this.filesService.readBufferForAsset(source.fileAsset!);
-        const file = {
+        const raw = {
           buffer,
           mimetype: source.fileAsset!.mimeType ?? 'image/jpeg',
           originalname: source.fileAsset!.originalFilename ?? 'page.jpg',
+          size: buffer.length,
+        } as Express.Multer.File;
+        const prepared = await prepareLessonPagePhoto(raw);
+        const file = {
+          ...raw,
+          buffer: prepared.buffer,
+          mimetype: prepared.mimeType,
+          originalname: prepared.originalname,
+          size: prepared.size,
         } as Express.Multer.File;
         const retried = await this.transcribeTextbookPhoto(
           file,
@@ -431,6 +442,11 @@ export class LessonsService {
         },
       });
     }
+  }
+
+  private unclearPagePhotoMessage(filename?: string): string {
+    const label = filename?.trim() ? `"${filename.trim()}"` : 'This page';
+    return `${label} is not clear enough to read. Re-upload a clearer photo: hold the phone straight above the page, use bright even light, keep the full page flat and in focus.`;
   }
 
   private visionAvailable(): boolean {
@@ -571,8 +587,14 @@ export class LessonsService {
         forceMainColumnVision: true,
       });
       if (retried.trim().length >= 40) {
-        return retried;
+        final = retried;
       }
+    }
+    if (!isPagePhotoTextReadable(final)) {
+      throw new BadRequestException({
+        code: 'PAGE_PHOTO_UNCLEAR',
+        message: this.unclearPagePhotoMessage(file.originalname),
+      });
     }
     return final;
   }
@@ -600,27 +622,43 @@ export class LessonsService {
       });
     }
     const perPageTexts: string[] = [];
+    const preparedFiles: Express.Multer.File[] = [];
     for (const file of files) {
-      const text = await this.transcribeTextbookPhoto(
-        file,
-        lesson.subject,
-        grade,
-        schoolId,
-        user.id,
-      );
-      if (!text.trim()) {
+      const prepared = await prepareLessonPagePhoto(file);
+      const readyFile = {
+        ...file,
+        buffer: prepared.buffer,
+        mimetype: prepared.mimeType,
+        originalname: prepared.originalname,
+        size: prepared.size,
+      } as Express.Multer.File;
+      preparedFiles.push(readyFile);
+      try {
+        const text = await this.transcribeTextbookPhoto(
+          readyFile,
+          lesson.subject,
+          grade,
+          schoolId,
+          user.id,
+        );
+        perPageTexts.push(text);
+      } catch (error) {
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
         throw new BadRequestException({
-          code: 'PAGE_TEXT_UNREADABLE',
-          message: 'Could not read the new photos. Try sharper, well-lit pictures.',
+          code: 'PAGE_PHOTO_UNCLEAR',
+          message: this.unclearPagePhotoMessage(prepared.originalname),
         });
       }
-      perPageTexts.push(text);
     }
     const existingImages = lesson.sources.filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE);
     const startPage =
       existingImages.reduce((max, s) => Math.max(max, s.pageFrom ?? 0), 0) + 1;
     const pageAssets = await Promise.all(
-      files.map((file) => this.filesService.saveSchoolUpload(schoolId, user.id, file, 'lesson-pages')),
+      preparedFiles.map((file) =>
+        this.filesService.saveSchoolUpload(schoolId, user.id, file, 'lesson-pages'),
+      ),
     );
     await this.prisma.$transaction(async (tx) => {
       for (let index = 0; index < pageAssets.length; index++) {
