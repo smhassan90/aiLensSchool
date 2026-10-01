@@ -21,8 +21,34 @@ import {
   uploadSingleChapterPage,
   type ChapterPageUploadItem,
 } from "@/lib/chapter-page-upload";
-import { ChevronDown, ChevronUp, ImagePlus, CheckCircle2, AlertCircle, RotateCcw } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  ChevronDown,
+  ChevronUp,
+  ImagePlus,
+  CheckCircle2,
+  AlertCircle,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+
+type PagePreviewEntry = {
+  key: string;
+  src: string;
+  label: string;
+  pageNumber: number;
+  kind: "saved" | "queue";
+  savedIndex?: number;
+};
 
 const IMAGE_EXT = /\.(jpe?g|png|webp|heic|heif)$/i;
 
@@ -49,6 +75,7 @@ export function ChapterPageManager({
   const [pasteText, setPasteText] = useState("");
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
   const [uploadQueue, setUploadQueue] = useState<ChapterPageUploadItem[]>([]);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const uploadQueueRef = useRef<ChapterPageUploadItem[]>([]);
   const uploadRunning = useRef(false);
   const initialStarted = useRef(false);
@@ -192,12 +219,46 @@ export function ChapterPageManager({
   const queueBusy = uploadQueue.some((item) => item.status === "uploading" || item.status === "queued");
   const busy = queueBusy || appendText.isPending || saveOrder.isPending;
 
+  const previewPages = useMemo((): PagePreviewEntry[] => {
+    const saved: PagePreviewEntry[] = [];
+    ordered.forEach((page, index) => {
+      const src = assetUrl(page.url);
+      if (!src) return;
+      saved.push({
+        key: page.id,
+        src,
+        label: page.label,
+        pageNumber: index + 1,
+        kind: "saved",
+        savedIndex: index,
+      });
+    });
+    const queued: PagePreviewEntry[] = uploadQueue.map((item, queueIndex) => ({
+      key: item.id,
+      src: item.previewUrl,
+      label: item.file.name,
+      pageNumber: ordered.length + queueIndex + 1,
+      kind: "queue" as const,
+    }));
+    return [...saved, ...queued];
+  }, [ordered, uploadQueue]);
+
+  const activePreview =
+    previewIndex !== null && previewIndex >= 0 && previewIndex < previewPages.length
+      ? previewPages[previewIndex]
+      : null;
+
+  const openPreview = (key: string) => {
+    const index = previewPages.findIndex((page) => page.key === key);
+    if (index >= 0) setPreviewIndex(index);
+  };
+
   return (
     <Card className="mb-4">
       <CardHeader>
         <CardTitle className="text-base">Pages &amp; more content</CardTitle>
         <CardDescription>
-          Add more photos or pasted text below what you already have. Reorder page photos so the text matches the book.
+          Add more photos or pasted text below what you already have. Tap a page photo to enlarge it, then reorder so the text matches the book.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -231,15 +292,30 @@ export function ChapterPageManager({
                       {index + 1}
                     </span>
                     {src ? (
-                      <img src={src} alt="" className="h-16 w-12 shrink-0 rounded object-cover" />
+                      <button
+                        type="button"
+                        className="group relative h-16 w-12 shrink-0 overflow-hidden rounded ring-offset-2 transition hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        onClick={() => openPreview(page.id)}
+                        aria-label={`Enlarge page ${index + 1}: ${page.label}`}
+                      >
+                        <img src={src} alt="" className="h-full w-full object-cover" />
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
+                          <ZoomIn className="h-5 w-5 text-white opacity-0 drop-shadow group-hover:opacity-100" />
+                        </span>
+                      </button>
                     ) : (
                       <div className="h-16 w-12 shrink-0 rounded bg-muted" />
                     )}
-                    <span className="flex min-w-0 flex-1 items-center gap-2 truncate text-xs text-muted-foreground">
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 items-center gap-2 truncate text-left text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => src && openPreview(page.id)}
+                      disabled={!src}
+                    >
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" aria-hidden />
                       <span className="truncate">{page.label}</span>
                       <span className="shrink-0 text-green-700">Uploaded</span>
-                    </span>
+                    </button>
                     <div className="flex shrink-0 flex-col gap-0.5">
                       <Button
                         type="button"
@@ -278,7 +354,17 @@ export function ChapterPageManager({
                   <span className="w-8 shrink-0 text-center text-sm font-medium tabular-nums text-muted-foreground">
                     {ordered.length + queueIndex + 1}
                   </span>
-                  <img src={item.previewUrl} alt="" className="h-16 w-12 shrink-0 rounded object-cover" />
+                  <button
+                    type="button"
+                    className="group relative h-16 w-12 shrink-0 overflow-hidden rounded ring-offset-2 transition hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    onClick={() => openPreview(item.id)}
+                    aria-label={`Enlarge ${item.file.name}`}
+                  >
+                    <img src={item.previewUrl} alt="" className="h-full w-full object-cover" />
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
+                      <ZoomIn className="h-5 w-5 text-white opacity-0 drop-shadow group-hover:opacity-100" />
+                    </span>
+                  </button>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-xs">
                       {item.status === "uploading" ? (
@@ -386,6 +472,96 @@ export function ChapterPageManager({
 
         {appendText.isPending || saveOrder.isPending ? <PageLoader variant="panel" /> : null}
       </CardContent>
+
+      <Dialog open={activePreview !== null} onOpenChange={(open) => !open && setPreviewIndex(null)}>
+        <DialogContent
+          className="max-h-[95vh] max-w-4xl overflow-y-auto"
+          onClose={() => setPreviewIndex(null)}
+        >
+          {activePreview ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Page {activePreview.pageNumber}</DialogTitle>
+                <DialogDescription>{activePreview.label}</DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-center rounded-lg border bg-muted/30 p-2 sm:p-4">
+                <img
+                  src={activePreview.src}
+                  alt={activePreview.label}
+                  className="max-h-[min(70vh,720px)] w-auto max-w-full object-contain"
+                />
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={previewIndex === 0}
+                    onClick={() => setPreviewIndex((i) => (i !== null && i > 0 ? i - 1 : i))}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={previewIndex === null || previewIndex >= previewPages.length - 1}
+                    onClick={() =>
+                      setPreviewIndex((i) =>
+                        i !== null && i < previewPages.length - 1 ? i + 1 : i,
+                      )
+                    }
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+                {activePreview.kind === "saved" && activePreview.savedIndex !== undefined ? (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={activePreview.savedIndex === 0 || queueBusy}
+                      onClick={() => {
+                        move(activePreview.savedIndex!, -1);
+                        setPreviewIndex((i) => (i !== null && i > 0 ? i - 1 : i));
+                      }}
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                      Move up
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={
+                        activePreview.savedIndex === ordered.length - 1 || queueBusy
+                      }
+                      onClick={() => {
+                        move(activePreview.savedIndex!, 1);
+                        setPreviewIndex((i) =>
+                          i !== null && i < previewPages.length - 1 ? i + 1 : i,
+                        );
+                      }}
+                    >
+                      Move down
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+              {orderDirty ? (
+                <p className="mt-2 text-center text-xs text-muted-foreground">
+                  Order changed — use &quot;Save page order&quot; when you are done.
+                </p>
+              ) : null}
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
