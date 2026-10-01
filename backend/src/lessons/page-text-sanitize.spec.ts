@@ -1,10 +1,34 @@
 import {
-  PAGE_OCR_ACCEPT_THRESHOLD,
   isPagePhotoTextReadable,
+  PAGE_OCR_ACCEPT_THRESHOLD,
+  pageHasStructuredLessonContent,
   scorePageOcrQuality,
 } from './page-text-sanitize';
 
 describe('scorePageOcrQuality', () => {
+  it('accepts poem and exercise page with decorative OCR noise', () => {
+    const text = `
+THE VOICE OF GOD
+
+I sought to hear the voice of God,
+And climbed the topmost steeple,
+But God declared: "Go down again,
+I dwell among the people."
+
+Louis I. Newman
+
+A. Notes:
+Line 2: steeple: the tallest part of a religious building.
+
+B. Exercise:
+1. Why did author climb the steeple?
+2. Why did God tell him to go down again?
+3. Explain in your own words what you think is the message of this poem?
+`.trim();
+    expect(pageHasStructuredLessonContent(text)).toBe(true);
+    expect(isPagePhotoTextReadable(text)).toBe(true);
+  });
+
   it('accepts mostly clean exercise text', () => {
     const text = `
 READING COMPREHENSION
@@ -61,6 +85,7 @@ a. useful      b. independent ~~ ¢: dependent      d. punctual
 their own work.
 BE   [Tn the present time, it is accepted that people | and another was 7. What lesso!
 `.trim();
+    expect(pageHasStructuredLessonContent(text)).toBe(false);
     expect(scorePageOcrQuality(text)).toBeLessThan(PAGE_OCR_ACCEPT_THRESHOLD);
     expect(isPagePhotoTextReadable(text)).toBe(false);
   });

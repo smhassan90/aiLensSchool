@@ -82,6 +82,7 @@ import {
   filterCompiledLessonText,
   filterPageTextForLessonAssembly,
   isPagePhotoTextReadable,
+  pageOcrAcceptThreshold,
   PAGE_OCR_ACCEPT_THRESHOLD,
   scorePageOcrQuality,
   pageTextNeedsVisionRetry,
@@ -476,10 +477,37 @@ export class LessonsService {
     grade: { name: string },
     schoolId: string,
     userId: string,
-    options?: { forceMainColumnVision?: boolean },
+    options?: { forceMainColumnVision?: boolean; forceTintedPageVision?: boolean },
   ): Promise<string> {
     const expectsArabicScript = ocrLanguagesForSubject(subject.name) !== 'eng';
     const canVision = this.visionAvailable();
+
+    if (options?.forceTintedPageVision && canVision) {
+      const tintedPrompt = [
+        `Transcribe this ${subject.name} textbook page (${grade.name}) for the teacher's lesson library.`,
+        'The page may have a colored or parchment background and decorative borders — ignore border art and ornaments.',
+        'Copy every title, poem line, note, vocabulary line, and exercise question in reading order.',
+        'Keep English as English. Keep Urdu/Arabic in Unicode script.',
+      ].join(' ');
+      try {
+        const polished = await this.lessonProcessing.process({
+          schoolId,
+          userId,
+          sourceText: tintedPrompt,
+          subjectName: subject.name,
+          gradeName: grade.name,
+          images: this.toLessonImages([file]),
+        });
+        const cleaned = filterPageTextForLessonAssembly(coerceLessonDisplayText(polished.summary));
+        if (cleaned.trim().length >= 40 && !isFakeExtractText(cleaned)) {
+          return cleaned;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Tinted-page vision failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
 
     if (options?.forceMainColumnVision && canVision) {
       const mainColumnPrompt = [
@@ -536,7 +564,13 @@ export class LessonsService {
     if (usableOcr && !ocrThin && !needsPhotoVision) {
       summary = resolvedOcr;
     } else {
-      const visionTranscribePrompt = `Transcribe the attached ${subject.name} textbook page photo for ${grade.name}. Copy every heading, paragraph, number, and activity instruction accurately. Keep English as English. Keep every Urdu/Arabic line in original Unicode script (not Latin letters).`;
+      const visionTranscribePrompt = expectsArabicScript
+        ? `Transcribe the attached ${subject.name} textbook page photo for ${grade.name}. Copy every heading, paragraph, number, and activity instruction accurately. Keep English as English. Keep every Urdu/Arabic line in original Unicode script (not Latin letters).`
+        : [
+            `Transcribe this ${subject.name} textbook page (${grade.name}).`,
+            'The page may have a tinted/colored background, red headings, and decorative borders — ignore border art.',
+            'Copy titles, poems, notes, vocabulary, and exercise questions in reading order.',
+          ].join(' ');
       try {
         const polished = await this.lessonProcessing.process({
           schoolId,
@@ -593,9 +627,15 @@ export class LessonsService {
       longestRealLessonText(usableOcr ? resolvedOcr : undefined, polishedLooksReal ? summary : undefined),
     );
     final = filterPageTextForLessonAssembly(final);
-    if (pageTextNeedsVisionRetry(final) && canVision && !options?.forceMainColumnVision) {
+    if (
+      pageTextNeedsVisionRetry(final) &&
+      canVision &&
+      !options?.forceMainColumnVision &&
+      !options?.forceTintedPageVision
+    ) {
       const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
-        forceMainColumnVision: true,
+        forceTintedPageVision: !expectsArabicScript,
+        forceMainColumnVision: expectsArabicScript,
       });
       if (retried.trim().length >= 40) {
         final = retried;
@@ -603,13 +643,28 @@ export class LessonsService {
     }
     if (!isPagePhotoTextReadable(final)) {
       const quality = scorePageOcrQuality(final);
-      throw new BadRequestException({
-        code: 'PAGE_PHOTO_UNCLEAR',
-        message:
-          quality > 0 && quality < PAGE_OCR_ACCEPT_THRESHOLD
-            ? `Only about ${quality}% of this page was read clearly (need at least ${PAGE_OCR_ACCEPT_THRESHOLD}%). ${this.unclearPagePhotoMessage(file.originalname)}`
-            : this.unclearPagePhotoMessage(file.originalname),
-      });
+      const need = pageOcrAcceptThreshold(final);
+      if (canVision && !options?.forceTintedPageVision) {
+        const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
+          forceTintedPageVision: true,
+        });
+        if (isPagePhotoTextReadable(retried)) {
+          return retried;
+        }
+        if (retried.trim().length > final.trim().length) {
+          final = retried;
+        }
+      }
+      if (!isPagePhotoTextReadable(final)) {
+        const qualityAfter = scorePageOcrQuality(final);
+        throw new BadRequestException({
+          code: 'PAGE_PHOTO_UNCLEAR',
+          message:
+            qualityAfter > 0 && qualityAfter < need
+              ? `Only about ${qualityAfter}% of this page was read clearly (need at least ${need}%). ${this.unclearPagePhotoMessage(file.originalname)}`
+              : this.unclearPagePhotoMessage(file.originalname),
+        });
+      }
     }
     return final;
   }

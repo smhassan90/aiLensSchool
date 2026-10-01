@@ -2,6 +2,7 @@ import {
   countArabicScriptChars,
   countLatinLetters,
   englishOnlyFromMixedOcr,
+  looksLikeRealLessonText,
 } from '../common/extract-quality';
 import { looksLikeGarbledLatinOcr } from '../common/garbled-latin-ocr';
 
@@ -148,16 +149,45 @@ export function filterCompiledLessonText(text: string): string {
   return filterPageTextForLessonAssembly(text);
 }
 
+/** Poems, notes, and exercises on decorative/colored textbook pages. */
+export function pageHasStructuredLessonContent(text: string): boolean {
+  const value = (text ?? '').trim();
+  if (!looksLikeRealLessonText(value)) return false;
+  const latin = countLatinLetters(value);
+  if (latin < 80) return false;
+  const symbolHits = (value.match(/[|©®¢«»]/g) ?? []).length;
+  if (symbolHits >= 4) return false;
+  return (
+    /\b(Exercise|Notes|poem|author|steeple|voice of god|comprehension)\b/i.test(value) ||
+    /(?:^|\n)[A-Za-z][^.!?\n]{10,}[.!?]/m.test(value)
+  );
+}
+
 /** After OCR/vision — reject pages that are still unusable (ask teacher to re-upload). */
+export function pageOcrAcceptThreshold(text: string): number {
+  if (pageHasStructuredLessonContent(text)) return 62;
+  if (looksLikeRealLessonText(text) && countLatinLetters(text) >= 100) return 78;
+  return PAGE_OCR_ACCEPT_THRESHOLD;
+}
+
 export function isPagePhotoTextReadable(text: string | undefined | null): boolean {
   const value = (text ?? '').trim();
+  const ocrSymbolHits = (value.match(/[|©®¢«»]/g) ?? []).length;
+  if (ocrSymbolHits >= 5 && scorePageOcrQuality(value) < PAGE_OCR_ACCEPT_THRESHOLD) {
+    return false;
+  }
   const arabic = countArabicScriptChars(value);
-  const minLen = arabic >= 30 ? 28 : 48;
+  const structured = pageHasStructuredLessonContent(value);
+  const realLesson = looksLikeRealLessonText(value);
+  const minLen = arabic >= 30 ? 28 : structured || realLesson ? 32 : 48;
   if (value.length < minLen) return false;
-  if (scorePageOcrQuality(value) < PAGE_OCR_ACCEPT_THRESHOLD) return false;
+  const score = scorePageOcrQuality(value);
+  if (score < pageOcrAcceptThreshold(value)) return false;
   const blocks = value.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
   const good = blocks.filter((b) => !isSuspectParagraph(b));
   if (good.length === 0) return false;
-  if (good.join(' ').replace(/\s+/g, ' ').split(' ').length < 8) return false;
+  const wordCount = good.join(' ').replace(/\s+/g, ' ').split(' ').filter(Boolean).length;
+  if (structured && wordCount >= 6 && score >= 58) return true;
+  if (wordCount < 8) return false;
   return true;
 }

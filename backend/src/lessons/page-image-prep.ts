@@ -40,14 +40,25 @@ export async function prepareLessonPagePhoto(
       height = turned.info.height;
     }
 
-    let pipeline = sharpFn(working).normalize().sharpen({ sigma: 0.8 });
+    // Tinted/parchment pages and red headings: greyscale + contrast helps Tesseract and vision.
+    let pipeline = sharpFn(working)
+      .greyscale()
+      .normalize()
+      .gamma(1.08)
+      .linear(1.22, -18)
+      .sharpen({ sigma: 1.0 });
 
     try {
       const trimmed = await pipeline.clone().trim({ threshold: 18 }).toBuffer({ resolveWithObject: true });
       const areaBefore = width * height;
       const areaAfter = trimmed.info.width * trimmed.info.height;
       if (areaAfter >= areaBefore * 0.55) {
-        pipeline = sharpFn(trimmed.data);
+        pipeline = sharpFn(trimmed.data)
+          .greyscale()
+          .normalize()
+          .gamma(1.08)
+          .linear(1.22, -18)
+          .sharpen({ sigma: 1.0 });
       }
     } catch {
       // trim skipped — uniform background or busy layout
