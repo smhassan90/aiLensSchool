@@ -74,6 +74,10 @@ export class FilesService {
     });
   }
 
+  async readBufferForAsset(asset: { storageKey: string }): Promise<Buffer> {
+    return this.localStorage.readBuffer(asset.storageKey);
+  }
+
   async findAll(user: AuthUser, query: PaginationDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;

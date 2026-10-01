@@ -34,6 +34,11 @@ export class LocalStorageService {
     };
   }
 
+  async readBuffer(storageKey: string): Promise<Buffer> {
+    const fullPath = join(this.basePath, storageKey);
+    return fs.readFile(fullPath);
+  }
+
   async delete(storageKey: string): Promise<void> {
     const fullPath = join(this.basePath, storageKey);
     try {

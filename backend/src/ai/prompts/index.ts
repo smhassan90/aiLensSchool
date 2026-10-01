@@ -108,6 +108,7 @@ Do NOT invent new teaching content. Keep every fact, heading, story, definition,
 Tasks:
 - Fix small OCR/spelling issues and broken line breaks only.
 - Remove scanner artifacts: standalone lines like "Page 1", "Page 2", "صفحہ 1", repeated headers from photo stitching.
+- DELETE OCR garbage entirely: reversed/mirrored Latin (e.g. "aj0N", "9sI0Y"), sidebar instructions ("jumbled order", "compare your answers"), random digits, and lines that are not real lesson sentences. Never paste junk into lessonBody or exercises.
 - Merge paragraphs that were split across pages; keep logical reading order.
 - Put narrative lesson content in lessonBody (headings, explanations, stories, examples that are NOT end-of-chapter drills).
 - Put practice work in exercises: numbered questions, "Exercise", "Activity", "سوالات", fill-in-the-blank drills, MCQ-style prompts from the book.

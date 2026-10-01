@@ -73,6 +73,11 @@ import {
 import { ocrLanguagesForSubject } from './page-ocr.service';
 import { isServerlessRuntime, readEnv } from '../common/env';
 import { FilesService } from '../files/files.service';
+import {
+  filterCompiledLessonText,
+  filterPageTextForLessonAssembly,
+  pageTextNeedsVisionRetry,
+} from './page-text-sanitize';
 
 const ARABIC_SCRIPT_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
@@ -208,7 +213,10 @@ export class LessonsService {
       .map((s) => s.ocrText?.trim())
       .filter((t): t is string => Boolean(t));
     if (!pageTexts.length) return '';
-    return pageTexts.map((t) => coerceLessonDisplayText(t)).join('\n\n');
+    return pageTexts
+      .map((t) => filterPageTextForLessonAssembly(coerceLessonDisplayText(t)))
+      .filter((t) => t.trim().length > 0)
+      .join('\n\n');
   }
 
   private chapterDraftFromSources(
@@ -267,7 +275,9 @@ export class LessonsService {
         pageOrder: s.pageFrom ?? 0,
         url: s.fileAsset!.url,
         label: s.fileAsset!.originalFilename ?? 'Page photo',
-        fetchedText: s.ocrText?.trim() ? coerceLessonDisplayText(s.ocrText) : '',
+        fetchedText: s.ocrText?.trim()
+          ? filterPageTextForLessonAssembly(coerceLessonDisplayText(s.ocrText))
+          : '',
       }));
   }
 
@@ -337,7 +347,13 @@ export class LessonsService {
     const lesson = await this.prisma.dailyLesson.findUnique({
       where: { id },
       include: {
-        sources: { include: { fileAsset: { select: { url: true, originalFilename: true } } } },
+        sources: {
+          include: {
+            fileAsset: {
+              select: { url: true, originalFilename: true, storageKey: true, mimeType: true },
+            },
+          },
+        },
         subject: true,
       },
     });
@@ -349,6 +365,47 @@ export class LessonsService {
       throw new ForbiddenException({ code: 'LESSON_OWNER_REQUIRED', message: 'Not your chapter' });
     }
     return lesson;
+  }
+
+  private async refreshWeakChapterPages(lessonId: string, user: AuthUser) {
+    const lesson = await this.requireOwnedChapterLesson(lessonId, user);
+    const grade = await this.prisma.grade.findUnique({ where: { id: lesson.gradeId } });
+    if (!grade || !this.visionAvailable()) return;
+
+    const images = lesson.sources
+      .filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE && s.fileAsset?.storageKey)
+      .sort((a, b) => (a.pageFrom ?? 0) - (b.pageFrom ?? 0));
+
+    for (const source of images) {
+      const current = source.ocrText?.trim() ?? '';
+      if (!pageTextNeedsVisionRetry(current)) continue;
+      try {
+        const buffer = await this.filesService.readBufferForAsset(source.fileAsset!);
+        const file = {
+          buffer,
+          mimetype: source.fileAsset!.mimeType ?? 'image/jpeg',
+          originalname: source.fileAsset!.originalFilename ?? 'page.jpg',
+        } as Express.Multer.File;
+        const retried = await this.transcribeTextbookPhoto(
+          file,
+          lesson.subject,
+          grade,
+          lesson.schoolId,
+          user.id,
+          { forceMainColumnVision: true },
+        );
+        if (retried.trim()) {
+          await this.prisma.lessonSource.update({
+            where: { id: source.id },
+            data: { ocrText: retried },
+          });
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Page re-read failed for source ${source.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
   }
 
   private async upsertChapterManualText(
@@ -392,9 +449,36 @@ export class LessonsService {
     grade: { name: string },
     schoolId: string,
     userId: string,
+    options?: { forceMainColumnVision?: boolean },
   ): Promise<string> {
     const expectsArabicScript = ocrLanguagesForSubject(subject.name) !== 'eng';
     const canVision = this.visionAvailable();
+
+    if (options?.forceMainColumnVision && canVision) {
+      const mainColumnPrompt = [
+        `Transcribe ONLY the main reading passage and primary headings on this ${subject.name} textbook page (${grade.name}).`,
+        'SKIP: sidebars, "jumbled words" activities, footers, page numbers, mirrored or reversed text, answer keys, and decorative fonts.',
+        'Keep real lesson/story paragraphs in correct reading order. Keep Urdu/Arabic in Unicode script.',
+      ].join(' ');
+      try {
+        const polished = await this.lessonProcessing.process({
+          schoolId,
+          userId,
+          sourceText: mainColumnPrompt,
+          subjectName: subject.name,
+          gradeName: grade.name,
+          images: this.toLessonImages([file]),
+        });
+        const cleaned = filterPageTextForLessonAssembly(coerceLessonDisplayText(polished.summary));
+        if (cleaned.trim().length >= 40 && !isFakeExtractText(cleaned)) {
+          return cleaned;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Main-column vision retry failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
     const [tesseractText] = await this.pageOcr.readPageTexts([file], { subjectName: subject.name });
     const resolvedOcr = (tesseractText ?? '').trim();
     const ocrGarbled = isPoorLessonOcr(resolvedOcr, { expectArabicScript: expectsArabicScript });
@@ -478,9 +562,19 @@ export class LessonsService {
         message: 'Could not read this page clearly. Try again with a clearer photo.',
       });
     }
-    return coerceLessonDisplayText(
+    let final = coerceLessonDisplayText(
       longestRealLessonText(usableOcr ? resolvedOcr : undefined, polishedLooksReal ? summary : undefined),
     );
+    final = filterPageTextForLessonAssembly(final);
+    if (pageTextNeedsVisionRetry(final) && canVision && !options?.forceMainColumnVision) {
+      const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
+        forceMainColumnVision: true,
+      });
+      if (retried.trim().length >= 40) {
+        return retried;
+      }
+    }
+    return final;
   }
 
   async appendChapterPhotos(id: string, files: Express.Multer.File[], user: AuthUser) {
@@ -614,7 +708,14 @@ export class LessonsService {
         message: 'Grade was not found for this chapter',
       });
     }
-    const rawInput = dto.sourceText?.trim() || this.chapterDraftFromSources(lesson.sources);
+
+    await this.refreshWeakChapterPages(id, user);
+    const refreshed = await this.requireOwnedChapterLesson(id, user);
+
+    const assembled = this.assemblePageTexts(refreshed.sources);
+    const rawCandidate =
+      dto.sourceText?.trim() || this.chapterDraftFromSources(refreshed.sources) || assembled;
+    const rawInput = filterPageTextForLessonAssembly(rawCandidate);
     if (!rawInput.trim()) {
       throw new BadRequestException({
         code: 'CONTENT_REQUIRED',
@@ -631,10 +732,12 @@ export class LessonsService {
       instruction: dto.instruction?.trim(),
     });
 
-    const fullText = joinCompiledChapter(compiled.lessonBody, compiled.exercises);
+    const lessonBody = filterCompiledLessonText(compiled.lessonBody);
+    const exercises = filterCompiledLessonText(compiled.exercises);
+    const fullText = joinCompiledChapter(lessonBody, exercises);
     const concepts = compiled.concepts?.length
       ? compiled.concepts
-      : deriveKeyPointsFromLesson(compiled.lessonBody);
+      : deriveKeyPointsFromLesson(lessonBody);
 
     await this.prisma.$transaction(async (tx) => {
       const refreshed = await tx.lessonSource.findMany({ where: { lessonId: id } });
@@ -661,8 +764,8 @@ export class LessonsService {
     return {
       ...presented,
       compile: {
-        lessonBody: compiled.lessonBody,
-        exercises: compiled.exercises,
+        lessonBody,
+        exercises,
         fullText: coerceLessonDisplayText(fullText),
         chapterName: compiled.chapterName,
         topicName: compiled.topicName,
