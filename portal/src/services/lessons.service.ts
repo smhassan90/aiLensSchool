@@ -145,7 +145,13 @@ export const lessonsService = {
     sectionId?: string;
     subjectId?: string;
   }) {
-    return apiClient<Paginated<Lesson>>(`/lessons${buildQuery(params ?? {})}`);
+    const { forExamLectures, ...rest } = params ?? {};
+    return apiClient<Paginated<Lesson>>(
+      `/lessons${buildQuery({
+        ...rest,
+        ...(forExamLectures === true ? { forExamLectures: "true" } : {}),
+      })}`,
+    );
   },
 
   listChapters(params?: { sectionId?: string; subjectId?: string; limit?: number }) {
