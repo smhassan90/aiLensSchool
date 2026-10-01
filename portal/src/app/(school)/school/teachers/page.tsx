@@ -85,7 +85,7 @@ export default function TeachersPage() {
             queryKey: ["teacher", teacherId],
             queryFn: () => teachersService.getById(teacherId),
           }));
-        if (teacherHasActiveAssignments(detail)) {
+        if (detail && teacherHasActiveAssignments(detail)) {
           const msg = teacherDeactivateAssignmentToast(detail);
           toast({ ...msg, variant: "warning", durationMs: 12000 });
           return;
