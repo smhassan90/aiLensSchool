@@ -34,7 +34,7 @@ import { UserSquare2, Plus } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import type { Teacher } from "@/lib/types";
 import { formatStatusLabel } from "@/lib/display-labels";
-import { teacherAssignmentWarningSummary, teacherHasActiveAssignments } from "@/lib/teacher-assignments";
+import { teacherHasActiveAssignments } from "@/lib/teacher-assignments";
 import {
   teacherDeactivateAssignmentToast,
 } from "@/lib/teacher-deactivate-toast";
@@ -131,9 +131,6 @@ export default function TeachersPage() {
         actions={
           can("MANAGE_TEACHERS") ? (
             <div className="flex flex-wrap gap-2">
-              <Link href="/school/teachers/teaching-assignments">
-                <Button variant="outline">Teaching assignments</Button>
-              </Link>
               <Link href="/school/teachers/head-teachers">
                 <Button variant="outline">Head teachers</Button>
               </Link>

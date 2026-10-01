@@ -22,6 +22,8 @@ import { teachersService } from "@/services/teachers.service";
 import { teacherDisplayNameFromUser } from "@/lib/person-name";
 import { gradeClassLabel } from "@/lib/utils";
 import { fetchAllPages } from "@/lib/fetch-all-pages";
+import type { Subject } from "@/lib/types";
+import { subjectIdsWithSameName, uniqueSubjectsForPicker } from "@/lib/unique-subjects";
 import { BookOpen, GraduationCap, Search, UserSquare2 } from "lucide-react";
 
 export function SchoolRosterExplorer() {
@@ -41,9 +43,9 @@ export function SchoolRosterExplorer() {
     queryFn: () => academicsService.listSections({ gradeId, limit: 100 }),
     enabled: Boolean(gradeId),
   });
-  const subjects = useQuery({
-    queryKey: ["subjects", "roster", gradeId],
-    queryFn: () => academicsService.listSubjects({ gradeId: gradeId || undefined, limit: 100 }),
+  const subjectsCatalogue = useQuery({
+    queryKey: ["subjects", "roster-catalogue"],
+    queryFn: () => fetchAllPages((page, limit) => academicsService.listSubjects({ page, limit })),
   });
   const teachers = useQuery({
     queryKey: ["teachers", "roster"],
@@ -73,8 +75,8 @@ export function SchoolRosterExplorer() {
     enabled: Boolean(teacherId),
   });
 
-  const classSubjects = useQuery({
-    queryKey: ["roster-class-subjects", gradeId, sectionId, subjectId, teacherId],
+  const rosterAssignments = useQuery({
+    queryKey: ["roster-class-subjects", gradeId, sectionId, teacherId],
     queryFn: () =>
       fetchAllPages((page, limit) =>
         academicsService.listClassSubjects({
@@ -82,17 +84,38 @@ export function SchoolRosterExplorer() {
           limit,
           gradeId: gradeId || undefined,
           sectionId: sectionId || undefined,
-          subjectId: subjectId || undefined,
           teacherId: teacherId || undefined,
         }),
       ),
-    enabled: tab === "teaching" || Boolean(subjectId),
+    enabled:
+      tab === "teaching" ||
+      Boolean(gradeId || sectionId || teacherId || subjectId),
   });
 
-  const subjectSectionIds = useMemo(() => {
+  const catalogueItems = subjectsCatalogue.data ?? [];
+
+  const subjectIdSet = useMemo(() => {
     if (!subjectId) return null;
-    return new Set((classSubjects.data ?? []).map((row) => row.sectionId));
-  }, [subjectId, classSubjects.data]);
+    return subjectIdsWithSameName(catalogueItems, subjectId);
+  }, [subjectId, catalogueItems]);
+
+  const subjectOptions = useMemo(() => {
+    const fromAssignments = (rosterAssignments.data ?? [])
+      .map((row) => row.subject)
+      .filter((s): s is Subject => Boolean(s?.id && s?.name));
+    if (fromAssignments.length) {
+      return uniqueSubjectsForPicker(fromAssignments, gradeId || undefined);
+    }
+    return uniqueSubjectsForPicker(catalogueItems, gradeId || undefined);
+  }, [rosterAssignments.data, catalogueItems, gradeId]);
+
+  const subjectSectionIds = useMemo(() => {
+    if (!subjectId || !subjectIdSet) return null;
+    const rows = rosterAssignments.data ?? [];
+    return new Set(
+      rows.filter((row) => subjectIdSet.has(row.subjectId)).map((row) => row.sectionId),
+    );
+  }, [subjectId, subjectIdSet, rosterAssignments.data]);
 
   const teacherSectionIds = useMemo(() => {
     if (!teacherId) return null;
@@ -121,7 +144,13 @@ export function SchoolRosterExplorer() {
     });
   }, [enrollments.data, studentSearch, teacherId, teacherSectionIds, subjectId, subjectSectionIds]);
 
-  const teachingRows = useMemo(() => classSubjects.data ?? [], [classSubjects.data]);
+  const teachingRows = useMemo(() => {
+    let rows = rosterAssignments.data ?? [];
+    if (subjectId && subjectIdSet) {
+      rows = rows.filter((row) => subjectIdSet.has(row.subjectId));
+    }
+    return rows;
+  }, [rosterAssignments.data, subjectId, subjectIdSet]);
 
   return (
     <div className="space-y-6">
@@ -174,9 +203,10 @@ export function SchoolRosterExplorer() {
             onChange={(e) => setSubjectId(e.target.value)}
           >
             <option value="">All subjects</option>
-            {(subjects.data?.items ?? []).map((subject) => (
+            {subjectOptions.map((subject) => (
               <option key={subject.id} value={subject.id}>
                 {subject.name}
+                {subject.code ? ` (${subject.code})` : ""}
               </option>
             ))}
           </Select>
@@ -220,7 +250,7 @@ export function SchoolRosterExplorer() {
         </TabsList>
 
         <TabsContent value="students" className="mt-4">
-          {enrollments.isLoading || (subjectId && classSubjects.isLoading) ? (
+          {enrollments.isLoading || (subjectId && rosterAssignments.isLoading) ? (
             <PageLoader variant="panel" />
           ) : !studentRows.length ? (
             <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -257,7 +287,7 @@ export function SchoolRosterExplorer() {
         </TabsContent>
 
         <TabsContent value="teaching" className="mt-4">
-          {classSubjects.isLoading ? (
+          {rosterAssignments.isLoading ? (
             <PageLoader variant="panel" />
           ) : !teachingRows.length ? (
             <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">

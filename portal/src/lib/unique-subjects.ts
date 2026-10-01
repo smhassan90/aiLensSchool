@@ -16,3 +16,12 @@ export function uniqueSubjectsForPicker(subjects: Subject[], preferGradeId?: str
 
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
+
+/** All catalogue IDs that share the same display name (duplicate subject rows). */
+export function subjectIdsWithSameName(subjects: Subject[], subjectId: string): Set<string> {
+  const picked = subjects.find((s) => s.id === subjectId);
+  if (!picked) return new Set([subjectId]);
+  const key = picked.name.trim().toLowerCase();
+  const ids = subjects.filter((s) => s.name.trim().toLowerCase() === key).map((s) => s.id);
+  return new Set(ids.length ? ids : [subjectId]);
+}
