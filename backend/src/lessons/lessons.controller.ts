@@ -22,6 +22,7 @@ import {
   AppendChapterTextDto,
   ConfirmChapterContentDto,
   ReorderChapterPagesDto,
+  CreateChapterDraftDto,
   CreateChapterPasteDto,
   CreateClassSessionDto,
   CreateLessonDto,
@@ -174,6 +175,12 @@ export class LessonsController {
   @Post('chapters/paste')
   createChapterPaste(@Body() dto: CreateChapterPasteDto, @CurrentUser() user: AuthUser) {
     return this.lessonsService.createChapterFromPaste(dto, user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Post('chapters/draft')
+  createChapterDraft(@Body() dto: CreateChapterDraftDto, @CurrentUser() user: AuthUser) {
+    return this.lessonsService.createChapterDraft(dto, user);
   }
 
   @Roles(RoleName.TEACHER)

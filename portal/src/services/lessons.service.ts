@@ -57,6 +57,16 @@ export interface CreateChapterPastePayload {
   contentText: string;
 }
 
+export interface CreateChapterDraftPayload {
+  academicYearId: string;
+  gradeId: string;
+  sectionId: string;
+  subjectId: string;
+  branchId: string;
+  chapterName?: string;
+  topicName?: string;
+}
+
 export interface CreateClassSessionPayload {
   academicYearId: string;
   gradeId: string;
@@ -184,6 +194,13 @@ export const lessonsService = {
 
   pasteChapter(payload: CreateChapterPastePayload) {
     return apiClient<Lesson>("/lessons/chapters/paste", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  createChapterDraft(payload: CreateChapterDraftPayload) {
+    return apiClient<Lesson>("/lessons/chapters/draft", {
       method: "POST",
       body: JSON.stringify(payload),
     });

@@ -34,6 +34,7 @@ import { coerceLessonDisplayText } from './lesson-display-text';
 import {
   AppendChapterTextDto,
   ConfirmChapterContentDto,
+  CreateChapterDraftDto,
   CreateChapterPasteDto,
   ReorderChapterPagesDto,
   CreateClassSessionDto,
@@ -334,6 +335,113 @@ export class LessonsService {
     }
   }
 
+  private visionAvailable(): boolean {
+    return Boolean(
+      readEnv('OPENAI_API_KEY') ||
+        readEnv('CURSOR_API_KEY') ||
+        this.config.get<string>('OPENAI_API_KEY')?.trim() ||
+        this.config.get<string>('CURSOR_API_KEY')?.trim(),
+    );
+  }
+
+  /** OCR + vision for a single textbook photo (used when appending chapter pages one at a time). */
+  private async transcribeTextbookPhoto(
+    file: Express.Multer.File,
+    subject: { name: string },
+    grade: { name: string },
+    schoolId: string,
+    userId: string,
+  ): Promise<string> {
+    const expectsArabicScript = ocrLanguagesForSubject(subject.name) !== 'eng';
+    const canVision = this.visionAvailable();
+    const [tesseractText] = await this.pageOcr.readPageTexts([file], { subjectName: subject.name });
+    const resolvedOcr = (tesseractText ?? '').trim();
+    const ocrGarbled = isPoorLessonOcr(resolvedOcr, { expectArabicScript: expectsArabicScript });
+    const usableOcr = isUsableLessonOcr(resolvedOcr, {
+      expectArabicScript: expectsArabicScript || countArabicScriptChars(resolvedOcr) >= 40,
+    });
+    const needsPhotoVision = expectsArabicScript || isGarbledRtlOcr(resolvedOcr) || ocrGarbled;
+    const usePhotoVision = canVision && (needsPhotoVision || !usableOcr);
+    const local = this.structureFromPageText(
+      usableOcr ? resolvedOcr : `${subject.name} lesson`,
+      subject.name,
+    );
+    const ocrThin =
+      isFakeExtractText(resolvedOcr) ||
+      ocrGarbled ||
+      (usePhotoVision && !usableOcr) ||
+      (needsPhotoVision && canVision && !usableOcr);
+
+    if (needsPhotoVision && !canVision && (ocrGarbled || isFakeExtractText(resolvedOcr))) {
+      throw new BadRequestException({
+        code: 'PHOTO_VISION_REQUIRED',
+        message:
+          'This page needs AI photo reading. Set CURSOR_API_KEY or OPENAI_API_KEY on the backend, then try again.',
+      });
+    }
+
+    let summary: string;
+    if (usableOcr && !ocrThin && !needsPhotoVision) {
+      summary = resolvedOcr;
+    } else {
+      const visionTranscribePrompt = `Transcribe the attached ${subject.name} textbook page photo for ${grade.name}. Copy every heading, paragraph, number, and activity instruction accurately. Keep English as English. Keep every Urdu/Arabic line in original Unicode script (not Latin letters).`;
+      try {
+        const polished = await this.lessonProcessing.process({
+          schoolId,
+          userId,
+          sourceText: usePhotoVision || !usableOcr ? visionTranscribePrompt : resolvedOcr,
+          subjectName: subject.name,
+          gradeName: grade.name,
+          images: canVision && usePhotoVision ? this.toLessonImages([file]) : undefined,
+        });
+        summary = polished.summary;
+      } catch (error) {
+        const englishFallback = englishOnlyFromMixedOcr(resolvedOcr);
+        if (compactTextLength(englishFallback) > 140) {
+          summary = englishFallback;
+        } else if (usableOcr && !ocrThin) {
+          summary = resolvedOcr;
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    if (isGarbledRtlOcr(summary) || looksLikeMangledRtlOcr(summary)) {
+      const englishFallback = englishOnlyFromMixedOcr(longestRealLessonText(resolvedOcr, summary));
+      if (compactTextLength(englishFallback) > 140) {
+        summary = englishFallback;
+      }
+    }
+    if (usableOcr && !isUsableLessonOcr(summary, { expectArabicScript: expectsArabicScript })) {
+      summary = resolvedOcr;
+    }
+    const polishedLooksReal =
+      usableOcr ||
+      isUsableLessonOcr(summary, { expectArabicScript: expectsArabicScript }) ||
+      (looksLikeRealLessonText(summary) &&
+        !isPoorLessonOcr(summary, { expectArabicScript: expectsArabicScript }));
+    const cannotReadPage =
+      !usableOcr &&
+      (ocrGarbled || isFakeExtractText(resolvedOcr) || usePhotoVision);
+    if (cannotReadPage && !polishedLooksReal) {
+      throw new BadRequestException({
+        code: 'PAGE_TEXT_UNREADABLE',
+        message:
+          'Could not read this page clearly. Try a sharper photo with the full page flat and well lit.',
+      });
+    }
+    if (isFakeExtractText(summary)) {
+      throw new BadRequestException({
+        code: 'PAGE_TEXT_UNREADABLE',
+        message: 'Could not read this page clearly. Try again with a clearer photo.',
+      });
+    }
+    return coerceLessonDisplayText(
+      longestRealLessonText(usableOcr ? resolvedOcr : undefined, polishedLooksReal ? summary : undefined),
+    );
+  }
+
   async appendChapterPhotos(id: string, files: Express.Multer.File[], user: AuthUser) {
     if (!files?.length) {
       throw new BadRequestException({
@@ -349,16 +457,31 @@ export class LessonsService {
     }
     const lesson = await this.requireOwnedChapterLesson(id, user);
     const schoolId = lesson.schoolId;
-    const perPageTexts = await this.pageOcr.readPageTexts(files, {
-      subjectName: lesson.subject.name,
-    });
-    const newChunk = perPageTexts.filter(Boolean).join('\n\n').trim();
-    if (!newChunk) {
+    const grade = await this.prisma.grade.findUnique({ where: { id: lesson.gradeId } });
+    if (!grade) {
       throw new BadRequestException({
-        code: 'PAGE_TEXT_UNREADABLE',
-        message: 'Could not read the new photos. Try sharper, well-lit pictures.',
+        code: 'CLASS_NOT_FOUND',
+        message: 'Grade was not found for this chapter',
       });
     }
+    const perPageTexts: string[] = [];
+    for (const file of files) {
+      const text = await this.transcribeTextbookPhoto(
+        file,
+        lesson.subject,
+        grade,
+        schoolId,
+        user.id,
+      );
+      if (!text.trim()) {
+        throw new BadRequestException({
+          code: 'PAGE_TEXT_UNREADABLE',
+          message: 'Could not read the new photos. Try sharper, well-lit pictures.',
+        });
+      }
+      perPageTexts.push(text);
+    }
+    const newChunk = perPageTexts.join('\n\n').trim();
     const existingImages = lesson.sources.filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE);
     const startPage =
       existingImages.reduce((max, s) => Math.max(max, s.pageFrom ?? 0), 0) + 1;
@@ -1477,6 +1600,41 @@ export class LessonsService {
       },
     });
     return items.map((row) => this.presentLesson(row));
+  }
+
+  async createChapterDraft(dto: CreateChapterDraftDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const teacher = await this.requireTeacherProfile(user.id);
+    await this.assertTeacherAssignment({
+      schoolId,
+      userId: user.id,
+      teacherId: teacher.id,
+      sectionId: dto.sectionId,
+      subjectId: dto.subjectId,
+      academicYearId: dto.academicYearId,
+    });
+    const chapterName = dto.chapterName?.trim() || 'New chapter';
+    const lesson = await this.prisma.dailyLesson.create({
+      data: {
+        schoolId,
+        branchId: dto.branchId,
+        academicYearId: dto.academicYearId,
+        gradeId: dto.gradeId,
+        sectionId: dto.sectionId,
+        subjectId: dto.subjectId,
+        teacherId: teacher.id,
+        createdById: user.id,
+        date: new Date(),
+        chapterName,
+        topicName: dto.topicName?.trim(),
+        aiSummary: '',
+        status: LessonStatus.READY_FOR_REVIEW,
+        recordKind: LessonRecordKind.CHAPTER_LIBRARY,
+        contentConfirmed: false,
+        chapterProgress: ChapterProgressStatus.IN_PROGRESS,
+      },
+    });
+    return this.loadPresented(lesson.id);
   }
 
   async createChapterFromPaste(dto: CreateChapterPasteDto, user: AuthUser) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -13,9 +13,15 @@ import { assetUrl } from "@/lib/api-client";
 import { LESSON_MAX_PAGE_UPLOADS } from "@/lib/lesson-upload-limits";
 import { compressPhotosForUpload } from "@/lib/page-ocr";
 import { PageLoader } from "@/components/layout/page-loader";
-import { AiWait } from "@/components/layout/ai-wait";
 import type { Lesson, LessonPageSource } from "@/lib/types";
-import { ChevronDown, ChevronUp, ImagePlus } from "lucide-react";
+import {
+  createChapterPageUploadItems,
+  releaseChapterPageUploadPreviews,
+  uploadErrorMessage,
+  uploadSingleChapterPage,
+  type ChapterPageUploadItem,
+} from "@/lib/chapter-page-upload";
+import { ChevronDown, ChevronUp, ImagePlus, CheckCircle2, AlertCircle, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const IMAGE_EXT = /\.(jpe?g|png|webp|heic|heif)$/i;
@@ -28,10 +34,12 @@ function isImageFile(file: File) {
 export function ChapterPageManager({
   lessonId,
   pageSources,
+  initialUploadFiles,
   onContentUpdated,
 }: {
   lessonId: string;
   pageSources: LessonPageSource[];
+  initialUploadFiles?: File[];
   onContentUpdated: (lesson: Lesson) => void;
 }) {
   const { toast } = useToast();
@@ -40,10 +48,29 @@ export function ChapterPageManager({
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
+  const [uploadQueue, setUploadQueue] = useState<ChapterPageUploadItem[]>([]);
+  const uploadQueueRef = useRef<ChapterPageUploadItem[]>([]);
+  const uploadRunning = useRef(false);
+  const initialStarted = useRef(false);
+
+  const setQueue = useCallback(
+    (updater: ChapterPageUploadItem[] | ((prev: ChapterPageUploadItem[]) => ChapterPageUploadItem[])) => {
+      setUploadQueue((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        uploadQueueRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     setOrdered(pageSources);
   }, [pageSources]);
+
+  useEffect(() => {
+    return () => releaseChapterPageUploadPreviews(uploadQueueRef.current);
+  }, []);
 
   const orderDirty = useMemo(() => {
     if (ordered.length !== pageSources.length) return true;
@@ -57,24 +84,70 @@ export function ChapterPageManager({
     queryClient.invalidateQueries({ queryKey: ["lesson-chapters"] });
   };
 
-  const appendPhotos = useMutation({
-    mutationFn: async (files: File[]) => {
-      const pages = await compressPhotosForUpload(files);
-      return lessonsService.appendChapterPhotos(lessonId, pages);
-    },
-    onSuccess: (lesson) => {
-      setPendingPhotos([]);
+  const runNextUpload = useCallback(async () => {
+    if (uploadRunning.current) return;
+    const next = uploadQueueRef.current.find((item) => item.status === "queued");
+    if (!next) return;
+
+    uploadRunning.current = true;
+    setQueue((current) =>
+      current.map((item) =>
+        item.id === next.id ? { ...item, status: "uploading", error: undefined } : item,
+      ),
+    );
+
+    try {
+      const lesson = await uploadSingleChapterPage(lessonId, next.file);
+      URL.revokeObjectURL(next.previewUrl);
+      setQueue((current) => current.filter((item) => item.id !== next.id));
       invalidate();
       onContentUpdated(lesson);
-      toast({ title: "Photos added", description: "New text was merged into the chapter.", variant: "success" });
-    },
-    onError: (err) =>
+    } catch (err) {
+      const message = uploadErrorMessage(err);
+      setQueue((current) =>
+        current.map((item) =>
+          item.id === next.id ? { ...item, status: "failed", error: message } : item,
+        ),
+      );
       toast({
-        title: "Could not read photos",
-        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        title: `Page “${next.file.name}” failed`,
+        description: message,
         variant: "error",
-      }),
-  });
+      });
+    } finally {
+      uploadRunning.current = false;
+      if (uploadQueueRef.current.some((item) => item.status === "queued")) {
+        void runNextUpload();
+      }
+    }
+  }, [lessonId, onContentUpdated, setQueue, toast]);
+
+  const enqueueUploads = useCallback(
+    async (files: File[]) => {
+      if (!files.length) return;
+      const compressed = await compressPhotosForUpload(files);
+      const items = createChapterPageUploadItems(compressed);
+      setQueue((current) => [...current, ...items]);
+      setPendingPhotos([]);
+      void runNextUpload();
+    },
+    [runNextUpload, setQueue],
+  );
+
+  useEffect(() => {
+    if (!initialUploadFiles?.length || initialStarted.current) return;
+    initialStarted.current = true;
+    void enqueueUploads(initialUploadFiles);
+  }, [initialUploadFiles, enqueueUploads]);
+
+  const retryUpload = (id: string) => {
+    setQueue((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, status: "queued", error: undefined } : item,
+      ),
+    );
+    void runNextUpload();
+  };
 
   const appendText = useMutation({
     mutationFn: () => lessonsService.appendChapterText(lessonId, pasteText.trim()),
@@ -116,11 +189,8 @@ export function ChapterPageManager({
     setOrdered(next);
   };
 
-  const busy = appendPhotos.isPending || appendText.isPending || saveOrder.isPending;
-
-  if (appendPhotos.isPending) {
-    return <AiWait kind="extract" variant="panel" />;
-  }
+  const queueBusy = uploadQueue.some((item) => item.status === "uploading" || item.status === "queued");
+  const busy = queueBusy || appendText.isPending || saveOrder.isPending;
 
   return (
     <Card className="mb-4">
@@ -131,10 +201,13 @@ export function ChapterPageManager({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {ordered.length > 0 ? (
+        {ordered.length > 0 || uploadQueue.length > 0 ? (
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <Label>Page photos ({ordered.length})</Label>
+              <Label>
+                Page photos ({ordered.length}
+                {uploadQueue.length ? ` · ${uploadQueue.length} in progress` : ""})
+              </Label>
               {orderDirty ? (
                 <div className="flex gap-2">
                   <Button type="button" size="sm" variant="outline" onClick={syncFromProps}>
@@ -162,14 +235,18 @@ export function ChapterPageManager({
                     ) : (
                       <div className="h-16 w-12 shrink-0 rounded bg-muted" />
                     )}
-                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{page.label}</span>
+                    <span className="flex min-w-0 flex-1 items-center gap-2 truncate text-xs text-muted-foreground">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" aria-hidden />
+                      <span className="truncate">{page.label}</span>
+                      <span className="shrink-0 text-green-700">Uploaded</span>
+                    </span>
                     <div className="flex shrink-0 flex-col gap-0.5">
                       <Button
                         type="button"
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7"
-                        disabled={index === 0}
+                        disabled={index === 0 || queueBusy}
                         onClick={() => move(index, -1)}
                         aria-label="Move page up"
                       >
@@ -180,7 +257,7 @@ export function ChapterPageManager({
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7"
-                        disabled={index === ordered.length - 1}
+                        disabled={index === ordered.length - 1 || queueBusy}
                         onClick={() => move(index, 1)}
                         aria-label="Move page down"
                       >
@@ -190,6 +267,50 @@ export function ChapterPageManager({
                   </li>
                 );
               })}
+              {uploadQueue.map((item, queueIndex) => (
+                <li
+                  key={item.id}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg border p-2",
+                    item.status === "failed" ? "border-destructive/40 bg-destructive/5" : "bg-muted/10",
+                  )}
+                >
+                  <span className="w-8 shrink-0 text-center text-sm font-medium tabular-nums text-muted-foreground">
+                    {ordered.length + queueIndex + 1}
+                  </span>
+                  <img src={item.previewUrl} alt="" className="h-16 w-12 shrink-0 rounded object-cover" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-xs">
+                      {item.status === "uploading" ? (
+                        <span className="text-muted-foreground">Reading page…</span>
+                      ) : item.status === "failed" ? (
+                        <>
+                          <AlertCircle className="h-4 w-4 shrink-0 text-destructive" aria-hidden />
+                          <span className="text-destructive">Failed</span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">Waiting…</span>
+                      )}
+                      <span className="truncate text-muted-foreground">{item.file.name}</span>
+                    </div>
+                    {item.error ? (
+                      <p className="mt-1 line-clamp-2 text-xs text-destructive">{item.error}</p>
+                    ) : null}
+                  </div>
+                  {item.status === "failed" ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={queueBusy}
+                      onClick={() => retryUpload(item.id)}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Retry
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
             </ul>
           </div>
         ) : (
@@ -208,7 +329,7 @@ export function ChapterPageManager({
           >
             <ImagePlus className="mb-2 h-7 w-7 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">
-              Up to {LESSON_MAX_PAGE_UPLOADS} photos per batch
+              Up to {LESSON_MAX_PAGE_UPLOADS} photos per batch · each page uploads separately
               {pendingPhotos.length ? ` · ${pendingPhotos.length} selected` : ""}
             </span>
             <input
@@ -216,6 +337,7 @@ export function ChapterPageManager({
               accept="image/*"
               multiple
               className="hidden"
+              disabled={busy}
               onChange={(e) => {
                 const next = Array.from(e.target.files ?? []).filter(isImageFile);
                 e.target.value = "";
@@ -233,11 +355,7 @@ export function ChapterPageManager({
             />
           </label>
           {pendingPhotos.length > 0 && (
-            <Button
-              type="button"
-              disabled={busy}
-              onClick={() => appendPhotos.mutate(pendingPhotos)}
-            >
+            <Button type="button" disabled={busy} onClick={() => void enqueueUploads(pendingPhotos)}>
               Read text from {pendingPhotos.length} new photo{pendingPhotos.length === 1 ? "" : "s"}
             </Button>
           )}

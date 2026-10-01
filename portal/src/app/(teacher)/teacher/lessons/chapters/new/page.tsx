@@ -19,6 +19,7 @@ import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { LESSON_MAX_PAGE_UPLOADS } from "@/lib/lesson-upload-limits";
 import { compressPhotosForUpload } from "@/lib/page-ocr";
+import { stashPendingChapterPhotos } from "@/lib/chapter-pending-uploads";
 import { localDateISO } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ImagePlus, X } from "lucide-react";
@@ -57,19 +58,21 @@ export default function NewChapterPage() {
 
   const selected = classes.data?.find((c) => `${c.sectionId}:${c.subjectId}` === classKey);
 
-  const extractMutation = useMutation({
+  const startPhotoChapterMutation = useMutation({
     mutationFn: async () => {
       if (!selected?.gradeId) throw new Error("Select a class");
       const pages = await compressPhotosForUpload(photos);
-      return lessonsService.extractChapter({
+      const draft = await lessonsService.createChapterDraft({
         academicYearId: selected.academicYearId,
         gradeId: selected.gradeId,
         sectionId: selected.sectionId,
         subjectId: selected.subjectId,
         branchId: selected.branchId,
-        date: localDateISO(),
-        pages,
+        chapterName: chapterName.trim() || undefined,
+        topicName: topicName.trim() || undefined,
       });
+      stashPendingChapterPhotos(draft.id, pages);
+      return draft;
     },
     onSuccess: (lesson) => {
       queryClient.invalidateQueries({ queryKey: ["lesson-chapters"] });
@@ -77,7 +80,7 @@ export default function NewChapterPage() {
     },
     onError: (err) => {
       toast({
-        title: "Could not read pages",
+        title: "Could not start chapter",
         description: err instanceof ApiClientError ? err.message : "Unexpected error",
         variant: "error",
       });
@@ -112,7 +115,7 @@ export default function NewChapterPage() {
     },
   });
 
-  const busy = extractMutation.isPending || pasteMutation.isPending;
+  const busy = startPhotoChapterMutation.isPending || pasteMutation.isPending;
 
   if (classes.isLoading) {
     return <PageLoader variant="page" task="lessons" />;
@@ -157,7 +160,7 @@ export default function NewChapterPage() {
           <CardHeader>
             <CardTitle>{tab === "photos" ? "Page photos" : "Paste text"}</CardTitle>
             <CardDescription>
-              Confirm content on the next screen before using in class. You can add up to {LESSON_MAX_PAGE_UPLOADS} photos per upload.
+              Confirm content on the next screen. Each page uploads separately so successful pages are saved even if one fails.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -235,7 +238,7 @@ export default function NewChapterPage() {
                 )}
                 <Button
                   disabled={!classKey || !photos.length}
-                  onClick={() => extractMutation.mutate()}
+                  onClick={() => startPhotoChapterMutation.mutate()}
                 >
                   Read text from photos
                 </Button>

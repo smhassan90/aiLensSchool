@@ -283,6 +283,38 @@ export class CreateChapterPasteDto {
   contentText!: string;
 }
 
+export class CreateChapterDraftDto {
+  @ApiProperty()
+  @IsString()
+  academicYearId!: string;
+
+  @ApiProperty()
+  @IsString()
+  gradeId!: string;
+
+  @ApiProperty()
+  @IsString()
+  sectionId!: string;
+
+  @ApiProperty()
+  @IsString()
+  subjectId!: string;
+
+  @ApiProperty()
+  @IsString()
+  branchId!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  chapterName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  topicName?: string;
+}
+
 export class AppendChapterTextDto {
   @ApiProperty()
   @IsString()

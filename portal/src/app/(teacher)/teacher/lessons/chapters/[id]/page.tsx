@@ -17,6 +17,7 @@ import { ApiClientError } from "@/lib/api-client";
 import { coerceLessonDisplayText } from "@/lib/lesson-display-text";
 import type { Lesson } from "@/lib/types";
 import { useEffect, useState } from "react";
+import { takePendingChapterPhotos } from "@/lib/chapter-pending-uploads";
 import { ChapterPageManager } from "@/components/lessons/chapter-page-manager";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 
@@ -28,11 +29,17 @@ export default function ChapterDetailPage() {
   const [chapterName, setChapterName] = useState("");
   const [topicName, setTopicName] = useState("");
   const [contentText, setContentText] = useState("");
+  const [initialUploadFiles, setInitialUploadFiles] = useState<File[]>([]);
 
   const { data: lesson, isLoading } = useQuery({
     queryKey: ["lesson", id],
     queryFn: () => lessonsService.getById(id),
   });
+
+  useEffect(() => {
+    const pending = takePendingChapterPhotos(id);
+    if (pending.length) setInitialUploadFiles(pending);
+  }, [id]);
 
   useEffect(() => {
     if (!lesson) return;
@@ -119,6 +126,7 @@ export default function ChapterDetailPage() {
       <ChapterPageManager
         lessonId={id}
         pageSources={lesson.pageSources ?? []}
+        initialUploadFiles={initialUploadFiles}
         onContentUpdated={(updated: Lesson) => {
           setContentText(coerceLessonDisplayText(updated.extractedText ?? updated.aiSummary ?? ""));
           queryClient.setQueryData(["lesson", id], updated);
