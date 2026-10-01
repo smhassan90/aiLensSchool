@@ -17,6 +17,7 @@ LISTEN_PORT = int(os.environ.get("DEPLOY_WEBHOOK_PORT", "9000"))
 PID_FILE = "/tmp/hawknexa-deploy.pid"
 LOG_FILE = "/tmp/hawknexa-deploy.log"
 STATUS_FILE = f"{DEPLOY_DIR}/.last-deploy.json"
+PENDING_TARGETS_FILE = f"{DEPLOY_DIR}/.pending-deploy-targets"
 DEPLOY_CONTAINER = "hawknexa-deploy-run"
 
 
@@ -50,6 +51,28 @@ def log_tail(max_lines: int = 40) -> str:
         return "".join(lines[-max_lines:])
     except OSError:
         return ""
+
+
+def merge_pending_targets(new_targets: str) -> str:
+    parts: list[str] = []
+    if os.path.isfile(PENDING_TARGETS_FILE):
+        try:
+            with open(PENDING_TARGETS_FILE, encoding="utf-8") as handle:
+                parts.extend(p.strip() for p in handle.read().split(",") if p.strip())
+        except OSError:
+            pass
+    if new_targets:
+        parts.extend(p.strip() for p in new_targets.split(",") if p.strip())
+    seen: set[str] = set()
+    merged: list[str] = []
+    for part in parts:
+        if part not in seen:
+            seen.add(part)
+            merged.append(part)
+    merged_str = ",".join(merged)
+    with open(PENDING_TARGETS_FILE, "w", encoding="utf-8") as handle:
+        handle.write(merged_str)
+    return merged_str
 
 
 def deploy_running() -> bool:
@@ -175,12 +198,6 @@ class DeployHandler(BaseHTTPRequestHandler):
             self.send_error(401)
             return
 
-        if deploy_running():
-            self.send_response(409)
-            self.end_headers()
-            self.wfile.write(b"Deploy already in progress")
-            return
-
         deploy_targets = ""
         length = int(self.headers.get("Content-Length", "0") or "0")
         if length > 0:
@@ -194,6 +211,18 @@ class DeployHandler(BaseHTTPRequestHandler):
                     deploy_targets = targets.strip()
             except (UnicodeDecodeError, json.JSONDecodeError, AttributeError):
                 pass
+
+        if deploy_running():
+            queued = merge_pending_targets(deploy_targets)
+            self._send_json(
+                202,
+                {
+                    "queued": True,
+                    "message": "Deploy already in progress; targets queued for a follow-up run",
+                    "pendingTargets": queued,
+                },
+            )
+            return
 
         proc = start_deploy(deploy_targets)
 

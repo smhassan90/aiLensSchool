@@ -88,6 +88,10 @@ Manual deploy on the server:
 bash /opt/apps/hawknexa/deploy/deploy.sh
 ```
 
+### If GitHub Actions shows HTTP 409 (`Deploy already in progress`)
+
+Another deploy was still running (common when several pushes land close together). Recent webhook versions **queue** the new targets and run again when the current deploy finishes; Actions also retries POST for up to ~7 minutes. Re-run the failed workflow if needed, or wait for the in-progress deploy to finish.
+
 ### If GitHub Actions shows HTTP 502 on `/internal/deploy`
 
 The deploy webhook container is down or Caddy cannot reach it. In **Hostinger VPS browser terminal** (or SSH):

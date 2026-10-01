@@ -11,7 +11,24 @@ HEALTH_ATTEMPTS="${DEPLOY_HEALTH_ATTEMPTS:-24}"
 STATUS_FILE="${DEPLOY_DIR}/.last-deploy.json"
 PID_FILE="/tmp/hawknexa-deploy.pid"
 LOCK_DIR="/tmp/hawknexa-deploy.lockdir"
+PENDING_TARGETS_FILE="${DEPLOY_DIR}/.pending-deploy-targets"
 SKIP_WEBHOOK_RESTART="${SKIP_WEBHOOK_RESTART:-false}"
+
+chain_pending_deploy() {
+  if [[ ! -f "${PENDING_TARGETS_FILE}" ]]; then
+    return 0
+  fi
+  local targets
+  targets="$(tr -d '\n\r' < "${PENDING_TARGETS_FILE}")"
+  rm -f "${PENDING_TARGETS_FILE}"
+  if [[ -z "${targets}" ]]; then
+    return 0
+  fi
+  echo "=== Queued deploy (targets=${targets}) ==="
+  export DEPLOY_TARGETS="${targets}"
+  export SKIP_WEBHOOK_RESTART=true
+  exec bash "${DEPLOY_DIR}/deploy.sh"
+}
 
 write_status() {
   local status="$1"
@@ -178,6 +195,7 @@ for i in $(seq 1 "${HEALTH_ATTEMPTS}"); do
     docker compose -f "${COMPOSE_FILE}" ps
     trap - ERR
     write_status "success" "Deploy completed" "${BUILD_SHA}"
+    chain_pending_deploy
     exit 0
   fi
   echo "Waiting for API... (${i}/6)"
