@@ -34,7 +34,10 @@ import { UserSquare2, Plus } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import type { Teacher } from "@/lib/types";
 import { formatStatusLabel } from "@/lib/display-labels";
-import { teacherHasActiveAssignments } from "@/lib/teacher-assignments";
+import {
+  teacherAssignmentWarningSummary,
+  teacherHasActiveAssignments,
+} from "@/lib/teacher-assignments";
 
 type ResetResult = {
   teacherId: string;
@@ -82,9 +85,8 @@ export default function TeachersPage() {
         teacherHasActiveAssignments(detail)
       ) {
         toast({
-          title: "Teacher deactivated",
-          description:
-            "They still have class or subject assignments. Reassign those subjects before relying on a replacement teacher.",
+          title: "Teacher deactivated — assignments still on file",
+          description: `Still linked: ${teacherAssignmentWarningSummary(detail)}. Open Teaching assignments or this teacher’s profile to reassign before classes run without a teacher.`,
           variant: "warning",
         });
       } else {

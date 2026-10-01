@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/utils";
-import { X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 
 type ToastVariant = "default" | "success" | "error" | "warning";
 
@@ -18,6 +18,7 @@ interface Toast {
   title: string;
   description?: string;
   variant: ToastVariant;
+  durationMs?: number;
 }
 
 interface ToastContextValue {
@@ -25,6 +26,26 @@ interface ToastContextValue {
 }
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
+
+function toastDuration(variant: ToastVariant, override?: number) {
+  if (override != null) return override;
+  if (variant === "warning") return 9000;
+  if (variant === "error") return 6000;
+  return 4500;
+}
+
+function ToastIcon({ variant }: { variant: ToastVariant }) {
+  if (variant === "success") {
+    return <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" aria-hidden />;
+  }
+  if (variant === "error") {
+    return <XCircle className="h-5 w-5 shrink-0 text-destructive" aria-hidden />;
+  }
+  if (variant === "warning") {
+    return <AlertTriangle className="h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />;
+  }
+  return <Info className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />;
+}
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -37,51 +58,87 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (opts: Omit<Toast, "id">) => {
       const id = crypto.randomUUID();
       setToasts((prev) => [...prev, { ...opts, id }]);
-      setTimeout(() => dismiss(id), 4500);
+      setTimeout(() => dismiss(id), toastDuration(opts.variant, opts.durationMs));
     },
     [dismiss],
   );
 
   const value = useMemo(() => ({ toast }), [toast]);
 
+  const standardToasts = toasts.filter((t) => t.variant !== "warning");
+  const warningToasts = toasts.filter((t) => t.variant === "warning");
+
+  const renderToast = (t: Toast) => (
+    <div
+      key={t.id}
+      role={t.variant === "error" || t.variant === "warning" ? "alert" : "status"}
+      className={cn(
+        "rounded-lg border p-4 shadow-lg animate-in slide-in-from-right",
+        t.variant === "default" && "border-border bg-card",
+        t.variant === "success" && "border-primary/30 bg-card",
+        t.variant === "error" && "border-destructive/40 bg-card",
+        t.variant === "warning" &&
+          "border-amber-500 bg-amber-50 text-amber-950 shadow-amber-200/50 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-50 dark:shadow-none",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <ToastIcon variant={t.variant} />
+        <div className="min-w-0 flex-1">
+          <p
+            className={cn(
+              "text-sm font-semibold leading-snug",
+              t.variant === "warning" && "text-amber-950 dark:text-amber-50",
+            )}
+          >
+            {t.title}
+          </p>
+          {t.description ? (
+            <p
+              className={cn(
+                "mt-1.5 text-sm leading-relaxed",
+                t.variant === "warning"
+                  ? "text-amber-900 dark:text-amber-100"
+                  : "text-muted-foreground",
+              )}
+            >
+              {t.description}
+            </p>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={() => dismiss(t.id)}
+          className={cn(
+            "shrink-0 rounded p-1 hover:bg-black/5 dark:hover:bg-white/10",
+            t.variant === "warning" ? "text-amber-800 dark:text-amber-200" : "text-muted-foreground",
+          )}
+          aria-label={`Dismiss: ${t.title}`}
+        >
+          <X className="h-4 w-4" aria-hidden />
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <ToastContext.Provider value={value}>
       {children}
-      {toasts.length > 0 ? (
+      {warningToasts.length > 0 ? (
+        <div
+          role="region"
+          aria-label="Important notifications"
+          className="fixed inset-x-3 top-4 z-[100] flex max-w-md flex-col gap-2 sm:inset-x-auto sm:right-4"
+        >
+          {warningToasts.map(renderToast)}
+        </div>
+      ) : null}
+      {standardToasts.length > 0 ? (
         <div
           role="region"
           aria-label="Notifications"
           className="fixed inset-x-3 bottom-4 z-[100] flex max-w-sm flex-col gap-2 sm:inset-x-auto sm:right-4"
         >
-          {toasts.map((t) => (
-            <div
-              key={t.id}
-              role={t.variant === "error" ? "alert" : "status"}
-              className={cn(
-                "rounded-lg border bg-card p-4 shadow-lg animate-in slide-in-from-right",
-                t.variant === "success" && "border-primary/30",
-                t.variant === "error" && "border-destructive/30",
-                t.variant === "warning" && "border-amber-500/40 bg-amber-50/90 dark:bg-amber-950/40",
-              )}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm font-medium">{t.title}</p>
-                  {t.description ? (
-                    <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => dismiss(t.id)}
-                  className="rounded p-1 text-muted-foreground hover:bg-muted"
-                  aria-label={`Dismiss: ${t.title}`}
-                >
-                  <X className="h-4 w-4" aria-hidden />
-                </button>
-              </div>
-            </div>
-          ))}
+          {standardToasts.map(renderToast)}
         </div>
       ) : null}
     </ToastContext.Provider>

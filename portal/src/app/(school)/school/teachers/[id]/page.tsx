@@ -28,7 +28,10 @@ import { gradeClassLabel, gradeClassNumber } from "@/lib/utils";
 import { formatStatusLabel } from "@/lib/display-labels";
 import { TeacherSubjectAssignmentsPanel } from "@/components/teachers/teacher-subject-assignments-panel";
 import { TeacherResetPasswordDialog } from "@/components/teachers/teacher-reset-password-dialog";
-import { teacherHasActiveAssignments } from "@/lib/teacher-assignments";
+import {
+  teacherAssignmentWarningSummary,
+  teacherHasActiveAssignments,
+} from "@/lib/teacher-assignments";
 
 const schema = z.object({
   firstName: z.string().min(1, "Required"),
@@ -150,9 +153,8 @@ export default function TeacherDetailsPage() {
     onSuccess: (_, values) => {
       if (values.status === "INACTIVE" && teacher.data && teacherHasActiveAssignments(teacher.data)) {
         toast({
-          title: "Teacher deactivated",
-          description:
-            "This teacher still has class or subject assignments. Reassign them on Teaching assignments or their profile.",
+          title: "Teacher deactivated — assignments still on file",
+          description: `Still linked: ${teacherAssignmentWarningSummary(teacher.data)}. Reassign on Teaching assignments or below before relying on a replacement.`,
           variant: "warning",
         });
       } else {
