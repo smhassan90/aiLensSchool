@@ -35,10 +35,31 @@ function Refresh-SessionPath {
     }
 }
 
+function Invoke-PythonCommand($pythonExe, [string[]]$ArgumentList) {
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        return & $pythonExe @ArgumentList 2>&1
+    } catch {
+        return $null
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+}
+
 function Get-PythonVersion($pythonExe) {
-    $out = & $pythonExe --version 2>&1
+    $out = Invoke-PythonCommand $pythonExe @("--version")
     $text = "$out".Trim()
     if ($text -match 'Python (\d+)\.(\d+)') {
+        return @{
+            Major = [int]$Matches[1]
+            Minor = [int]$Matches[2]
+            Text = "$($Matches[1]).$($Matches[2])"
+        }
+    }
+    $probe = Invoke-PythonCommand $pythonExe @("-c", "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')")
+    $probeText = "$probe".Trim()
+    if ($probeText -match '^(\d+)\.(\d+)$') {
         return @{
             Major = [int]$Matches[1]
             Minor = [int]$Matches[2]
@@ -73,9 +94,122 @@ function Add-PythonCandidate($list, $path) {
     }
 }
 
+function Get-PythonRegistryInstallPaths {
+    $paths = New-Object System.Collections.Generic.List[string]
+    foreach ($root in @("HKLM:\Software\Python\PythonCore", "HKCU:\Software\Python\PythonCore")) {
+        if (-not (Test-Path -LiteralPath $root)) {
+            continue
+        }
+        Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                $installPath = (Get-ItemProperty -LiteralPath $_.PSPath -Name InstallPath -ErrorAction Stop).InstallPath
+                if ($installPath) {
+                    Add-PythonCandidate $paths (Join-Path $installPath.TrimEnd('\') "python.exe")
+                }
+            } catch {}
+        }
+    }
+    return $paths
+}
+
+function Prepend-PythonDirToSessionPath($pythonExe) {
+    $dir = Split-Path -Parent $pythonExe
+    if (-not $dir) {
+        return
+    }
+    $parts = $env:Path -split ';' | Where-Object { $_ -and $_.Trim() -ne $dir }
+    $env:Path = $dir + [char]59 + ($parts -join [char]59)
+}
+
+function Get-PythonPathMarkerFile {
+    return Join-Path $ScriptDir ".edge-sync-python.path"
+}
+
+function Get-PythonFromPathMarker {
+    $marker = Get-PythonPathMarkerFile
+    if (-not (Test-Path -LiteralPath $marker)) {
+        return $null
+    }
+    $exe = (Get-Content -LiteralPath $marker -Raw -ErrorAction SilentlyContinue).Trim()
+    if ($exe -and (Test-Path -LiteralPath $exe)) {
+        return $exe
+    }
+    return $null
+}
+
+function Write-PythonPathMarker($pythonExe) {
+    Set-Content -LiteralPath (Get-PythonPathMarkerFile) -Value $pythonExe -Encoding ASCII -NoNewline
+}
+
+function Get-PythonFromShim {
+    $shim = Join-Path $ScriptDir "python.cmd"
+    if (-not (Test-Path -LiteralPath $shim)) {
+        return $null
+    }
+    $raw = Get-Content -LiteralPath $shim -Raw -ErrorAction SilentlyContinue
+    if ($raw -match '"([^"]+\\python\.exe)"') {
+        $exe = $Matches[1]
+        if (Test-Path -LiteralPath $exe) {
+            return $exe
+        }
+    }
+    return $null
+}
+
+function Get-LikelyPythonInstallPaths {
+    $paths = New-Object System.Collections.Generic.List[string]
+    foreach ($p in @(
+        (Get-PythonFromPathMarker),
+        (Get-PythonFromShim),
+        (Get-DefaultPython312Path)
+    )) {
+        Add-PythonCandidate $paths $p
+    }
+    foreach ($regExe in Get-PythonRegistryInstallPaths) {
+        $paths.Add($regExe)
+    }
+    return ($paths | Select-Object -Unique)
+}
+
+function Test-PythonAlreadyOnMachine {
+    foreach ($exe in Get-LikelyPythonInstallPaths) {
+        if (Test-PythonExe $exe) {
+            return $true
+        }
+    }
+    if (Find-Python) {
+        return $true
+    }
+    foreach ($exe in Get-LikelyPythonInstallPaths) {
+        if ($exe -and (Test-Path -LiteralPath $exe)) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Resolve-ExistingPython {
+    Refresh-SessionPath
+    foreach ($exe in Get-LikelyPythonInstallPaths) {
+        $hit = Test-PythonExe $exe
+        if ($hit) {
+            return $hit
+        }
+    }
+    return Find-Python
+}
+
 function Find-Python {
     $candidates = New-Object System.Collections.Generic.List[string]
     $pyExeProbe = 'import sys; print(sys.executable)'
+
+    foreach ($exe in Get-LikelyPythonInstallPaths) {
+        $candidates.Add($exe)
+    }
+
+    foreach ($regExe in Get-PythonRegistryInstallPaths) {
+        $candidates.Add($regExe)
+    }
 
     foreach ($cmd in @("python", "py")) {
         try {
@@ -97,9 +231,10 @@ function Find-Python {
         }
     }
 
-    foreach ($ver in @("312", "311", "310", "313")) {
+    foreach ($ver in @("313", "312", "311", "310", "39")) {
         Add-PythonCandidate $candidates (Join-Path $env:LOCALAPPDATA "Programs\Python\Python$ver\python.exe")
         Add-PythonCandidate $candidates (Join-Path ${env:ProgramFiles} "Python$ver\python.exe")
+        Add-PythonCandidate $candidates ("C:\Python{0}\python.exe" -f $ver)
     }
 
     $searchRoots = @(
@@ -107,7 +242,10 @@ function Find-Python {
         "${env:ProgramFiles}\Python312",
         "${env:ProgramFiles}\Python311",
         "${env:ProgramFiles}\Python310",
-        "${env:ProgramFiles(x86)}\Python312"
+        "${env:ProgramFiles}\Python313",
+        "${env:ProgramFiles(x86)}\Python312",
+        "C:\Python312",
+        "C:\Python311"
     )
     foreach ($root in $searchRoots) {
         if (-not (Test-Path -LiteralPath $root)) {
@@ -253,10 +391,31 @@ function Invoke-PythonInstaller($downloadedPath, $installerArgs) {
     return $null
 }
 
+function Test-PythonWingetPackagePresent {
+    $winget = Get-Command winget -ErrorAction SilentlyContinue
+    if (-not $winget) {
+        return $false
+    }
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $out = & winget list --id Python.Python.3.12 -e 2>&1 | Out-String
+        return $out -match "Python\.Python\.3\.12"
+    } catch {
+        return $false
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+}
+
 function Install-Python-Winget {
     $winget = Get-Command winget -ErrorAction SilentlyContinue
     if (-not $winget) {
         return $false
+    }
+    if (Test-PythonWingetPackagePresent) {
+        Write-Host "Python 3.12 is already installed (winget) - skipping download." -ForegroundColor Green
+        return $true
     }
     Write-Step "Installing Python 3.12 with winget (first-time install may take several minutes)"
     & winget install --id Python.Python.3.12 -e --accept-source-agreements --accept-package-agreements --silent
@@ -343,18 +502,52 @@ function Get-DefaultPython312Path {
     return Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\python.exe"
 }
 
+function Resolve-PythonAfterInstall {
+    $maxAttempts = 24
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        Refresh-SessionPath
+        $found = Find-Python
+        if ($found) {
+            return $found
+        }
+
+        $defaultPy = Get-DefaultPython312Path
+        $hit = Test-PythonExe $defaultPy
+        if ($hit) {
+            return $hit
+        }
+
+        if ($attempt -lt $maxAttempts) {
+            if ($attempt -eq 1) {
+                Write-Host "Python was installed but not detected yet - retrying discovery..." -ForegroundColor Yellow
+            } else {
+                Write-Host ("Still waiting for Python install to finish ({0}/{1})..." -f $attempt, $maxAttempts) -ForegroundColor Yellow
+            }
+            Start-Sleep -Seconds 5
+        }
+    }
+    return $null
+}
+
 function Ensure-PythonInstalled {
-    Refresh-SessionPath
-    $found = Find-Python
+    $found = Resolve-ExistingPython
     if ($found) {
         return $found
     }
 
-    $defaultPy = Get-DefaultPython312Path
-    if (Test-Path -LiteralPath $defaultPy) {
-        $hit = Test-PythonExe $defaultPy
-        if ($hit) {
-            return $hit
+    if (Test-PythonAlreadyOnMachine) {
+        Write-Host ""
+        Write-Host "Python is already on this PC but was not on PATH in this window." -ForegroundColor Yellow
+        Write-Host "Skipping reinstall - locating the existing install..." -ForegroundColor Green
+        $found = Resolve-PythonAfterInstall
+        if ($found) {
+            return $found
+        }
+        foreach ($exe in Get-LikelyPythonInstallPaths) {
+            $hit = Test-PythonExe $exe
+            if ($hit) {
+                return $hit
+            }
         }
     }
 
@@ -379,20 +572,30 @@ function Ensure-PythonInstalled {
         exit 1
     }
 
-    Start-Sleep -Seconds 5
-    Refresh-SessionPath
-    $found = Find-Python
+    $found = Resolve-PythonAfterInstall
     if (-not $found) {
-        Write-Host "Python was installed but not detected yet - retrying discovery..." -ForegroundColor Yellow
-        Start-Sleep -Seconds 5
-        Refresh-SessionPath
-        $found = Find-Python
+        $defaultPy = Get-DefaultPython312Path
+        $hit = Test-PythonExe $defaultPy
+        if ($hit) {
+            $found = $hit
+        }
     }
     if (-not $found) {
-        Write-Host "Python was installed but is not on PATH yet." -ForegroundColor Yellow
-        Write-Host "Close this window, open a new Command Prompt, and run setup-edge-sync.bat again." -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "Python was installed but is not on PATH yet in this window." -ForegroundColor Yellow
+        if (Test-Path -LiteralPath (Get-DefaultPython312Path)) {
+            $defaultPy = Get-DefaultPython312Path
+            Write-PythonShim $defaultPy
+            Write-Host ("Found {0}" -f $defaultPy) -ForegroundColor Green
+            Write-Host "Close this window, open a new Command Prompt, and run setup-edge-sync.bat again." -ForegroundColor Yellow
+            Write-Host "(python.cmd was updated so run-edge-sync.bat may already work.)" -ForegroundColor Gray
+        } else {
+            Write-Host "Close this window, open a new Command Prompt, and run setup-edge-sync.bat again." -ForegroundColor Yellow
+            Write-Host 'If it still fails, reinstall Python from python.org with "Add python.exe to PATH".' -ForegroundColor Yellow
+        }
         exit 1
     }
+    Prepend-PythonDirToSessionPath $found.Exe
     return $found
 }
 
@@ -413,8 +616,10 @@ Write-Host "Needs: internet once (Python + pyzk). Nothing else is assumed to be 
 Write-Step "Python 3.9+"
 $py = Ensure-PythonInstalled
 $pythonExe = $py.Exe
+Prepend-PythonDirToSessionPath $pythonExe
 Write-Host ('Using {0} ({1})' -f $pythonExe, $py.Version) -ForegroundColor Green
 Write-PythonShim $pythonExe
+Write-PythonPathMarker $pythonExe
 
 Write-Step "pip (Python package manager)"
 & $pythonExe -m ensurepip --upgrade --default-pip

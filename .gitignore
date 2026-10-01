@@ -195,6 +195,7 @@ mobile/release/
 # Edge sync agent (school laptop — local only)
 scripts/bootstrap.json
 scripts/python.cmd
+scripts/.edge-sync-python.path
 scripts/*.part
 scripts/agent_config.json
 scripts/sync_state.json
