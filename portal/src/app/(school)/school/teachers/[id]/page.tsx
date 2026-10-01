@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -17,16 +17,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { teachersService } from "@/services/teachers.service";
 import { branchesService } from "@/services/branches.service";
-import { academicsService } from "@/services/academics.service";
-import type { Section } from "@/lib/types";
 import { teacherDisplayNameFromUser } from "@/lib/person-name";
 import { useToast } from "@/providers/toast-provider";
 import { useAuth } from "@/providers/auth-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { ArrowLeft } from "lucide-react";
-import { gradeClassLabel, gradeClassNumber } from "@/lib/utils";
 import { formatStatusLabel } from "@/lib/display-labels";
-import { TeacherSubjectAssignmentsPanel } from "@/components/teachers/teacher-subject-assignments-panel";
 import { TeacherResetPasswordDialog } from "@/components/teachers/teacher-reset-password-dialog";
 import { teacherHasActiveAssignments } from "@/lib/teacher-assignments";
 import { teacherDeactivateAssignmentToast } from "@/lib/teacher-deactivate-toast";
@@ -49,29 +45,6 @@ function hireDateValue(value?: string | null) {
   return value.slice(0, 10);
 }
 
-type ClassAssignmentRow = {
-  id: string;
-  sectionId: string | null;
-  className?: string;
-  classNumber?: number | null;
-  sectionName?: string | null;
-  subject: string | null;
-  role: string;
-};
-
-function classHeadingFor(item: ClassAssignmentRow, sectionById: Map<string, Section>) {
-  const section = item.sectionId ? sectionById.get(item.sectionId) : undefined;
-  if (section?.grade) {
-    const fromSection = gradeClassNumber({ name: section.name, grade: section.grade });
-    if (fromSection != null) return `Class ${fromSection}`;
-    const label = gradeClassLabel({ name: section.name, grade: section.grade });
-    if (label !== "—") return label;
-  }
-  if (item.classNumber != null) return `Class ${item.classNumber}`;
-  if (item.className && item.className !== "—") return item.className;
-  return null;
-}
-
 export default function TeacherDetailsPage() {
   const params = useParams<{ id: string }>();
   const { can } = useAuth();
@@ -89,24 +62,6 @@ export default function TeacherDetailsPage() {
     queryFn: () => branchesService.list({ limit: 50 }),
     enabled: canEdit,
   });
-  const needsSectionLookup = Boolean(
-    teacher.data &&
-      !(teacher.data.assignments?.length) &&
-      ((teacher.data.classSections?.length ?? 0) > 0 ||
-        (teacher.data.classSubjects?.length ?? 0) > 0 ||
-        (teacher.data.assistantClassSubjects?.length ?? 0) > 0),
-  );
-  const sections = useQuery({
-    queryKey: ["sections", "teacher-detail"],
-    queryFn: () => academicsService.listSections({ limit: 100 }),
-    enabled: needsSectionLookup,
-  });
-  const sectionById = useMemo(() => {
-    const map = new Map<string, Section>();
-    for (const section of sections.data?.items ?? []) map.set(section.id, section);
-    return map;
-  }, [sections.data?.items]);
-
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -179,37 +134,6 @@ export default function TeacherDetailsPage() {
   }
 
   const row = teacher.data;
-  const classes =
-    row.assignments ??
-    [
-      ...(row.classSections ?? []).map((section) => ({
-        id: `homeroom-${section.id}`,
-        sectionId: section.id,
-        className: gradeClassLabel(section),
-        classNumber: gradeClassNumber(section),
-        sectionName: section.name?.trim() || null,
-        subject: null as string | null,
-        role: "Class teacher" as const,
-      })),
-      ...(row.classSubjects ?? []).map((item) => ({
-        id: item.id,
-        sectionId: item.section?.id ?? null,
-        className: gradeClassLabel(item.section),
-        classNumber: gradeClassNumber(item.section),
-        sectionName: item.section?.name?.trim() || null,
-        subject: item.subject?.name ?? null,
-        role: "Subject teacher" as const,
-      })),
-      ...(row.assistantClassSubjects ?? []).map((item) => ({
-        id: `assistant-${item.id}`,
-        sectionId: item.section?.id ?? null,
-        className: gradeClassLabel(item.section),
-        classNumber: gradeClassNumber(item.section),
-        sectionName: item.section?.name?.trim() || null,
-        subject: item.subject?.name ?? null,
-        role: "Assistant" as const,
-      })),
-    ];
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -333,10 +257,6 @@ export default function TeacherDetailsPage() {
             </div>
           </CardContent>
         </Card>
-
-        {canEdit || classes.length ? (
-          <TeacherSubjectAssignmentsPanel teacher={row} teacherId={params.id} canManage={canEdit} />
-        ) : null}
 
         {canEdit ? (
           <div className="flex justify-end gap-2">

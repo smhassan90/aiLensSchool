@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -26,12 +26,13 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { academicsService } from "@/services/academics.service";
-import type { Teacher } from "@/lib/types";
+import type { Subject, Teacher } from "@/lib/types";
 import { gradeClassLabel } from "@/lib/utils";
 import { ApiClientError } from "@/lib/api-client";
 import { useToast } from "@/providers/toast-provider";
 import { BookOpen, Plus, UserMinus } from "lucide-react";
 import Link from "next/link";
+import { uniqueSubjectsForPicker } from "@/lib/unique-subjects";
 
 const assignSchema = z.object({
   academicYearId: z.string().min(1, "Select year"),
@@ -114,16 +115,48 @@ export function TeacherSubjectAssignmentsPanel({
 
   const form = useForm<AssignValues>({ resolver: zodResolver(assignSchema) });
   const gradeId = form.watch("gradeId");
+  const sectionId = form.watch("sectionId");
+  const academicYearId = form.watch("academicYearId");
   const sections = useQuery({
     queryKey: ["sections", gradeId],
     queryFn: () => academicsService.listSections({ gradeId, limit: 50 }),
     enabled: canManage && assignOpen && Boolean(gradeId),
   });
+  const sectionItems = sections.data?.items ?? [];
+  const singleSection = sectionItems.length === 1 ? sectionItems[0] : null;
+
+  useEffect(() => {
+    if (!assignOpen || !gradeId || !singleSection) return;
+    if (form.getValues("sectionId") !== singleSection.id) {
+      form.setValue("sectionId", singleSection.id);
+    }
+  }, [assignOpen, gradeId, singleSection, form]);
+
   const subjects = useQuery({
     queryKey: ["subjects", gradeId],
     queryFn: () => academicsService.listSubjects({ gradeId, limit: 100 }),
     enabled: canManage && assignOpen && Boolean(gradeId),
   });
+  const sectionClassSubjects = useQuery({
+    queryKey: ["class-subjects", "assign-picker", sectionId, academicYearId],
+    queryFn: () =>
+      academicsService.listClassSubjects({
+        sectionId,
+        academicYearId,
+        limit: 100,
+      }),
+    enabled: canManage && assignOpen && Boolean(sectionId) && Boolean(academicYearId),
+  });
+
+  const subjectOptions = useMemo(() => {
+    const fromSection: Subject[] = (sectionClassSubjects.data?.items ?? [])
+      .map((row) => row.subject)
+      .filter((s): s is Subject => Boolean(s));
+    if (fromSection.length) {
+      return uniqueSubjectsForPicker(fromSection, gradeId);
+    }
+    return uniqueSubjectsForPicker(subjects.data?.items ?? [], gradeId);
+  }, [sectionClassSubjects.data?.items, subjects.data?.items, gradeId]);
 
   const currentYear =
     years.data?.items.find((y) => y.isCurrent) ?? years.data?.items[0];
@@ -334,7 +367,9 @@ export function TeacherSubjectAssignmentsPanel({
               <Select
                 id="gradeId"
                 {...form.register("gradeId", {
-                  onChange: () => {
+                  onChange: (event) => {
+                    const nextGradeId = event.target.value;
+                    form.setValue("gradeId", nextGradeId);
                     form.setValue("sectionId", "");
                     form.setValue("subjectId", "");
                   },
@@ -348,24 +383,46 @@ export function TeacherSubjectAssignmentsPanel({
                 ))}
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="sectionId">Section</Label>
-              <Select id="sectionId" {...form.register("sectionId")} disabled={!gradeId}>
-                <option value="">Select section</option>
-                {(sections.data?.items ?? []).map((section) => (
-                  <option key={section.id} value={section.id}>
-                    {section.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
+            {singleSection ? (
+              <>
+                <input type="hidden" {...form.register("sectionId")} />
+                <p className="text-sm text-muted-foreground">
+                  Section{" "}
+                  <span className="font-medium text-foreground">{singleSection.name}</span> is selected
+                  automatically — this class has only one section.
+                </p>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="sectionId">Section</Label>
+                <Select
+                  id="sectionId"
+                  {...form.register("sectionId", {
+                    onChange: () => form.setValue("subjectId", ""),
+                  })}
+                  disabled={!gradeId}
+                >
+                  <option value="">Select section</option>
+                  {sectionItems.map((section) => (
+                    <option key={section.id} value={section.id}>
+                      {section.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="subjectId">Subject</Label>
-              <Select id="subjectId" {...form.register("subjectId")} disabled={!gradeId}>
+              <Select
+                id="subjectId"
+                {...form.register("subjectId")}
+                disabled={!gradeId || (!singleSection && !sectionId)}
+              >
                 <option value="">Select subject</option>
-                {(subjects.data?.items ?? []).map((subject) => (
+                {subjectOptions.map((subject) => (
                   <option key={subject.id} value={subject.id}>
                     {subject.name}
+                    {subject.code ? ` (${subject.code})` : ""}
                   </option>
                 ))}
               </Select>

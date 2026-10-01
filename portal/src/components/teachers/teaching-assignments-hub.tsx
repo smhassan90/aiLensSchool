@@ -144,7 +144,7 @@ export function TeachingAssignmentsHub() {
     <div className="space-y-6">
       <PageHeader
         title="Teaching assignments"
-        description="See who teaches what — by teacher, class section, or subject. Open a teacher to change assignments."
+        description="See who teaches what — by teacher, class section, or subject. Open a teacher&apos;s overview to assign or remove subjects."
       />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
