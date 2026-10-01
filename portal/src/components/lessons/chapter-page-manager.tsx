@@ -11,7 +11,6 @@ import { lessonsService } from "@/services/lessons.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { assetUrl } from "@/lib/api-client";
-import { LESSON_MAX_PAGE_UPLOADS } from "@/lib/lesson-upload-limits";
 import { compressPhotosForUpload } from "@/lib/page-ocr";
 import { PageLoader } from "@/components/layout/page-loader";
 import type { Lesson, LessonPageSource } from "@/lib/types";
@@ -548,7 +547,7 @@ export function ChapterPageManager({
           >
             <ImagePlus className="mb-2 h-7 w-7 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">
-              Up to {LESSON_MAX_PAGE_UPLOADS} photos per batch · each page uploads separately
+              Add as many page photos as you need · each page uploads and is read separately
               {pendingPhotos.length ? ` · ${pendingPhotos.length} selected` : ""}
             </span>
             <input
@@ -560,16 +559,7 @@ export function ChapterPageManager({
               onChange={(e) => {
                 const next = Array.from(e.target.files ?? []).filter(isImageFile);
                 e.target.value = "";
-                setPendingPhotos((current) => {
-                  const merged = [...current, ...next].slice(0, LESSON_MAX_PAGE_UPLOADS);
-                  if (merged.length < current.length + next.length) {
-                    toast({
-                      title: `Maximum ${LESSON_MAX_PAGE_UPLOADS} photos per batch`,
-                      variant: "error",
-                    });
-                  }
-                  return merged;
-                });
+                setPendingPhotos((current) => [...current, ...next]);
               }}
             />
           </label>

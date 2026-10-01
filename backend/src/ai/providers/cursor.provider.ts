@@ -21,7 +21,6 @@ import {
 } from '../prompts';
 import { difficultyInstruction, mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
 import { parseModelJson } from '../parse-model-json';
-import { LESSON_MAX_PAGE_UPLOADS } from '../../lessons/lesson-upload.constants';
 import { deriveKeyPointsFromLesson } from '../../lessons/lesson-text-formatter';
 import {
   isFakeExtractText,
@@ -396,12 +395,12 @@ export class CursorProvider implements AiProvider {
 
   /** Per-page vision budget — Urdu/Arabic textbook photos often need >45s. */
   private lessonPageVisionTimeoutMs(pageCount: number): number {
-    const count = Math.max(1, Math.min(LESSON_MAX_PAGE_UPLOADS, pageCount));
+    const count = Math.max(1, pageCount);
     return Math.min(240_000, 90_000 + (count - 1) * 12_000);
   }
 
   private async completeWithImages(system: string, user: string, images: LessonImageInput[]) {
-    const pages = images.slice(0, LESSON_MAX_PAGE_UPLOADS);
+    const pages = images;
     const shrunk = await Promise.all(pages.map((page) => this.shrinkLessonImage(page)));
     const perPageMs = this.lessonPageVisionTimeoutMs(shrunk.length);
     this.logger.log(

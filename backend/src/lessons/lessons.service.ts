@@ -623,7 +623,7 @@ export class LessonsService {
     if (files.length > LESSON_MAX_PAGE_UPLOADS) {
       throw new BadRequestException({
         code: 'TOO_MANY_PHOTOS',
-        message: `You can add up to ${LESSON_MAX_PAGE_UPLOADS} photos at a time`,
+        message: `You can add up to ${LESSON_MAX_PAGE_UPLOADS} photos in one upload. Add more in another batch if needed.`,
       });
     }
     const lesson = await this.requireOwnedChapterLesson(id, user);
