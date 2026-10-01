@@ -22,9 +22,52 @@ import { teachersService } from "@/services/teachers.service";
 import { teacherDisplayNameFromUser } from "@/lib/person-name";
 import { gradeClassLabel } from "@/lib/utils";
 import { fetchAllPages } from "@/lib/fetch-all-pages";
-import type { Subject } from "@/lib/types";
+import type { ClassSubject, Subject } from "@/lib/types";
 import { subjectIdsWithSameName, uniqueSubjectsForPicker } from "@/lib/unique-subjects";
 import { BookOpen, GraduationCap, Search, UserSquare2 } from "lucide-react";
+
+type TeachingPair = {
+  subject: string;
+  teacherId: string | null;
+  teacherName: string;
+};
+
+function teachingPairsForSection(
+  sectionId: string,
+  assignments: ClassSubject[],
+  subjectIdSet: Set<string> | null,
+  filterTeacherId: string,
+): TeachingPair[] {
+  let rows = assignments.filter((row) => row.sectionId === sectionId);
+  if (subjectIdSet) {
+    rows = rows.filter((row) => subjectIdSet.has(row.subjectId));
+  }
+  if (filterTeacherId) {
+    rows = rows.filter(
+      (row) => row.teacherId === filterTeacherId || row.assistantTeacherId === filterTeacherId,
+    );
+  }
+
+  const seen = new Set<string>();
+  const pairs: TeachingPair[] = [];
+  for (const row of rows) {
+    const subject = row.subject?.name ?? "—";
+    const teacher = row.teacher;
+    const teacherName = teacher
+      ? teacherDisplayNameFromUser(teacher.user, teacher.gender)
+      : "Not assigned";
+    const key = `${subject.toLowerCase()}::${row.teacherId ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    pairs.push({
+      subject,
+      teacherId: row.teacherId ?? null,
+      teacherName,
+    });
+  }
+  pairs.sort((a, b) => a.subject.localeCompare(b.subject, undefined, { sensitivity: "base" }));
+  return pairs;
+}
 
 export function SchoolRosterExplorer() {
   const [tab, setTab] = useState("students");
@@ -88,6 +131,7 @@ export function SchoolRosterExplorer() {
         }),
       ),
     enabled:
+      tab === "students" ||
       tab === "teaching" ||
       Boolean(gradeId || sectionId || teacherId || subjectId),
   });
@@ -151,6 +195,8 @@ export function SchoolRosterExplorer() {
     }
     return rows;
   }, [rosterAssignments.data, subjectId, subjectIdSet]);
+
+  const assignmentRows = rosterAssignments.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -250,7 +296,7 @@ export function SchoolRosterExplorer() {
         </TabsList>
 
         <TabsContent value="students" className="mt-4">
-          {enrollments.isLoading || (subjectId && rosterAssignments.isLoading) ? (
+          {enrollments.isLoading || rosterAssignments.isLoading ? (
             <PageLoader variant="panel" />
           ) : !studentRows.length ? (
             <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -265,10 +311,19 @@ export function SchoolRosterExplorer() {
                     <TableHead>Student ID</TableHead>
                     <TableHead>Class</TableHead>
                     <TableHead>Section</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Teacher</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {studentRows.map((row) => (
+                  {studentRows.map((row) => {
+                    const pairs = teachingPairsForSection(
+                      row.sectionId,
+                      assignmentRows,
+                      subjectIdSet,
+                      teacherId,
+                    );
+                    return (
                     <TableRow key={row.id}>
                       <TableCell className="font-medium">
                         <Link href={`/school/students/${row.studentId}`} className="hover:underline">
@@ -278,8 +333,43 @@ export function SchoolRosterExplorer() {
                       <TableCell className="font-mono text-sm">{row.student?.studentCode ?? "—"}</TableCell>
                       <TableCell>{row.grade?.name ?? "—"}</TableCell>
                       <TableCell>{row.section?.name ?? "—"}</TableCell>
+                      <TableCell className="text-sm">
+                        {pairs.length ? (
+                          <span className="flex flex-col gap-0.5">
+                            {pairs.map((pair) => (
+                              <span key={`${pair.subject}-${pair.teacherId ?? "none"}`}>{pair.subject}</span>
+                            ))}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {pairs.length ? (
+                          <span className="flex flex-col gap-0.5">
+                            {pairs.map((pair) =>
+                              pair.teacherId ? (
+                                <Link
+                                  key={`${pair.subject}-${pair.teacherId}`}
+                                  href={`/school/teachers/${pair.teacherId}/overview`}
+                                  className="hover:underline"
+                                >
+                                  {pair.teacherName}
+                                </Link>
+                              ) : (
+                                <span key={pair.subject} className="text-muted-foreground">
+                                  {pair.teacherName}
+                                </span>
+                              ),
+                            )}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
