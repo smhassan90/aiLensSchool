@@ -220,7 +220,11 @@ export default function ClassDetailPage() {
       });
     },
     onSuccess: () => {
-      toast({ title: "Teacher assigned", variant: "success" });
+      toast({
+        title: "Teacher assigned",
+        description: "Subject teacher saved for this section.",
+        variant: "success",
+      });
       invalidate();
       setTeacherOpen(false);
       teacherForm.reset();

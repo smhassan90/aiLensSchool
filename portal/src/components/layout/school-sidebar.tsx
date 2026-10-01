@@ -5,6 +5,7 @@ import {
   CalendarClock,
   CalendarDays,
   ClipboardCheck,
+  Filter,
   FileText,
   GraduationCap,
   LayoutDashboard,
@@ -75,6 +76,7 @@ const mainNav: Array<{
 }> = [
   { href: "/school/dashboard", label: "Dashboard", icon: LayoutDashboard, permission: "VIEW_DASHBOARD" },
   { href: "/school/students", label: "Students", icon: GraduationCap },
+  { href: "/school/academics/roster", label: "Class & roster", icon: Filter },
   { href: "/school/front-desk", label: "Front desk", icon: Search, permission: "SEARCH_STUDENTS" },
   { href: "/school/teachers", label: "Teachers", icon: UserSquare2 },
   { href: "/school/teachers/attendance", label: "Attendance", icon: ClipboardCheck },

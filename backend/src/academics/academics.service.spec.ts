@@ -29,7 +29,7 @@ describe('AcademicsService', () => {
     studentEnrollment: { findFirst: jest.Mock; create: jest.Mock; count: jest.Mock };
     subject: { findFirst: jest.Mock };
     teacherProfile: { findMany: jest.Mock };
-    classSubject: { upsert: jest.Mock };
+    classSubject: { upsert: jest.Mock; findUnique: jest.Mock };
   };
   let audit: { log: jest.Mock };
 
@@ -50,7 +50,7 @@ describe('AcademicsService', () => {
       studentEnrollment: { findFirst: jest.fn(), create: jest.fn(), count: jest.fn() },
       subject: { findFirst: jest.fn() },
       teacherProfile: { findMany: jest.fn() },
-      classSubject: { upsert: jest.fn() },
+      classSubject: { upsert: jest.fn(), findUnique: jest.fn().mockResolvedValue(null) },
     };
     audit = { log: jest.fn() };
 
@@ -155,6 +155,37 @@ describe('AcademicsService', () => {
       }),
     );
     expect(result.assistantTeacherId).toBe('t-2');
+  });
+
+  it('rejects replacing an assigned primary teacher without unassigning first', async () => {
+    prisma.section.findFirst.mockResolvedValue({ id: 'sec-1', schoolId: 'school-1' });
+    prisma.subject.findFirst.mockResolvedValue({ id: 'sub-1', schoolId: 'school-1' });
+    prisma.teacherProfile.findMany.mockResolvedValue([{ id: 't-2' }]);
+    prisma.classSubject.findUnique.mockResolvedValue({
+      id: 'cs-1',
+      teacherId: 't-1',
+      assistantTeacherId: null,
+      teacher: {
+        id: 't-1',
+        gender: 'FEMALE',
+        user: { firstName: 'Saima', lastName: 'Khan' },
+      },
+      assistantTeacher: null,
+    });
+
+    await expect(
+      service.assignClassSubject(
+        {
+          sectionId: 'sec-1',
+          subjectId: 'sub-1',
+          academicYearId: 'year-1',
+          branchId: 'branch-1',
+          teacherId: 't-2',
+        },
+        admin,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.classSubject.upsert).not.toHaveBeenCalled();
   });
 
   it('rejects using the same person as teacher and assistant', async () => {

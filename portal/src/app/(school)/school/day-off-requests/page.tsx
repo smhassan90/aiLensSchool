@@ -9,8 +9,7 @@ import { useAuth } from "@/providers/auth-provider";
 
 export default function DayOffRequestsPage() {
   const { user } = useAuth();
-  const canReview =
-    user?.roles.includes("SCHOOL_ADMIN") || user?.roles.includes("PRINCIPAL");
+  const canReview = user?.roles.includes("PRINCIPAL");
   const query = useQuery({
     queryKey: ["day-off-requests"],
     queryFn: () => parentsService.listDayOffRequests(),
@@ -21,7 +20,7 @@ export default function DayOffRequestsPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Day-off requests"
-        description="Track parent day-off requests. School admins can approve any request; class teachers approve for their own class."
+        description="Track parent day-off requests. Only the principal and each student's class teacher can approve or reject."
       />
       {query.isLoading ? <PageLoader variant="panel" /> : null}
       {query.isError ? (

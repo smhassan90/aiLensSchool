@@ -97,6 +97,8 @@ export function TeacherSubjectAssignmentsPanel({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [assignOpen, setAssignOpen] = useState(false);
+  const [pendingAssign, setPendingAssign] = useState<AssignValues | null>(null);
+  const [pendingUnassign, setPendingUnassign] = useState<AssignmentRow | null>(null);
   const rows = useMemo(() => rowsFromTeacher(teacher), [teacher]);
 
   const years = useQuery({
@@ -145,9 +147,14 @@ export function TeacherSubjectAssignmentsPanel({
       });
     },
     onSuccess: () => {
-      toast({ title: "Subject assigned", variant: "success" });
+      toast({
+        title: "Subject assigned",
+        description: "The teacher is now linked to this class and subject.",
+        variant: "success",
+      });
       invalidate();
       setAssignOpen(false);
+      setPendingAssign(null);
       form.reset();
     },
     onError: (err) =>
@@ -179,7 +186,12 @@ export function TeacherSubjectAssignmentsPanel({
       });
     },
     onSuccess: () => {
-      toast({ title: "Assignment removed", variant: "success" });
+      setPendingUnassign(null);
+      toast({
+        title: "Subject unassigned",
+        description: "This teacher is no longer linked to that class subject.",
+        variant: "success",
+      });
       invalidate();
     },
     onError: (err) =>
@@ -274,7 +286,7 @@ export function TeacherSubjectAssignmentsPanel({
                         variant="ghost"
                         size="sm"
                         disabled={unassign.isPending}
-                        onClick={() => unassign.mutate(row)}
+                        onClick={() => setPendingUnassign(row)}
                       >
                         <UserMinus className="h-4 w-4" />
                         Remove
@@ -304,7 +316,7 @@ export function TeacherSubjectAssignmentsPanel({
           </DialogHeader>
           <form
             className="mt-4 space-y-4"
-            onSubmit={form.handleSubmit((values) => assign.mutate(values))}
+            onSubmit={form.handleSubmit((values) => setPendingAssign(values))}
           >
             <div className="space-y-2">
               <Label htmlFor="academicYearId">Academic year</Label>
@@ -367,6 +379,55 @@ export function TeacherSubjectAssignmentsPanel({
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(pendingAssign)} onOpenChange={(open) => { if (!open) setPendingAssign(null); }}>
+        <DialogContent onClose={() => setPendingAssign(null)}>
+          <DialogHeader>
+            <DialogTitle>Confirm assignment</DialogTitle>
+            <DialogDescription>
+              Assign this teacher to the selected class, section, and subject?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setPendingAssign(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={assign.isPending}
+              onClick={() => pendingAssign && assign.mutate(pendingAssign)}
+            >
+              {assign.isPending ? "Assigning…" : "Confirm assign"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(pendingUnassign)} onOpenChange={(open) => { if (!open) setPendingUnassign(null); }}>
+        <DialogContent onClose={() => setPendingUnassign(null)}>
+          <DialogHeader>
+            <DialogTitle>Unassign subject?</DialogTitle>
+            <DialogDescription>
+              {pendingUnassign
+                ? `Remove ${pendingUnassign.subjectName} (${pendingUnassign.classLabel} · Section ${pendingUnassign.sectionName}) from this teacher?`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setPendingUnassign(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={unassign.isPending}
+              onClick={() => pendingUnassign && unassign.mutate(pendingUnassign)}
+            >
+              {unassign.isPending ? "Removing…" : "Confirm unassign"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </Card>

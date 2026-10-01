@@ -849,6 +849,58 @@ export class AcademicsService {
       }
     }
 
+    const existing = await this.prisma.classSubject.findUnique({
+      where: {
+        sectionId_subjectId_academicYearId: {
+          sectionId: dto.sectionId,
+          subjectId: dto.subjectId,
+          academicYearId: dto.academicYearId,
+        },
+      },
+      include: {
+        teacher: {
+          select: {
+            id: true,
+            gender: true,
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
+        assistantTeacher: {
+          select: {
+            id: true,
+            gender: true,
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+    });
+
+    if (dto.teacherId && existing?.teacherId && existing.teacherId !== dto.teacherId) {
+      const incumbent = existing.teacher;
+      const name = incumbent
+        ? teacherDisplayName(incumbent.user.firstName, incumbent.user.lastName, incumbent.gender)
+        : 'another teacher';
+      throw new ConflictException({
+        code: 'SUBJECT_ALREADY_ASSIGNED',
+        message: `This subject already has a teacher (${name}). Unassign them first, then assign the new teacher.`,
+      });
+    }
+
+    if (
+      dto.assistantTeacherId &&
+      existing?.assistantTeacherId &&
+      existing.assistantTeacherId !== dto.assistantTeacherId
+    ) {
+      const incumbent = existing.assistantTeacher;
+      const name = incumbent
+        ? teacherDisplayName(incumbent.user.firstName, incumbent.user.lastName, incumbent.gender)
+        : 'another teacher';
+      throw new ConflictException({
+        code: 'ASSISTANT_ALREADY_ASSIGNED',
+        message: `This subject already has an assistant (${name}). Unassign them first.`,
+      });
+    }
+
     const classSubject = await this.prisma.classSubject.upsert({
       where: {
         sectionId_subjectId_academicYearId: {

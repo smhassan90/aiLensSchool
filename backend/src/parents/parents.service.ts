@@ -388,10 +388,13 @@ export class ParentsService {
 
   private async assertCanReviewDayOff(user: AuthUser, studentId: string) {
     const schoolId = this.tenant.requireSchoolId(user);
-    if (
-      user.roles.includes(RoleName.SCHOOL_ADMIN) ||
-      user.roles.includes(RoleName.PRINCIPAL)
-    ) {
+    if (user.roles.includes(RoleName.SCHOOL_ADMIN)) {
+      throw new ForbiddenException({
+        code: 'DAY_OFF_REVIEW_FORBIDDEN',
+        message: 'School administrators cannot approve or reject day-off requests',
+      });
+    }
+    if (user.roles.includes(RoleName.PRINCIPAL)) {
       const enrollment = await this.prisma.studentEnrollment.findFirst({
         where: {
           studentId,
