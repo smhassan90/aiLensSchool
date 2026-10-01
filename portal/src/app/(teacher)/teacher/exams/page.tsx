@@ -48,6 +48,30 @@ const schema = z
         message: "Short and long questions together cannot exceed 20",
       });
     }
+    const marksPairs: Array<
+      [
+        "mcqCount" | "fillBlankCount" | "trueFalseCount" | "shortAnswerCount" | "longAnswerCount",
+        "mcqMarks" | "fillBlankMarks" | "trueFalseMarks" | "shortAnswerMarks" | "longAnswerMarks",
+        string,
+      ]
+    > = [
+      ["mcqCount", "mcqMarks", "MCQ"],
+      ["fillBlankCount", "fillBlankMarks", "fill-in-the-blank"],
+      ["trueFalseCount", "trueFalseMarks", "true/false"],
+      ["shortAnswerCount", "shortAnswerMarks", "short-answer"],
+      ["longAnswerCount", "longAnswerMarks", "long-answer"],
+    ];
+    for (const [countKey, marksKey, label] of marksPairs) {
+      const count = Number(value[countKey]);
+      const marks = Number(value[marksKey]);
+      if (count > 0 && (!Number.isFinite(marks) || marks <= 0)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [marksKey],
+          message: `Enter marks per ${label} question`,
+        });
+      }
+    }
   });
 
 type FormValues = z.infer<typeof schema>;
