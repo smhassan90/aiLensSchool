@@ -199,6 +199,11 @@ export class UpdateLessonDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsString()
+  chapterDraftText?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsInt()
   @Min(1)
   pageFrom?: number;
@@ -328,6 +333,18 @@ export class ReorderChapterPagesDto {
   @ArrayMinSize(1)
   @IsString({ each: true })
   sourceIds!: string[];
+}
+
+export class CompileChapterDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sourceText?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  instruction?: string;
 }
 
 export class ConfirmChapterContentDto {

@@ -5,9 +5,14 @@ import {
   AiProvider,
   LessonImageInput,
 } from './ai.provider';
+import {
+  ChapterCompileOutput,
+  ChapterCompileOutputSchema,
+} from '../schemas/chapter-compile.schema';
 import { LessonOutput, LessonOutputSchema } from '../schemas/lesson-output.schema';
 import { QuizOutput, QuizOutputSchema } from '../schemas/quiz-output.schema';
 import {
+  CHAPTER_COMPILE_PROMPT,
   EXAM_GENERATION_PROMPT,
   HOMEWORK_GENERATION_PROMPT,
   LESSON_PROCESSING_PROMPT,
@@ -61,6 +66,49 @@ export class OpenAiProvider implements AiProvider {
       input.images,
     );
     const parsed = LessonOutputSchema.parse(parseModelJson(content.text));
+    return {
+      data: parsed,
+      provider: 'openai',
+      model: content.model,
+      inputTokens: content.inputTokens,
+      outputTokens: content.outputTokens,
+      estimatedCost: this.estimateCost(content.inputTokens, content.outputTokens),
+    };
+  }
+
+  async compileChapter(input: {
+    sourceText: string;
+    subjectName?: string;
+    gradeName?: string;
+    instruction?: string;
+  }): Promise<AiCompletionResult<ChapterCompileOutput>> {
+    if (!this.apiKey) {
+      const cleaned = input.sourceText.trim();
+      return {
+        data: {
+          lessonBody: cleaned,
+          exercises: '',
+          concepts: [],
+        },
+        provider: 'mock',
+        model: 'deterministic-mock',
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCost: 0,
+      };
+    }
+    const user = [
+      `Subject: ${input.subjectName ?? 'General'}`,
+      `Grade: ${input.gradeName ?? 'N/A'}`,
+      input.instruction?.trim() ? `Teacher instruction: ${input.instruction.trim()}` : '',
+      '',
+      'Raw page text:',
+      input.sourceText,
+    ]
+      .filter((line) => line !== '')
+      .join('\n');
+    const content = await this.chat(CHAPTER_COMPILE_PROMPT, user);
+    const parsed = ChapterCompileOutputSchema.parse(parseModelJson(content.text));
     return {
       data: parsed,
       provider: 'openai',

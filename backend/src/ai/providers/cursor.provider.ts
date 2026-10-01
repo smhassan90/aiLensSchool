@@ -4,11 +4,16 @@ import { mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { AiCompletionResult, AiProvider, LessonImageInput } from './ai.provider';
+import {
+  ChapterCompileOutput,
+  ChapterCompileOutputSchema,
+} from '../schemas/chapter-compile.schema';
 import { LessonOutput, LessonOutputSchema } from '../schemas/lesson-output.schema';
 import { QuizOutput, QuizOutputSchema } from '../schemas/quiz-output.schema';
 import {
   EXAM_GENERATION_PROMPT,
   HOMEWORK_GENERATION_PROMPT,
+  CHAPTER_COMPILE_PROMPT,
   LESSON_PROCESSING_PROMPT,
   QUIZ_GENERATION_PROMPT,
   STUDENT_ANALYSIS_PROMPT,
@@ -17,6 +22,7 @@ import {
 import { difficultyInstruction, mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
 import { parseModelJson } from '../parse-model-json';
 import { LESSON_MAX_PAGE_UPLOADS } from '../../lessons/lesson-upload.constants';
+import { deriveKeyPointsFromLesson } from '../../lessons/lesson-text-formatter';
 import {
   isFakeExtractText,
   isGarbledRtlOcr,
@@ -118,6 +124,69 @@ export class CursorProvider implements AiProvider {
       }
       return this.textFallback(input);
     }
+  }
+
+  async compileChapter(input: {
+    sourceText: string;
+    subjectName?: string;
+    gradeName?: string;
+    instruction?: string;
+  }): Promise<AiCompletionResult<ChapterCompileOutput>> {
+    if (!this.apiKey) {
+      return { data: this.mockCompileChapter(input.sourceText), ...this.mockMeta() };
+    }
+    const user = [
+      `Subject: ${input.subjectName ?? 'General'}`,
+      `Grade: ${input.gradeName ?? 'N/A'}`,
+      input.instruction?.trim() ? `Teacher instruction: ${input.instruction.trim()}` : '',
+      '',
+      'Raw page text:',
+      input.sourceText,
+    ]
+      .filter((line) => line !== '')
+      .join('\n');
+    try {
+      const content = await this.withTimeout(
+        this.complete(CHAPTER_COMPILE_PROMPT, user),
+        this.jsonTimeoutMs,
+        'Chapter compile',
+      );
+      const parsed = ChapterCompileOutputSchema.parse(parseModelJson(content.text));
+      return { data: parsed, ...content.meta };
+    } catch (error) {
+      this.logger.warn(
+        `Chapter compile failed, using local cleanup: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return { data: this.mockCompileChapter(input.sourceText), ...this.mockMeta() };
+    }
+  }
+
+  private mockMeta() {
+    return {
+      provider: 'mock' as const,
+      model: 'deterministic-mock',
+      inputTokens: 0,
+      outputTokens: 0,
+      estimatedCost: 0,
+    };
+  }
+
+  private mockCompileChapter(sourceText: string): ChapterCompileOutput {
+    const cleaned = sourceText
+      .replace(/^\s*Page\s+\d+\s*$/gim, '')
+      .replace(/^\s*صفحہ\s*\d+\s*$/gim, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    const exerciseMatch = cleaned.match(
+      /(Exercise|Exercises|Activity|ACTIVITIES|سوالات|مشق|سرگرمی)[\s\S]*$/i,
+    );
+    const exercises = exerciseMatch ? exerciseMatch[0].trim() : '';
+    const lessonBody = exerciseMatch ? cleaned.slice(0, exerciseMatch.index).trim() : cleaned;
+    return {
+      lessonBody,
+      exercises,
+      concepts: deriveKeyPointsFromLesson(lessonBody).slice(0, 6),
+    };
   }
 
   async generateQuiz(

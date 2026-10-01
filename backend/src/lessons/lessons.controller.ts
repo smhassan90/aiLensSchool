@@ -20,6 +20,7 @@ import { LESSON_MAX_PAGE_UPLOADS } from './lesson-upload.constants';
 import { LessonsService } from './lessons.service';
 import {
   AppendChapterTextDto,
+  CompileChapterDto,
   ConfirmChapterContentDto,
   ReorderChapterPagesDto,
   CreateChapterDraftDto,
@@ -231,6 +232,16 @@ export class LessonsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.lessonsService.appendChapterPhotos(id, files ?? [], user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Post('chapters/:id/compile')
+  compileChapter(
+    @Param('id') id: string,
+    @Body() dto: CompileChapterDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.lessonsService.compileChapter(id, dto, user);
   }
 
   @Roles(RoleName.TEACHER)

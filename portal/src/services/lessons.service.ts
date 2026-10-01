@@ -41,6 +41,7 @@ export interface UpdateLessonPayload {
   teacherNotes?: string;
   aiSummary?: string;
   extractedText?: string;
+  chapterDraftText?: string;
   pageFrom?: number;
   pageTo?: number;
   concepts?: string[];
@@ -55,6 +56,15 @@ export interface CreateChapterPastePayload {
   chapterName: string;
   topicName?: string;
   contentText: string;
+}
+
+export interface ChapterCompileResult {
+  lessonBody: string;
+  exercises: string;
+  fullText: string;
+  chapterName?: string | null;
+  topicName?: string | null;
+  concepts: string[];
 }
 
 export interface CreateChapterDraftPayload {
@@ -183,6 +193,19 @@ export const lessonsService = {
       method: "POST",
       body: JSON.stringify({ text }),
     });
+  },
+
+  compileChapter(
+    lessonId: string,
+    payload: { sourceText?: string; instruction?: string },
+  ) {
+    return apiClient<Lesson & { compile: ChapterCompileResult }>(
+      `/lessons/chapters/${lessonId}/compile`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
   },
 
   reorderChapterPages(lessonId: string, sourceIds: string[]) {

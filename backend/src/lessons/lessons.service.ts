@@ -21,7 +21,12 @@ import { TenantService } from '../common/services/tenant.service';
 import { MemoryCacheService } from '../common/services/memory-cache.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
+import { ChapterCompileService } from '../ai/services/chapter-compile.service';
 import { LessonProcessingService } from '../ai/services/lesson-processing.service';
+import {
+  joinCompiledChapter,
+  splitCompiledChapter,
+} from '../ai/schemas/chapter-compile.schema';
 import { ParentsService } from '../parents/parents.service';
 import {
   resolveHeadTeacherSectionIds,
@@ -33,6 +38,7 @@ import { deriveKeyPointsFromLesson, formatOcrLesson } from './lesson-text-format
 import { coerceLessonDisplayText } from './lesson-display-text';
 import {
   AppendChapterTextDto,
+  CompileChapterDto,
   ConfirmChapterContentDto,
   CreateChapterDraftDto,
   CreateChapterPasteDto,
@@ -79,6 +85,7 @@ export class LessonsService {
     private readonly audit: AuditService,
     private readonly tenant: TenantService,
     private readonly lessonProcessing: LessonProcessingService,
+    private readonly chapterCompile: ChapterCompileService,
     private readonly config: ConfigService,
     private readonly parentsService: ParentsService,
     private readonly pageOcr: PageOcrService,
@@ -186,6 +193,37 @@ export class LessonsService {
     };
   }
 
+  private assemblePageTexts(
+    sources?: Array<{
+      type?: LessonSourceType;
+      ocrText?: string | null;
+      pageFrom?: number | null;
+    }>,
+  ) {
+    if (!sources?.length) return '';
+    const images = sources
+      .filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE)
+      .sort((a, b) => (a.pageFrom ?? 0) - (b.pageFrom ?? 0));
+    const pageTexts = images
+      .map((s) => s.ocrText?.trim())
+      .filter((t): t is string => Boolean(t));
+    if (!pageTexts.length) return '';
+    return pageTexts.map((t) => coerceLessonDisplayText(t)).join('\n\n');
+  }
+
+  private chapterDraftFromSources(
+    sources?: Array<{
+      type?: LessonSourceType;
+      ocrText?: string | null;
+      manualText?: string | null;
+    }>,
+  ) {
+    const manual = sources?.find((s) => s.type === LessonSourceType.MANUAL_TEXT);
+    const manualText = manual?.manualText?.trim() || manual?.ocrText?.trim();
+    if (manualText) return coerceLessonDisplayText(manualText);
+    return this.assemblePageTexts(sources);
+  }
+
   private extractedTextFromSources(
     sources?: Array<{
       type?: LessonSourceType;
@@ -196,15 +234,8 @@ export class LessonsService {
     }>,
   ) {
     if (!sources?.length) return '';
-    const images = sources
-      .filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE)
-      .sort((a, b) => (a.pageFrom ?? 0) - (b.pageFrom ?? 0));
-    const pageTexts = images
-      .map((s) => s.ocrText?.trim())
-      .filter((t): t is string => Boolean(t));
-    if (pageTexts.length) {
-      return pageTexts.map((t) => coerceLessonDisplayText(t)).join('\n\n');
-    }
+    const pageJoined = this.assemblePageTexts(sources);
+    if (pageJoined) return pageJoined;
     const manual = sources.find((s) => s.type === LessonSourceType.MANUAL_TEXT);
     const manualText = manual?.manualText?.trim() || manual?.ocrText?.trim();
     if (manualText) return coerceLessonDisplayText(manualText);
@@ -251,10 +282,19 @@ export class LessonsService {
           fileAsset?: { url: string; originalFilename: string | null } | null;
         }>
       | undefined;
+    const pageText = this.assemblePageTexts(sources);
+    const draftText = this.chapterDraftFromSources(sources);
+    const compiledFull = lesson.aiSummary ? coerceLessonDisplayText(lesson.aiSummary) : '';
+    const compiledParts = compiledFull ? splitCompiledChapter(compiledFull) : null;
     return {
       ...lesson,
-      aiSummary: lesson.aiSummary ? coerceLessonDisplayText(lesson.aiSummary) : lesson.aiSummary,
-      extractedText: this.extractedTextFromSources(sources),
+      aiSummary: compiledFull || lesson.aiSummary,
+      chapterPageText: pageText,
+      chapterDraftText: draftText || pageText,
+      chapterCompiledText: compiledFull || undefined,
+      chapterCompiledBody: compiledParts?.lessonBody,
+      chapterCompiledExercises: compiledParts?.exercises,
+      extractedText: compiledFull || draftText || pageText,
       pageSources: sources ? this.mapPageSources(sources) : [],
     };
   }
@@ -481,16 +521,12 @@ export class LessonsService {
       }
       perPageTexts.push(text);
     }
-    const newChunk = perPageTexts.join('\n\n').trim();
     const existingImages = lesson.sources.filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE);
     const startPage =
       existingImages.reduce((max, s) => Math.max(max, s.pageFrom ?? 0), 0) + 1;
     const pageAssets = await Promise.all(
       files.map((file) => this.filesService.saveSchoolUpload(schoolId, user.id, file, 'lesson-pages')),
     );
-    const existingText = this.extractedTextFromSources(lesson.sources);
-    const combinedText = existingText ? `${existingText}\n\n${newChunk}` : newChunk;
-
     await this.prisma.$transaction(async (tx) => {
       for (let index = 0; index < pageAssets.length; index++) {
         await tx.lessonSource.create({
@@ -503,12 +539,9 @@ export class LessonsService {
           },
         });
       }
-      const refreshed = await tx.lessonSource.findMany({ where: { lessonId: id } });
-      await this.upsertChapterManualText(tx, id, refreshed, combinedText);
       await tx.dailyLesson.update({
         where: { id },
         data: {
-          aiSummary: combinedText,
           contentConfirmed: false,
           status: LessonStatus.READY_FOR_REVIEW,
         },
@@ -559,15 +592,6 @@ export class LessonsService {
     }
     const byId = new Map(images.map((s) => [s.id, s]));
     const ordered = dto.sourceIds.map((sid) => byId.get(sid)!);
-    const pageTexts = ordered.map((s) => s.ocrText?.trim()).filter((t): t is string => Boolean(t));
-    const combinedFromPages = pageTexts.map((t) => coerceLessonDisplayText(t)).join('\n\n');
-    const manualOnly = lesson.sources.find((s) => s.type === LessonSourceType.MANUAL_TEXT);
-    const pastedTail =
-      manualOnly && !pageTexts.length
-        ? manualOnly.manualText?.trim() || manualOnly.ocrText?.trim() || ''
-        : '';
-    const combinedText = combinedFromPages || pastedTail || this.extractedTextFromSources(lesson.sources);
-
     await this.prisma.$transaction(async (tx) => {
       for (let index = 0; index < ordered.length; index++) {
         await tx.lessonSource.update({
@@ -575,17 +599,75 @@ export class LessonsService {
           data: { pageFrom: index + 1 },
         });
       }
-      if (combinedFromPages) {
-        const refreshed = await tx.lessonSource.findMany({ where: { lessonId: id } });
-        await this.upsertChapterManualText(tx, id, refreshed, combinedText);
-      }
-      await tx.dailyLesson.update({
-        where: { id },
-        data: { aiSummary: combinedText },
-      });
     });
 
     return this.loadPresented(id);
+  }
+
+  async compileChapter(id: string, dto: CompileChapterDto, user: AuthUser) {
+    const lesson = await this.requireOwnedChapterLesson(id, user);
+    const grade = await this.prisma.grade.findUnique({ where: { id: lesson.gradeId } });
+    if (!grade) {
+      throw new BadRequestException({
+        code: 'CLASS_NOT_FOUND',
+        message: 'Grade was not found for this chapter',
+      });
+    }
+    const rawInput = dto.sourceText?.trim() || this.chapterDraftFromSources(lesson.sources);
+    if (!rawInput.trim()) {
+      throw new BadRequestException({
+        code: 'CONTENT_REQUIRED',
+        message: 'Read page text first, then compile the lesson',
+      });
+    }
+
+    const compiled = await this.chapterCompile.compile({
+      schoolId: lesson.schoolId,
+      userId: user.id,
+      sourceText: rawInput,
+      subjectName: lesson.subject.name,
+      gradeName: grade.name,
+      instruction: dto.instruction?.trim(),
+    });
+
+    const fullText = joinCompiledChapter(compiled.lessonBody, compiled.exercises);
+    const concepts = compiled.concepts?.length
+      ? compiled.concepts
+      : deriveKeyPointsFromLesson(compiled.lessonBody);
+
+    await this.prisma.$transaction(async (tx) => {
+      const refreshed = await tx.lessonSource.findMany({ where: { lessonId: id } });
+      await this.upsertChapterManualText(tx, id, refreshed, coerceLessonDisplayText(rawInput));
+      await tx.dailyLesson.update({
+        where: { id },
+        data: {
+          aiSummary: coerceLessonDisplayText(fullText),
+          chapterName: compiled.chapterName?.trim() || lesson.chapterName,
+          topicName: compiled.topicName?.trim() ?? lesson.topicName,
+          contentConfirmed: false,
+          status: LessonStatus.READY_FOR_REVIEW,
+        },
+      });
+      await tx.lessonConcept.deleteMany({ where: { lessonId: id } });
+      if (concepts.length) {
+        await tx.lessonConcept.createMany({
+          data: concepts.map((name) => ({ lessonId: id, name })),
+        });
+      }
+    });
+
+    const presented = await this.loadPresented(id);
+    return {
+      ...presented,
+      compile: {
+        lessonBody: compiled.lessonBody,
+        exercises: compiled.exercises,
+        fullText: coerceLessonDisplayText(fullText),
+        chapterName: compiled.chapterName,
+        topicName: compiled.topicName,
+        concepts,
+      },
+    };
   }
 
   async extractFromPhotos(dto: ExtractLessonDto, files: Express.Multer.File[], user: AuthUser) {
@@ -1014,6 +1096,7 @@ export class LessonsService {
     const libraryEdit =
       lesson.recordKind === LessonRecordKind.CHAPTER_LIBRARY &&
       (dto.extractedText !== undefined ||
+        dto.chapterDraftText !== undefined ||
         dto.chapterName !== undefined ||
         dto.topicName !== undefined);
     if (lesson.status === LessonStatus.CONFIRMED && !libraryEdit) {
@@ -1037,23 +1120,21 @@ export class LessonsService {
       });
 
       if (dto.extractedText !== undefined) {
-        const normalizedExtracted = coerceLessonDisplayText(dto.extractedText);
-        const source = lesson.sources[0];
-        if (source) {
-          await tx.lessonSource.update({
-            where: { id: source.id },
-            data: { ocrText: normalizedExtracted },
-          });
-        } else {
-          await tx.lessonSource.create({
-            data: {
-              lessonId: id,
-              type: LessonSourceType.MANUAL_TEXT,
-              ocrText: normalizedExtracted,
-              manualText: normalizedExtracted,
-            },
-          });
-        }
+        const normalizedCompiled = coerceLessonDisplayText(dto.extractedText);
+        await tx.dailyLesson.update({
+          where: { id },
+          data: { aiSummary: normalizedCompiled },
+        });
+      }
+
+      if (dto.chapterDraftText !== undefined) {
+        const refreshed = await tx.lessonSource.findMany({ where: { lessonId: id } });
+        await this.upsertChapterManualText(
+          tx,
+          id,
+          refreshed,
+          coerceLessonDisplayText(dto.chapterDraftText),
+        );
       }
 
       if (dto.concepts) {

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { AI_PROVIDER, FAST_AI_PROVIDER } from './providers/ai.provider';
 import { CursorProvider } from './providers/cursor.provider';
 import { OpenAiProvider } from './providers/openai.provider';
+import { ChapterCompileService } from './services/chapter-compile.service';
 import { LessonProcessingService } from './services/lesson-processing.service';
 import { QuizGenerationService } from './services/quiz-generation.service';
 import { HomeworkGenerationService } from './services/homework-generation.service';
@@ -35,6 +36,7 @@ import { StudentAnalysisService } from './services/student-analysis.service';
       },
     },
     LessonProcessingService,
+    ChapterCompileService,
     QuizGenerationService,
     HomeworkGenerationService,
     StudentAnalysisService,
@@ -43,6 +45,7 @@ import { StudentAnalysisService } from './services/student-analysis.service';
     AI_PROVIDER,
     FAST_AI_PROVIDER,
     LessonProcessingService,
+    ChapterCompileService,
     QuizGenerationService,
     HomeworkGenerationService,
     StudentAnalysisService,

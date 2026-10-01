@@ -1,4 +1,5 @@
 import type { QuizMixRequest } from '../quiz-mix';
+import { ChapterCompileOutput } from '../schemas/chapter-compile.schema';
 import { LessonOutput } from '../schemas/lesson-output.schema';
 import { QuizOutput } from '../schemas/quiz-output.schema';
 
@@ -24,6 +25,13 @@ export interface AiProvider {
     gradeName?: string;
     images?: LessonImageInput[];
   }): Promise<AiCompletionResult<LessonOutput>>;
+
+  compileChapter(input: {
+    sourceText: string;
+    subjectName?: string;
+    gradeName?: string;
+    instruction?: string;
+  }): Promise<AiCompletionResult<ChapterCompileOutput>>;
 
   generateQuiz(
     input: QuizMixRequest & {

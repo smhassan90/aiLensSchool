@@ -101,6 +101,29 @@ Rules:
 - "answerKey" is teacher-facing: numbered correct answers matching description.
 - "questions" must include correctAnswer for every item so the app can mark submissions.`;
 
+export const CHAPTER_COMPILE_PROMPT = `You compile photographed textbook pages into clean chapter content for teachers.
+You receive raw OCR text (possibly with duplicate page markers, line breaks, and minor errors).
+Do NOT invent new teaching content. Keep every fact, heading, story, definition, and quote from the source.
+
+Tasks:
+- Fix small OCR/spelling issues and broken line breaks only.
+- Remove scanner artifacts: standalone lines like "Page 1", "Page 2", "صفحہ 1", repeated headers from photo stitching.
+- Merge paragraphs that were split across pages; keep logical reading order.
+- Put narrative lesson content in lessonBody (headings, explanations, stories, examples that are NOT end-of-chapter drills).
+- Put practice work in exercises: numbered questions, "Exercise", "Activity", "سوالات", fill-in-the-blank drills, MCQ-style prompts from the book.
+- If the source has no exercises, return an empty string for exercises.
+- concepts: 4-8 short key points from the lesson (not from exercises).
+- Keep Urdu/Arabic in Unicode script when the source uses it.
+
+Return ONLY valid JSON:
+{
+  "chapterName": string?,
+  "topicName": string?,
+  "lessonBody": string,
+  "exercises": string,
+  "concepts": string[]
+}`;
+
 export const STUDENT_ANALYSIS_PROMPT = `Analyze student quiz performance and return JSON:
 { "summary": string, "strengths": string[], "weaknesses": string[] }`;
 

@@ -344,6 +344,11 @@ export interface Lesson {
   aiSummary?: string;
   aiKeyPoints?: string[];
   extractedText?: string;
+  chapterPageText?: string;
+  chapterDraftText?: string;
+  chapterCompiledText?: string;
+  chapterCompiledBody?: string;
+  chapterCompiledExercises?: string;
   pageFrom?: number | null;
   pageTo?: number | null;
   concepts?: Array<{ id: string; name: string }>;
