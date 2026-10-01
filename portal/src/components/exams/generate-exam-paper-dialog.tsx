@@ -401,6 +401,27 @@ export function GenerateExamPaperDialog({
                 {formState.errors.mcqCount && (
                   <p className="text-sm text-destructive">{formState.errors.mcqCount.message}</p>
                 )}
+                {(
+                  [
+                    formState.errors.mcqMarks,
+                    formState.errors.fillBlankMarks,
+                    formState.errors.trueFalseMarks,
+                    formState.errors.shortAnswerMarks,
+                    formState.errors.longAnswerMarks,
+                  ].find((err) => err?.message)
+                )?.message ? (
+                  <p className="text-sm text-destructive">
+                    {
+                      [
+                        formState.errors.mcqMarks,
+                        formState.errors.fillBlankMarks,
+                        formState.errors.trueFalseMarks,
+                        formState.errors.shortAnswerMarks,
+                        formState.errors.longAnswerMarks,
+                      ].find((err) => err?.message)?.message
+                    }
+                  </p>
+                ) : null}
                 {openQuestionCount > 20 ? (
                   <p className="text-sm text-destructive">
                     Short and long questions together cannot exceed 20 open questions.

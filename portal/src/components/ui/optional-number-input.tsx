@@ -29,10 +29,13 @@ export function OptionalNumberInput({
 
   useEffect(() => {
     if (draft === null) return;
+    // Keep an empty field while the teacher clears the old value to type a new one.
+    if (draft === "") return;
     const normalized = allowDecimal ? String(value) : String(Math.round(value));
-    if (draft !== "" && draft !== normalized) return;
-    if (draft === "" && value === 0) return;
-    setDraft(null);
+    const fromProp = value === 0 ? "" : normalized;
+    if (draft === fromProp) {
+      setDraft(null);
+    }
   }, [value, draft, allowDecimal]);
 
   const display = draft ?? (value === 0 ? "" : String(value));
