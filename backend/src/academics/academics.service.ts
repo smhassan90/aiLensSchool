@@ -943,6 +943,7 @@ export class AcademicsService {
       academicYearId?: string;
       gradeId?: string;
       teacherId?: string;
+      subjectId?: string;
     },
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
@@ -952,6 +953,7 @@ export class AcademicsService {
     const where: Prisma.ClassSubjectWhereInput = {
       section: { schoolId, ...(query.gradeId ? { gradeId: query.gradeId } : {}) },
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+      ...(query.subjectId ? { subjectId: query.subjectId } : {}),
       ...(yearId ? { academicYearId: yearId } : {}),
       ...(query.teacherId
         ? {

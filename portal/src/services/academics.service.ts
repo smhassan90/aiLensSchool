@@ -241,6 +241,7 @@ export const academicsService = {
     academicYearId?: string;
     gradeId?: string;
     teacherId?: string;
+    subjectId?: string;
   }) {
     return apiClient<Paginated<ClassSubject>>(`/academics/class-subjects${buildQuery(params ?? {})}`);
   },

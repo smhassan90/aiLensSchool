@@ -22,13 +22,14 @@ import { teachersService } from "@/services/teachers.service";
 import { teacherDisplayNameFromUser } from "@/lib/person-name";
 import { gradeClassLabel } from "@/lib/utils";
 import { fetchAllPages } from "@/lib/fetch-all-pages";
-import { GraduationCap, Search, UserSquare2 } from "lucide-react";
+import { BookOpen, GraduationCap, Search, UserSquare2 } from "lucide-react";
 
 export function SchoolRosterExplorer() {
   const [tab, setTab] = useState("students");
   const [gradeId, setGradeId] = useState("");
   const [sectionId, setSectionId] = useState("");
   const [teacherId, setTeacherId] = useState("");
+  const [subjectId, setSubjectId] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
 
   const grades = useQuery({
@@ -39,6 +40,10 @@ export function SchoolRosterExplorer() {
     queryKey: ["sections", gradeId],
     queryFn: () => academicsService.listSections({ gradeId, limit: 100 }),
     enabled: Boolean(gradeId),
+  });
+  const subjects = useQuery({
+    queryKey: ["subjects", "roster", gradeId],
+    queryFn: () => academicsService.listSubjects({ gradeId: gradeId || undefined, limit: 100 }),
   });
   const teachers = useQuery({
     queryKey: ["teachers", "roster"],
@@ -69,7 +74,7 @@ export function SchoolRosterExplorer() {
   });
 
   const classSubjects = useQuery({
-    queryKey: ["roster-class-subjects", gradeId, sectionId],
+    queryKey: ["roster-class-subjects", gradeId, sectionId, subjectId, teacherId],
     queryFn: () =>
       fetchAllPages((page, limit) =>
         academicsService.listClassSubjects({
@@ -77,10 +82,17 @@ export function SchoolRosterExplorer() {
           limit,
           gradeId: gradeId || undefined,
           sectionId: sectionId || undefined,
+          subjectId: subjectId || undefined,
+          teacherId: teacherId || undefined,
         }),
       ),
-    enabled: tab === "teaching",
+    enabled: tab === "teaching" || Boolean(subjectId),
   });
+
+  const subjectSectionIds = useMemo(() => {
+    if (!subjectId) return null;
+    return new Set((classSubjects.data ?? []).map((row) => row.sectionId));
+  }, [subjectId, classSubjects.data]);
 
   const teacherSectionIds = useMemo(() => {
     if (!teacherId) return null;
@@ -97,6 +109,9 @@ export function SchoolRosterExplorer() {
     if (teacherId && teacherSectionIds) {
       rows = rows.filter((row) => teacherSectionIds.has(row.sectionId));
     }
+    if (subjectId && subjectSectionIds) {
+      rows = rows.filter((row) => subjectSectionIds.has(row.sectionId));
+    }
     if (!q) return rows;
     return rows.filter((row) => {
       const student = row.student;
@@ -104,23 +119,18 @@ export function SchoolRosterExplorer() {
       const blob = `${student.firstName} ${student.lastName} ${student.studentCode}`.toLowerCase();
       return blob.includes(q);
     });
-  }, [enrollments.data, studentSearch, teacherId, teacherSectionIds]);
+  }, [enrollments.data, studentSearch, teacherId, teacherSectionIds, subjectId, subjectSectionIds]);
 
-  const teachingRows = useMemo(() => {
-    return (classSubjects.data ?? []).filter((row) => {
-      if (!teacherId) return true;
-      return row.teacherId === teacherId || row.assistantTeacherId === teacherId;
-    });
-  }, [classSubjects.data, teacherId]);
+  const teachingRows = useMemo(() => classSubjects.data ?? [], [classSubjects.data]);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Class & roster explorer"
-        description="Filter by class, section, teacher, or student name. Switch between enrolled students and who teaches each subject."
+        description="Filter by class, section, subject, teacher, or student name. Switch between enrolled students and who teaches each subject."
       />
 
-      <div className="grid gap-4 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <div className="space-y-2">
           <Label htmlFor="roster-grade">Class</Label>
           <Select
@@ -129,6 +139,7 @@ export function SchoolRosterExplorer() {
             onChange={(e) => {
               setGradeId(e.target.value);
               setSectionId("");
+              setSubjectId("");
             }}
           >
             <option value="">All classes</option>
@@ -156,6 +167,21 @@ export function SchoolRosterExplorer() {
           </Select>
         </div>
         <div className="space-y-2">
+          <Label htmlFor="roster-subject">Subject</Label>
+          <Select
+            id="roster-subject"
+            value={subjectId}
+            onChange={(e) => setSubjectId(e.target.value)}
+          >
+            <option value="">All subjects</option>
+            {(subjects.data?.items ?? []).map((subject) => (
+              <option key={subject.id} value={subject.id}>
+                {subject.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="space-y-2">
           <Label htmlFor="roster-teacher">Teacher</Label>
           <Select id="roster-teacher" value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
             <option value="">All teachers</option>
@@ -166,7 +192,7 @@ export function SchoolRosterExplorer() {
             ))}
           </Select>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2 sm:col-span-2 lg:col-span-1 xl:col-span-1">
           <Label htmlFor="roster-student">Student search</Label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -188,13 +214,13 @@ export function SchoolRosterExplorer() {
             Students ({studentRows.length})
           </TabsTrigger>
           <TabsTrigger value="teaching">
-            <UserSquare2 className="mr-1.5 h-4 w-4" />
+            <BookOpen className="mr-1.5 h-4 w-4" />
             Subject teachers ({teachingRows.length})
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="students" className="mt-4">
-          {enrollments.isLoading ? (
+          {enrollments.isLoading || (subjectId && classSubjects.isLoading) ? (
             <PageLoader variant="panel" />
           ) : !studentRows.length ? (
             <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">

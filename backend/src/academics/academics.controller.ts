@@ -70,6 +70,10 @@ class ClassSubjectQueryDto extends PaginationDto {
   @IsOptional()
   @IsString()
   teacherId?: string;
+
+  @IsOptional()
+  @IsString()
+  subjectId?: string;
 }
 
 @ApiTags('Academics')
