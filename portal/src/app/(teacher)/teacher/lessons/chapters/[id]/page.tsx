@@ -15,7 +15,9 @@ import { lessonsService } from "@/services/lessons.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { coerceLessonDisplayText } from "@/lib/lesson-display-text";
+import type { Lesson } from "@/lib/types";
 import { useEffect, useState } from "react";
+import { ChapterPageManager } from "@/components/lessons/chapter-page-manager";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 
 export default function ChapterDetailPage() {
@@ -113,6 +115,15 @@ export default function ChapterDetailPage() {
       <Badge className="mb-4" variant={ready ? "success" : "warning"}>
         {ready ? "Ready" : "Needs confirmation"}
       </Badge>
+
+      <ChapterPageManager
+        lessonId={id}
+        pageSources={lesson.pageSources ?? []}
+        onContentUpdated={(updated: Lesson) => {
+          setContentText(coerceLessonDisplayText(updated.extractedText ?? updated.aiSummary ?? ""));
+          queryClient.setQueryData(["lesson", id], updated);
+        }}
+      />
 
       <Card className="mb-4">
         <CardHeader>

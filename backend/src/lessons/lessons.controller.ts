@@ -19,7 +19,9 @@ import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-va
 import { LESSON_MAX_PAGE_UPLOADS } from './lesson-upload.constants';
 import { LessonsService } from './lessons.service';
 import {
+  AppendChapterTextDto,
   ConfirmChapterContentDto,
+  ReorderChapterPagesDto,
   CreateChapterPasteDto,
   CreateClassSessionDto,
   CreateLessonDto,
@@ -188,6 +190,60 @@ export class LessonsController {
   @Patch('chapters/:id/complete')
   completeChapter(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.lessonsService.markChapterCompleted(id, user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Post('chapters/:id/append-photos')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FilesInterceptor('pages', LESSON_MAX_PAGE_UPLOADS, {
+      storage: memoryStorage(),
+      limits: { fileSize: 15 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const allowed =
+          IMAGE_MIME.test(file.mimetype) ||
+          (!file.mimetype && IMAGE_NAME.test(file.originalname)) ||
+          IMAGE_NAME.test(file.originalname);
+        if (!allowed) {
+          cb(
+            new BadRequestException({
+              code: 'INVALID_IMAGE',
+              message: 'Only JPEG, PNG, WebP, or HEIC photos are allowed',
+            }),
+            false,
+          );
+          return;
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  appendChapterPhotos(
+    @Param('id') id: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.lessonsService.appendChapterPhotos(id, files ?? [], user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Post('chapters/:id/append-text')
+  appendChapterText(
+    @Param('id') id: string,
+    @Body() dto: AppendChapterTextDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.lessonsService.appendChapterText(id, dto, user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Patch('chapters/:id/page-order')
+  reorderChapterPages(
+    @Param('id') id: string,
+    @Body() dto: ReorderChapterPagesDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.lessonsService.reorderChapterPages(id, dto, user);
   }
 
   @Roles(RoleName.TEACHER)

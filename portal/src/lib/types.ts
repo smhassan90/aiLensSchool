@@ -315,6 +315,13 @@ export type ClassSessionType = "NEW_LESSON" | "CONTINUATION" | "REVISION";
 export type ChapterProgressStatus = "IN_PROGRESS" | "COMPLETED";
 export type HomeworkSessionMode = "NONE" | "PLAIN" | "AI";
 
+export interface LessonPageSource {
+  id: string;
+  pageOrder: number;
+  url: string;
+  label: string;
+}
+
 export interface Lesson {
   id: string;
   date: string;
@@ -341,6 +348,7 @@ export interface Lesson {
   pageTo?: number | null;
   concepts?: Array<{ id: string; name: string }>;
   sources?: Array<{ ocrText?: string | null; manualText?: string | null }>;
+  pageSources?: LessonPageSource[];
   section?: { id: string; name: string; grade?: { id: string; name: string } | null };
   subject?: { id: string; name: string };
   grade?: { id: string; name: string };

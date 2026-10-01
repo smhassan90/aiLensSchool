@@ -152,6 +152,39 @@ export class PageOcrService implements OnModuleDestroy {
     return pages.filter(Boolean).join('\n\n').trim();
   }
 
+  /** One OCR string per file (no "Page N" prefix), same order as input files. */
+  async readPageTexts(
+    files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
+    options?: { subjectName?: string | null },
+  ): Promise<string[]> {
+    if (isServerlessRuntime() || !files.length) {
+      return files.map(() => '');
+    }
+
+    const languages = ocrLanguagesForSubject(options?.subjectName);
+    let workers: OcrWorker[];
+    try {
+      workers = await this.getPool(languages);
+    } catch (error) {
+      if (languages !== 'eng') {
+        workers = await this.getPool('eng');
+      } else {
+        throw error;
+      }
+    }
+
+    return mapPool(files, workers.length, async (file, index) => {
+      const worker = workers[index % workers.length];
+      const source = this.toDataUrl(file);
+      try {
+        const result = await worker.recognize(source);
+        return result.data.text?.replace(/\u000c/g, '').trim() ?? '';
+      } catch {
+        return '';
+      }
+    });
+  }
+
   async onModuleDestroy() {
     if (!this.poolWorkers) return;
     try {

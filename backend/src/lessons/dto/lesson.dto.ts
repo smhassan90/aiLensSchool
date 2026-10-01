@@ -1,11 +1,14 @@
 import {
   Allow,
+  ArrayMinSize,
+  IsArray,
   IsDateString,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
   Min,
+  MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ClassSessionType, LessonRecordKind, LessonSourceType, LessonStatus } from '@prisma/client';
@@ -278,6 +281,21 @@ export class CreateChapterPasteDto {
   @ApiProperty()
   @IsString()
   contentText!: string;
+}
+
+export class AppendChapterTextDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  text!: string;
+}
+
+export class ReorderChapterPagesDto {
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  sourceIds!: string[];
 }
 
 export class ConfirmChapterContentDto {

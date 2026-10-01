@@ -27,12 +27,15 @@ import {
   resolveHeadTeacherSectionIds,
   teacherHeadsSection,
 } from '../head-teachers/head-teacher-sections';
+import { LESSON_MAX_PAGE_UPLOADS } from './lesson-upload.constants';
 import { PageOcrService } from './page-ocr.service';
 import { deriveKeyPointsFromLesson, formatOcrLesson } from './lesson-text-formatter';
 import { coerceLessonDisplayText } from './lesson-display-text';
 import {
+  AppendChapterTextDto,
   ConfirmChapterContentDto,
   CreateChapterPasteDto,
+  ReorderChapterPagesDto,
   CreateClassSessionDto,
   CreateLessonDto,
   ExtractLessonDto,
@@ -183,11 +186,30 @@ export class LessonsService {
   }
 
   private extractedTextFromSources(
-    sources?: Array<{ ocrText?: string | null; manualText?: string | null }>,
+    sources?: Array<{
+      type?: LessonSourceType;
+      ocrText?: string | null;
+      manualText?: string | null;
+      pageFrom?: number | null;
+      fileAssetId?: string | null;
+    }>,
   ) {
+    if (!sources?.length) return '';
+    const images = sources
+      .filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE)
+      .sort((a, b) => (a.pageFrom ?? 0) - (b.pageFrom ?? 0));
+    const pageTexts = images
+      .map((s) => s.ocrText?.trim())
+      .filter((t): t is string => Boolean(t));
+    if (pageTexts.length) {
+      return pageTexts.map((t) => coerceLessonDisplayText(t)).join('\n\n');
+    }
+    const manual = sources.find((s) => s.type === LessonSourceType.MANUAL_TEXT);
+    const manualText = manual?.manualText?.trim() || manual?.ocrText?.trim();
+    if (manualText) return coerceLessonDisplayText(manualText);
     return (
       sources
-        ?.map((source) => {
+        .map((source) => {
           const raw = source.ocrText?.trim() || source.manualText?.trim() || '';
           return raw ? coerceLessonDisplayText(raw) : '';
         })
@@ -196,16 +218,43 @@ export class LessonsService {
     );
   }
 
-  private presentLesson<
-    T extends {
-      aiSummary?: string | null;
-      sources?: Array<{ ocrText?: string | null; manualText?: string | null }>;
-    },
-  >(lesson: T) {
+  private mapPageSources(
+    sources: Array<{
+      id: string;
+      type: LessonSourceType;
+      pageFrom?: number | null;
+      ocrText?: string | null;
+      fileAsset?: { url: string; originalFilename: string | null } | null;
+    }>,
+  ) {
+    return sources
+      .filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE && s.fileAsset?.url)
+      .sort((a, b) => (a.pageFrom ?? 0) - (b.pageFrom ?? 0))
+      .map((s) => ({
+        id: s.id,
+        pageOrder: s.pageFrom ?? 0,
+        url: s.fileAsset!.url,
+        label: s.fileAsset!.originalFilename ?? 'Page photo',
+      }));
+  }
+
+  private presentLesson<T extends { aiSummary?: string | null; sources?: unknown }>(lesson: T) {
+    const sources = lesson.sources as
+      | Array<{
+          id: string;
+          type: LessonSourceType;
+          ocrText?: string | null;
+          manualText?: string | null;
+          pageFrom?: number | null;
+          fileAssetId?: string | null;
+          fileAsset?: { url: string; originalFilename: string | null } | null;
+        }>
+      | undefined;
     return {
       ...lesson,
       aiSummary: lesson.aiSummary ? coerceLessonDisplayText(lesson.aiSummary) : lesson.aiSummary,
-      extractedText: this.extractedTextFromSources(lesson.sources),
+      extractedText: this.extractedTextFromSources(sources),
+      pageSources: sources ? this.mapPageSources(sources) : [],
     };
   }
 
@@ -227,7 +276,7 @@ export class LessonsService {
     const lesson = await this.prisma.dailyLesson.findUnique({
       where: { id },
       include: {
-        sources: true,
+        sources: { include: { fileAsset: { select: { url: true, originalFilename: true } } } },
         concepts: true,
         subject: true,
         section: true,
@@ -239,6 +288,181 @@ export class LessonsService {
       throw new NotFoundException({ code: 'LESSON_NOT_FOUND', message: 'Lesson not found' });
     }
     return this.presentLessonWithStyle(lesson);
+  }
+
+  private async requireOwnedChapterLesson(id: string, user: AuthUser) {
+    const teacher = await this.requireTeacherProfile(user.id);
+    const lesson = await this.prisma.dailyLesson.findUnique({
+      where: { id },
+      include: {
+        sources: { include: { fileAsset: { select: { url: true, originalFilename: true } } } },
+        subject: true,
+      },
+    });
+    if (!lesson || lesson.recordKind !== LessonRecordKind.CHAPTER_LIBRARY) {
+      throw new NotFoundException({ code: 'CHAPTER_NOT_FOUND', message: 'Chapter not found' });
+    }
+    this.tenant.assertSchoolAccess(user, lesson.schoolId);
+    if (lesson.teacherId !== teacher.id) {
+      throw new ForbiddenException({ code: 'LESSON_OWNER_REQUIRED', message: 'Not your chapter' });
+    }
+    return lesson;
+  }
+
+  private async upsertChapterManualText(
+    tx: Prisma.TransactionClient,
+    lessonId: string,
+    sources: Array<{ id: string; type: LessonSourceType }>,
+    combinedText: string,
+  ) {
+    const manual = sources.find((s) => s.type === LessonSourceType.MANUAL_TEXT);
+    const normalized = coerceLessonDisplayText(combinedText);
+    if (manual) {
+      await tx.lessonSource.update({
+        where: { id: manual.id },
+        data: { ocrText: normalized, manualText: normalized },
+      });
+    } else {
+      await tx.lessonSource.create({
+        data: {
+          lessonId,
+          type: LessonSourceType.MANUAL_TEXT,
+          ocrText: normalized,
+          manualText: normalized,
+        },
+      });
+    }
+  }
+
+  async appendChapterPhotos(id: string, files: Express.Multer.File[], user: AuthUser) {
+    if (!files?.length) {
+      throw new BadRequestException({
+        code: 'PHOTOS_REQUIRED',
+        message: 'Upload at least one photo',
+      });
+    }
+    if (files.length > LESSON_MAX_PAGE_UPLOADS) {
+      throw new BadRequestException({
+        code: 'TOO_MANY_PHOTOS',
+        message: `You can add up to ${LESSON_MAX_PAGE_UPLOADS} photos at a time`,
+      });
+    }
+    const lesson = await this.requireOwnedChapterLesson(id, user);
+    const schoolId = lesson.schoolId;
+    const perPageTexts = await this.pageOcr.readPageTexts(files, {
+      subjectName: lesson.subject.name,
+    });
+    const newChunk = perPageTexts.filter(Boolean).join('\n\n').trim();
+    if (!newChunk) {
+      throw new BadRequestException({
+        code: 'PAGE_TEXT_UNREADABLE',
+        message: 'Could not read the new photos. Try sharper, well-lit pictures.',
+      });
+    }
+    const existingImages = lesson.sources.filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE);
+    const startPage =
+      existingImages.reduce((max, s) => Math.max(max, s.pageFrom ?? 0), 0) + 1;
+    const pageAssets = await Promise.all(
+      files.map((file) => this.filesService.saveSchoolUpload(schoolId, user.id, file, 'lesson-pages')),
+    );
+    const existingText = this.extractedTextFromSources(lesson.sources);
+    const combinedText = existingText ? `${existingText}\n\n${newChunk}` : newChunk;
+
+    await this.prisma.$transaction(async (tx) => {
+      for (let index = 0; index < pageAssets.length; index++) {
+        await tx.lessonSource.create({
+          data: {
+            lessonId: id,
+            type: LessonSourceType.TEXTBOOK_IMAGE,
+            fileAssetId: pageAssets[index].id,
+            pageFrom: startPage + index,
+            ocrText: perPageTexts[index]?.trim() || null,
+          },
+        });
+      }
+      const refreshed = await tx.lessonSource.findMany({ where: { lessonId: id } });
+      await this.upsertChapterManualText(tx, id, refreshed, combinedText);
+      await tx.dailyLesson.update({
+        where: { id },
+        data: {
+          aiSummary: combinedText,
+          contentConfirmed: false,
+          status: LessonStatus.READY_FOR_REVIEW,
+        },
+      });
+    });
+
+    return this.loadPresented(id);
+  }
+
+  async appendChapterText(id: string, dto: AppendChapterTextDto, user: AuthUser) {
+    const lesson = await this.requireOwnedChapterLesson(id, user);
+    const addition = coerceLessonDisplayText(dto.text.trim());
+    const existingText = this.extractedTextFromSources(lesson.sources);
+    const combinedText = existingText ? `${existingText}\n\n${addition}` : addition;
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.upsertChapterManualText(tx, id, lesson.sources, combinedText);
+      await tx.dailyLesson.update({
+        where: { id },
+        data: {
+          aiSummary: combinedText,
+          contentConfirmed: false,
+          status: LessonStatus.READY_FOR_REVIEW,
+        },
+      });
+    });
+
+    return this.loadPresented(id);
+  }
+
+  async reorderChapterPages(id: string, dto: ReorderChapterPagesDto, user: AuthUser) {
+    const lesson = await this.requireOwnedChapterLesson(id, user);
+    const images = lesson.sources
+      .filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE)
+      .sort((a, b) => (a.pageFrom ?? 0) - (b.pageFrom ?? 0));
+    if (!images.length) {
+      throw new BadRequestException({
+        code: 'NO_PAGE_PHOTOS',
+        message: 'This chapter has no page photos to reorder',
+      });
+    }
+    const expected = new Set(images.map((s) => s.id));
+    if (dto.sourceIds.length !== images.length || dto.sourceIds.some((sid) => !expected.has(sid))) {
+      throw new BadRequestException({
+        code: 'INVALID_PAGE_ORDER',
+        message: 'Provide every page photo id in the new order',
+      });
+    }
+    const byId = new Map(images.map((s) => [s.id, s]));
+    const ordered = dto.sourceIds.map((sid) => byId.get(sid)!);
+    const pageTexts = ordered.map((s) => s.ocrText?.trim()).filter((t): t is string => Boolean(t));
+    const combinedFromPages = pageTexts.map((t) => coerceLessonDisplayText(t)).join('\n\n');
+    const manualOnly = lesson.sources.find((s) => s.type === LessonSourceType.MANUAL_TEXT);
+    const pastedTail =
+      manualOnly && !pageTexts.length
+        ? manualOnly.manualText?.trim() || manualOnly.ocrText?.trim() || ''
+        : '';
+    const combinedText = combinedFromPages || pastedTail || this.extractedTextFromSources(lesson.sources);
+
+    await this.prisma.$transaction(async (tx) => {
+      for (let index = 0; index < ordered.length; index++) {
+        await tx.lessonSource.update({
+          where: { id: ordered[index].id },
+          data: { pageFrom: index + 1 },
+        });
+      }
+      if (combinedFromPages) {
+        const refreshed = await tx.lessonSource.findMany({ where: { lessonId: id } });
+        await this.upsertChapterManualText(tx, id, refreshed, combinedText);
+      }
+      await tx.dailyLesson.update({
+        where: { id },
+        data: { aiSummary: combinedText },
+      });
+    });
+
+    return this.loadPresented(id);
   }
 
   async extractFromPhotos(dto: ExtractLessonDto, files: Express.Multer.File[], user: AuthUser) {
@@ -576,6 +800,10 @@ export class LessonsService {
     }
     const extractedText = coerceLessonDisplayText(output.summary);
     const rawOcrArchive = (resolvedOcr ?? '').trim();
+    const perPageTexts =
+      !uploadedLooksUsable && !preferVisionOcr
+        ? await this.pageOcr.readPageTexts(files, { subjectName: subject.name })
+        : files.map(() => '');
     const pageAssets = await Promise.all(
       files.map((file) => this.filesService.saveSchoolUpload(schoolId, user.id, file, 'lesson-pages')),
     );
@@ -584,6 +812,7 @@ export class LessonsService {
         type: LessonSourceType.TEXTBOOK_IMAGE,
         fileAssetId: asset.id,
         pageFrom: index + 1,
+        ocrText: perPageTexts[index]?.trim() || null,
       })),
       ...(rawOcrArchive || extractedText
         ? [
@@ -1717,7 +1946,7 @@ export class LessonsService {
     const lesson = await this.prisma.dailyLesson.findUnique({
       where: { id },
       include: {
-        sources: true,
+        sources: { include: { fileAsset: { select: { url: true, originalFilename: true } } } },
         concepts: true,
         subject: true,
         section: true,

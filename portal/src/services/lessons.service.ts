@@ -158,6 +158,30 @@ export const lessonsService = {
     });
   },
 
+  appendChapterPhotos(lessonId: string, pages: File[]) {
+    const body = new FormData();
+    for (const page of pages) {
+      body.append("pages", page);
+    }
+    return apiForm<Lesson>(`/lessons/chapters/${lessonId}/append-photos`, body, "POST", {
+      timeoutMs: lessonExtractTimeoutMs(pages.length),
+    });
+  },
+
+  appendChapterText(lessonId: string, text: string) {
+    return apiClient<Lesson>(`/lessons/chapters/${lessonId}/append-text`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    });
+  },
+
+  reorderChapterPages(lessonId: string, sourceIds: string[]) {
+    return apiClient<Lesson>(`/lessons/chapters/${lessonId}/page-order`, {
+      method: "PATCH",
+      body: JSON.stringify({ sourceIds }),
+    });
+  },
+
   pasteChapter(payload: CreateChapterPastePayload) {
     return apiClient<Lesson>("/lessons/chapters/paste", {
       method: "POST",
