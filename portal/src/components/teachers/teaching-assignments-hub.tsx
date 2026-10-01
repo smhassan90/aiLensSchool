@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { fetchAllPages } from "@/lib/fetch-all-pages";
 import { academicsService } from "@/services/academics.service";
 import { teachersService } from "@/services/teachers.service";
 import type { ClassSubject } from "@/lib/types";
@@ -44,14 +45,16 @@ export function TeachingAssignmentsHub() {
 
   const assignments = useQuery({
     queryKey: ["teaching-assignments"],
-    queryFn: () => academicsService.listClassSubjects({ limit: 500 }),
+    queryFn: () =>
+      fetchAllPages((page, limit) => academicsService.listClassSubjects({ page, limit })),
   });
   const teachers = useQuery({
     queryKey: ["teachers", "active"],
-    queryFn: () => teachersService.list({ limit: 200, status: "ACTIVE" }),
+    queryFn: () =>
+      fetchAllPages((page, limit) => teachersService.list({ page, limit, status: "ACTIVE" })),
   });
 
-  const items = assignments.data?.items ?? [];
+  const items = assignments.data ?? [];
   const q = search.trim().toLowerCase();
 
   const filtered = useMemo(() => {
@@ -135,7 +138,7 @@ export function TeachingAssignmentsHub() {
   }, [filtered]);
 
   const unassigned = filtered.filter((item) => !item.teacherId).length;
-  const teacherList = teachers.data?.items ?? [];
+  const teacherList = teachers.data ?? [];
 
   return (
     <div className="space-y-6">

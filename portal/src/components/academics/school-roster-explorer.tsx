@@ -21,6 +21,7 @@ import { academicsService } from "@/services/academics.service";
 import { teachersService } from "@/services/teachers.service";
 import { teacherDisplayNameFromUser } from "@/lib/person-name";
 import { gradeClassLabel } from "@/lib/utils";
+import { fetchAllPages } from "@/lib/fetch-all-pages";
 import { GraduationCap, Search, UserSquare2 } from "lucide-react";
 
 export function SchoolRosterExplorer() {
@@ -41,48 +42,58 @@ export function SchoolRosterExplorer() {
   });
   const teachers = useQuery({
     queryKey: ["teachers", "roster"],
-    queryFn: () => teachersService.list({ limit: 200, status: "ACTIVE" }),
+    queryFn: () =>
+      fetchAllPages((page, limit) => teachersService.list({ page, limit, status: "ACTIVE" })),
   });
   const enrollments = useQuery({
     queryKey: ["roster-enrollments", gradeId, sectionId],
     queryFn: () =>
-      academicsService.listEnrollments({
-        gradeId: gradeId || undefined,
-        sectionId: sectionId || undefined,
-        status: "ACTIVE",
-        limit: 300,
-      }),
+      fetchAllPages((page, limit) =>
+        academicsService.listEnrollments({
+          page,
+          limit,
+          gradeId: gradeId || undefined,
+          sectionId: sectionId || undefined,
+          status: "ACTIVE",
+        }),
+      ),
     enabled: tab === "students",
   });
   const teacherAssignments = useQuery({
     queryKey: ["roster-teacher-assignments", teacherId],
-    queryFn: () => academicsService.listClassSubjects({ teacherId: teacherId!, limit: 300 }),
+    queryFn: () =>
+      fetchAllPages((page, limit) =>
+        academicsService.listClassSubjects({ page, limit, teacherId: teacherId! }),
+      ),
     enabled: Boolean(teacherId),
   });
 
   const classSubjects = useQuery({
     queryKey: ["roster-class-subjects", gradeId, sectionId],
     queryFn: () =>
-      academicsService.listClassSubjects({
-        gradeId: gradeId || undefined,
-        sectionId: sectionId || undefined,
-        limit: 300,
-      }),
+      fetchAllPages((page, limit) =>
+        academicsService.listClassSubjects({
+          page,
+          limit,
+          gradeId: gradeId || undefined,
+          sectionId: sectionId || undefined,
+        }),
+      ),
     enabled: tab === "teaching",
   });
 
   const teacherSectionIds = useMemo(() => {
     if (!teacherId) return null;
     const ids = new Set<string>();
-    for (const row of teacherAssignments.data?.items ?? []) {
+    for (const row of teacherAssignments.data ?? []) {
       ids.add(row.sectionId);
     }
     return ids;
-  }, [teacherId, teacherAssignments.data?.items]);
+  }, [teacherId, teacherAssignments.data]);
 
   const studentRows = useMemo(() => {
     const q = studentSearch.trim().toLowerCase();
-    let rows = enrollments.data?.items ?? [];
+    let rows = enrollments.data ?? [];
     if (teacherId && teacherSectionIds) {
       rows = rows.filter((row) => teacherSectionIds.has(row.sectionId));
     }
@@ -93,14 +104,14 @@ export function SchoolRosterExplorer() {
       const blob = `${student.firstName} ${student.lastName} ${student.studentCode}`.toLowerCase();
       return blob.includes(q);
     });
-  }, [enrollments.data?.items, studentSearch, teacherId, teacherSectionIds]);
+  }, [enrollments.data, studentSearch, teacherId, teacherSectionIds]);
 
   const teachingRows = useMemo(() => {
-    return (classSubjects.data?.items ?? []).filter((row) => {
+    return (classSubjects.data ?? []).filter((row) => {
       if (!teacherId) return true;
       return row.teacherId === teacherId || row.assistantTeacherId === teacherId;
     });
-  }, [classSubjects.data?.items, teacherId]);
+  }, [classSubjects.data, teacherId]);
 
   return (
     <div className="space-y-6">
@@ -148,7 +159,7 @@ export function SchoolRosterExplorer() {
           <Label htmlFor="roster-teacher">Teacher</Label>
           <Select id="roster-teacher" value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
             <option value="">All teachers</option>
-            {(teachers.data?.items ?? []).map((teacher) => (
+            {(teachers.data ?? []).map((teacher) => (
               <option key={teacher.id} value={teacher.id}>
                 {teacherDisplayNameFromUser(teacher.user, teacher.gender)}
               </option>
