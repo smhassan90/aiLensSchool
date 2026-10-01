@@ -1,5 +1,31 @@
-import { LessonRecordKind, Prisma } from '@prisma/client';
+import { LessonRecordKind, LessonSourceType, LessonStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+
+/** Lessons a teacher can pick when building an exam paper. */
+export function examLectureTeachableStatusWhere(): Prisma.DailyLessonWhereInput {
+  return {
+    OR: [
+      { status: LessonStatus.CONFIRMED },
+      {
+        recordKind: LessonRecordKind.CHAPTER_LIBRARY,
+        OR: [
+          { contentConfirmed: true },
+          {
+            AND: [{ aiSummary: { not: null } }, { NOT: { aiSummary: '' } }],
+          },
+          {
+            sources: {
+              some: {
+                type: LessonSourceType.TEXTBOOK_IMAGE,
+                AND: [{ ocrText: { not: null } }, { NOT: { ocrText: '' } }],
+              },
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
 
 /** Chapter library ids that already have at least one logged class session in this class/subject. */
 export async function chapterSourceIdsWithClassSessions(
@@ -10,6 +36,7 @@ export async function chapterSourceIdsWithClassSessions(
     where: {
       ...where,
       recordKind: LessonRecordKind.CLASS_SESSION,
+      status: LessonStatus.CONFIRMED,
       chapterSourceId: { not: null },
     },
     select: { chapterSourceId: true },

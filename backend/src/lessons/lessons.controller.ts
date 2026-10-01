@@ -15,6 +15,7 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import { LessonStatus, RoleName } from '@prisma/client';
+import { Transform } from 'class-transformer';
 import { IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { LESSON_MAX_PAGE_UPLOADS } from './lesson-upload.constants';
 import { LessonsService } from './lessons.service';
@@ -66,6 +67,7 @@ class LessonListQueryDto extends PaginationDto {
 
   /** When true, hide chapter-library rows that already have a class session (exam paper picker). */
   @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
   @IsBoolean()
   forExamLectures?: boolean;
 }

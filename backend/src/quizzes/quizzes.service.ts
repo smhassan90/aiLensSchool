@@ -17,6 +17,7 @@ import {
   chapterSourceIdsWithClassSessions,
   dedupeExamLectureLessons,
   examLectureRecordWhere,
+  examLectureTeachableStatusWhere,
 } from '../lessons/exam-lecture-filter';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -236,7 +237,7 @@ export class QuizzesService {
           schoolId,
           sectionId: dto.sectionId,
           subjectId: dto.subjectId,
-          status: LessonStatus.CONFIRMED,
+          ...examLectureTeachableStatusWhere(),
         },
         select: {
           id: true,
@@ -276,7 +277,7 @@ export class QuizzesService {
       const lessons = await this.prisma.dailyLesson.findMany({
         where: {
           ...scope,
-          status: LessonStatus.CONFIRMED,
+          ...examLectureTeachableStatusWhere(),
           ...examLectureRecordWhere(chapterIdsWithSessions),
           date: {
             gte: new Date(`${dto.lessonDateFrom}T00:00:00.000`),

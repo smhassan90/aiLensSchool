@@ -39,6 +39,7 @@ import { coerceLessonDisplayText } from './lesson-display-text';
 import {
   chapterSourceIdsWithClassSessions,
   examLectureRecordWhere,
+  examLectureTeachableStatusWhere,
 } from './exam-lecture-filter';
 import {
   AppendChapterTextDto,
@@ -1840,15 +1841,7 @@ export class LessonsService {
       };
       const chapterIdsWithSessions = await chapterSourceIdsWithClassSessions(this.prisma, scope);
       examLectureScope = examLectureRecordWhere(chapterIdsWithSessions);
-      examStatusScope = {
-        OR: [
-          { status: LessonStatus.CONFIRMED },
-          {
-            recordKind: LessonRecordKind.CHAPTER_LIBRARY,
-            contentConfirmed: true,
-          },
-        ],
-      };
+      examStatusScope = examLectureTeachableStatusWhere();
     }
 
     const where: Prisma.DailyLessonWhereInput = {
