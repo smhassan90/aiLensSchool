@@ -14,6 +14,7 @@ import { PageLoader } from "@/components/layout/page-loader";
 import { AiWait } from "@/components/layout/ai-wait";
 import { TeacherPaceBoard } from "@/components/dashboard/teacher-pace";
 import { cn } from "@/lib/utils";
+import { teacherClassDetailHref } from "@/lib/teacher-class-links";
 import { headTeachersService } from "@/services/head-teachers.service";
 
 export default function TeacherDashboardPage() {
@@ -267,7 +268,7 @@ export default function TeacherDashboardPage() {
             {sortedClasses.map((cls) => (
               <Link
                 key={`${cls.sectionId}-${cls.subjectId}`}
-                href="/teacher/classes"
+                href={teacherClassDetailHref(cls)}
                 className="block rounded-md border px-3 py-2 hover:bg-muted"
               >
                 {cls.gradeName} {cls.sectionName} · {cls.subjectName}

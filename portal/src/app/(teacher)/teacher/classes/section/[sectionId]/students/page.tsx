@@ -26,6 +26,7 @@ export default function TeacherSectionStudentsPage() {
   const gradeName = search.get("grade") ?? "Class";
   const sectionName = search.get("section") ?? "";
   const subjectName = search.get("subject") ?? "";
+  const subjectId = search.get("subjectId") ?? "";
 
   const rosterQuery = useQuery({
     queryKey: ["teacher-section-students", params.sectionId],
@@ -45,6 +46,10 @@ export default function TeacherSectionStudentsPage() {
 
   const classLabel = sectionName ? `${gradeName} · ${sectionName}` : gradeName;
   const subtitle = [subjectName, `${students.length} students`].filter(Boolean).join(" · ");
+  const backHref =
+    subjectId
+      ? `/teacher/classes/section/${params.sectionId}/${subjectId}`
+      : "/teacher/classes";
 
   const studentHref = (studentId: string) => {
     const q = new URLSearchParams({
@@ -71,10 +76,10 @@ export default function TeacherSectionStudentsPage() {
         title={classLabel}
         description={subtitle || "Students in this section"}
         actions={
-          <Link href="/teacher/classes">
+          <Link href={backHref}>
             <Button variant="outline">
               <ArrowLeft className="h-4 w-4" />
-              My classes
+              {subjectId ? "Class details" : "My classes"}
             </Button>
           </Link>
         }

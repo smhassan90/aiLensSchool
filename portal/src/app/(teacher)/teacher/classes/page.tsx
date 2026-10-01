@@ -4,6 +4,7 @@ import { PageLoader } from "@/components/layout/page-loader";
 
 import Link from "next/link";
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { teachersService } from "@/services/teachers.service";
 import type { TeacherClass } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { teacherClassDetailHref } from "@/lib/teacher-class-links";
 import { Users } from "lucide-react";
 
 function compareClasses(a: TeacherClass, b: TeacherClass) {
@@ -30,16 +32,8 @@ function compareClasses(a: TeacherClass, b: TeacherClass) {
   return a.subjectName.localeCompare(b.subjectName, undefined, { sensitivity: "base" });
 }
 
-function rosterHref(cls: TeacherClass) {
-  const q = new URLSearchParams({
-    grade: cls.gradeName,
-    section: cls.sectionName,
-    subject: cls.subjectName,
-  });
-  return `/teacher/classes/section/${cls.sectionId}/students?${q.toString()}`;
-}
-
 export default function TeacherClassesPage() {
+  const router = useRouter();
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["teacher-classes"],
     queryFn: () => teachersService.myClasses(),
@@ -88,46 +82,54 @@ export default function TeacherClassesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {classes.map((cls) => (
-                <TableRow
-                  key={`${cls.sectionId}-${cls.subjectId}`}
-                  className={cn(
-                    cls.isClassTeacher && "border-l-2 border-l-primary bg-primary/5 hover:bg-primary/10",
-                  )}
-                >
-                  <TableCell className="font-medium">{cls.gradeName}</TableCell>
-                  <TableCell>{cls.sectionName}</TableCell>
-                  <TableCell className="truncate">{cls.subjectName}</TableCell>
-                  <TableCell>
-                    {cls.isClassTeacher ? (
-                      <Badge variant="success" className="font-normal">Class teacher</Badge>
-                    ) : (
-                      <Badge variant={cls.role === "ASSISTANT" ? "secondary" : "outline"} className="font-normal">
-                        {cls.role === "ASSISTANT" ? "Assistant" : "Subject teacher"}
-                      </Badge>
+              {classes.map((cls) => {
+                const detailHref = teacherClassDetailHref(cls);
+                return (
+                  <TableRow
+                    key={`${cls.sectionId}-${cls.subjectId}`}
+                    className={cn(
+                      "cursor-pointer hover:bg-muted/50",
+                      cls.isClassTeacher && "border-l-2 border-l-primary bg-primary/5 hover:bg-primary/10",
                     )}
-                  </TableCell>
-                  <TableCell className="tabular-nums">
-                    <Link
-                      href={rosterHref(cls)}
-                      className="font-medium text-primary underline-offset-2 hover:underline"
-                    >
-                      {cls.studentCount ?? 0}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {cls.gradeId ? (
-                      <Link href={`/teacher/classes/${cls.gradeId}/analytics?sectionId=${cls.sectionId}`}>
-                        <Button size="sm" variant="outline" className="min-w-[5.5rem]">
-                          Progress
-                        </Button>
-                      </Link>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                    tabIndex={0}
+                    onClick={() => router.push(detailHref)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        router.push(detailHref);
+                      }
+                    }}
+                  >
+                    <TableCell className="font-medium">{cls.gradeName}</TableCell>
+                    <TableCell>{cls.sectionName}</TableCell>
+                    <TableCell className="truncate">{cls.subjectName}</TableCell>
+                    <TableCell>
+                      {cls.isClassTeacher ? (
+                        <Badge variant="success" className="font-normal">Class teacher</Badge>
+                      ) : (
+                        <Badge variant={cls.role === "ASSISTANT" ? "secondary" : "outline"} className="font-normal">
+                          {cls.role === "ASSISTANT" ? "Assistant" : "Subject teacher"}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="tabular-nums">{cls.studentCount ?? 0}</TableCell>
+                    <TableCell className="text-right">
+                      {cls.gradeId ? (
+                        <Link
+                          href={`/teacher/classes/${cls.gradeId}/analytics?sectionId=${cls.sectionId}`}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <Button size="sm" variant="outline" className="min-w-[5.5rem]">
+                            Progress
+                          </Button>
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
