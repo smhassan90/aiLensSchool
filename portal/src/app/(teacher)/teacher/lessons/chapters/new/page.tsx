@@ -17,7 +17,6 @@ import { lessonsService } from "@/services/lessons.service";
 import { teachersService } from "@/services/teachers.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
-import { LESSON_MAX_PAGE_UPLOADS } from "@/lib/lesson-upload-limits";
 import { compressPhotosForUpload } from "@/lib/page-ocr";
 import { stashPendingChapterPhotos } from "@/lib/chapter-pending-uploads";
 import { localDateISO } from "@/lib/utils";
@@ -196,7 +195,7 @@ export default function NewChapterPage() {
                 >
                   <ImagePlus className="mb-2 h-8 w-8 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
-                    Add photos ({photos.length}/{LESSON_MAX_PAGE_UPLOADS})
+                    Add photos{photos.length ? ` (${photos.length})` : ""}
                   </span>
                   <input
                     type="file"
@@ -206,17 +205,7 @@ export default function NewChapterPage() {
                     onChange={(e) => {
                       const next = Array.from(e.target.files ?? []).filter(isImageFile);
                       e.target.value = "";
-                      setPhotos((c) => {
-                        const merged = [...c, ...next];
-                        if (merged.length > LESSON_MAX_PAGE_UPLOADS) {
-                          toast({
-                            title: `Maximum ${LESSON_MAX_PAGE_UPLOADS} photos`,
-                            description: `Only the first ${LESSON_MAX_PAGE_UPLOADS} photos are kept.`,
-                            variant: "error",
-                          });
-                        }
-                        return merged.slice(0, LESSON_MAX_PAGE_UPLOADS);
-                      });
+                      setPhotos((c) => [...c, ...next]);
                     }}
                   />
                 </label>
