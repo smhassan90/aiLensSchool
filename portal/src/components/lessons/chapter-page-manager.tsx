@@ -615,7 +615,7 @@ export function ChapterPageManager({
           ) : null}
         </div>
 
-        {appendText.isPending || saveOrder.isPending ? <PageLoader variant="panel" /> : null}
+        {appendText.isPending || orderSaving ? <PageLoader variant="panel" /> : null}
 
         <input
           ref={reuploadInputRef}
