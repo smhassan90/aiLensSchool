@@ -17,12 +17,12 @@ import { lessonsService } from "@/services/lessons.service";
 import { teachersService } from "@/services/teachers.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
+import { LESSON_MAX_PAGE_UPLOADS } from "@/lib/lesson-upload-limits";
 import { compressPhotosForUpload } from "@/lib/page-ocr";
 import { localDateISO } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ImagePlus, X } from "lucide-react";
 
-const MAX_PHOTOS = 5;
 const IMAGE_EXT = /\.(jpe?g|png|webp|heic|heif)$/i;
 
 function isImageFile(file: File) {
@@ -157,7 +157,7 @@ export default function NewChapterPage() {
           <CardHeader>
             <CardTitle>{tab === "photos" ? "Page photos" : "Paste text"}</CardTitle>
             <CardDescription>
-              Confirm content on the next screen before using in class. You can add up to {MAX_PHOTOS} photos per upload.
+              Confirm content on the next screen before using in class. You can add up to {LESSON_MAX_PAGE_UPLOADS} photos per upload.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -192,7 +192,9 @@ export default function NewChapterPage() {
                   )}
                 >
                   <ImagePlus className="mb-2 h-8 w-8 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Add photos (up to {MAX_PHOTOS})</span>
+                  <span className="text-sm text-muted-foreground">
+                    Add photos ({photos.length}/{LESSON_MAX_PAGE_UPLOADS})
+                  </span>
                   <input
                     type="file"
                     accept="image/*"
@@ -203,14 +205,14 @@ export default function NewChapterPage() {
                       e.target.value = "";
                       setPhotos((c) => {
                         const merged = [...c, ...next];
-                        if (merged.length > MAX_PHOTOS) {
+                        if (merged.length > LESSON_MAX_PAGE_UPLOADS) {
                           toast({
-                            title: `Maximum ${MAX_PHOTOS} photos`,
-                            description: `Only the first ${MAX_PHOTOS} photos are kept.`,
+                            title: `Maximum ${LESSON_MAX_PAGE_UPLOADS} photos`,
+                            description: `Only the first ${LESSON_MAX_PAGE_UPLOADS} photos are kept.`,
                             variant: "error",
                           });
                         }
-                        return merged.slice(0, MAX_PHOTOS);
+                        return merged.slice(0, LESSON_MAX_PAGE_UPLOADS);
                       });
                     }}
                   />

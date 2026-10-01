@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import { LessonStatus, RoleName } from '@prisma/client';
 import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { LESSON_MAX_PAGE_UPLOADS } from './lesson-upload.constants';
 import { LessonsService } from './lessons.service';
 import {
   ConfirmChapterContentDto,
@@ -113,7 +114,7 @@ export class LessonsController {
     },
   })
   @UseInterceptors(
-    FilesInterceptor('pages', 5, {
+    FilesInterceptor('pages', LESSON_MAX_PAGE_UPLOADS, {
       storage: memoryStorage(),
       limits: { fileSize: 15 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
@@ -199,7 +200,7 @@ export class LessonsController {
   @Post('chapters/extract')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
-    FilesInterceptor('pages', 5, {
+    FilesInterceptor('pages', LESSON_MAX_PAGE_UPLOADS, {
       storage: memoryStorage(),
       limits: { fileSize: 15 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {

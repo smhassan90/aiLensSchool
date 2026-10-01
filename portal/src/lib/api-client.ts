@@ -127,7 +127,19 @@ async function authorizedFetch<T>(path: string, init: RequestInit, baseUrl = get
   const headers = new Headers(init.headers);
   applyAuthHeader(headers);
 
-  let response = await fetch(`${baseUrl}${path}`, { ...init, headers });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, { ...init, headers });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiClientError(
+        "The request took too long. Try fewer photos, a stronger connection, or try again.",
+        408,
+        "REQUEST_TIMEOUT",
+      );
+    }
+    throw err;
+  }
   let payload = await parsePayload<T>(response);
 
   if (response.status === 401 && !isPublicAuthPath(path)) {
@@ -182,8 +194,26 @@ export async function apiUpload<T>(path: string, file: File, fieldName = "file")
   return authorizedFetch<T>(path, { method: "POST", body });
 }
 
-export async function apiForm<T>(path: string, body: FormData, method = "POST"): Promise<T> {
-  return authorizedFetch<T>(path, { method, body }, getDirectApiUrl());
+const DEFAULT_FORM_TIMEOUT_MS = 180_000;
+
+export async function apiForm<T>(
+  path: string,
+  body: FormData,
+  method = "POST",
+  options?: { timeoutMs?: number },
+): Promise<T> {
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_FORM_TIMEOUT_MS;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await authorizedFetch<T>(
+      path,
+      { method, body, signal: controller.signal },
+      getDirectApiUrl(),
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function buildQuery(params: Record<string, string | number | undefined | null>): string {

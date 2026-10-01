@@ -1,4 +1,5 @@
 import { apiClient, apiForm, buildQuery } from "@/lib/api-client";
+import { lessonExtractTimeoutMs } from "@/lib/lesson-upload-limits";
 import type {
   ClassSessionType,
   HomeworkSessionMode,
@@ -144,13 +145,17 @@ export const lessonsService = {
   extract(payload: ExtractLessonPayload) {
     const body = new FormData();
     appendExtractForm(body, payload);
-    return apiForm<Lesson>("/lessons/extract", body);
+    return apiForm<Lesson>("/lessons/extract", body, "POST", {
+      timeoutMs: lessonExtractTimeoutMs(payload.pages.length),
+    });
   },
 
   extractChapter(payload: ExtractLessonPayload) {
     const body = new FormData();
     appendExtractForm(body, payload);
-    return apiForm<Lesson>("/lessons/chapters/extract", body);
+    return apiForm<Lesson>("/lessons/chapters/extract", body, "POST", {
+      timeoutMs: lessonExtractTimeoutMs(payload.pages.length),
+    });
   },
 
   pasteChapter(payload: CreateChapterPastePayload) {
