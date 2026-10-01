@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
@@ -8,7 +8,6 @@ import { PageLoader } from "@/components/layout/page-loader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -19,58 +18,46 @@ import {
 } from "@/components/ui/table";
 import { academicsService } from "@/services/academics.service";
 import { teachersService } from "@/services/teachers.service";
-import { teacherDisplayNameFromUser } from "@/lib/person-name";
-import { gradeClassLabel } from "@/lib/utils";
+import { personFullName, teacherDisplayNameFromUser } from "@/lib/person-name";
+import { cn, gradeClassLabel } from "@/lib/utils";
 import { fetchAllPages } from "@/lib/fetch-all-pages";
-import type { ClassSubject, Subject } from "@/lib/types";
+import type { Enrollment, Subject } from "@/lib/types";
 import { subjectIdsWithSameName, uniqueSubjectsForPicker } from "@/lib/unique-subjects";
-import { BookOpen, GraduationCap, Search, UserSquare2 } from "lucide-react";
+import { ChevronDown, Search, UserSquare2 } from "lucide-react";
 
-type TeachingPair = {
-  subject: string;
+type RosterGroup = {
+  id: string;
+  sectionId: string;
+  classLabel: string;
+  sectionName: string;
+  subjectName: string;
   teacherId: string | null;
   teacherName: string;
 };
 
-function teachingPairsForSection(
-  sectionId: string,
-  assignments: ClassSubject[],
-  subjectIdSet: Set<string> | null,
-  filterTeacherId: string,
-): TeachingPair[] {
-  let rows = assignments.filter((row) => row.sectionId === sectionId);
-  if (subjectIdSet) {
-    rows = rows.filter((row) => subjectIdSet.has(row.subjectId));
-  }
-  if (filterTeacherId) {
-    rows = rows.filter(
-      (row) => row.teacherId === filterTeacherId || row.assistantTeacherId === filterTeacherId,
-    );
-  }
+function compareGroups(a: RosterGroup, b: RosterGroup) {
+  const cls = a.classLabel.localeCompare(b.classLabel, undefined, { numeric: true, sensitivity: "base" });
+  if (cls !== 0) return cls;
+  const sec = a.sectionName.localeCompare(b.sectionName, undefined, { numeric: true, sensitivity: "base" });
+  if (sec !== 0) return sec;
+  const sub = a.subjectName.localeCompare(b.subjectName, undefined, { sensitivity: "base" });
+  if (sub !== 0) return sub;
+  return a.teacherName.localeCompare(b.teacherName, undefined, { sensitivity: "base" });
+}
 
-  const seen = new Set<string>();
-  const pairs: TeachingPair[] = [];
-  for (const row of rows) {
-    const subject = row.subject?.name ?? "—";
-    const teacher = row.teacher;
-    const teacherName = teacher
-      ? teacherDisplayNameFromUser(teacher.user, teacher.gender)
-      : "Not assigned";
-    const key = `${subject.toLowerCase()}::${row.teacherId ?? ""}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    pairs.push({
-      subject,
-      teacherId: row.teacherId ?? null,
-      teacherName,
-    });
-  }
-  pairs.sort((a, b) => a.subject.localeCompare(b.subject, undefined, { sensitivity: "base" }));
-  return pairs;
+function enrollmentsMatchingSearch(enrollments: Enrollment[], query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return enrollments;
+  return enrollments.filter((row) => {
+    const student = row.student;
+    if (!student) return false;
+    const blob = `${student.firstName} ${student.lastName} ${student.studentCode}`.toLowerCase();
+    return blob.includes(q);
+  });
 }
 
 export function SchoolRosterExplorer() {
-  const [tab, setTab] = useState("students");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [gradeId, setGradeId] = useState("");
   const [sectionId, setSectionId] = useState("");
   const [teacherId, setTeacherId] = useState("");
@@ -107,15 +94,6 @@ export function SchoolRosterExplorer() {
           status: "ACTIVE",
         }),
       ),
-    enabled: tab === "students",
-  });
-  const teacherAssignments = useQuery({
-    queryKey: ["roster-teacher-assignments", teacherId],
-    queryFn: () =>
-      fetchAllPages((page, limit) =>
-        academicsService.listClassSubjects({ page, limit, teacherId: teacherId! }),
-      ),
-    enabled: Boolean(teacherId),
   });
 
   const rosterAssignments = useQuery({
@@ -130,10 +108,6 @@ export function SchoolRosterExplorer() {
           teacherId: teacherId || undefined,
         }),
       ),
-    enabled:
-      tab === "students" ||
-      tab === "teaching" ||
-      Boolean(gradeId || sectionId || teacherId || subjectId),
   });
 
   const catalogueItems = subjectsCatalogue.data ?? [];
@@ -153,41 +127,6 @@ export function SchoolRosterExplorer() {
     return uniqueSubjectsForPicker(catalogueItems, gradeId || undefined);
   }, [rosterAssignments.data, catalogueItems, gradeId]);
 
-  const subjectSectionIds = useMemo(() => {
-    if (!subjectId || !subjectIdSet) return null;
-    const rows = rosterAssignments.data ?? [];
-    return new Set(
-      rows.filter((row) => subjectIdSet.has(row.subjectId)).map((row) => row.sectionId),
-    );
-  }, [subjectId, subjectIdSet, rosterAssignments.data]);
-
-  const teacherSectionIds = useMemo(() => {
-    if (!teacherId) return null;
-    const ids = new Set<string>();
-    for (const row of teacherAssignments.data ?? []) {
-      ids.add(row.sectionId);
-    }
-    return ids;
-  }, [teacherId, teacherAssignments.data]);
-
-  const studentRows = useMemo(() => {
-    const q = studentSearch.trim().toLowerCase();
-    let rows = enrollments.data ?? [];
-    if (teacherId && teacherSectionIds) {
-      rows = rows.filter((row) => teacherSectionIds.has(row.sectionId));
-    }
-    if (subjectId && subjectSectionIds) {
-      rows = rows.filter((row) => subjectSectionIds.has(row.sectionId));
-    }
-    if (!q) return rows;
-    return rows.filter((row) => {
-      const student = row.student;
-      if (!student) return false;
-      const blob = `${student.firstName} ${student.lastName} ${student.studentCode}`.toLowerCase();
-      return blob.includes(q);
-    });
-  }, [enrollments.data, studentSearch, teacherId, teacherSectionIds, subjectId, subjectSectionIds]);
-
   const teachingRows = useMemo(() => {
     let rows = rosterAssignments.data ?? [];
     if (subjectId && subjectIdSet) {
@@ -196,13 +135,78 @@ export function SchoolRosterExplorer() {
     return rows;
   }, [rosterAssignments.data, subjectId, subjectIdSet]);
 
-  const assignmentRows = rosterAssignments.data ?? [];
+  const enrollmentsBySection = useMemo(() => {
+    const map = new Map<string, Enrollment[]>();
+    for (const row of enrollments.data ?? []) {
+      const list = map.get(row.sectionId) ?? [];
+      list.push(row);
+      map.set(row.sectionId, list);
+    }
+    for (const [key, list] of map) {
+      list.sort((a, b) =>
+        personFullName(a.student?.firstName, a.student?.lastName).localeCompare(
+          personFullName(b.student?.firstName, b.student?.lastName),
+          undefined,
+          { sensitivity: "base" },
+        ),
+      );
+      map.set(key, list);
+    }
+    return map;
+  }, [enrollments.data]);
+
+  const rosterGroups = useMemo(() => {
+    const groups: RosterGroup[] = teachingRows.map((row) => ({
+      id: row.id,
+      sectionId: row.sectionId,
+      classLabel: gradeClassLabel(row.section),
+      sectionName: row.section?.name ?? "—",
+      subjectName: row.subject?.name ?? "—",
+      teacherId: row.teacherId ?? null,
+      teacherName: row.teacher
+        ? teacherDisplayNameFromUser(row.teacher.user, row.teacher.gender)
+        : "Not assigned",
+    }));
+
+    const q = studentSearch.trim();
+    const filtered = q
+      ? groups.filter((group) => {
+          const sectionEnrollments = enrollmentsBySection.get(group.sectionId) ?? [];
+          return enrollmentsMatchingSearch(sectionEnrollments, q).length > 0;
+        })
+      : groups;
+
+    return [...filtered].sort(compareGroups);
+  }, [teachingRows, enrollmentsBySection, studentSearch]);
+
+  const totalStudentsShown = useMemo(() => {
+    const seen = new Set<string>();
+    let count = 0;
+    for (const group of rosterGroups) {
+      const rows = enrollmentsMatchingSearch(
+        enrollmentsBySection.get(group.sectionId) ?? [],
+        studentSearch,
+      );
+      for (const row of rows) {
+        if (seen.has(row.studentId)) continue;
+        seen.add(row.studentId);
+        count += 1;
+      }
+    }
+    return count;
+  }, [rosterGroups, enrollmentsBySection, studentSearch]);
+
+  const toggleExpanded = (id: string) => {
+    setExpandedId((current) => (current === id ? null : id));
+  };
+
+  const isLoading = enrollments.isLoading || rosterAssignments.isLoading;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Class & roster explorer"
-        description="Filter by class, section, subject, teacher, or student name. Switch between enrolled students and who teaches each subject."
+        description="Each row is a class, section, subject, and teacher. Click a row to expand and see enrolled students."
       />
 
       <div className="grid gap-4 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -215,6 +219,7 @@ export function SchoolRosterExplorer() {
               setGradeId(e.target.value);
               setSectionId("");
               setSubjectId("");
+              setExpandedId(null);
             }}
           >
             <option value="">All classes</option>
@@ -230,7 +235,10 @@ export function SchoolRosterExplorer() {
           <Select
             id="roster-section"
             value={sectionId}
-            onChange={(e) => setSectionId(e.target.value)}
+            onChange={(e) => {
+              setSectionId(e.target.value);
+              setExpandedId(null);
+            }}
             disabled={!gradeId}
           >
             <option value="">All sections</option>
@@ -246,7 +254,10 @@ export function SchoolRosterExplorer() {
           <Select
             id="roster-subject"
             value={subjectId}
-            onChange={(e) => setSubjectId(e.target.value)}
+            onChange={(e) => {
+              setSubjectId(e.target.value);
+              setExpandedId(null);
+            }}
           >
             <option value="">All subjects</option>
             {subjectOptions.map((subject) => (
@@ -259,7 +270,14 @@ export function SchoolRosterExplorer() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="roster-teacher">Teacher</Label>
-          <Select id="roster-teacher" value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
+          <Select
+            id="roster-teacher"
+            value={teacherId}
+            onChange={(e) => {
+              setTeacherId(e.target.value);
+              setExpandedId(null);
+            }}
+          >
             <option value="">All teachers</option>
             {(teachers.data ?? []).map((teacher) => (
               <option key={teacher.id} value={teacher.id}>
@@ -283,152 +301,125 @@ export function SchoolRosterExplorer() {
         </div>
       </div>
 
-      <Tabs defaultValue="students" value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="students">
-            <GraduationCap className="mr-1.5 h-4 w-4" />
-            Students ({studentRows.length})
-          </TabsTrigger>
-          <TabsTrigger value="teaching">
-            <BookOpen className="mr-1.5 h-4 w-4" />
-            Subject teachers ({teachingRows.length})
-          </TabsTrigger>
-        </TabsList>
+      <p className="text-sm text-muted-foreground">
+        {rosterGroups.length} teaching group{rosterGroups.length === 1 ? "" : "s"} · {totalStudentsShown} student
+        {totalStudentsShown === 1 ? "" : "s"} in view
+      </p>
 
-        <TabsContent value="students" className="mt-4">
-          {enrollments.isLoading || rosterAssignments.isLoading ? (
-            <PageLoader variant="panel" />
-          ) : !studentRows.length ? (
-            <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-              No students match these filters.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border bg-card">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Student ID</TableHead>
-                    <TableHead>Class</TableHead>
-                    <TableHead>Section</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Teacher</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {studentRows.map((row) => {
-                    const pairs = teachingPairsForSection(
-                      row.sectionId,
-                      assignmentRows,
-                      subjectIdSet,
-                      teacherId,
-                    );
-                    return (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium">
-                        <Link href={`/school/students/${row.studentId}`} className="hover:underline">
-                          {row.student?.firstName} {row.student?.lastName}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{row.student?.studentCode ?? "—"}</TableCell>
-                      <TableCell>{row.grade?.name ?? "—"}</TableCell>
-                      <TableCell>{row.section?.name ?? "—"}</TableCell>
-                      <TableCell className="text-sm">
-                        {pairs.length ? (
-                          <span className="flex flex-col gap-0.5">
-                            {pairs.map((pair) => (
-                              <span key={`${pair.subject}-${pair.teacherId ?? "none"}`}>{pair.subject}</span>
-                            ))}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {pairs.length ? (
-                          <span className="flex flex-col gap-0.5">
-                            {pairs.map((pair) =>
-                              pair.teacherId ? (
-                                <Link
-                                  key={`${pair.subject}-${pair.teacherId}`}
-                                  href={`/school/teachers/${pair.teacherId}/overview`}
-                                  className="hover:underline"
-                                >
-                                  {pair.teacherName}
-                                </Link>
-                              ) : (
-                                <span key={pair.subject} className="text-muted-foreground">
-                                  {pair.teacherName}
-                                </span>
-                              ),
-                            )}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                    </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="teaching" className="mt-4">
-          {rosterAssignments.isLoading ? (
-            <PageLoader variant="panel" />
-          ) : !teachingRows.length ? (
-            <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-              No subject assignments match these filters.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border bg-card">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Class</TableHead>
-                    <TableHead>Section</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Teacher</TableHead>
-                    <TableHead>Assistant</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {teachingRows.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell>{gradeClassLabel(row.section)}</TableCell>
-                      <TableCell>{row.section?.name ?? "—"}</TableCell>
-                      <TableCell>{row.subject?.name ?? "—"}</TableCell>
+      {isLoading ? (
+        <PageLoader variant="panel" />
+      ) : !rosterGroups.length ? (
+        <div className="rounded-lg border border-dashed p-8 text-center">
+          <UserSquare2 className="mx-auto h-10 w-10 text-muted-foreground" />
+          <p className="mt-3 text-sm text-muted-foreground">
+            No class–subject rows match these filters. Try another class or clear subject/teacher filters.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10" aria-label="Expand" />
+                <TableHead>Class</TableHead>
+                <TableHead>Section</TableHead>
+                <TableHead>Subject</TableHead>
+                <TableHead>Teacher</TableHead>
+                <TableHead className="text-right tabular-nums">Students</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rosterGroups.map((group) => {
+                const open = expandedId === group.id;
+                const sectionStudents = enrollmentsMatchingSearch(
+                  enrollmentsBySection.get(group.sectionId) ?? [],
+                  studentSearch,
+                );
+                return (
+                  <Fragment key={group.id}>
+                    <TableRow
+                      className="cursor-pointer hover:bg-muted/50"
+                      tabIndex={0}
+                      aria-expanded={open}
+                      onClick={() => toggleExpanded(group.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          toggleExpanded(group.id);
+                        }
+                      }}
+                    >
                       <TableCell>
-                        {row.teacher ? (
+                        <ChevronDown
+                          className={cn(
+                            "h-4 w-4 text-muted-foreground transition-transform",
+                            open && "rotate-180",
+                          )}
+                          aria-hidden
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">{group.classLabel}</TableCell>
+                      <TableCell>{group.sectionName}</TableCell>
+                      <TableCell>{group.subjectName}</TableCell>
+                      <TableCell>
+                        {group.teacherId ? (
                           <Link
-                            href={`/school/teachers/${row.teacherId}/overview`}
+                            href={`/school/teachers/${group.teacherId}/overview`}
                             className="hover:underline"
+                            onClick={(event) => event.stopPropagation()}
                           >
-                            {teacherDisplayNameFromUser(row.teacher.user, row.teacher.gender)}
+                            {group.teacherName}
                           </Link>
                         ) : (
-                          "—"
+                          <span className="text-muted-foreground">{group.teacherName}</span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        {row.assistantTeacher
-                          ? teacherDisplayNameFromUser(
-                              row.assistantTeacher.user,
-                              row.assistantTeacher.gender,
-                            )
-                          : "—"}
-                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{sectionStudents.length}</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+                    {open ? (
+                      <TableRow key={`${group.id}-students`} className="hover:bg-transparent">
+                        <td colSpan={6} className="bg-muted/20 p-0 align-middle">
+                          {sectionStudents.length ? (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Student</TableHead>
+                                  <TableHead>Student ID</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {sectionStudents.map((row) => (
+                                  <TableRow key={row.id}>
+                                    <TableCell className="font-medium">
+                                      <Link
+                                        href={`/school/students/${row.studentId}`}
+                                        className="hover:underline"
+                                      >
+                                        {personFullName(row.student?.firstName, row.student?.lastName)}
+                                      </Link>
+                                    </TableCell>
+                                    <TableCell className="font-mono text-sm">
+                                      {row.student?.studentCode ?? "—"}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          ) : (
+                            <p className="p-4 text-sm text-muted-foreground">
+                              No active students in this section.
+                            </p>
+                          )}
+                        </td>
+                      </TableRow>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }
