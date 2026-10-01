@@ -16,6 +16,7 @@ import {
 } from '../prompts';
 import { difficultyInstruction, mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
 import { parseModelJson } from '../parse-model-json';
+import { LESSON_MAX_PAGE_UPLOADS } from '../../lessons/lesson-upload.constants';
 import {
   isFakeExtractText,
   isGarbledRtlOcr,
@@ -324,19 +325,28 @@ export class CursorProvider implements AiProvider {
     return { cwd, storeDir };
   }
 
+  /** Per-page vision budget — Urdu/Arabic textbook photos often need >45s. */
+  private lessonPageVisionTimeoutMs(pageCount: number): number {
+    const count = Math.max(1, Math.min(LESSON_MAX_PAGE_UPLOADS, pageCount));
+    return Math.min(240_000, 90_000 + (count - 1) * 12_000);
+  }
+
   private async completeWithImages(system: string, user: string, images: LessonImageInput[]) {
-    const pages = images.slice(0, 3);
+    const pages = images.slice(0, LESSON_MAX_PAGE_UPLOADS);
     const shrunk = await Promise.all(pages.map((page) => this.shrinkLessonImage(page)));
-    this.logger.log(`Cursor vision ${shrunk.length} page(s) in parallel`);
-    const pageTexts = await Promise.all(
-      shrunk.map((page, index) =>
-        this.withTimeout(
-          this.transcribeSinglePage(system, user, page, index + 1, shrunk.length),
-          45_000,
-          `Lesson page ${index + 1}`,
-        ),
-      ),
+    const perPageMs = this.lessonPageVisionTimeoutMs(shrunk.length);
+    this.logger.log(
+      `Cursor vision ${shrunk.length} page(s) sequentially (${perPageMs}ms budget per page)`,
     );
+    const pageTexts: string[] = [];
+    for (let index = 0; index < shrunk.length; index++) {
+      const text = await this.withTimeout(
+        this.transcribeSinglePage(system, user, shrunk[index], index + 1, shrunk.length),
+        perPageMs,
+        `Lesson page ${index + 1}`,
+      );
+      pageTexts.push(text);
+    }
 
     const summaries: string[] = [];
     let chapterName: string | undefined;
