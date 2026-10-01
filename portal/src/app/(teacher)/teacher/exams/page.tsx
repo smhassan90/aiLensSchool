@@ -101,6 +101,7 @@ export default function TeacherExamsPage() {
         sectionId: lectureSectionId!,
         subjectId: lectureSubjectId!,
         status: "CONFIRMED",
+        forExamLectures: true,
         limit: 100,
       }),
     enabled: Boolean(lectureSectionId && lectureSubjectId),

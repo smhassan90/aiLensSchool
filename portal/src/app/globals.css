@@ -181,3 +181,20 @@
     -webkit-print-color-adjust: exact;
   }
 }
+
+@keyframes chapter-page-reading-ring {
+  0% {
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.15), 0 0 0 0 hsl(var(--primary) / 0.08);
+  }
+  50% {
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.55), 0 0 12px 2px hsl(var(--primary) / 0.2);
+  }
+  100% {
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.15), 0 0 0 0 hsl(var(--primary) / 0.08);
+  }
+}
+
+.chapter-page-reading {
+  animation: chapter-page-reading-ring 1.35s ease-in-out infinite;
+  border-color: hsl(var(--primary) / 0.45) !important;
+}

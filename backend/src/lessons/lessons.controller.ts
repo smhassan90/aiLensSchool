@@ -15,7 +15,7 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import { LessonStatus, RoleName } from '@prisma/client';
-import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { LESSON_MAX_PAGE_UPLOADS } from './lesson-upload.constants';
 import { LessonsService } from './lessons.service';
 import {
@@ -63,6 +63,11 @@ class LessonListQueryDto extends PaginationDto {
   @IsOptional()
   @IsEnum(LessonRecordKind)
   recordKind?: LessonRecordKind;
+
+  /** When true, hide chapter-library rows that already have a class session (exam paper picker). */
+  @IsOptional()
+  @IsBoolean()
+  forExamLectures?: boolean;
 }
 
 class ChapterListQueryDto {
@@ -232,6 +237,48 @@ export class LessonsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.lessonsService.appendChapterPhotos(id, files ?? [], user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Post('chapters/:id/pages/:sourceId/replace-photo')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FilesInterceptor('pages', 1, {
+      storage: memoryStorage(),
+      limits: { fileSize: 15 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const allowed =
+          IMAGE_MIME.test(file.mimetype) ||
+          (!file.mimetype && IMAGE_NAME.test(file.originalname)) ||
+          IMAGE_NAME.test(file.originalname);
+        if (!allowed) {
+          cb(
+            new BadRequestException({
+              code: 'INVALID_IMAGE',
+              message: 'Only JPEG, PNG, WebP, or HEIC photos are allowed',
+            }),
+            false,
+          );
+          return;
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  replaceChapterPagePhoto(
+    @Param('id') id: string,
+    @Param('sourceId') sourceId: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @CurrentUser() user: AuthUser,
+  ) {
+    const file = files?.[0];
+    if (!file) {
+      throw new BadRequestException({
+        code: 'PHOTO_REQUIRED',
+        message: 'Choose a photo to upload',
+      });
+    }
+    return this.lessonsService.replaceChapterPagePhoto(id, sourceId, file, user);
   }
 
   @Roles(RoleName.TEACHER)

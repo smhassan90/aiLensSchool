@@ -15,6 +15,50 @@ function words(line: string): string[] {
   return line.match(/[A-Za-z]{2,}/g) ?? [];
 }
 
+export const PAGE_OCR_ACCEPT_THRESHOLD = 90;
+
+function lineQualityWeight(line: string): number {
+  const trimmed = line.trim();
+  if (trimmed.length < 3) return 1;
+  if (lineLooksLikeGibberish(trimmed)) return 0;
+  if (isSuspectParagraph(trimmed)) {
+    const latin = countLatinLetters(trimmed);
+    if (trimmed.length >= 32 && latin >= 18) return 0.78;
+    return 0.22;
+  }
+
+  let weight = 1;
+  if (/^[«»]/.test(trimmed) || /[«»]$/.test(trimmed)) weight -= 0.12;
+  const symbolHits = (trimmed.match(/[|«»©®¢§°^`~]/g) ?? []).length;
+  if (symbolHits >= 2) weight -= Math.min(0.35, symbolHits * 0.08);
+  if (/\b[A-Za-z]{1,3}\s*[|,.]{1,2}\s*/.test(trimmed)) weight -= 0.18;
+  if (/\|\s*[a-z]{1,3}\b/i.test(trimmed)) weight -= 0.15;
+  if (/\b[a-z]{1,2}\s*[-—_]{2,}/i.test(trimmed)) weight -= 0.12;
+  if (/\b[A-Za-z]*[|©®][A-Za-z]*\b/.test(trimmed)) weight -= 0.2;
+  if (looksLikeGarbledLatinOcr(trimmed) && trimmed.length < 120) weight -= 0.35;
+
+  return Math.max(0, Math.min(1, weight));
+}
+
+/** Share of page text that looks cleanly read (0–100). Accept when ≥ PAGE_OCR_ACCEPT_THRESHOLD. */
+export function scorePageOcrQuality(text: string | undefined | null): number {
+  const value = (text ?? '').trim();
+  if (!value) return 0;
+
+  const lines = value.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length >= 3);
+  if (!lines.length) return 0;
+
+  let weighted = 0;
+  let total = 0;
+  for (const line of lines) {
+    const len = Math.max(line.length, 6);
+    weighted += lineQualityWeight(line) * len;
+    total += len;
+  }
+  if (!total) return 0;
+  return Math.round((weighted / total) * 100);
+}
+
 function lineLooksLikeGibberish(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return false;
@@ -110,7 +154,7 @@ export function isPagePhotoTextReadable(text: string | undefined | null): boolea
   const arabic = countArabicScriptChars(value);
   const minLen = arabic >= 30 ? 28 : 48;
   if (value.length < minLen) return false;
-  if (looksLikeGarbledLatinOcr(value) && value.length < 220 && arabic < 40) return false;
+  if (scorePageOcrQuality(value) < PAGE_OCR_ACCEPT_THRESHOLD) return false;
   const blocks = value.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
   const good = blocks.filter((b) => !isSuspectParagraph(b));
   if (good.length === 0) return false;

@@ -13,6 +13,11 @@ import {
   QuestionType,
   QuizStatus,
 } from '@prisma/client';
+import {
+  chapterSourceIdsWithClassSessions,
+  dedupeExamLectureLessons,
+  examLectureRecordWhere,
+} from '../lessons/exam-lecture-filter';
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantService } from '../common/services/tenant.service';
@@ -225,7 +230,7 @@ export class QuizzesService {
     }
 
     if (dto.lessonIds?.length) {
-      const lessons = await this.prisma.dailyLesson.findMany({
+      const lessonsRaw = await this.prisma.dailyLesson.findMany({
         where: {
           id: { in: dto.lessonIds },
           schoolId,
@@ -234,6 +239,9 @@ export class QuizzesService {
           status: LessonStatus.CONFIRMED,
         },
         select: {
+          id: true,
+          recordKind: true,
+          chapterSourceId: true,
           date: true,
           topicName: true,
           chapterName: true,
@@ -242,6 +250,7 @@ export class QuizzesService {
         },
         orderBy: { date: 'asc' },
       });
+      const lessons = dedupeExamLectureLessons(lessonsRaw);
       if (!lessons.length) {
         throw new BadRequestException({
           code: 'NO_CONFIRMED_LECTURES',
@@ -262,12 +271,13 @@ export class QuizzesService {
     }
 
     if (dto.lessonDateFrom && dto.lessonDateTo) {
+      const scope = { schoolId, sectionId: dto.sectionId, subjectId: dto.subjectId };
+      const chapterIdsWithSessions = await chapterSourceIdsWithClassSessions(this.prisma, scope);
       const lessons = await this.prisma.dailyLesson.findMany({
         where: {
-          schoolId,
-          sectionId: dto.sectionId,
-          subjectId: dto.subjectId,
+          ...scope,
           status: LessonStatus.CONFIRMED,
+          ...examLectureRecordWhere(chapterIdsWithSessions),
           date: {
             gte: new Date(`${dto.lessonDateFrom}T00:00:00.000`),
             lte: new Date(`${dto.lessonDateTo}T23:59:59.999`),

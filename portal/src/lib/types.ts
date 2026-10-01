@@ -322,6 +322,10 @@ export interface LessonPageSource {
   label: string;
   /** Text read from this page photo (OCR / vision). */
   fetchedText?: string;
+  /** 0–100 clarity score from OCR quality check. */
+  textQualityPercent?: number;
+  /** True when at least ~90% of page text read cleanly. */
+  textAccepted?: boolean;
 }
 
 export interface Lesson {

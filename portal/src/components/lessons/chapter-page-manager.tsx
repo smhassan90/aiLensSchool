@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,12 +33,14 @@ import {
   ChevronDown,
   ChevronUp,
   ImagePlus,
-  CheckCircle2,
   AlertCircle,
   RotateCcw,
   ChevronLeft,
   ChevronRight,
   ZoomIn,
+  Loader2,
+  FileImage,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +58,11 @@ const IMAGE_EXT = /\.(jpe?g|png|webp|heic|heif)$/i;
 function isImageFile(file: File) {
   if (file.type.startsWith("image/")) return true;
   return IMAGE_EXT.test(file.name);
+}
+
+function pageTextAccepted(page: LessonPageSource): boolean {
+  if (page.textAccepted !== undefined) return page.textAccepted;
+  return Boolean(page.fetchedText?.trim());
 }
 
 export function ChapterPageManager({
@@ -84,6 +92,9 @@ export function ChapterPageManager({
   const uploadQueueRef = useRef<ChapterPageUploadItem[]>([]);
   const uploadRunning = useRef(false);
   const initialStarted = useRef(false);
+  const [reuploadSourceId, setReuploadSourceId] = useState<string | null>(null);
+  const reuploadInputRef = useRef<HTMLInputElement>(null);
+  const reuploadTargetRef = useRef<string | null>(null);
 
   const setQueue = useCallback(
     (updater: ChapterPageUploadItem[] | ((prev: ChapterPageUploadItem[]) => ChapterPageUploadItem[])) => {
@@ -171,6 +182,48 @@ export function ChapterPageManager({
     initialStarted.current = true;
     void enqueueUploads(initialUploadFiles);
   }, [initialUploadFiles, enqueueUploads]);
+
+  const reuploadPage = async (sourceId: string, file: File) => {
+    setReuploadSourceId(sourceId);
+    try {
+      const compressed = await compressPhotosForUpload([file]);
+      const lesson = await lessonsService.replaceChapterPagePhoto(
+        lessonId,
+        sourceId,
+        compressed[0] ?? file,
+      );
+      invalidate();
+      onContentUpdated(lesson);
+      const updated = lesson.pageSources?.find((p) => p.id === sourceId);
+      if (updated && pageTextAccepted(updated)) {
+        toast({
+          title: "Page read successfully",
+          description: `About ${updated.textQualityPercent ?? 90}% of the text was captured clearly.`,
+          variant: "success",
+        });
+      } else {
+        toast({
+          title: "Photo still unclear",
+          description: "Try a sharper photo with the full page flat and well lit.",
+          variant: "error",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Could not read this page",
+        description: uploadErrorMessage(err),
+        variant: "error",
+      });
+    } finally {
+      setReuploadSourceId(null);
+      reuploadTargetRef.current = null;
+    }
+  };
+
+  const promptReupload = (sourceId: string) => {
+    reuploadTargetRef.current = sourceId;
+    reuploadInputRef.current?.click();
+  };
 
   const retryUpload = (id: string) => {
     setQueue((current) =>
@@ -263,7 +316,8 @@ export function ChapterPageManager({
       <CardHeader>
         <CardTitle className="text-base">Pages &amp; more content</CardTitle>
         <CardDescription>
-          Upload each page, then use Read fetched text on uploaded pages. Reorder photos so compile follows the book.
+          Each photo is read automatically. A green badge means at least 90% of the text was captured; otherwise
+          re-upload that page. Reorder photos so compile follows the book.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -288,10 +342,17 @@ export function ChapterPageManager({
             <ul className="space-y-2">
               {ordered.map((page, index) => {
                 const src = assetUrl(page.url);
+                const accepted = pageTextAccepted(page);
+                const reading = reuploadSourceId === page.id;
+                const quality = page.textQualityPercent;
                 return (
                   <li
                     key={page.id}
-                    className="flex items-center gap-3 rounded-lg border bg-muted/20 p-2"
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg border p-2 transition-colors",
+                      reading && "chapter-page-reading bg-primary/5",
+                      accepted ? "border-emerald-200/80 bg-emerald-50/40" : "border-amber-200/80 bg-amber-50/30",
+                    )}
                   >
                     <span className="w-8 shrink-0 text-center text-sm font-medium tabular-nums text-muted-foreground">
                       {index + 1}
@@ -311,36 +372,74 @@ export function ChapterPageManager({
                     ) : (
                       <div className="h-16 w-12 shrink-0 rounded bg-muted" />
                     )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" aria-hidden />
-                        <span className="truncate">{page.label}</span>
-                        <span className="shrink-0 text-green-700">Uploaded</span>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="truncate text-xs font-medium text-foreground">{page.label}</span>
+                        {reading ? (
+                          <Badge variant="secondary" className="gap-1 border-primary/30 bg-primary/10 text-primary">
+                            <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                            Reading page…
+                          </Badge>
+                        ) : accepted ? (
+                          <Badge
+                            variant="secondary"
+                            className="gap-1 border-emerald-300/80 bg-emerald-100 text-emerald-900"
+                          >
+                            <Sparkles className="h-3 w-3" aria-hidden />
+                            Text captured
+                            {typeof quality === "number" ? ` · ${quality}%` : ""}
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="secondary"
+                            className="gap-1 border-amber-300/80 bg-amber-100 text-amber-950"
+                          >
+                            <AlertCircle className="h-3 w-3" aria-hidden />
+                            Needs clearer photo
+                            {typeof quality === "number" && quality > 0 ? ` · ${quality}%` : ""}
+                          </Badge>
+                        )}
                       </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="mt-2 h-8"
-                        onClick={() => {
-                          const text = page.fetchedText?.trim() ?? "";
-                          if (!text) {
-                            toast({
-                              title: "No text for this page",
-                              description: "Re-upload the photo or wait for reading to finish.",
-                              variant: "error",
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8"
+                          disabled={reading || !accepted}
+                          onClick={() => {
+                            const text = page.fetchedText?.trim() ?? "";
+                            if (!text) {
+                              toast({
+                                title: "No text for this page",
+                                description: "Re-upload a clearer photo of this page.",
+                                variant: "error",
+                              });
+                              return;
+                            }
+                            setPageTextView({
+                              pageNumber: index + 1,
+                              label: page.label,
+                              text,
                             });
-                            return;
-                          }
-                          setPageTextView({
-                            pageNumber: index + 1,
-                            label: page.label,
-                            text,
-                          });
-                        }}
-                      >
-                        Read fetched text
-                      </Button>
+                          }}
+                        >
+                          Preview text
+                        </Button>
+                        {!accepted && !reading ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-8 gap-1.5"
+                            disabled={queueBusy}
+                            onClick={() => promptReupload(page.id)}
+                          >
+                            <FileImage className="h-3.5 w-3.5" aria-hidden />
+                            Re-upload picture
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="flex shrink-0 flex-col gap-0.5">
                       <Button
@@ -374,7 +473,12 @@ export function ChapterPageManager({
                   key={item.id}
                   className={cn(
                     "flex items-center gap-3 rounded-lg border p-2",
-                    item.status === "failed" ? "border-destructive/40 bg-destructive/5" : "bg-muted/10",
+                    item.status === "uploading" && "chapter-page-reading bg-primary/5",
+                    item.status === "failed"
+                      ? "border-destructive/40 bg-destructive/5"
+                      : item.status === "uploading"
+                        ? "border-primary/40"
+                        : "bg-muted/10",
                   )}
                 >
                   <span className="w-8 shrink-0 text-center text-sm font-medium tabular-nums text-muted-foreground">
@@ -392,9 +496,12 @@ export function ChapterPageManager({
                     </span>
                   </button>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
                       {item.status === "uploading" ? (
-                        <span className="text-muted-foreground">Reading text…</span>
+                        <Badge variant="secondary" className="gap-1 border-primary/30 bg-primary/10 text-primary">
+                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                          Reading text…
+                        </Badge>
                       ) : item.status === "failed" ? (
                         <>
                           <AlertCircle className="h-4 w-4 shrink-0 text-destructive" aria-hidden />
@@ -497,6 +604,21 @@ export function ChapterPageManager({
         </div>
 
         {appendText.isPending || saveOrder.isPending ? <PageLoader variant="panel" /> : null}
+
+        <input
+          ref={reuploadInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            const sourceId = reuploadTargetRef.current;
+            if (file && isImageFile(file) && sourceId) {
+              void reuploadPage(sourceId, file);
+            }
+          }}
+        />
       </CardContent>
 
       <Dialog open={pageTextView !== null} onOpenChange={(open) => !open && setPageTextView(null)}>

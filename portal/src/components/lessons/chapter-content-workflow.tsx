@@ -105,7 +105,7 @@ export function ChapterContentWorkflow({
     if (!fromPages.trim()) {
       toast({
         title: "No page text yet",
-        description: "Upload pages until each shows Uploaded, then assemble or compile.",
+        description: "Upload each page until it shows Text captured (90%+ read), then assemble or compile.",
         variant: "error",
       });
       return;

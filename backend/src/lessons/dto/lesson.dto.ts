@@ -2,6 +2,7 @@ import {
   Allow,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsInt,
@@ -239,6 +240,10 @@ export class LessonQueryDto {
   @IsOptional()
   @IsEnum(LessonRecordKind)
   recordKind?: LessonRecordKind;
+
+  @IsOptional()
+  @IsBoolean()
+  forExamLectures?: boolean;
 
   @IsOptional()
   @IsString()

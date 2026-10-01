@@ -141,6 +141,7 @@ export const lessonsService = {
     date?: string;
     status?: string;
     recordKind?: string;
+    forExamLectures?: boolean;
     sectionId?: string;
     subjectId?: string;
   }) {
@@ -186,6 +187,17 @@ export const lessonsService = {
     return apiForm<Lesson>(`/lessons/chapters/${lessonId}/append-photos`, body, "POST", {
       timeoutMs: lessonExtractTimeoutMs(pages.length),
     });
+  },
+
+  replaceChapterPagePhoto(lessonId: string, sourceId: string, page: File) {
+    const body = new FormData();
+    body.append("pages", page);
+    return apiForm<Lesson>(
+      `/lessons/chapters/${lessonId}/pages/${sourceId}/replace-photo`,
+      body,
+      "POST",
+      { timeoutMs: lessonExtractTimeoutMs(1) },
+    );
   },
 
   appendChapterText(lessonId: string, text: string) {

@@ -37,6 +37,10 @@ import { PageOcrService } from './page-ocr.service';
 import { deriveKeyPointsFromLesson, formatOcrLesson } from './lesson-text-formatter';
 import { coerceLessonDisplayText } from './lesson-display-text';
 import {
+  chapterSourceIdsWithClassSessions,
+  examLectureRecordWhere,
+} from './exam-lecture-filter';
+import {
   AppendChapterTextDto,
   CompileChapterDto,
   ConfirmChapterContentDto,
@@ -77,6 +81,8 @@ import {
   filterCompiledLessonText,
   filterPageTextForLessonAssembly,
   isPagePhotoTextReadable,
+  PAGE_OCR_ACCEPT_THRESHOLD,
+  scorePageOcrQuality,
   pageTextNeedsVisionRetry,
 } from './page-text-sanitize';
 import { prepareLessonPagePhoto } from './page-image-prep';
@@ -272,15 +278,19 @@ export class LessonsService {
     return sources
       .filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE && s.fileAsset?.url)
       .sort((a, b) => (a.pageFrom ?? 0) - (b.pageFrom ?? 0))
-      .map((s) => ({
-        id: s.id,
-        pageOrder: s.pageFrom ?? 0,
-        url: s.fileAsset!.url,
-        label: s.fileAsset!.originalFilename ?? 'Page photo',
-        fetchedText: s.ocrText?.trim()
-          ? filterPageTextForLessonAssembly(coerceLessonDisplayText(s.ocrText))
-          : '',
-      }));
+      .map((s) => {
+        const raw = s.ocrText?.trim() ? coerceLessonDisplayText(s.ocrText) : '';
+        const textQualityPercent = raw ? scorePageOcrQuality(raw) : 0;
+        return {
+          id: s.id,
+          pageOrder: s.pageFrom ?? 0,
+          url: s.fileAsset!.url,
+          label: s.fileAsset!.originalFilename ?? 'Page photo',
+          fetchedText: raw ? filterPageTextForLessonAssembly(raw) : '',
+          textQualityPercent,
+          textAccepted: Boolean(raw) && textQualityPercent >= PAGE_OCR_ACCEPT_THRESHOLD,
+        };
+      });
   }
 
   private presentLesson<T extends { aiSummary?: string | null; sources?: unknown }>(lesson: T) {
@@ -591,9 +601,13 @@ export class LessonsService {
       }
     }
     if (!isPagePhotoTextReadable(final)) {
+      const quality = scorePageOcrQuality(final);
       throw new BadRequestException({
         code: 'PAGE_PHOTO_UNCLEAR',
-        message: this.unclearPagePhotoMessage(file.originalname),
+        message:
+          quality > 0 && quality < PAGE_OCR_ACCEPT_THRESHOLD
+            ? `Only about ${quality}% of this page was read clearly (need at least ${PAGE_OCR_ACCEPT_THRESHOLD}%). ${this.unclearPagePhotoMessage(file.originalname)}`
+            : this.unclearPagePhotoMessage(file.originalname),
       });
     }
     return final;
@@ -682,6 +696,72 @@ export class LessonsService {
     });
 
     return this.loadPresented(id);
+  }
+
+  async replaceChapterPagePhoto(
+    lessonId: string,
+    sourceId: string,
+    file: Express.Multer.File,
+    user: AuthUser,
+  ) {
+    if (!file) {
+      throw new BadRequestException({
+        code: 'PHOTO_REQUIRED',
+        message: 'Choose a photo to upload',
+      });
+    }
+    const lesson = await this.requireOwnedChapterLesson(lessonId, user);
+    const source = lesson.sources.find(
+      (s) => s.id === sourceId && s.type === LessonSourceType.TEXTBOOK_IMAGE,
+    );
+    if (!source) {
+      throw new NotFoundException({ code: 'PAGE_NOT_FOUND', message: 'Page photo not found' });
+    }
+    const grade = await this.prisma.grade.findUnique({ where: { id: lesson.gradeId } });
+    if (!grade) {
+      throw new BadRequestException({
+        code: 'CLASS_NOT_FOUND',
+        message: 'Grade was not found for this chapter',
+      });
+    }
+    const prepared = await prepareLessonPagePhoto(file);
+    const readyFile = {
+      ...file,
+      buffer: prepared.buffer,
+      mimetype: prepared.mimeType,
+      originalname: prepared.originalname,
+      size: prepared.size,
+    } as Express.Multer.File;
+    const text = await this.transcribeTextbookPhoto(
+      readyFile,
+      lesson.subject,
+      grade,
+      lesson.schoolId,
+      user.id,
+    );
+    const asset = await this.filesService.saveSchoolUpload(
+      lesson.schoolId,
+      user.id,
+      readyFile,
+      'lesson-pages',
+    );
+    await this.prisma.$transaction(async (tx) => {
+      await tx.lessonSource.update({
+        where: { id: sourceId },
+        data: {
+          fileAssetId: asset.id,
+          ocrText: text.trim() || null,
+        },
+      });
+      await tx.dailyLesson.update({
+        where: { id: lessonId },
+        data: {
+          contentConfirmed: false,
+          status: LessonStatus.READY_FOR_REVIEW,
+        },
+      });
+    });
+    return this.loadPresented(lessonId);
   }
 
   async appendChapterText(id: string, dto: AppendChapterTextDto, user: AuthUser) {
@@ -1749,11 +1829,27 @@ export class LessonsService {
       }
     }
 
+    let examLectureScope: Prisma.DailyLessonWhereInput | undefined;
+    if (query.forExamLectures && query.sectionId && query.subjectId) {
+      const scope = {
+        schoolId,
+        sectionId: query.sectionId,
+        subjectId: query.subjectId,
+        ...teacherFilter,
+      };
+      const chapterIdsWithSessions = await chapterSourceIdsWithClassSessions(this.prisma, scope);
+      examLectureScope = examLectureRecordWhere(chapterIdsWithSessions);
+    }
+
     const where: Prisma.DailyLessonWhereInput = {
       schoolId,
       ...teacherFilter,
       ...(query.status ? { status: query.status } : {}),
-      ...(query.recordKind ? { recordKind: query.recordKind } : {}),
+      ...(examLectureScope
+        ? examLectureScope
+        : query.recordKind
+          ? { recordKind: query.recordKind }
+          : {}),
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
       ...(query.subjectId ? { subjectId: query.subjectId } : {}),
       ...(query.date ? { date: new Date(query.date) } : {}),
