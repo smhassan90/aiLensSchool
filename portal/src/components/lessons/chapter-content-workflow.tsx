@@ -74,11 +74,16 @@ export function ChapterContentWorkflow({
   });
 
   const compile = useMutation({
-    mutationFn: () =>
-      lessonsService.compileChapter(lessonId, {
-        sourceText: draftText,
+    mutationFn: () => {
+      const sourceText = sourceForCompile();
+      if (!sourceText.trim()) {
+        throw new Error("Upload pages and assemble text before compiling.");
+      }
+      return lessonsService.compileChapter(lessonId, {
+        sourceText,
         instruction: compileInstruction.trim() || undefined,
-      }),
+      });
+    },
     onSuccess: (result) => {
       setCompiledBody(coerceLessonDisplayText(result.compile.lessonBody));
       setCompiledExercises(coerceLessonDisplayText(result.compile.exercises));
@@ -95,19 +100,27 @@ export function ChapterContentWorkflow({
       }),
   });
 
-  const readFromPages = () => {
+  const assemblePagesForCompile = () => {
     const fromPages = coerceLessonDisplayText(lesson.chapterPageText ?? "");
     if (!fromPages.trim()) {
       toast({
         title: "No page text yet",
-        description: "Upload and read page photos first.",
+        description: "Upload pages until each shows Uploaded, then assemble or compile.",
         variant: "error",
       });
       return;
     }
     setDraftText(fromPages);
     setDraftTouched(true);
+    toast({
+      title: "Pages assembled",
+      description: "Text is in page order. Edit if needed, then compile.",
+      variant: "success",
+    });
   };
+
+  const sourceForCompile = () =>
+    draftText.trim() || coerceLessonDisplayText(lesson.chapterPageText ?? "");
 
   const compiledFull = [compiledBody, compiledExercises].filter(Boolean).join(
     compiledExercises ? "\n\n## Exercises\n\n" : "",
@@ -127,7 +140,8 @@ export function ChapterContentWorkflow({
             Raw page text
           </CardTitle>
           <CardDescription>
-            Read text from your uploaded pages, fix OCR mistakes, reorder photos above, then compile.
+            After each page is uploaded, use Read fetched text on that row. When order is right, assemble all
+            pages here (or compile directly — pages are merged in photo order).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -142,8 +156,8 @@ export function ChapterContentWorkflow({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={readFromPages}>
-              Read the content
+            <Button type="button" variant="outline" onClick={assemblePagesForCompile}>
+              Assemble all pages
             </Button>
             <Button
               type="button"
@@ -163,13 +177,13 @@ export function ChapterContentWorkflow({
               setDraftTouched(true);
               setDraftText(e.target.value);
             }}
-            placeholder="Page text appears here after you click Read the content…"
+            placeholder="Assemble all pages, or edit the combined text before compile…"
           />
           {!ready && (
             <Button
               type="button"
               className="w-full sm:w-auto"
-              disabled={!draftText.trim() || compile.isPending}
+              disabled={!sourceForCompile().trim() || compile.isPending}
               onClick={() => compile.mutate()}
             >
               <Sparkles className="h-4 w-4" />

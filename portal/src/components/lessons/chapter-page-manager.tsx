@@ -76,6 +76,11 @@ export function ChapterPageManager({
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
   const [uploadQueue, setUploadQueue] = useState<ChapterPageUploadItem[]>([]);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [pageTextView, setPageTextView] = useState<{
+    pageNumber: number;
+    label: string;
+    text: string;
+  } | null>(null);
   const uploadQueueRef = useRef<ChapterPageUploadItem[]>([]);
   const uploadRunning = useRef(false);
   const initialStarted = useRef(false);
@@ -258,7 +263,7 @@ export function ChapterPageManager({
       <CardHeader>
         <CardTitle className="text-base">Pages &amp; more content</CardTitle>
         <CardDescription>
-          Add more photos or pasted text below what you already have. Tap a page photo to enlarge it, then reorder so the text matches the book.
+          Upload each page, then use Read fetched text on uploaded pages. Reorder photos so compile follows the book.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -306,16 +311,37 @@ export function ChapterPageManager({
                     ) : (
                       <div className="h-16 w-12 shrink-0 rounded bg-muted" />
                     )}
-                    <button
-                      type="button"
-                      className="flex min-w-0 flex-1 items-center gap-2 truncate text-left text-xs text-muted-foreground hover:text-foreground"
-                      onClick={() => src && openPreview(page.id)}
-                      disabled={!src}
-                    >
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" aria-hidden />
-                      <span className="truncate">{page.label}</span>
-                      <span className="shrink-0 text-green-700">Uploaded</span>
-                    </button>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" aria-hidden />
+                        <span className="truncate">{page.label}</span>
+                        <span className="shrink-0 text-green-700">Uploaded</span>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="mt-2 h-8"
+                        onClick={() => {
+                          const text = page.fetchedText?.trim() ?? "";
+                          if (!text) {
+                            toast({
+                              title: "No text for this page",
+                              description: "Re-upload the photo or wait for reading to finish.",
+                              variant: "error",
+                            });
+                            return;
+                          }
+                          setPageTextView({
+                            pageNumber: index + 1,
+                            label: page.label,
+                            text,
+                          });
+                        }}
+                      >
+                        Read fetched text
+                      </Button>
+                    </div>
                     <div className="flex shrink-0 flex-col gap-0.5">
                       <Button
                         type="button"
@@ -368,7 +394,7 @@ export function ChapterPageManager({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-xs">
                       {item.status === "uploading" ? (
-                        <span className="text-muted-foreground">Reading page…</span>
+                        <span className="text-muted-foreground">Reading text…</span>
                       ) : item.status === "failed" ? (
                         <>
                           <AlertCircle className="h-4 w-4 shrink-0 text-destructive" aria-hidden />
@@ -472,6 +498,26 @@ export function ChapterPageManager({
 
         {appendText.isPending || saveOrder.isPending ? <PageLoader variant="panel" /> : null}
       </CardContent>
+
+      <Dialog open={pageTextView !== null} onOpenChange={(open) => !open && setPageTextView(null)}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" onClose={() => setPageTextView(null)}>
+          {pageTextView ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Page {pageTextView.pageNumber}</DialogTitle>
+                <DialogDescription>{pageTextView.label}</DialogDescription>
+              </DialogHeader>
+              <Textarea
+                readOnly
+                rows={16}
+                className="min-h-[12rem] font-sans leading-relaxed"
+                dir={/[\u0600-\u06FF]/.test(pageTextView.text) ? "rtl" : "ltr"}
+                value={pageTextView.text}
+              />
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={activePreview !== null} onOpenChange={(open) => !open && setPreviewIndex(null)}>
         <DialogContent

@@ -320,6 +320,8 @@ export interface LessonPageSource {
   pageOrder: number;
   url: string;
   label: string;
+  /** Text read from this page photo (OCR / vision). */
+  fetchedText?: string;
 }
 
 export interface Lesson {

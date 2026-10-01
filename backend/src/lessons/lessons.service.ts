@@ -267,6 +267,7 @@ export class LessonsService {
         pageOrder: s.pageFrom ?? 0,
         url: s.fileAsset!.url,
         label: s.fileAsset!.originalFilename ?? 'Page photo',
+        fetchedText: s.ocrText?.trim() ? coerceLessonDisplayText(s.ocrText) : '',
       }));
   }
 
