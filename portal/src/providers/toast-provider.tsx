@@ -78,16 +78,25 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         t.variant === "success" && "border-primary/30 bg-card",
         t.variant === "error" && "border-destructive/40 bg-card",
         t.variant === "warning" &&
-          "border-amber-500 bg-amber-50 text-amber-950 shadow-amber-200/50 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-50 dark:shadow-none",
+          "border border-orange-300 border-l-[6px] border-l-orange-500 bg-white shadow-xl ring-1 ring-black/5 dark:border-orange-700 dark:border-l-orange-400 dark:bg-slate-900 dark:ring-white/10",
       )}
     >
       <div className="flex items-start gap-3">
-        <ToastIcon variant={t.variant} />
+        {t.variant === "warning" ? (
+          <span
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-950"
+            aria-hidden
+          >
+            <AlertTriangle className="h-5 w-5 text-orange-700 dark:text-orange-300" />
+          </span>
+        ) : (
+          <ToastIcon variant={t.variant} />
+        )}
         <div className="min-w-0 flex-1">
           <p
             className={cn(
               "text-sm font-semibold leading-snug",
-              t.variant === "warning" && "text-amber-950 dark:text-amber-50",
+              t.variant === "warning" && "text-base font-bold text-slate-900 dark:text-white",
             )}
           >
             {t.title}
@@ -95,9 +104,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           {t.description ? (
             <p
               className={cn(
-                "mt-1.5 text-sm leading-relaxed",
+                "mt-2 text-sm leading-relaxed",
                 t.variant === "warning"
-                  ? "text-amber-900 dark:text-amber-100"
+                  ? "whitespace-pre-line text-slate-700 dark:text-slate-200"
                   : "text-muted-foreground",
               )}
             >
@@ -110,7 +119,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           onClick={() => dismiss(t.id)}
           className={cn(
             "shrink-0 rounded p-1 hover:bg-black/5 dark:hover:bg-white/10",
-            t.variant === "warning" ? "text-amber-800 dark:text-amber-200" : "text-muted-foreground",
+            t.variant === "warning" ? "text-slate-600 dark:text-slate-300" : "text-muted-foreground",
           )}
           aria-label={`Dismiss: ${t.title}`}
         >
@@ -127,7 +136,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         <div
           role="region"
           aria-label="Important notifications"
-          className="fixed inset-x-3 top-4 z-[100] flex max-w-md flex-col gap-2 sm:inset-x-auto sm:right-4"
+          className="fixed inset-x-3 top-4 z-[100] flex w-[min(100%,28rem)] flex-col gap-2 sm:inset-x-auto sm:right-4"
         >
           {warningToasts.map(renderToast)}
         </div>

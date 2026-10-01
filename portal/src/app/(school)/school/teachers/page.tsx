@@ -34,10 +34,10 @@ import { UserSquare2, Plus } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import type { Teacher } from "@/lib/types";
 import { formatStatusLabel } from "@/lib/display-labels";
+import { teacherAssignmentWarningSummary, teacherHasActiveAssignments } from "@/lib/teacher-assignments";
 import {
-  teacherAssignmentWarningSummary,
-  teacherHasActiveAssignments,
-} from "@/lib/teacher-assignments";
+  teacherDeactivateAssignmentToast,
+} from "@/lib/teacher-deactivate-toast";
 
 type ResetResult = {
   teacherId: string;
@@ -75,26 +75,26 @@ export default function TeachersPage() {
   const setTeacherStatus = useMutation({
     mutationFn: ({ teacherId, nextStatus }: { teacherId: string; nextStatus: "ACTIVE" | "INACTIVE" }) =>
       teachersService.update(teacherId, { status: nextStatus }),
-    onSuccess: (_, { nextStatus }) => {
-      const detail = deactivateDetail.data;
+    onSuccess: async (_, { teacherId, nextStatus }) => {
       setStatusConfirm(null);
       queryClient.invalidateQueries({ queryKey: ["teachers"] });
-      if (
-        nextStatus === "INACTIVE" &&
-        detail &&
-        teacherHasActiveAssignments(detail)
-      ) {
-        toast({
-          title: "Teacher deactivated — assignments still on file",
-          description: `Still linked: ${teacherAssignmentWarningSummary(detail)}. Open Teaching assignments or this teacher’s profile to reassign before classes run without a teacher.`,
-          variant: "warning",
-        });
-      } else {
-        toast({
-          title: nextStatus === "INACTIVE" ? "Teacher marked inactive" : "Teacher reactivated",
-          variant: "success",
-        });
+      if (nextStatus === "INACTIVE") {
+        const detail =
+          deactivateDetail.data ??
+          (await queryClient.fetchQuery({
+            queryKey: ["teacher", teacherId],
+            queryFn: () => teachersService.getById(teacherId),
+          }));
+        if (teacherHasActiveAssignments(detail)) {
+          const msg = teacherDeactivateAssignmentToast(detail);
+          toast({ ...msg, variant: "warning", durationMs: 12000 });
+          return;
+        }
       }
+      toast({
+        title: nextStatus === "INACTIVE" ? "Teacher marked inactive" : "Teacher reactivated",
+        variant: "success",
+      });
     },
     onError: (err) =>
       toast({
