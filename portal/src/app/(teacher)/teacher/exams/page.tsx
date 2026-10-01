@@ -100,7 +100,6 @@ export default function TeacherExamsPage() {
       lessonsService.list({
         sectionId: lectureSectionId!,
         subjectId: lectureSubjectId!,
-        status: "CONFIRMED",
         forExamLectures: true,
         limit: 100,
       }),

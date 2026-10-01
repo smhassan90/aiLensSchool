@@ -91,6 +91,8 @@ export function ChapterPageManager({
   const uploadQueueRef = useRef<ChapterPageUploadItem[]>([]);
   const uploadRunning = useRef(false);
   const initialStarted = useRef(false);
+  const orderSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [orderSaving, setOrderSaving] = useState(false);
   const [reuploadSourceId, setReuploadSourceId] = useState<string | null>(null);
   const reuploadInputRef = useRef<HTMLInputElement>(null);
   const reuploadTargetRef = useRef<string | null>(null);
@@ -250,20 +252,35 @@ export function ChapterPageManager({
       }),
   });
 
-  const saveOrder = useMutation({
-    mutationFn: () => lessonsService.reorderChapterPages(lessonId, ordered.map((p) => p.id)),
-    onSuccess: (lesson) => {
-      invalidate();
-      onContentUpdated(lesson);
-      toast({ title: "Page order saved", variant: "success" });
+  const persistOrder = useCallback(
+    (nextOrder: LessonPageSource[]) => {
+      if (orderSaveTimer.current) clearTimeout(orderSaveTimer.current);
+      orderSaveTimer.current = setTimeout(() => {
+        setOrderSaving(true);
+        lessonsService
+          .reorderChapterPages(lessonId, nextOrder.map((p) => p.id))
+          .then((lesson) => {
+            invalidate();
+            onContentUpdated(lesson);
+          })
+          .catch((err) =>
+            toast({
+              title: "Could not save page order",
+              description: err instanceof ApiClientError ? err.message : "Unexpected error",
+              variant: "error",
+            }),
+          )
+          .finally(() => setOrderSaving(false));
+      }, 350);
     },
-    onError: (err) =>
-      toast({
-        title: "Could not save order",
-        description: err instanceof ApiClientError ? err.message : "Unexpected error",
-        variant: "error",
-      }),
-  });
+    [lessonId, onContentUpdated, toast],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (orderSaveTimer.current) clearTimeout(orderSaveTimer.current);
+    };
+  }, []);
 
   const move = (index: number, direction: -1 | 1) => {
     const next = [...ordered];
@@ -271,10 +288,11 @@ export function ChapterPageManager({
     if (target < 0 || target >= next.length) return;
     [next[index], next[target]] = [next[target], next[index]];
     setOrdered(next);
+    persistOrder(next);
   };
 
   const queueBusy = uploadQueue.some((item) => item.status === "uploading" || item.status === "queued");
-  const busy = queueBusy || appendText.isPending || saveOrder.isPending;
+  const busy = queueBusy || appendText.isPending || orderSaving;
 
   const previewPages = useMemo((): PagePreviewEntry[] => {
     const saved: PagePreviewEntry[] = [];
@@ -327,14 +345,18 @@ export function ChapterPageManager({
                 Page photos ({ordered.length}
                 {uploadQueue.length ? ` · ${uploadQueue.length} in progress` : ""})
               </Label>
-              {orderDirty ? (
-                <div className="flex gap-2">
-                  <Button type="button" size="sm" variant="outline" onClick={syncFromProps}>
-                    Reset order
-                  </Button>
-                  <Button type="button" size="sm" disabled={saveOrder.isPending} onClick={() => saveOrder.mutate()}>
-                    Save page order
-                  </Button>
+              {orderDirty || orderSaving ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {orderSaving ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      Updating page order…
+                    </>
+                  ) : (
+                    <Button type="button" size="sm" variant="ghost" className="h-7 px-2" onClick={syncFromProps}>
+                      Reset order
+                    </Button>
+                  )}
                 </div>
               ) : null}
             </div>
@@ -711,10 +733,8 @@ export function ChapterPageManager({
                   </div>
                 ) : null}
               </div>
-              {orderDirty ? (
-                <p className="mt-2 text-center text-xs text-muted-foreground">
-                  Order changed — use &quot;Save page order&quot; when you are done.
-                </p>
+              {orderSaving ? (
+                <p className="mt-2 text-center text-xs text-muted-foreground">Saving new page order…</p>
               ) : null}
             </>
           ) : null}

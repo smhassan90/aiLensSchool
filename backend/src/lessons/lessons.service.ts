@@ -1830,6 +1830,7 @@ export class LessonsService {
     }
 
     let examLectureScope: Prisma.DailyLessonWhereInput | undefined;
+    let examStatusScope: Prisma.DailyLessonWhereInput | undefined;
     if (query.forExamLectures && query.sectionId && query.subjectId) {
       const scope = {
         schoolId,
@@ -1839,12 +1840,21 @@ export class LessonsService {
       };
       const chapterIdsWithSessions = await chapterSourceIdsWithClassSessions(this.prisma, scope);
       examLectureScope = examLectureRecordWhere(chapterIdsWithSessions);
+      examStatusScope = {
+        OR: [
+          { status: LessonStatus.CONFIRMED },
+          {
+            recordKind: LessonRecordKind.CHAPTER_LIBRARY,
+            contentConfirmed: true,
+          },
+        ],
+      };
     }
 
     const where: Prisma.DailyLessonWhereInput = {
       schoolId,
       ...teacherFilter,
-      ...(query.status ? { status: query.status } : {}),
+      ...(examStatusScope ?? (query.status ? { status: query.status } : {})),
       ...(examLectureScope
         ? examLectureScope
         : query.recordKind
@@ -2028,7 +2038,7 @@ export class LessonsService {
           aiSummary: contentText ?? lesson.aiSummary,
           contentConfirmed: true,
           status: LessonStatus.CONFIRMED,
-          chapterProgress: lesson.chapterProgress ?? ChapterProgressStatus.IN_PROGRESS,
+          chapterProgress: ChapterProgressStatus.COMPLETED,
           confirmedAt: new Date(),
         },
       });
@@ -2047,16 +2057,32 @@ export class LessonsService {
 
   async markChapterCompleted(id: string, user: AuthUser) {
     const teacher = await this.requireTeacherProfile(user.id);
-    const lesson = await this.prisma.dailyLesson.findUnique({ where: { id } });
+    const lesson = await this.prisma.dailyLesson.findUnique({
+      where: { id },
+      include: { sources: true },
+    });
     if (!lesson || lesson.recordKind !== LessonRecordKind.CHAPTER_LIBRARY) {
       throw new NotFoundException({ code: 'CHAPTER_NOT_FOUND', message: 'Chapter not found' });
     }
     if (lesson.teacherId !== teacher.id) {
       throw new ForbiddenException({ code: 'LESSON_OWNER_REQUIRED', message: 'Not your chapter' });
     }
+    const body =
+      coerceLessonDisplayText(lesson.aiSummary ?? '') ||
+      this.assemblePageTexts(lesson.sources);
+    const hasTeachableContent = body.trim().length >= 48;
     await this.prisma.dailyLesson.update({
       where: { id },
-      data: { chapterProgress: ChapterProgressStatus.COMPLETED },
+      data: {
+        chapterProgress: ChapterProgressStatus.COMPLETED,
+        ...(hasTeachableContent
+          ? {
+              contentConfirmed: true,
+              status: LessonStatus.CONFIRMED,
+              confirmedAt: lesson.confirmedAt ?? new Date(),
+            }
+          : {}),
+      },
     });
     return this.loadPresented(id);
   }

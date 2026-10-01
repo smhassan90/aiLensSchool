@@ -63,14 +63,6 @@ export default function ChapterDetailPage() {
     },
   });
 
-  const complete = useMutation({
-    mutationFn: () => lessonsService.completeChapter(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["lesson-chapters"] });
-      toast({ title: "Chapter marked completed", variant: "success" });
-    },
-  });
-
   const refreshLesson = (updated: Lesson) => {
     queryClient.setQueryData(["lesson", id], updated);
   };
@@ -127,11 +119,6 @@ export default function ChapterDetailPage() {
           <Link href={`/teacher/lessons/today?type=NEW_LESSON&chapter=${id}`}>
             <Button>Log class with this chapter</Button>
           </Link>
-          {lesson.chapterProgress !== "COMPLETED" && (
-            <Button variant="secondary" onClick={() => complete.mutate()}>
-              Mark chapter finished
-            </Button>
-          )}
         </div>
       )}
     </div>

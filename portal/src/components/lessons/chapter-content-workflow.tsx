@@ -53,6 +53,13 @@ export function ChapterContentWorkflow({
     setCompiledExercises(coerceLessonDisplayText(lesson.chapterCompiledExercises ?? ""));
   }, [lesson, draftTouched]);
 
+  useEffect(() => {
+    const fromPages = coerceLessonDisplayText(lesson.chapterPageText ?? "");
+    if (fromPages.trim()) {
+      setDraftText(fromPages);
+    }
+  }, [lesson.chapterPageText]);
+
   const saveDraft = useMutation({
     mutationFn: () =>
       lessonsService.update(lessonId, {
@@ -77,7 +84,7 @@ export function ChapterContentWorkflow({
     mutationFn: () => {
       const sourceText = sourceForCompile();
       if (!sourceText.trim()) {
-        throw new Error("Upload pages and assemble text before compiling.");
+        throw new Error("Upload pages and capture text before compiling.");
       }
       return lessonsService.compileChapter(lessonId, {
         sourceText,
@@ -100,25 +107,6 @@ export function ChapterContentWorkflow({
       }),
   });
 
-  const assemblePagesForCompile = () => {
-    const fromPages = coerceLessonDisplayText(lesson.chapterPageText ?? "");
-    if (!fromPages.trim()) {
-      toast({
-        title: "No page text yet",
-        description: "Upload each page until it shows Text captured (90%+ read), then assemble or compile.",
-        variant: "error",
-      });
-      return;
-    }
-    setDraftText(fromPages);
-    setDraftTouched(true);
-    toast({
-      title: "Pages assembled",
-      description: "Text is in page order. Edit if needed, then compile.",
-      variant: "success",
-    });
-  };
-
   const sourceForCompile = () =>
     draftText.trim() || coerceLessonDisplayText(lesson.chapterPageText ?? "");
 
@@ -140,8 +128,7 @@ export function ChapterContentWorkflow({
             Raw page text
           </CardTitle>
           <CardDescription>
-            After each page is uploaded, use Read fetched text on that row. When order is right, assemble all
-            pages here (or compile directly — pages are merged in photo order).
+            Page text is merged automatically in photo order. Reorder pages above and this draft updates on its own.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -156,9 +143,6 @@ export function ChapterContentWorkflow({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={assemblePagesForCompile}>
-              Assemble all pages
-            </Button>
             <Button
               type="button"
               variant="outline"
@@ -177,7 +161,7 @@ export function ChapterContentWorkflow({
               setDraftTouched(true);
               setDraftText(e.target.value);
             }}
-            placeholder="Assemble all pages, or edit the combined text before compile…"
+            placeholder="Combined page text appears here. Edit before compile if needed…"
           />
           {!ready && (
             <Button
