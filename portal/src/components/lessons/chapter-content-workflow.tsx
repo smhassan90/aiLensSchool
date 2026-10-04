@@ -114,6 +114,11 @@ export function ChapterContentWorkflow({
     compiledExercises ? "\n\n## Exercises\n\n" : "",
   );
   const isRtl = /[\u0600-\u06FF]/.test(draftText + compiledBody);
+  const needsCompileStep =
+    !ready &&
+    !compiledBody.trim() &&
+    sourceForCompile().trim().length > 80 &&
+    /\b(Exercise|Notes|comprehension|steeple)\b/i.test(sourceForCompile());
 
   if (compile.isPending) {
     return <AiWait kind="extract" variant="panel" />;
@@ -128,7 +133,8 @@ export function ChapterContentWorkflow({
             Raw page text
           </CardTitle>
           <CardDescription>
-            Page text is merged automatically in photo order. Reorder pages above and this draft updates on its own.
+            This is a working draft from your photos (title, poem, notes, and exercise questions together). It is not
+            the final lesson students see until you compile and approve below.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -163,6 +169,12 @@ export function ChapterContentWorkflow({
             }}
             placeholder="Combined page text appears here. Edit before compile if needed…"
           />
+          {needsCompileStep ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+              Next step: click <strong>Compile the lesson</strong> so AI formats the poem and notes, moves exercise
+              questions into a separate section, and drops boilerplate (for example the author biography in brackets).
+            </div>
+          ) : null}
           {!ready && (
             <Button
               type="button"

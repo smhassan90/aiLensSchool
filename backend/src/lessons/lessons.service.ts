@@ -84,6 +84,7 @@ import {
   isPagePhotoTextReadable,
   pageOcrAcceptThreshold,
   PAGE_OCR_ACCEPT_THRESHOLD,
+  pageHasStructuredLessonContent,
   scorePageOcrQuality,
   pageTextNeedsVisionRetry,
 } from './page-text-sanitize';
@@ -561,6 +562,22 @@ export class LessonsService {
     }
 
     let summary: string;
+    if (
+      canVision &&
+      !expectsArabicScript &&
+      usableOcr &&
+      !ocrThin &&
+      !needsPhotoVision &&
+      !options?.forceTintedPageVision &&
+      pageHasStructuredLessonContent(resolvedOcr)
+    ) {
+      const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
+        forceTintedPageVision: true,
+      });
+      if (retried.trim().length >= 40 && !isFakeExtractText(retried)) {
+        return retried;
+      }
+    }
     if (usableOcr && !ocrThin && !needsPhotoVision) {
       summary = resolvedOcr;
     } else {
