@@ -565,11 +565,9 @@ export class LessonsService {
     if (
       canVision &&
       !expectsArabicScript &&
-      usableOcr &&
-      !ocrThin &&
-      !needsPhotoVision &&
       !options?.forceTintedPageVision &&
-      pageHasStructuredLessonContent(resolvedOcr)
+      pageHasStructuredLessonContent(resolvedOcr) &&
+      scorePageOcrQuality(resolvedOcr) >= 58
     ) {
       const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
         forceTintedPageVision: true,
@@ -627,6 +625,16 @@ export class LessonsService {
     const cannotReadPage =
       !usableOcr &&
       (ocrGarbled || isFakeExtractText(resolvedOcr) || usePhotoVision);
+    if (cannotReadPage && !polishedLooksReal) {
+      const ocrSalvage = englishOnlyFromMixedOcr(resolvedOcr);
+      if (
+        compactTextLength(ocrSalvage) > 140 &&
+        (isPagePhotoTextReadable(ocrSalvage) || isPagePhotoTextReadable(resolvedOcr))
+      ) {
+        summary = ocrSalvage;
+        polishedLooksReal = true;
+      }
+    }
     if (cannotReadPage && !polishedLooksReal) {
       throw new BadRequestException({
         code: 'PAGE_TEXT_UNREADABLE',

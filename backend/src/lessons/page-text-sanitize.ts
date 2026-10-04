@@ -117,7 +117,15 @@ export function filterPageTextForLessonAssembly(text: string): string {
   const blocks = value.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
   const keptBlocks = blocks.filter((b) => !isSuspectParagraph(b));
   if (keptBlocks.length >= 1) {
-    return keptBlocks.join('\n\n').trim();
+    const joined = keptBlocks.join('\n\n').trim();
+    if (
+      pageHasStructuredLessonContent(value) &&
+      isPagePhotoTextReadable(value) &&
+      !isPagePhotoTextReadable(joined)
+    ) {
+      return value;
+    }
+    return joined;
   }
 
   const lines = value.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);

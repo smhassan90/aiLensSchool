@@ -33,7 +33,6 @@ import {
   ChevronUp,
   ImagePlus,
   AlertCircle,
-  RotateCcw,
   ChevronLeft,
   ChevronRight,
   ZoomIn,
@@ -95,7 +94,10 @@ export function ChapterPageManager({
   const [orderSaving, setOrderSaving] = useState(false);
   const [reuploadSourceId, setReuploadSourceId] = useState<string | null>(null);
   const reuploadInputRef = useRef<HTMLInputElement>(null);
-  const reuploadTargetRef = useRef<string | null>(null);
+  type ReuploadTarget =
+    | { kind: "saved"; sourceId: string }
+    | { kind: "queue"; itemId: string };
+  const reuploadTargetRef = useRef<ReuploadTarget | null>(null);
 
   const setQueue = useCallback(
     (updater: ChapterPageUploadItem[] | ((prev: ChapterPageUploadItem[]) => ChapterPageUploadItem[])) => {
@@ -222,15 +224,30 @@ export function ChapterPageManager({
   };
 
   const promptReupload = (sourceId: string) => {
-    reuploadTargetRef.current = sourceId;
+    reuploadTargetRef.current = { kind: "saved", sourceId };
     reuploadInputRef.current?.click();
   };
 
-  const retryUpload = (id: string) => {
+  const promptFailedQueueReupload = (itemId: string) => {
+    reuploadTargetRef.current = { kind: "queue", itemId };
+    reuploadInputRef.current?.click();
+  };
+
+  const replaceFailedQueuePhoto = async (itemId: string, file: File) => {
+    const compressed = await compressPhotosForUpload([file]);
+    const newFile = compressed[0] ?? file;
     setQueue((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, status: "queued", error: undefined } : item,
-      ),
+      current.map((item) => {
+        if (item.id !== itemId) return item;
+        URL.revokeObjectURL(item.previewUrl);
+        return {
+          ...item,
+          file: newFile,
+          previewUrl: URL.createObjectURL(newFile),
+          status: "queued" as const,
+          error: undefined,
+        };
+      }),
     );
     void runNextUpload();
   };
@@ -541,12 +558,13 @@ export function ChapterPageManager({
                     <Button
                       type="button"
                       size="sm"
-                      variant="outline"
+                      variant="secondary"
+                      className="h-8 shrink-0 gap-1.5"
                       disabled={queueBusy}
-                      onClick={() => retryUpload(item.id)}
+                      onClick={() => promptFailedQueueReupload(item.id)}
                     >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                      Retry
+                      <FileImage className="h-3.5 w-3.5" aria-hidden />
+                      Re-upload picture
                     </Button>
                   ) : null}
                 </li>
@@ -625,9 +643,13 @@ export function ChapterPageManager({
           onChange={(e) => {
             const file = e.target.files?.[0];
             e.target.value = "";
-            const sourceId = reuploadTargetRef.current;
-            if (file && isImageFile(file) && sourceId) {
-              void reuploadPage(sourceId, file);
+            const target = reuploadTargetRef.current;
+            reuploadTargetRef.current = null;
+            if (!file || !isImageFile(file) || !target) return;
+            if (target.kind === "saved") {
+              void reuploadPage(target.sourceId, file);
+            } else {
+              void replaceFailedQueuePhoto(target.itemId, file);
             }
           }}
         />

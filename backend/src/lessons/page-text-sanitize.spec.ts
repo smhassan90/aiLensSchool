@@ -1,4 +1,5 @@
 import {
+  filterPageTextForLessonAssembly,
   isPagePhotoTextReadable,
   PAGE_OCR_ACCEPT_THRESHOLD,
   pageHasStructuredLessonContent,
@@ -6,6 +7,40 @@ import {
 } from './page-text-sanitize';
 
 describe('scorePageOcrQuality', () => {
+  it('keeps readable poem OCR when paragraph filter would drop the stanza', () => {
+    const noisyOcr = `
+ HE VOICE OF GOD
+
+oem is written by Louis I. Newman (189   y
+1972). He was horn in Providence Rhode leland (USA).  \\
+| He studied at Brown University and after his doctorate
+jectured at Columbia. He is the author of many books
+igious subject. This poem. brings ‘out his religious
+
+[This p
+
+on rel
+bent of mind.]
+
+| sought to hear the voice, of God,
+And climbed the topmost: steeple,
+But God declared: "Go down again,
+
+1 dwell among the peoples
+
+Line 2: stee:
+building,
+
+B. Exercise:
+
+ple: the tall`.trim();
+    expect(isPagePhotoTextReadable(noisyOcr)).toBe(true);
+    const filtered = filterPageTextForLessonAssembly(noisyOcr);
+    expect(isPagePhotoTextReadable(filtered)).toBe(true);
+    expect(filtered).toMatch(/VOICE OF GOD|voice, of God/i);
+    expect(filtered).toMatch(/steeple/i);
+  });
+
   it('accepts poem and exercise page with decorative OCR noise', () => {
     const text = `
 THE VOICE OF GOD
