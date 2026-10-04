@@ -1,9 +1,11 @@
 import {
   filterPageTextForLessonAssembly,
   isPagePhotoTextReadable,
+  mergeEnglishPageVisionWithOcr,
   PAGE_OCR_ACCEPT_THRESHOLD,
   pageHasStructuredLessonContent,
   scorePageOcrQuality,
+  visionTranscriptMissingOcrContent,
 } from './page-text-sanitize';
 
 describe('scorePageOcrQuality', () => {
@@ -39,6 +41,26 @@ ple: the tall`.trim();
     expect(isPagePhotoTextReadable(filtered)).toBe(true);
     expect(filtered).toMatch(/VOICE OF GOD|voice, of God/i);
     expect(filtered).toMatch(/steeple/i);
+  });
+
+  it('detects when vision skipped poem body present in OCR', () => {
+    const vision = `[This poem is written by Louis I. Newman (1893-1972). He was born in Providence Rhode Island (USA).]
+
+Louis I. Newman
+
+B. Exercise:
+1. Why did author climb the steeple?`;
+    const ocr = `THE VOICE OF GOD
+I sought to hear the voice of God,
+And climbed the topmost steeple,
+A. Notes:
+Line 2: steeple: the tallest part of a religious building.
+B. Exercise:
+1. Why did author climb the steeple?`;
+    expect(visionTranscriptMissingOcrContent(vision, ocr)).toBe(true);
+    const merged = mergeEnglishPageVisionWithOcr(vision, ocr);
+    expect(merged).toMatch(/sought to hear/i);
+    expect(merged).toMatch(/topmost steeple/i);
   });
 
   it('accepts vision partial capture with exercises when quality is below 90%', () => {

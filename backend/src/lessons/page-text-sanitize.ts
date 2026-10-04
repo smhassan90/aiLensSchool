@@ -157,6 +157,50 @@ export function filterCompiledLessonText(text: string): string {
   return filterPageTextForLessonAssembly(text);
 }
 
+const POEM_PAGE_BODY_MARKERS = [
+  'sought to',
+  'topmost',
+  'go down again',
+  'dwell among',
+  'a. notes',
+  'voice of god',
+] as const;
+
+/** Vision often returns clean intro + exercises but drops centered poem lines and notes. */
+export function visionTranscriptMissingOcrContent(vision: string, ocr: string): boolean {
+  const v = (vision ?? '').toLowerCase();
+  const o = (ocr ?? '').toLowerCase();
+  if (!v.trim() || !o.trim()) return false;
+  let missing = 0;
+  for (const phrase of POEM_PAGE_BODY_MARKERS) {
+    if (o.includes(phrase) && !v.includes(phrase)) missing += 1;
+  }
+  if (missing >= 2) return true;
+  if (o.includes('sought to') && !v.includes('sought to')) return true;
+  if (o.includes('topmost') && !v.includes('topmost')) return true;
+  return false;
+}
+
+export function mergeEnglishPageVisionWithOcr(vision: string, ocr: string): string {
+  const v = (vision ?? '').trim();
+  const ocrTrim = (ocr ?? '').trim();
+  if (!v) return filterPageTextForLessonAssembly(ocrTrim) || ocrTrim;
+  if (!ocrTrim) return v;
+  if (!visionTranscriptMissingOcrContent(v, ocrTrim)) return v;
+
+  const combined = `${v}\n\n${ocrTrim}`.trim();
+  if (isPagePhotoTextReadable(combined)) {
+    const combinedFiltered = filterPageTextForLessonAssembly(combined);
+    const pick = combinedFiltered.trim() || combined;
+    if (!visionTranscriptMissingOcrContent(pick, ocrTrim)) return pick;
+    return combined;
+  }
+  if (isPagePhotoTextReadable(ocrTrim)) return ocrTrim;
+  const filtered = filterPageTextForLessonAssembly(ocrTrim);
+  if (isPagePhotoTextReadable(filtered)) return filtered;
+  return combined;
+}
+
 /** Poems, notes, and exercises on decorative/colored textbook pages. */
 export function pageHasStructuredLessonContent(text: string): boolean {
   const value = (text ?? '').trim();

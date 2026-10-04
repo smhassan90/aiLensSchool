@@ -83,6 +83,7 @@ import {
   filterPageTextForLessonAssembly,
   isPagePhotoTextReadable,
   pageOcrAcceptThreshold,
+  mergeEnglishPageVisionWithOcr,
   pageHasStructuredLessonContent,
   scorePageOcrQuality,
   pageTextNeedsVisionRetry,
@@ -488,8 +489,8 @@ export class LessonsService {
       const tintedPrompt = [
         `Transcribe this ${subject.name} textbook page (${grade.name}) for the teacher's lesson library.`,
         'The page may have a colored or parchment background and decorative borders — ignore border art and ornaments.',
-        'Copy every title, poem line, note, vocabulary line, and exercise question in reading order.',
-        'Keep English as English. Keep Urdu/Arabic in Unicode script.',
+        'Copy every red title, bracketed intro, poem stanza line (including italic/centered lines), A. Notes vocabulary, and B. Exercise question in reading order.',
+        'Do not skip the poem body — transcribe all four lines verbatim. Keep English as English. Keep Urdu/Arabic in Unicode script.',
       ].join(' ');
       try {
         const polished = await this.lessonProcessing.process({
@@ -502,7 +503,13 @@ export class LessonsService {
         });
         const cleaned = filterPageTextForLessonAssembly(coerceLessonDisplayText(polished.summary));
         if (cleaned.trim().length >= 40 && !isFakeExtractText(cleaned)) {
-          return cleaned;
+          const [ocrForMerge] = await this.pageOcr.readPageTexts([file], {
+            subjectName: subject.name,
+          });
+          const merged = mergeEnglishPageVisionWithOcr(cleaned, ocrForMerge ?? '');
+          if (merged.trim().length >= 40 && !isFakeExtractText(merged)) {
+            return merged;
+          }
         }
       } catch (error) {
         this.logger.warn(
@@ -573,8 +580,9 @@ export class LessonsService {
       const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
         forceTintedPageVision: true,
       });
-      if (retried.trim().length >= 40 && !isFakeExtractText(retried)) {
-        return retried;
+      const merged = mergeEnglishPageVisionWithOcr(retried, resolvedOcr);
+      if (merged.trim().length >= 40 && !isFakeExtractText(merged)) {
+        return merged;
       }
     }
     if (usableOcr && !ocrThin && !needsPhotoVision) {
@@ -585,7 +593,7 @@ export class LessonsService {
         : [
             `Transcribe this ${subject.name} textbook page (${grade.name}).`,
             'The page may have a tinted/colored background, red headings, and decorative borders — ignore border art.',
-            'Copy titles, poems, notes, vocabulary, and exercise questions in reading order.',
+            'Copy titles, poem stanzas (all lines), notes, vocabulary, and exercise questions in reading order. Do not skip centered or italic poem lines.',
           ].join(' ');
       try {
         const polished = await this.lessonProcessing.process({
@@ -596,7 +604,9 @@ export class LessonsService {
           gradeName: grade.name,
           images: canVision && usePhotoVision ? this.toLessonImages([file]) : undefined,
         });
-        summary = polished.summary;
+        summary = !expectsArabicScript
+          ? mergeEnglishPageVisionWithOcr(polished.summary, resolvedOcr)
+          : polished.summary;
       } catch (error) {
         const englishFallback = englishOnlyFromMixedOcr(resolvedOcr);
         if (compactTextLength(englishFallback) > 140) {
