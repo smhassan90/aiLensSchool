@@ -199,10 +199,21 @@ export function ChapterPageManager({
       onContentUpdated(lesson);
       const updated = lesson.pageSources?.find((p) => p.id === sourceId);
       if (updated && pageTextAccepted(updated)) {
+        const pct = updated.textQualityPercent;
         toast({
           title: "Page read successfully",
-          description: `About ${updated.textQualityPercent ?? 90}% of the text was captured clearly.`,
+          description:
+            typeof pct === "number"
+              ? `About ${pct}% of the text was captured clearly. Review the draft below and compile when ready.`
+              : "Review the draft below and compile when ready.",
           variant: "success",
+        });
+      } else if (updated?.fetchedText?.trim()) {
+        toast({
+          title: "Partial text captured",
+          description:
+            "Some of this page was read. Edit the draft or re-upload a sharper photo if lines are missing.",
+          variant: "warning",
         });
       } else {
         toast({
@@ -350,8 +361,9 @@ export function ChapterPageManager({
       <CardHeader>
         <CardTitle className="text-base">Pages &amp; more content</CardTitle>
         <CardDescription>
-          Each photo is read automatically. A green badge means at least 90% of the text was captured; otherwise
-          re-upload that page. Reorder photos so compile follows the book.
+          Each photo is read automatically. A green badge means the page is clear enough to compile (poem and
+          exercise pages may show a lower %). Re-upload if you see “needs clearer photo”. Reorder photos so compile
+          follows the book.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -41,6 +41,19 @@ ple: the tall`.trim();
     expect(filtered).toMatch(/steeple/i);
   });
 
+  it('accepts vision partial capture with exercises when quality is below 90%', () => {
+    const partial = `[This poem is written by Louis I. Newman (1893-1972). He was born in Providence Rhode Island (USA). He studied at Brown University and after his doctorate lectured at Columbia. He is the author of many books on religious subject. This poem brings out his religious bent of mind.]
+
+Louis I. Newman
+
+B. Exercise:
+1. Why did author climb the steeple?
+2. Why did God tell him to go down again?
+3. Explain in your own words what you think is the message of this poem?`;
+    expect(scorePageOcrQuality(partial)).toBeLessThan(PAGE_OCR_ACCEPT_THRESHOLD);
+    expect(isPagePhotoTextReadable(partial)).toBe(true);
+  });
+
   it('accepts poem and exercise page with decorative OCR noise', () => {
     const text = `
 THE VOICE OF GOD

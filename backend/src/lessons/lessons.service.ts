@@ -83,7 +83,6 @@ import {
   filterPageTextForLessonAssembly,
   isPagePhotoTextReadable,
   pageOcrAcceptThreshold,
-  PAGE_OCR_ACCEPT_THRESHOLD,
   pageHasStructuredLessonContent,
   scorePageOcrQuality,
   pageTextNeedsVisionRetry,
@@ -283,15 +282,17 @@ export class LessonsService {
       .sort((a, b) => (a.pageFrom ?? 0) - (b.pageFrom ?? 0))
       .map((s) => {
         const raw = s.ocrText?.trim() ? coerceLessonDisplayText(s.ocrText) : '';
+        const fetchedText = raw ? filterPageTextForLessonAssembly(raw) : '';
+        const textForAcceptance = fetchedText.trim() || raw;
         const textQualityPercent = raw ? scorePageOcrQuality(raw) : 0;
         return {
           id: s.id,
           pageOrder: s.pageFrom ?? 0,
           url: s.fileAsset!.url,
           label: s.fileAsset!.originalFilename ?? 'Page photo',
-          fetchedText: raw ? filterPageTextForLessonAssembly(raw) : '',
+          fetchedText,
           textQualityPercent,
-          textAccepted: Boolean(raw) && textQualityPercent >= PAGE_OCR_ACCEPT_THRESHOLD,
+          textAccepted: Boolean(textForAcceptance) && isPagePhotoTextReadable(textForAcceptance),
         };
       });
   }
