@@ -617,24 +617,23 @@ export class LessonsService {
     if (usableOcr && !isUsableLessonOcr(summary, { expectArabicScript: expectsArabicScript })) {
       summary = resolvedOcr;
     }
-    const polishedLooksReal =
-      usableOcr ||
-      isUsableLessonOcr(summary, { expectArabicScript: expectsArabicScript }) ||
-      (looksLikeRealLessonText(summary) &&
-        !isPoorLessonOcr(summary, { expectArabicScript: expectsArabicScript }));
     const cannotReadPage =
       !usableOcr &&
       (ocrGarbled || isFakeExtractText(resolvedOcr) || usePhotoVision);
-    if (cannotReadPage && !polishedLooksReal) {
+    if (cannotReadPage) {
       const ocrSalvage = englishOnlyFromMixedOcr(resolvedOcr);
       if (
         compactTextLength(ocrSalvage) > 140 &&
         (isPagePhotoTextReadable(ocrSalvage) || isPagePhotoTextReadable(resolvedOcr))
       ) {
         summary = ocrSalvage;
-        polishedLooksReal = true;
       }
     }
+    const polishedLooksReal =
+      usableOcr ||
+      isUsableLessonOcr(summary, { expectArabicScript: expectsArabicScript }) ||
+      (looksLikeRealLessonText(summary) &&
+        !isPoorLessonOcr(summary, { expectArabicScript: expectsArabicScript }));
     if (cannotReadPage && !polishedLooksReal) {
       throw new BadRequestException({
         code: 'PAGE_TEXT_UNREADABLE',
