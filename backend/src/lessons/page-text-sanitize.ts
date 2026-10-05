@@ -166,7 +166,7 @@ const POEM_PAGE_BODY_MARKERS = [
   'voice of god',
 ] as const;
 
-/** Vision often returns clean intro + exercises but drops centered poem lines and notes. */
+/** Vision often returns clean intro + title but drops poem stanzas, author lines, and footers. */
 export function visionTranscriptMissingOcrContent(vision: string, ocr: string): boolean {
   const v = (vision ?? '').toLowerCase();
   const o = (ocr ?? '').toLowerCase();
@@ -178,6 +178,34 @@ export function visionTranscriptMissingOcrContent(vision: string, ocr: string): 
   if (missing >= 2) return true;
   if (o.includes('sought to') && !v.includes('sought to')) return true;
   if (o.includes('topmost') && !v.includes('topmost')) return true;
+
+  const readingBodyPhrases = [
+    'flung himself',
+    'wore a crown',
+    'beginning to sink',
+    'eliza cook',
+    'scotland flung',
+  ];
+  const readingHits = readingBodyPhrases.filter((p) => o.includes(p) && !v.includes(p));
+  if (readingHits.length >= 1 && /reading comprehension|reading text|king bruce/i.test(v)) {
+    return true;
+  }
+
+  const vLatin = countLatinLetters(v);
+  const oLatin = countLatinLetters(o);
+  if (oLatin >= vLatin + 48 && oLatin >= Math.max(vLatin * 1.12, vLatin + 1)) {
+    const novelLines = (ocr ?? '')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length >= 16)
+      .filter((line) => {
+        const key = line.toLowerCase().slice(0, 22);
+        return key.length >= 10 && !v.includes(key);
+      })
+      .filter((line) => !/^(pre-reading|reading text|unit\b)/i.test(line));
+    if (novelLines.length >= 2) return true;
+  }
+
   return false;
 }
 

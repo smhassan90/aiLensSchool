@@ -43,6 +43,31 @@ ple: the tall`.trim();
     expect(filtered).toMatch(/steeple/i);
   });
 
+  it('merges reading comprehension page when vision stops at the title', () => {
+    const vision = `READING COMPREHENSION
+
+1. Have you seen a spider? Are you afraid of it?
+2. Can a spider hurt us?
+3. Can a spider teach us anything?
+
+Reading text
+
+King Bruce and the Spider`;
+    const ocr = `pre-reading
+1. Have you seen a spider? Are you afraid of it?
+Reading text
+King Bruce and the Spider
+Eliza Cook (1818-1889)
+King Bruce of Scotland flung himself down
+In a lonely mood to think;
+'Tis true he was monarch and wore a crown,
+But his heart was beginning to sink.`;
+    expect(visionTranscriptMissingOcrContent(vision, ocr)).toBe(true);
+    const merged = mergeEnglishPageVisionWithOcr(vision, ocr);
+    expect(merged).toMatch(/flung himself/i);
+    expect(merged).toMatch(/beginning to sink/i);
+  });
+
   it('detects when vision skipped poem body present in OCR', () => {
     const vision = `[This poem is written by Louis I. Newman (1893-1972). He was born in Providence Rhode Island (USA).]
 

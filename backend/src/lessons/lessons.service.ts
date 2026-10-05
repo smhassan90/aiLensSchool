@@ -489,8 +489,8 @@ export class LessonsService {
       const tintedPrompt = [
         `Transcribe this ${subject.name} textbook page (${grade.name}) for the teacher's lesson library.`,
         'The page may have a colored or parchment background and decorative borders — ignore border art and ornaments.',
-        'Copy every red title, bracketed intro, poem stanza line (including italic/centered lines), A. Notes vocabulary, and B. Exercise question in reading order.',
-        'Do not skip the poem body — transcribe all four lines verbatim. Keep English as English. Keep Urdu/Arabic in Unicode script.',
+        'Copy every unit header, pre-reading question, red story/poem title, author line, and every stanza or paragraph line through the bottom of the page.',
+        'Include text below illustrations and in shadows. Do not stop at the title — transcribe all poem or story lines verbatim. Keep English as English. Keep Urdu/Arabic in Unicode script.',
       ].join(' ');
       try {
         const polished = await this.lessonProcessing.process({
@@ -593,7 +593,7 @@ export class LessonsService {
         : [
             `Transcribe this ${subject.name} textbook page (${grade.name}).`,
             'The page may have a tinted/colored background, red headings, and decorative borders — ignore border art.',
-            'Copy titles, poem stanzas (all lines), notes, vocabulary, and exercise questions in reading order. Do not skip centered or italic poem lines.',
+            'Copy headers, questions, titles, author lines, and every poem/story line through the bottom of the page (including below pictures). Do not stop at the title.',
           ].join(' ');
       try {
         const polished = await this.lessonProcessing.process({
