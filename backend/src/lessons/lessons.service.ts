@@ -89,6 +89,7 @@ import {
   scorePageOcrQuality,
   pageTextNeedsVisionRetry,
 } from './page-text-sanitize';
+import { repairCompiledChapterFromSource } from './chapter-compile-repair';
 import {
   orientationCandidates,
   prepareLessonPagePhoto,
@@ -1146,8 +1147,12 @@ export class LessonsService {
     const assembled = this.assemblePageTexts(refreshed.sources);
     const rawCandidate =
       dto.sourceText?.trim() || this.chapterDraftFromSources(refreshed.sources) || assembled;
-    const rawInput = filterPageTextForLessonAssembly(rawCandidate);
-    if (!rawInput.trim()) {
+    // Keep poem lines intact for compile; only fall back to filtered text if needed.
+    const compileSource = (
+      rawCandidate.trim() ||
+      filterPageTextForLessonAssembly(rawCandidate)
+    ).trim();
+    if (!compileSource) {
       throw new BadRequestException({
         code: 'CONTENT_REQUIRED',
         message: 'Read page text first, then compile the lesson',
@@ -1157,14 +1162,19 @@ export class LessonsService {
     const compiled = await this.chapterCompile.compile({
       schoolId: lesson.schoolId,
       userId: user.id,
-      sourceText: rawInput,
+      sourceText: compileSource,
       subjectName: lesson.subject.name,
       gradeName: grade.name,
       instruction: dto.instruction?.trim(),
     });
 
-    const lessonBody = filterCompiledLessonText(compiled.lessonBody);
-    const exercises = filterCompiledLessonText(compiled.exercises);
+    const repaired = repairCompiledChapterFromSource(
+      compileSource,
+      compiled.lessonBody,
+      compiled.exercises,
+    );
+    const lessonBody = filterCompiledLessonText(repaired.lessonBody);
+    const exercises = filterCompiledLessonText(repaired.exercises);
     const fullText = joinCompiledChapter(lessonBody, exercises);
     const concepts = compiled.concepts?.length
       ? compiled.concepts
@@ -1172,7 +1182,7 @@ export class LessonsService {
 
     await this.prisma.$transaction(async (tx) => {
       const refreshed = await tx.lessonSource.findMany({ where: { lessonId: id } });
-      await this.upsertChapterManualText(tx, id, refreshed, coerceLessonDisplayText(rawInput));
+      await this.upsertChapterManualText(tx, id, refreshed, coerceLessonDisplayText(compileSource));
       await tx.dailyLesson.update({
         where: { id },
         data: {

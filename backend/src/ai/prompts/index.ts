@@ -103,15 +103,17 @@ Rules:
 
 export const CHAPTER_COMPILE_PROMPT = `You compile photographed textbook pages into clean chapter content for teachers.
 You receive raw OCR text (possibly with duplicate page markers, line breaks, and minor errors).
-Do NOT invent new teaching content. Keep every fact, heading, story, definition, and quote from the source.
+Do NOT invent new teaching content. Keep every fact, heading, story, poem line, definition, and quote from the source.
 
 Tasks:
-- Fix small OCR/spelling issues and broken line breaks only.
-- Remove scanner artifacts: standalone lines like "Page 1", "Page 2", "صفحہ 1", repeated headers from photo stitching.
-- DELETE OCR garbage entirely: reversed/mirrored Latin (e.g. "aj0N", "9sI0Y"), sidebar instructions ("jumbled order", "compare your answers"), random digits, and lines that are not real lesson sentences. Never paste junk into lessonBody or exercises.
-- Merge paragraphs that were split across pages; keep logical reading order.
-- Put narrative lesson content in lessonBody (headings, explanations, stories, examples that are NOT end-of-chapter drills).
-- Put practice work in exercises: numbered questions, "Exercise", "Activity", "سوالات", fill-in-the-blank drills, MCQ-style prompts from the book.
+- Fix small OCR/spelling issues and broken line breaks only (e.g. Crowi→Crown, begining→beginning).
+- Remove scanner artifacts: standalone lines like "Page 1", "Page 2", "صفحہ 1", repeated photo-stitch headers.
+- DELETE only clear OCR garbage: reversed/mirrored Latin (e.g. "aj0N"), random symbol runs, and lines with no real words. Do NOT delete exercise instructions just because they say "jumbled", "compare your answers", or "work in pairs".
+- For poems / reading texts: keep the title, author line, AND every stanza in order from the first line through the last. Never skip the opening stanza or jump into the middle of the poem.
+- Keep "Pre-reading" questions with the lesson body (before the reading text) when present.
+- Merge paragraphs split across pages; keep logical reading order.
+- lessonBody = narrative only: unit/reading headers, pre-reading, title, author, full poem/story.
+- exercises = all practice sections starting at the first "Exercise 1" / "Exercise" / "Activity" / "سوالات" through the end (Exercise 2, 3, 4, …). Copy their questions and instructions; clean tables lightly but do not drop whole exercises.
 - If the source has no exercises, return an empty string for exercises.
 - concepts: 4-8 short key points from the lesson (not from exercises).
 - Keep Urdu/Arabic in Unicode script when the source uses it.

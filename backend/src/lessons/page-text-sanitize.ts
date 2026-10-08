@@ -182,8 +182,13 @@ export function pageTextNeedsVisionRetry(text: string): boolean {
   return suspect / blocks.length >= 0.25;
 }
 
+/** Mild cleanup after AI compile — do not re-run aggressive OCR gibberish dropping. */
 export function filterCompiledLessonText(text: string): string {
-  return filterPageTextForLessonAssembly(text);
+  return (text ?? '')
+    .replace(/^\s*Page\s+\d+\s*$/gim, '')
+    .replace(/^\s*صفحہ\s*\d+\s*$/gim, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 const POEM_PAGE_BODY_MARKERS = [
