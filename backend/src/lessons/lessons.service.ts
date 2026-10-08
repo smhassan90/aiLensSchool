@@ -569,23 +569,39 @@ export class LessonsService {
       });
     }
 
+    const ocrAlreadyReadable =
+      Boolean(resolvedOcr.trim()) &&
+      (isPagePhotoTextReadable(resolvedOcr) ||
+        isPagePhotoTextReadable(filterPageTextForLessonAssembly(resolvedOcr)));
+
     let summary: string;
+    // Prefer readable OCR over a forced vision pass — vision often fails on glare
+    // or busy illustrations and used to surface PAGE_TEXT_UNREADABLE for good photos.
     if (
       canVision &&
       !expectsArabicScript &&
       !options?.forceTintedPageVision &&
+      !ocrAlreadyReadable &&
       pageHasStructuredLessonContent(resolvedOcr) &&
       scorePageOcrQuality(resolvedOcr) >= 58
     ) {
-      const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
-        forceTintedPageVision: true,
-      });
-      const merged = mergeEnglishPageVisionWithOcr(retried, resolvedOcr);
-      if (merged.trim().length >= 40 && !isFakeExtractText(merged)) {
-        return merged;
+      try {
+        const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
+          forceTintedPageVision: true,
+        });
+        const merged = mergeEnglishPageVisionWithOcr(retried, resolvedOcr);
+        if (merged.trim().length >= 40 && !isFakeExtractText(merged)) {
+          return merged;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Structured-page vision enhance failed, using OCR: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
       }
     }
-    if (usableOcr && !ocrThin && !needsPhotoVision) {
+    if ((usableOcr && !ocrThin && !needsPhotoVision) || ocrAlreadyReadable) {
       summary = resolvedOcr;
     } else {
       const visionTranscribePrompt = expectsArabicScript
@@ -630,10 +646,13 @@ export class LessonsService {
     }
     const cannotReadPage =
       !usableOcr &&
+      !ocrAlreadyReadable &&
       (ocrGarbled || isFakeExtractText(resolvedOcr) || usePhotoVision);
-    if (cannotReadPage) {
+    if (cannotReadPage || isFakeExtractText(summary)) {
       const ocrSalvage = englishOnlyFromMixedOcr(resolvedOcr);
-      if (
+      if (ocrAlreadyReadable) {
+        summary = resolvedOcr;
+      } else if (
         compactTextLength(ocrSalvage) > 140 &&
         (isPagePhotoTextReadable(ocrSalvage) || isPagePhotoTextReadable(resolvedOcr))
       ) {
@@ -642,6 +661,7 @@ export class LessonsService {
     }
     const polishedLooksReal =
       usableOcr ||
+      ocrAlreadyReadable ||
       isUsableLessonOcr(summary, { expectArabicScript: expectsArabicScript }) ||
       (looksLikeRealLessonText(summary) &&
         !isPoorLessonOcr(summary, { expectArabicScript: expectsArabicScript }));
@@ -653,44 +673,78 @@ export class LessonsService {
       });
     }
     if (isFakeExtractText(summary)) {
-      throw new BadRequestException({
-        code: 'PAGE_TEXT_UNREADABLE',
-        message: 'Could not read this page clearly. Try again with a clearer photo.',
-      });
+      if (ocrAlreadyReadable) {
+        summary = resolvedOcr;
+      } else {
+        throw new BadRequestException({
+          code: 'PAGE_TEXT_UNREADABLE',
+          message: 'Could not read this page clearly. Try again with a clearer photo.',
+        });
+      }
     }
     let final = coerceLessonDisplayText(
-      longestRealLessonText(usableOcr ? resolvedOcr : undefined, polishedLooksReal ? summary : undefined),
+      longestRealLessonText(
+        usableOcr || ocrAlreadyReadable ? resolvedOcr : undefined,
+        polishedLooksReal ? summary : undefined,
+      ),
     );
     final = filterPageTextForLessonAssembly(final);
     if (
+      !ocrAlreadyReadable &&
       pageTextNeedsVisionRetry(final) &&
       canVision &&
       !options?.forceMainColumnVision &&
       !options?.forceTintedPageVision
     ) {
-      const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
-        forceTintedPageVision: !expectsArabicScript,
-        forceMainColumnVision: expectsArabicScript,
-      });
-      if (retried.trim().length >= 40) {
-        final = retried;
+      try {
+        const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
+          forceTintedPageVision: !expectsArabicScript,
+          forceMainColumnVision: expectsArabicScript,
+        });
+        if (retried.trim().length >= 40) {
+          final = mergeEnglishPageVisionWithOcr(retried, resolvedOcr);
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Vision retry after weak OCR failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
       }
     }
     if (!isPagePhotoTextReadable(final)) {
+      if (ocrAlreadyReadable) {
+        const ocrFinal = filterPageTextForLessonAssembly(resolvedOcr) || resolvedOcr;
+        if (isPagePhotoTextReadable(ocrFinal) || isPagePhotoTextReadable(resolvedOcr)) {
+          return isPagePhotoTextReadable(ocrFinal) ? ocrFinal : resolvedOcr;
+        }
+      }
       const quality = scorePageOcrQuality(final);
       const need = pageOcrAcceptThreshold(final);
       if (canVision && !options?.forceTintedPageVision) {
-        const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
-          forceTintedPageVision: true,
-        });
-        if (isPagePhotoTextReadable(retried)) {
-          return retried;
-        }
-        if (retried.trim().length > final.trim().length) {
-          final = retried;
+        try {
+          const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
+            forceTintedPageVision: true,
+          });
+          const merged = mergeEnglishPageVisionWithOcr(retried, resolvedOcr);
+          if (isPagePhotoTextReadable(merged)) {
+            return merged;
+          }
+          if (merged.trim().length > final.trim().length) {
+            final = merged;
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Tinted vision clarity retry failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
         }
       }
       if (!isPagePhotoTextReadable(final)) {
+        if (isPagePhotoTextReadable(resolvedOcr)) {
+          return resolvedOcr;
+        }
         const qualityAfter = scorePageOcrQuality(final);
         throw new BadRequestException({
           code: 'PAGE_PHOTO_UNCLEAR',
