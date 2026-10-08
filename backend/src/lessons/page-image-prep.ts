@@ -9,6 +9,16 @@ export type PreparedLessonPagePhoto = {
   size: number;
 };
 
+export type OrientedPagePhoto = {
+  /** Greyscale / contrast-boosted buffer for Tesseract. */
+  ocr: PreparedLessonPagePhoto;
+  /** Color upright buffer for AI vision. */
+  vision: PreparedLessonPagePhoto;
+  width: number;
+  height: number;
+  rotationDegrees: number;
+};
+
 async function getSharp() {
   const sharpModule = await import('sharp');
   return (sharpModule as unknown as { default?: (i: Buffer) => import('sharp').Sharp }).default
@@ -16,54 +26,148 @@ async function getSharp() {
     : (sharpModule as unknown as (i: Buffer) => import('sharp').Sharp);
 }
 
-async function uprightPageBuffer(
+async function applyExifOrientation(
   file: Pick<Express.Multer.File, 'buffer'>,
 ): Promise<{ working: Buffer; width: number; height: number }> {
   const sharpFn = await getSharp();
   const oriented = await sharpFn(file.buffer).rotate().toBuffer({ resolveWithObject: true });
-  let working = oriented.data;
-  let width = oriented.info.width;
-  let height = oriented.info.height;
+  return {
+    working: oriented.data,
+    width: oriented.info.width,
+    height: oriented.info.height,
+  };
+}
 
-  // Phone photos often arrive landscape while the book page is portrait.
-  if (width > height * 1.08) {
-    const turned = await sharpFn(working).rotate(90).toBuffer({ resolveWithObject: true });
-    working = turned.data;
-    width = turned.info.width;
-    height = turned.info.height;
+async function rotateBuffer(
+  working: Buffer,
+  degrees: number,
+): Promise<{ working: Buffer; width: number; height: number }> {
+  if (!degrees) {
+    const sharpFn = await getSharp();
+    const meta = await sharpFn(working).metadata();
+    return {
+      working,
+      width: meta.width ?? 0,
+      height: meta.height ?? 0,
+    };
   }
-  return { working, width, height };
+  const sharpFn = await getSharp();
+  const turned = await sharpFn(working).rotate(degrees).toBuffer({ resolveWithObject: true });
+  return {
+    working: turned.data,
+    width: turned.info.width,
+    height: turned.info.height,
+  };
+}
+
+async function toOcrJpeg(
+  working: Buffer,
+  width: number,
+  height: number,
+  originalname: string,
+): Promise<PreparedLessonPagePhoto> {
+  const sharpFn = await getSharp();
+  let pipeline = sharpFn(working)
+    .greyscale()
+    .normalize()
+    .gamma(1.08)
+    .linear(1.22, -18)
+    .sharpen({ sigma: 1.0 });
+
+  try {
+    const trimmed = await pipeline.clone().trim({ threshold: 18 }).toBuffer({ resolveWithObject: true });
+    const areaBefore = Math.max(1, width * height);
+    const areaAfter = trimmed.info.width * trimmed.info.height;
+    if (areaAfter >= areaBefore * 0.55) {
+      pipeline = sharpFn(trimmed.data)
+        .greyscale()
+        .normalize()
+        .gamma(1.08)
+        .linear(1.22, -18)
+        .sharpen({ sigma: 1.0 });
+    }
+  } catch {
+    // trim skipped
+  }
+
+  const buffer = await pipeline.jpeg({ quality: 86, mozjpeg: true }).toBuffer();
+  return {
+    buffer,
+    mimeType: 'image/jpeg',
+    originalname: originalname.replace(/\.\w+$/i, '') + '.jpg',
+    size: buffer.length,
+  };
+}
+
+async function toVisionJpeg(
+  working: Buffer,
+  width: number,
+  height: number,
+  originalname: string,
+): Promise<PreparedLessonPagePhoto> {
+  const sharpFn = await getSharp();
+  const maxEdge = 2000;
+  const scale = Math.min(1, maxEdge / Math.max(width, height, 1));
+  let pipeline = sharpFn(working);
+  if (scale < 0.98) {
+    pipeline = pipeline.resize({
+      width: Math.max(1, Math.round(width * scale)),
+      height: Math.max(1, Math.round(height * scale)),
+      fit: 'inside',
+      withoutEnlargement: true,
+    });
+  }
+  const buffer = await pipeline.jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+  return {
+    buffer,
+    mimeType: 'image/jpeg',
+    originalname: originalname.replace(/\.\w+$/i, '') + '.jpg',
+    size: buffer.length,
+  };
+}
+
+/**
+ * Candidate rotations after EXIF.
+ * Do NOT force landscape→portrait: many phone shots are landscape with readable
+ * text, and a blind 90° turn makes Tesseract return mirrored junk.
+ */
+export function orientationCandidates(width: number, height: number): number[] {
+  // Always try EXIF-upright first. Then try the other turns if needed by caller.
+  if (width >= height) {
+    return [0, 270, 90, 180];
+  }
+  return [0, 90, 270, 180];
+}
+
+export async function prepareOrientedVariant(
+  file: Pick<Express.Multer.File, 'buffer' | 'mimetype' | 'originalname' | 'size'>,
+  rotationDegrees: number,
+): Promise<OrientedPagePhoto> {
+  const originalname = file.originalname ?? 'page.jpg';
+  const base = await applyExifOrientation(file);
+  const turned = await rotateBuffer(base.working, rotationDegrees);
+  const [ocr, vision] = await Promise.all([
+    toOcrJpeg(turned.working, turned.width, turned.height, originalname),
+    toVisionJpeg(turned.working, turned.width, turned.height, originalname),
+  ]);
+  return {
+    ocr,
+    vision,
+    width: turned.width,
+    height: turned.height,
+    rotationDegrees,
+  };
 }
 
 /**
  * Color upright page for AI vision — keep red titles and illustrations intact.
- * Greyscale OCR prep often makes vision stop at headings and skip poem lines.
  */
 export async function prepareLessonPagePhotoForVision(
   file: Pick<Express.Multer.File, 'buffer' | 'mimetype' | 'originalname' | 'size'>,
 ): Promise<PreparedLessonPagePhoto> {
-  const originalname = file.originalname ?? 'page.jpg';
   try {
-    const sharpFn = await getSharp();
-    const { working, width, height } = await uprightPageBuffer(file);
-    const maxEdge = 2000;
-    const scale = Math.min(1, maxEdge / Math.max(width, height));
-    let pipeline = sharpFn(working);
-    if (scale < 0.98) {
-      pipeline = pipeline.resize({
-        width: Math.max(1, Math.round(width * scale)),
-        height: Math.max(1, Math.round(height * scale)),
-        fit: 'inside',
-        withoutEnlargement: true,
-      });
-    }
-    const buffer = await pipeline.jpeg({ quality: 90, mozjpeg: true }).toBuffer();
-    return {
-      buffer,
-      mimeType: 'image/jpeg',
-      originalname: originalname.replace(/\.\w+$/i, '') + '.jpg',
-      size: buffer.length,
-    };
+    const variant = await prepareOrientedVariant(file, 0);
+    return variant.vision;
   } catch (error) {
     logger.warn(
       `Vision image prep failed, using original: ${error instanceof Error ? error.message : String(error)}`,
@@ -71,57 +175,22 @@ export async function prepareLessonPagePhotoForVision(
     return {
       buffer: file.buffer,
       mimeType: file.mimetype || 'image/jpeg',
-      originalname,
+      originalname: file.originalname ?? 'page.jpg',
       size: file.size ?? file.buffer.length,
     };
   }
 }
 
 /**
- * Upright textbook photo: EXIF orientation, portrait correction, greyscale cleanup for OCR.
+ * Upright textbook photo: EXIF orientation + greyscale cleanup for OCR.
+ * Does not force a 90° turn on landscape photos (that broke sideways phone shots).
  */
 export async function prepareLessonPagePhoto(
   file: Pick<Express.Multer.File, 'buffer' | 'mimetype' | 'originalname' | 'size'>,
 ): Promise<PreparedLessonPagePhoto> {
-  const originalname = file.originalname ?? 'page.jpg';
   try {
-    const sharpFn = await getSharp();
-    const { working, width, height } = await uprightPageBuffer(file);
-
-    // Tinted/parchment pages and red headings: greyscale + contrast helps Tesseract.
-    let pipeline = sharpFn(working)
-      .greyscale()
-      .normalize()
-      .gamma(1.08)
-      .linear(1.22, -18)
-      .sharpen({ sigma: 1.0 });
-
-    try {
-      const trimmed = await pipeline.clone().trim({ threshold: 18 }).toBuffer({ resolveWithObject: true });
-      const areaBefore = width * height;
-      const areaAfter = trimmed.info.width * trimmed.info.height;
-      if (areaAfter >= areaBefore * 0.55) {
-        pipeline = sharpFn(trimmed.data)
-          .greyscale()
-          .normalize()
-          .gamma(1.08)
-          .linear(1.22, -18)
-          .sharpen({ sigma: 1.0 });
-      }
-    } catch {
-      // trim skipped — uniform background or busy layout
-    }
-
-    const buffer = await pipeline
-      .jpeg({ quality: 86, mozjpeg: true })
-      .toBuffer();
-
-    return {
-      buffer,
-      mimeType: 'image/jpeg',
-      originalname: originalname.replace(/\.\w+$/i, '') + '.jpg',
-      size: buffer.length,
-    };
+    const variant = await prepareOrientedVariant(file, 0);
+    return variant.ocr;
   } catch (error) {
     logger.warn(
       `Page image prep failed, using original: ${error instanceof Error ? error.message : String(error)}`,
@@ -129,7 +198,7 @@ export async function prepareLessonPagePhoto(
     return {
       buffer: file.buffer,
       mimeType: file.mimetype || 'image/jpeg',
-      originalname,
+      originalname: file.originalname ?? 'page.jpg',
       size: file.size ?? file.buffer.length,
     };
   }

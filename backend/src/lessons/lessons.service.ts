@@ -89,7 +89,12 @@ import {
   scorePageOcrQuality,
   pageTextNeedsVisionRetry,
 } from './page-text-sanitize';
-import { prepareLessonPagePhoto, prepareLessonPagePhotoForVision } from './page-image-prep';
+import {
+  orientationCandidates,
+  prepareLessonPagePhoto,
+  prepareLessonPagePhotoForVision,
+  prepareOrientedVariant,
+} from './page-image-prep';
 
 const ARABIC_SCRIPT_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
@@ -482,6 +487,96 @@ export class LessonsService {
     );
   }
 
+  /**
+   * Prepare + read a page. Tries alternate rotations when the first pass is unreadable —
+   * phones often capture textbook pages sideways; a blind landscape→portrait turn
+   * used to make OCR fail with mirrored junk.
+   */
+  private async prepareAndTranscribePagePhoto(
+    file: Express.Multer.File,
+    subject: { name: string },
+    grade: { name: string },
+    schoolId: string,
+    userId: string,
+  ): Promise<{ text: string; readyFile: Express.Multer.File }> {
+    const sharpModule = await import('sharp');
+    const sharpFn =
+      (sharpModule as unknown as { default?: (i: Buffer) => import('sharp').Sharp }).default ??
+      (sharpModule as unknown as (i: Buffer) => import('sharp').Sharp);
+    const afterExif = await sharpFn(file.buffer).rotate().toBuffer({ resolveWithObject: true });
+    const degreesList = orientationCandidates(afterExif.info.width, afterExif.info.height);
+
+    let best:
+      | {
+          text: string;
+          readyFile: Express.Multer.File;
+          score: number;
+          readable: boolean;
+        }
+      | undefined;
+    let lastError: unknown;
+
+    for (const degrees of degreesList) {
+      try {
+        const variant = await prepareOrientedVariant(file, degrees);
+        const readyFile = {
+          ...file,
+          buffer: variant.ocr.buffer,
+          mimetype: variant.ocr.mimeType,
+          originalname: variant.ocr.originalname,
+          size: variant.ocr.size,
+        } as Express.Multer.File;
+        const visionFile = {
+          ...file,
+          buffer: variant.vision.buffer,
+          mimetype: variant.vision.mimeType,
+          originalname: variant.vision.originalname,
+          size: variant.vision.size,
+        } as Express.Multer.File;
+        const text = await this.transcribeTextbookPhoto(
+          readyFile,
+          subject,
+          grade,
+          schoolId,
+          userId,
+          { visionFile },
+        );
+        const score = scorePageOcrQuality(text);
+        const readable =
+          isPagePhotoTextReadable(text) && !englishPageTranscriptLooksIncomplete(text);
+        if (!best || (readable && !best.readable) || score > best.score) {
+          best = { text, readyFile, score, readable };
+        }
+        if (readable && score >= 58) {
+          if (degrees !== 0) {
+            this.logger.log(
+              `Page orientation: using ${degrees}° rotation for ${file.originalname ?? 'photo'}`,
+            );
+          }
+          return { text, readyFile };
+        }
+      } catch (error) {
+        lastError = error;
+        this.logger.warn(
+          `Orientation ${degrees}° failed for ${file.originalname ?? 'photo'}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+
+    if (best?.text?.trim()) {
+      return { text: best.text, readyFile: best.readyFile };
+    }
+    if (lastError instanceof BadRequestException) {
+      throw lastError;
+    }
+    throw new BadRequestException({
+      code: 'PAGE_PHOTO_UNCLEAR',
+      message: this.unclearPagePhotoMessage(file.originalname),
+    });
+  }
+
   /** OCR + vision for a single textbook photo (used when appending chapter pages one at a time). */
   private async transcribeTextbookPhoto(
     file: Express.Multer.File,
@@ -839,32 +934,15 @@ export class LessonsService {
     const perPageTexts: string[] = [];
     const preparedFiles: Express.Multer.File[] = [];
     for (const file of files) {
-      const prepared = await prepareLessonPagePhoto(file);
-      const forVision = await prepareLessonPagePhotoForVision(file);
-      const readyFile = {
-        ...file,
-        buffer: prepared.buffer,
-        mimetype: prepared.mimeType,
-        originalname: prepared.originalname,
-        size: prepared.size,
-      } as Express.Multer.File;
-      const visionFile = {
-        ...file,
-        buffer: forVision.buffer,
-        mimetype: forVision.mimeType,
-        originalname: forVision.originalname,
-        size: forVision.size,
-      } as Express.Multer.File;
-      preparedFiles.push(readyFile);
       try {
-        const text = await this.transcribeTextbookPhoto(
-          readyFile,
+        const { text, readyFile } = await this.prepareAndTranscribePagePhoto(
+          file,
           lesson.subject,
           grade,
           schoolId,
           user.id,
-          { visionFile },
         );
+        preparedFiles.push(readyFile);
         perPageTexts.push(text);
       } catch (error) {
         if (error instanceof BadRequestException) {
@@ -872,7 +950,7 @@ export class LessonsService {
         }
         throw new BadRequestException({
           code: 'PAGE_PHOTO_UNCLEAR',
-          message: this.unclearPagePhotoMessage(prepared.originalname),
+          message: this.unclearPagePhotoMessage(file.originalname),
         });
       }
     }
@@ -934,29 +1012,12 @@ export class LessonsService {
         message: 'Grade was not found for this chapter',
       });
     }
-    const prepared = await prepareLessonPagePhoto(file);
-    const forVision = await prepareLessonPagePhotoForVision(file);
-    const readyFile = {
-      ...file,
-      buffer: prepared.buffer,
-      mimetype: prepared.mimeType,
-      originalname: prepared.originalname,
-      size: prepared.size,
-    } as Express.Multer.File;
-    const visionFile = {
-      ...file,
-      buffer: forVision.buffer,
-      mimetype: forVision.mimeType,
-      originalname: forVision.originalname,
-      size: forVision.size,
-    } as Express.Multer.File;
-    const text = await this.transcribeTextbookPhoto(
-      readyFile,
+    const { text, readyFile } = await this.prepareAndTranscribePagePhoto(
+      file,
       lesson.subject,
       grade,
       lesson.schoolId,
       user.id,
-      { visionFile },
     );
     const asset = await this.filesService.saveSchoolUpload(
       lesson.schoolId,
