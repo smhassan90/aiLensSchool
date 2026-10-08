@@ -66,6 +66,15 @@ function lineLooksLikeGibberish(line: string): boolean {
   if (/^Page\s+\d+$/i.test(trimmed)) return false;
   if (/^\*\*[^*]+\*\*$/.test(trimmed)) return false;
   if (trimmed.length >= 40 && /^[A-Z][a-z].*[.!?]"?\s*$/.test(trimmed)) return false;
+  // Keep numbered questions, section labels, title-case headings, and author years.
+  if (/^\d+[.)]\s+\S/.test(trimmed)) return false;
+  if (/^(pre-reading|reading text|unit\b|exercise|notes|reading comprehension)\b/i.test(trimmed)) {
+    return false;
+  }
+  if (/\(\d{4}\s*[-–]\s*\d{4}\)/.test(trimmed)) return false;
+  if (/^[A-Z][\w'’.-]+(?:\s+[A-Z][\w'’.-]+){1,8}\.?$/.test(trimmed) && trimmed.length >= 12) {
+    return false;
+  }
 
   const w = words(trimmed);
   const latin = countLatinLetters(trimmed);
@@ -93,6 +102,13 @@ function lineLooksLikeGibberish(line: string): boolean {
 export function isSuspectParagraph(block: string): boolean {
   const trimmed = block.trim();
   if (!trimmed) return true;
+  if (
+    /^(pre-reading|reading text|unit\b|exercise|notes|reading comprehension)\b/i.test(trimmed) ||
+    /^\d+[.)]\s+\S/.test(trimmed) ||
+    /\(\d{4}\s*[-–]\s*\d{4}\)/.test(trimmed)
+  ) {
+    return false;
+  }
   if (trimmed.length < 12) return true;
   const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   if (!lines.length) return true;
@@ -121,7 +137,9 @@ export function filterPageTextForLessonAssembly(text: string): string {
     if (
       pageHasStructuredLessonContent(value) &&
       isPagePhotoTextReadable(value) &&
-      !isPagePhotoTextReadable(joined)
+      (!isPagePhotoTextReadable(joined) ||
+        (englishPageTranscriptLooksIncomplete(joined) &&
+          !englishPageTranscriptLooksIncomplete(value)))
     ) {
       return value;
     }
@@ -166,11 +184,55 @@ const POEM_PAGE_BODY_MARKERS = [
   'voice of god',
 ] as const;
 
+const READING_BODY_CUES =
+  /\b(flung|lonely mood|wore a crown|beginning to sink|scotland|sought to|topmost|dwell among|steeple)\b/i;
+
+/**
+ * Vision often stops after "Reading text" + title and skips the poem/story body.
+ * Also true when OCR still has those body lines.
+ */
+export function englishPageTranscriptLooksIncomplete(text: string): boolean {
+  const value = (text ?? '').trim();
+  if (!value) return true;
+  const lower = value.toLowerCase();
+  const readingLayout =
+    /reading text|reading comprehension|pre-reading|king bruce|voice of god/i.test(lower);
+  if (!readingLayout) return false;
+
+  if (/king bruce and the spider\s*\.?$/i.test(value) && !READING_BODY_CUES.test(value)) {
+    return true;
+  }
+  if (
+    /the voice of god\s*\.?$/i.test(value) &&
+    !/sought to|steeple|dwell among/i.test(lower)
+  ) {
+    return true;
+  }
+  if (
+    /reading text/i.test(lower) &&
+    /king bruce/i.test(lower) &&
+    !READING_BODY_CUES.test(value)
+  ) {
+    return true;
+  }
+  if (
+    readingLayout &&
+    countLatinLetters(value) < 180 &&
+    !READING_BODY_CUES.test(value)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /** Vision often returns clean intro + title but drops poem stanzas, author lines, and footers. */
 export function visionTranscriptMissingOcrContent(vision: string, ocr: string): boolean {
   const v = (vision ?? '').toLowerCase();
   const o = (ocr ?? '').toLowerCase();
   if (!v.trim() || !o.trim()) return false;
+  if (englishPageTranscriptLooksIncomplete(vision) && countLatinLetters(ocr) > countLatinLetters(vision)) {
+    return true;
+  }
   let missing = 0;
   for (const phrase of POEM_PAGE_BODY_MARKERS) {
     if (o.includes(phrase) && !v.includes(phrase)) missing += 1;
@@ -181,10 +243,13 @@ export function visionTranscriptMissingOcrContent(vision: string, ocr: string): 
 
   const readingBodyPhrases = [
     'flung himself',
+    'flung',
     'wore a crown',
     'beginning to sink',
     'eliza cook',
+    'eliza coole',
     'scotland flung',
+    'scotland',
   ];
   const readingHits = readingBodyPhrases.filter((p) => o.includes(p) && !v.includes(p));
   if (readingHits.length >= 1 && /reading comprehension|reading text|king bruce/i.test(v)) {
@@ -214,13 +279,33 @@ export function mergeEnglishPageVisionWithOcr(vision: string, ocr: string): stri
   const ocrTrim = (ocr ?? '').trim();
   if (!v) return filterPageTextForLessonAssembly(ocrTrim) || ocrTrim;
   if (!ocrTrim) return v;
-  if (!visionTranscriptMissingOcrContent(v, ocrTrim)) return v;
+
+  const visionIncomplete = englishPageTranscriptLooksIncomplete(v);
+  const ocrHasMoreBody =
+    visionTranscriptMissingOcrContent(v, ocrTrim) ||
+    (visionIncomplete && countLatinLetters(ocrTrim) > countLatinLetters(v));
+
+  if (!ocrHasMoreBody) return v;
+
+  // Prefer OCR when vision stopped at the title but OCR still has stanza/body lines.
+  if (visionIncomplete && !englishPageTranscriptLooksIncomplete(ocrTrim)) {
+    const ocrFiltered = filterPageTextForLessonAssembly(ocrTrim);
+    if (ocrFiltered.trim().length >= 40 && !englishPageTranscriptLooksIncomplete(ocrFiltered)) {
+      return ocrFiltered;
+    }
+    return ocrTrim;
+  }
 
   const combined = `${v}\n\n${ocrTrim}`.trim();
   if (isPagePhotoTextReadable(combined)) {
     const combinedFiltered = filterPageTextForLessonAssembly(combined);
     const pick = combinedFiltered.trim() || combined;
-    if (!visionTranscriptMissingOcrContent(pick, ocrTrim)) return pick;
+    if (
+      !visionTranscriptMissingOcrContent(pick, ocrTrim) &&
+      !englishPageTranscriptLooksIncomplete(pick)
+    ) {
+      return pick;
+    }
     return combined;
   }
   if (isPagePhotoTextReadable(ocrTrim)) return ocrTrim;

@@ -1,4 +1,5 @@
 import {
+  englishPageTranscriptLooksIncomplete,
   filterPageTextForLessonAssembly,
   isPagePhotoTextReadable,
   mergeEnglishPageVisionWithOcr,
@@ -43,6 +44,39 @@ ple: the tall`.trim();
     expect(filtered).toMatch(/steeple/i);
   });
 
+  it('flags truncated King Bruce vision that stops at the title', () => {
+    const vision = `9. Can a spider hurt us?
+
+3. Can a spider teach us anything?
+
+Reading text
+
+King Bruce and the Spider`;
+    expect(englishPageTranscriptLooksIncomplete(vision)).toBe(true);
+  });
+
+  it('keeps pre-reading questions and poem title when filtering OCR', () => {
+    const ocr = `pre-reading
+1. Have you seen a spider? Are you afraid of it?
+
+2. Can a spider hurt us?
+3. Can a spider teach us anything?
+
+Reading text
+
+King Bruce and the Spider
+Eliza Cook (1818-1889)
+
+King Bruce of Scotland flung himself down
+In a lonely mood to think;
+'Tis true he was monarch and wore a crown,
+But his heart was beginning to sink.`;
+    const filtered = filterPageTextForLessonAssembly(ocr);
+    expect(filtered).toMatch(/Have you seen a spider/i);
+    expect(filtered).toMatch(/King Bruce and the Spider/i);
+    expect(filtered).toMatch(/flung himself/i);
+  });
+
   it('merges reading comprehension page when vision stops at the title', () => {
     const vision = `READING COMPREHENSION
 
@@ -62,6 +96,7 @@ King Bruce of Scotland flung himself down
 In a lonely mood to think;
 'Tis true he was monarch and wore a crown,
 But his heart was beginning to sink.`;
+    expect(englishPageTranscriptLooksIncomplete(vision)).toBe(true);
     expect(visionTranscriptMissingOcrContent(vision, ocr)).toBe(true);
     const merged = mergeEnglishPageVisionWithOcr(vision, ocr);
     expect(merged).toMatch(/flung himself/i);

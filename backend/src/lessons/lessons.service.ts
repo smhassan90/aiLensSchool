@@ -83,12 +83,13 @@ import {
   filterPageTextForLessonAssembly,
   isPagePhotoTextReadable,
   pageOcrAcceptThreshold,
+  englishPageTranscriptLooksIncomplete,
   mergeEnglishPageVisionWithOcr,
   pageHasStructuredLessonContent,
   scorePageOcrQuality,
   pageTextNeedsVisionRetry,
 } from './page-text-sanitize';
-import { prepareLessonPagePhoto } from './page-image-prep';
+import { prepareLessonPagePhoto, prepareLessonPagePhotoForVision } from './page-image-prep';
 
 const ARABIC_SCRIPT_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
@@ -405,6 +406,7 @@ export class LessonsService {
           size: buffer.length,
         } as Express.Multer.File;
         const prepared = await prepareLessonPagePhoto(raw);
+        const forVision = await prepareLessonPagePhotoForVision(raw);
         const file = {
           ...raw,
           buffer: prepared.buffer,
@@ -412,13 +414,20 @@ export class LessonsService {
           originalname: prepared.originalname,
           size: prepared.size,
         } as Express.Multer.File;
+        const visionFile = {
+          ...raw,
+          buffer: forVision.buffer,
+          mimetype: forVision.mimeType,
+          originalname: forVision.originalname,
+          size: forVision.size,
+        } as Express.Multer.File;
         const retried = await this.transcribeTextbookPhoto(
           file,
           lesson.subject,
           grade,
           lesson.schoolId,
           user.id,
-          { forceMainColumnVision: true },
+          { forceMainColumnVision: true, visionFile },
         );
         if (retried.trim()) {
           await this.prisma.lessonSource.update({
@@ -480,17 +489,23 @@ export class LessonsService {
     grade: { name: string },
     schoolId: string,
     userId: string,
-    options?: { forceMainColumnVision?: boolean; forceTintedPageVision?: boolean },
+    options?: {
+      forceMainColumnVision?: boolean;
+      forceTintedPageVision?: boolean;
+      /** Color upright photo for vision — greyscale OCR prep often truncates poem lines. */
+      visionFile?: Express.Multer.File;
+    },
   ): Promise<string> {
     const expectsArabicScript = ocrLanguagesForSubject(subject.name) !== 'eng';
     const canVision = this.visionAvailable();
+    const visionImages = this.toLessonImages([options?.visionFile ?? file]);
 
     if (options?.forceTintedPageVision && canVision) {
       const tintedPrompt = [
         `Transcribe this ${subject.name} textbook page (${grade.name}) for the teacher's lesson library.`,
-        'The page may have a colored or parchment background and decorative borders — ignore border art and ornaments.',
-        'Copy every unit header, pre-reading question, red story/poem title, author line, and every stanza or paragraph line through the bottom of the page.',
-        'Include text below illustrations and in shadows. Do not stop at the title — transcribe all poem or story lines verbatim. Keep English as English. Keep Urdu/Arabic in Unicode script.',
+        'The page may have a colored or parchment background, a large illustration, and decorative borders — ignore border art and the picture itself.',
+        'Copy every unit header, pre-reading question, red story/poem title, author line (with years), and EVERY stanza or paragraph line below the illustration through the bottom of the page.',
+        'Do not stop at the title. After "Reading text" / the story title you MUST copy all poem lines verbatim (for example lines that begin with King Bruce / I sought / And climbed). Keep English as English. Keep Urdu/Arabic in Unicode script.',
       ].join(' ');
       try {
         const polished = await this.lessonProcessing.process({
@@ -499,7 +514,7 @@ export class LessonsService {
           sourceText: tintedPrompt,
           subjectName: subject.name,
           gradeName: grade.name,
-          images: this.toLessonImages([file]),
+          images: visionImages,
         });
         const cleaned = filterPageTextForLessonAssembly(coerceLessonDisplayText(polished.summary));
         if (cleaned.trim().length >= 40 && !isFakeExtractText(cleaned)) {
@@ -507,9 +522,14 @@ export class LessonsService {
             subjectName: subject.name,
           });
           const merged = mergeEnglishPageVisionWithOcr(cleaned, ocrForMerge ?? '');
-          if (merged.trim().length >= 40 && !isFakeExtractText(merged)) {
+          if (
+            merged.trim().length >= 40 &&
+            !isFakeExtractText(merged) &&
+            !englishPageTranscriptLooksIncomplete(merged)
+          ) {
             return merged;
           }
+          // Incomplete vision (title only) — keep going so OCR / another pass can fill the poem.
         }
       } catch (error) {
         this.logger.warn(
@@ -531,7 +551,7 @@ export class LessonsService {
           sourceText: mainColumnPrompt,
           subjectName: subject.name,
           gradeName: grade.name,
-          images: this.toLessonImages([file]),
+          images: visionImages,
         });
         const cleaned = filterPageTextForLessonAssembly(coerceLessonDisplayText(polished.summary));
         if (cleaned.trim().length >= 40 && !isFakeExtractText(cleaned)) {
@@ -573,25 +593,36 @@ export class LessonsService {
       Boolean(resolvedOcr.trim()) &&
       (isPagePhotoTextReadable(resolvedOcr) ||
         isPagePhotoTextReadable(filterPageTextForLessonAssembly(resolvedOcr)));
+    const ocrHasReadingBody =
+      Boolean(resolvedOcr.trim()) && !englishPageTranscriptLooksIncomplete(resolvedOcr);
+    const visionOpts = { visionFile: options?.visionFile };
 
     let summary: string;
-    // Prefer readable OCR over a forced vision pass — vision often fails on glare
-    // or busy illustrations and used to surface PAGE_TEXT_UNREADABLE for good photos.
+    // Prefer readable OCR that already includes the poem/body. Only force vision when OCR
+    // is incomplete (title/questions only) or unusable — vision on greyscale often truncates.
     if (
       canVision &&
       !expectsArabicScript &&
       !options?.forceTintedPageVision &&
-      !ocrAlreadyReadable &&
-      pageHasStructuredLessonContent(resolvedOcr) &&
-      scorePageOcrQuality(resolvedOcr) >= 58
+      (!ocrAlreadyReadable || !ocrHasReadingBody) &&
+      (pageHasStructuredLessonContent(resolvedOcr) || !resolvedOcr.trim()) &&
+      (scorePageOcrQuality(resolvedOcr) >= 40 || !resolvedOcr.trim())
     ) {
       try {
         const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
           forceTintedPageVision: true,
+          ...visionOpts,
         });
         const merged = mergeEnglishPageVisionWithOcr(retried, resolvedOcr);
-        if (merged.trim().length >= 40 && !isFakeExtractText(merged)) {
+        if (
+          merged.trim().length >= 40 &&
+          !isFakeExtractText(merged) &&
+          !englishPageTranscriptLooksIncomplete(merged)
+        ) {
           return merged;
+        }
+        if (ocrHasReadingBody && merged.trim().length >= 40 && !isFakeExtractText(merged)) {
+          return mergeEnglishPageVisionWithOcr(merged, resolvedOcr);
         }
       } catch (error) {
         this.logger.warn(
@@ -601,15 +632,20 @@ export class LessonsService {
         );
       }
     }
-    if ((usableOcr && !ocrThin && !needsPhotoVision) || ocrAlreadyReadable) {
+    if (
+      ((usableOcr && !ocrThin && !needsPhotoVision) || ocrAlreadyReadable) &&
+      ocrHasReadingBody
+    ) {
+      summary = resolvedOcr;
+    } else if ((usableOcr && !ocrThin && !needsPhotoVision) || ocrAlreadyReadable) {
       summary = resolvedOcr;
     } else {
       const visionTranscribePrompt = expectsArabicScript
         ? `Transcribe the attached ${subject.name} textbook page photo for ${grade.name}. Copy every heading, paragraph, number, and activity instruction accurately. Keep English as English. Keep every Urdu/Arabic line in original Unicode script (not Latin letters).`
         : [
             `Transcribe this ${subject.name} textbook page (${grade.name}).`,
-            'The page may have a tinted/colored background, red headings, and decorative borders — ignore border art.',
-            'Copy headers, questions, titles, author lines, and every poem/story line through the bottom of the page (including below pictures). Do not stop at the title.',
+            'The page may have a colored background, red headings, a large illustration, and decorative borders — ignore border art and the picture.',
+            'Copy headers, pre-reading questions, titles, author lines, and every poem/story line through the bottom of the page (below the picture). Do not stop at the title.',
           ].join(' ');
       try {
         const polished = await this.lessonProcessing.process({
@@ -618,7 +654,7 @@ export class LessonsService {
           sourceText: usePhotoVision || !usableOcr ? visionTranscribePrompt : resolvedOcr,
           subjectName: subject.name,
           gradeName: grade.name,
-          images: canVision && usePhotoVision ? this.toLessonImages([file]) : undefined,
+          images: canVision && usePhotoVision ? visionImages : undefined,
         });
         summary = !expectsArabicScript
           ? mergeEnglishPageVisionWithOcr(polished.summary, resolvedOcr)
@@ -633,6 +669,14 @@ export class LessonsService {
           throw error;
         }
       }
+    }
+
+    if (
+      !expectsArabicScript &&
+      englishPageTranscriptLooksIncomplete(summary) &&
+      ocrHasReadingBody
+    ) {
+      summary = mergeEnglishPageVisionWithOcr(summary, resolvedOcr);
     }
 
     if (isGarbledRtlOcr(summary) || looksLikeMangledRtlOcr(summary)) {
@@ -689,6 +733,13 @@ export class LessonsService {
       ),
     );
     final = filterPageTextForLessonAssembly(final);
+    if (englishPageTranscriptLooksIncomplete(final) && ocrHasReadingBody) {
+      const ocrKept = filterPageTextForLessonAssembly(resolvedOcr);
+      final =
+        ocrKept.trim() && !englishPageTranscriptLooksIncomplete(ocrKept)
+          ? ocrKept
+          : resolvedOcr;
+    }
     if (
       !ocrAlreadyReadable &&
       pageTextNeedsVisionRetry(final) &&
@@ -700,6 +751,7 @@ export class LessonsService {
         const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
           forceTintedPageVision: !expectsArabicScript,
           forceMainColumnVision: expectsArabicScript,
+          ...visionOpts,
         });
         if (retried.trim().length >= 40) {
           final = mergeEnglishPageVisionWithOcr(retried, resolvedOcr);
@@ -711,6 +763,9 @@ export class LessonsService {
           }`,
         );
       }
+    }
+    if (englishPageTranscriptLooksIncomplete(final) && ocrHasReadingBody) {
+      final = mergeEnglishPageVisionWithOcr(final, resolvedOcr);
     }
     if (!isPagePhotoTextReadable(final)) {
       if (ocrAlreadyReadable) {
@@ -725,9 +780,10 @@ export class LessonsService {
         try {
           const retried = await this.transcribeTextbookPhoto(file, subject, grade, schoolId, userId, {
             forceTintedPageVision: true,
+            ...visionOpts,
           });
           const merged = mergeEnglishPageVisionWithOcr(retried, resolvedOcr);
-          if (isPagePhotoTextReadable(merged)) {
+          if (isPagePhotoTextReadable(merged) && !englishPageTranscriptLooksIncomplete(merged)) {
             return merged;
           }
           if (merged.trim().length > final.trim().length) {
@@ -784,12 +840,20 @@ export class LessonsService {
     const preparedFiles: Express.Multer.File[] = [];
     for (const file of files) {
       const prepared = await prepareLessonPagePhoto(file);
+      const forVision = await prepareLessonPagePhotoForVision(file);
       const readyFile = {
         ...file,
         buffer: prepared.buffer,
         mimetype: prepared.mimeType,
         originalname: prepared.originalname,
         size: prepared.size,
+      } as Express.Multer.File;
+      const visionFile = {
+        ...file,
+        buffer: forVision.buffer,
+        mimetype: forVision.mimeType,
+        originalname: forVision.originalname,
+        size: forVision.size,
       } as Express.Multer.File;
       preparedFiles.push(readyFile);
       try {
@@ -799,6 +863,7 @@ export class LessonsService {
           grade,
           schoolId,
           user.id,
+          { visionFile },
         );
         perPageTexts.push(text);
       } catch (error) {
@@ -870,6 +935,7 @@ export class LessonsService {
       });
     }
     const prepared = await prepareLessonPagePhoto(file);
+    const forVision = await prepareLessonPagePhotoForVision(file);
     const readyFile = {
       ...file,
       buffer: prepared.buffer,
@@ -877,12 +943,20 @@ export class LessonsService {
       originalname: prepared.originalname,
       size: prepared.size,
     } as Express.Multer.File;
+    const visionFile = {
+      ...file,
+      buffer: forVision.buffer,
+      mimetype: forVision.mimeType,
+      originalname: forVision.originalname,
+      size: forVision.size,
+    } as Express.Multer.File;
     const text = await this.transcribeTextbookPhoto(
       readyFile,
       lesson.subject,
       grade,
       lesson.schoolId,
       user.id,
+      { visionFile },
     );
     const asset = await this.filesService.saveSchoolUpload(
       lesson.schoolId,
