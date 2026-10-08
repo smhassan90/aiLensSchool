@@ -204,6 +204,12 @@ export const lessonsService = {
       "POST",
       { timeoutMs: lessonExtractTimeoutMs(1) },
     );
+  }
+
+  deleteChapterPagePhoto(lessonId: string, sourceId: string) {
+    return apiClient<Lesson>(`/lessons/chapters/${lessonId}/pages/${sourceId}`, {
+      method: "DELETE",
+    });
   },
 
   appendChapterText(lessonId: string, text: string) {

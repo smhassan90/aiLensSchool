@@ -983,6 +983,39 @@ export class LessonsService {
     return this.loadPresented(lessonId);
   }
 
+  async deleteChapterPagePhoto(lessonId: string, sourceId: string, user: AuthUser) {
+    const lesson = await this.requireOwnedChapterLesson(lessonId, user);
+    const source = lesson.sources.find(
+      (s) => s.id === sourceId && s.type === LessonSourceType.TEXTBOOK_IMAGE,
+    );
+    if (!source) {
+      throw new NotFoundException({ code: 'PAGE_NOT_FOUND', message: 'Page photo not found' });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.lessonSource.delete({ where: { id: sourceId } });
+      const remaining = await tx.lessonSource.findMany({
+        where: { lessonId, type: LessonSourceType.TEXTBOOK_IMAGE },
+        orderBy: { pageFrom: 'asc' },
+      });
+      for (let index = 0; index < remaining.length; index++) {
+        await tx.lessonSource.update({
+          where: { id: remaining[index].id },
+          data: { pageFrom: index + 1 },
+        });
+      }
+      await tx.dailyLesson.update({
+        where: { id: lessonId },
+        data: {
+          contentConfirmed: false,
+          status: LessonStatus.READY_FOR_REVIEW,
+        },
+      });
+    });
+
+    return this.loadPresented(lessonId);
+  }
+
   async appendChapterText(id: string, dto: AppendChapterTextDto, user: AuthUser) {
     const lesson = await this.requireOwnedChapterLesson(id, user);
     const addition = coerceLessonDisplayText(dto.text.trim());

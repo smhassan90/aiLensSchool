@@ -39,6 +39,7 @@ import {
   Loader2,
   FileImage,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -99,13 +100,14 @@ export function ChapterPageManager({
     | { kind: "queue"; itemId: string };
   const reuploadTargetRef = useRef<ReuploadTarget | null>(null);
 
-  const setQueue = useCallback(
+  /** Update queue state and ref synchronously so runNextUpload never sees a stale "failed" list. */
+  const applyQueue = useCallback(
     (updater: ChapterPageUploadItem[] | ((prev: ChapterPageUploadItem[]) => ChapterPageUploadItem[])) => {
-      setUploadQueue((prev) => {
-        const next = typeof updater === "function" ? updater(prev) : updater;
-        uploadQueueRef.current = next;
-        return next;
-      });
+      const prev = uploadQueueRef.current;
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      uploadQueueRef.current = next;
+      setUploadQueue(next);
+      return next;
     },
     [],
   );
@@ -136,7 +138,7 @@ export function ChapterPageManager({
     if (!next) return;
 
     uploadRunning.current = true;
-    setQueue((current) =>
+    applyQueue((current) =>
       current.map((item) =>
         item.id === next.id ? { ...item, status: "uploading", error: undefined } : item,
       ),
@@ -145,12 +147,12 @@ export function ChapterPageManager({
     try {
       const lesson = await uploadSingleChapterPage(lessonId, next.file);
       URL.revokeObjectURL(next.previewUrl);
-      setQueue((current) => current.filter((item) => item.id !== next.id));
+      applyQueue((current) => current.filter((item) => item.id !== next.id));
       invalidate();
       onContentUpdated(lesson);
     } catch (err) {
       const message = uploadErrorMessage(err);
-      setQueue((current) =>
+      applyQueue((current) =>
         current.map((item) =>
           item.id === next.id ? { ...item, status: "failed", error: message } : item,
         ),
@@ -166,18 +168,18 @@ export function ChapterPageManager({
         void runNextUpload();
       }
     }
-  }, [lessonId, onContentUpdated, setQueue, toast]);
+  }, [applyQueue, lessonId, onContentUpdated, toast]);
 
   const enqueueUploads = useCallback(
     async (files: File[]) => {
       if (!files.length) return;
       const compressed = await compressPhotosForUpload(files);
       const items = createChapterPageUploadItems(compressed);
-      setQueue((current) => [...current, ...items]);
+      applyQueue((current) => [...current, ...items]);
       setPendingPhotos([]);
       void runNextUpload();
     },
-    [runNextUpload, setQueue],
+    [applyQueue, runNextUpload],
   );
 
   useEffect(() => {
@@ -185,6 +187,13 @@ export function ChapterPageManager({
     initialStarted.current = true;
     void enqueueUploads(initialUploadFiles);
   }, [initialUploadFiles, enqueueUploads]);
+
+  // Safety net: if items sit in "queued" (e.g. after re-upload), kick the runner.
+  useEffect(() => {
+    if (uploadRunning.current) return;
+    if (!uploadQueue.some((item) => item.status === "queued")) return;
+    void runNextUpload();
+  }, [uploadQueue, runNextUpload]);
 
   const reuploadPage = async (sourceId: string, file: File) => {
     setReuploadSourceId(sourceId);
@@ -247,7 +256,7 @@ export function ChapterPageManager({
   const replaceFailedQueuePhoto = async (itemId: string, file: File) => {
     const compressed = await compressPhotosForUpload([file]);
     const newFile = compressed[0] ?? file;
-    setQueue((current) =>
+    applyQueue((current) =>
       current.map((item) => {
         if (item.id !== itemId) return item;
         URL.revokeObjectURL(item.previewUrl);
@@ -262,6 +271,29 @@ export function ChapterPageManager({
     );
     void runNextUpload();
   };
+
+  const removeQueueItem = (itemId: string) => {
+    applyQueue((current) => {
+      const target = current.find((item) => item.id === itemId);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return current.filter((item) => item.id !== itemId);
+    });
+  };
+
+  const deleteSavedPage = useMutation({
+    mutationFn: (sourceId: string) => lessonsService.deleteChapterPagePhoto(lessonId, sourceId),
+    onSuccess: (lesson) => {
+      invalidate();
+      onContentUpdated(lesson);
+      toast({ title: "Page removed", variant: "success" });
+    },
+    onError: (err) =>
+      toast({
+        title: "Could not remove page",
+        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        variant: "error",
+      }),
+  });
 
   const appendText = useMutation({
     mutationFn: () => lessonsService.appendChapterText(lessonId, pasteText.trim()),
@@ -320,7 +352,7 @@ export function ChapterPageManager({
   };
 
   const queueBusy = uploadQueue.some((item) => item.status === "uploading" || item.status === "queued");
-  const busy = queueBusy || appendText.isPending || orderSaving;
+  const busy = queueBusy || appendText.isPending || orderSaving || deleteSavedPage.isPending;
 
   const previewPages = useMemo((): PagePreviewEntry[] => {
     const saved: PagePreviewEntry[] = [];
@@ -497,7 +529,7 @@ export function ChapterPageManager({
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7"
-                        disabled={index === 0 || queueBusy}
+                        disabled={index === 0 || queueBusy || reading || deleteSavedPage.isPending}
                         onClick={() => move(index, -1)}
                         aria-label="Move page up"
                       >
@@ -508,11 +540,30 @@ export function ChapterPageManager({
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7"
-                        disabled={index === ordered.length - 1 || queueBusy}
+                        disabled={index === ordered.length - 1 || queueBusy || reading || deleteSavedPage.isPending}
                         onClick={() => move(index, 1)}
                         aria-label="Move page down"
                       >
                         <ChevronDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        disabled={reading || queueBusy || deleteSavedPage.isPending}
+                        onClick={() => {
+                          if (
+                            typeof window !== "undefined" &&
+                            !window.confirm(`Remove page ${index + 1} (${page.label})?`)
+                          ) {
+                            return;
+                          }
+                          deleteSavedPage.mutate(page.id);
+                        }}
+                        aria-label={`Delete page ${index + 1}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </li>
@@ -566,19 +617,33 @@ export function ChapterPageManager({
                       <p className="mt-1 line-clamp-2 text-xs text-destructive">{item.error}</p>
                     ) : null}
                   </div>
-                  {item.status === "failed" ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      className="h-8 shrink-0 gap-1.5"
-                      disabled={queueBusy}
-                      onClick={() => promptFailedQueueReupload(item.id)}
-                    >
-                      <FileImage className="h-3.5 w-3.5" aria-hidden />
-                      Re-upload picture
-                    </Button>
-                  ) : null}
+                  <div className="flex shrink-0 items-center gap-1">
+                    {item.status === "failed" ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="h-8 shrink-0 gap-1.5"
+                        disabled={queueBusy}
+                        onClick={() => promptFailedQueueReupload(item.id)}
+                      >
+                        <FileImage className="h-3.5 w-3.5" aria-hidden />
+                        Re-upload picture
+                      </Button>
+                    ) : null}
+                    {item.status !== "uploading" ? (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                        onClick={() => removeQueueItem(item.id)}
+                        aria-label={`Remove ${item.file.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    ) : null}
+                  </div>
                 </li>
               ))}
             </ul>

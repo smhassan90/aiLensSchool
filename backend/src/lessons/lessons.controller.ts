@@ -284,6 +284,16 @@ export class LessonsController {
   }
 
   @Roles(RoleName.TEACHER)
+  @Delete('chapters/:id/pages/:sourceId')
+  deleteChapterPagePhoto(
+    @Param('id') id: string,
+    @Param('sourceId') sourceId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.lessonsService.deleteChapterPagePhoto(id, sourceId, user);
+  }
+
+  @Roles(RoleName.TEACHER)
   @Post('chapters/:id/compile')
   compileChapter(
     @Param('id') id: string,
