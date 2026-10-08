@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
-import { PageLoader } from "@/components/layout/page-loader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TeacherLessonsList } from "@/components/lessons/teacher-lessons-list";
 import { lessonsService } from "@/services/lessons.service";
 import { teachersService } from "@/services/teachers.service";
 import { formatDate } from "@/lib/utils";
@@ -21,14 +21,8 @@ export default function TeacherLessonsHubPage() {
   const classKey = primary ? `${primary.sectionId}:${primary.subjectId}` : "";
 
   const chapters = useQuery({
-    queryKey: ["lesson-chapters", primary?.sectionId, primary?.subjectId],
-    queryFn: () =>
-      lessonsService.listChapters({
-        sectionId: primary!.sectionId,
-        subjectId: primary!.subjectId,
-        limit: 20,
-      }),
-    enabled: Boolean(primary?.sectionId && primary?.subjectId),
+    queryKey: ["lesson-chapters", "all"],
+    queryFn: () => lessonsService.listChapters({ limit: 50 }),
   });
 
   const sessions = useQuery({
@@ -36,7 +30,9 @@ export default function TeacherLessonsHubPage() {
     queryFn: () => lessonsService.list({ limit: 10, recordKind: "CLASS_SESSION" }),
   });
 
-  const inProgress = (chapters.data ?? []).find(
+  const chapterItems = chapters.data ?? [];
+
+  const inProgress = chapterItems.find(
     (c) => c.contentConfirmed && c.chapterProgress !== "COMPLETED",
   );
 
@@ -95,28 +91,43 @@ export default function TeacherLessonsHubPage() {
         </Card>
       )}
 
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Your lessons</CardTitle>
+          <CardDescription>Chapter content for your classes. Click a row to open; use the bin icon to delete a draft.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TeacherLessonsList lessons={chapterItems} isLoading={chapters.isLoading} />
+        </CardContent>
+      </Card>
+
       <Card>
-          <CardHeader>
-            <CardTitle>Recent class days</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {sessions.isLoading ? (
-              <PageLoader variant="panel" task="lessons" />
-            ) : !sessions.data?.items.length ? (
-              <p className="text-sm text-muted-foreground">No class days logged yet.</p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {sessions.data.items.map((row) => (
-                  <li key={row.id} className="flex justify-between gap-2 border-b border-border/60 pb-2">
+        <CardHeader>
+          <CardTitle>Recent class days</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {sessions.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : !sessions.data?.items.length ? (
+            <p className="text-sm text-muted-foreground">No class days logged yet.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {sessions.data.items.map((row) => (
+                <li key={row.id}>
+                  <Link
+                    href={`/teacher/lessons/${row.id}/review`}
+                    className="flex justify-between gap-2 border-b border-border/60 pb-2 transition-colors hover:text-primary"
+                  >
                     <span>
                       {formatDate(row.date)} · {row.sessionType?.replace("_", " ") ?? "Class"}
                       {row.chapterName ? ` · ${row.chapterName}` : ""}
                     </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
       </Card>
     </div>
   );
