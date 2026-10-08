@@ -42,6 +42,8 @@ services:
       dockerfile: Dockerfile
       args:
         BUILD_SHA: ${BUILD_SHA:-unknown}
+        # Set BUILD_PADDLE_OCR=1 in .env to bake PaddleOCR into the backend image (Tesseract stays as fallback).
+        BUILD_PADDLE_OCR: ${BUILD_PADDLE_OCR:-0}
     restart: unless-stopped
     env_file:
       - .env

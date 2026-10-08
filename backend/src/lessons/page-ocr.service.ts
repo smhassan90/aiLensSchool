@@ -3,6 +3,16 @@ import { mkdir } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { isServerlessRuntime } from '../common/env';
+import {
+  englishPageTranscriptLooksIncomplete,
+  isPagePhotoTextReadable,
+  scorePageOcrQuality,
+} from './page-text-sanitize';
+import {
+  ocrEngineMode,
+  paddleOcrEnabled,
+  runPaddleOcrOnBuffer,
+} from './paddle-ocr.runner';
 
 type OcrWorker = {
   setParameters: (params: Record<string, string>) => Promise<unknown>;
@@ -43,11 +53,58 @@ async function mapPool<T, R>(
   return results;
 }
 
+function compactLen(text: string): number {
+  return text.replace(/\s+/g, '').length;
+}
+
+/** Pick the stronger OCR transcript while we evaluate Paddle vs Tesseract. */
+export function preferOcrTranscript(paddleText: string, tesseractText: string): {
+  text: string;
+  engine: 'paddle' | 'tesseract' | 'none';
+} {
+  const paddle = (paddleText ?? '').trim();
+  const tess = (tesseractText ?? '').trim();
+  if (!paddle && !tess) return { text: '', engine: 'none' };
+  if (!paddle) return { text: tess, engine: 'tesseract' };
+  if (!tess) return { text: paddle, engine: 'paddle' };
+
+  const paddleIncomplete = englishPageTranscriptLooksIncomplete(paddle);
+  const tessIncomplete = englishPageTranscriptLooksIncomplete(tess);
+  if (!paddleIncomplete && tessIncomplete) return { text: paddle, engine: 'paddle' };
+  if (!tessIncomplete && paddleIncomplete) return { text: tess, engine: 'tesseract' };
+
+  const paddleReadable = isPagePhotoTextReadable(paddle);
+  const tessReadable = isPagePhotoTextReadable(tess);
+  if (paddleReadable && !tessReadable) return { text: paddle, engine: 'paddle' };
+  if (tessReadable && !paddleReadable) return { text: tess, engine: 'tesseract' };
+
+  const paddleLen = compactLen(paddle);
+  const tessLen = compactLen(tess);
+  // Title-only OCR can score "cleaner" than a full noisy poem page — prefer substance.
+  if (paddleLen >= tessLen + 80) return { text: paddle, engine: 'paddle' };
+  if (tessLen >= paddleLen + 80) return { text: tess, engine: 'tesseract' };
+
+  const paddleScore = scorePageOcrQuality(paddle);
+  const tessScore = scorePageOcrQuality(tess);
+  if (paddleScore !== tessScore) {
+    return paddleScore > tessScore
+      ? { text: paddle, engine: 'paddle' }
+      : { text: tess, engine: 'tesseract' };
+  }
+
+  // Prefer Paddle on ties when both look usable — that is the candidate to replace Tesseract.
+  if (paddleReadable || paddleScore >= 62 || paddleLen >= tessLen) {
+    return { text: paddle, engine: 'paddle' };
+  }
+  return { text: tess, engine: 'tesseract' };
+}
+
 @Injectable()
 export class PageOcrService implements OnModuleDestroy {
   private readonly logger = new Logger(PageOcrService.name);
   private poolLangs: string | null = null;
   private poolWorkers: Promise<OcrWorker>[] | null = null;
+  private paddleMissingLogged = false;
 
   private async createWorker(languages: string) {
     const cachePath = join(tmpdir(), 'ailens-tesseract-cache');
@@ -104,69 +161,21 @@ export class PageOcrService implements OnModuleDestroy {
     return `data:${mime};base64,${file.buffer.toString('base64')}`;
   }
 
-  async readPages(
+  private async readWithTesseract(
     files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
     options?: { subjectName?: string | null },
-  ) {
-    if (isServerlessRuntime()) {
-      this.logger.log('Skipping Tesseract on serverless to avoid function timeouts');
-      return '';
-    }
-    if (!files.length) return '';
+  ): Promise<string[]> {
+    if (!files.length) return [];
 
     const languages = ocrLanguagesForSubject(options?.subjectName);
     let workers: OcrWorker[];
     try {
       workers = await this.getPool(languages);
     } catch (error) {
-      // Urdu pack may be missing in some installs — fall back to English.
       if (languages !== 'eng') {
         this.logger.warn(
           `OCR languages ${languages} failed (${error instanceof Error ? error.message : String(error)}); falling back to eng`,
         );
-        workers = await this.getPool('eng');
-      } else {
-        throw error;
-      }
-    }
-
-    const pages = await mapPool(files, workers.length, async (file, index) => {
-      const worker = workers[index % workers.length];
-      const source = this.toDataUrl(file);
-      try {
-        const result = await worker.recognize(source);
-        const text = result.data.text?.replace(/\u000c/g, '').trim() ?? '';
-        this.logger.log(
-          `OCR page ${index + 1}: ${text.length} characters from ${file.originalname ?? 'photo'} (${this.poolLangs})`,
-        );
-        if (!text) return '';
-        return files.length > 1 ? `Page ${index + 1}\n${text}` : text;
-      } catch (error) {
-        this.logger.warn(
-          `OCR failed for page ${index + 1}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        return '';
-      }
-    });
-
-    return pages.filter(Boolean).join('\n\n').trim();
-  }
-
-  /** One OCR string per file (no "Page N" prefix), same order as input files. */
-  async readPageTexts(
-    files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
-    options?: { subjectName?: string | null },
-  ): Promise<string[]> {
-    if (isServerlessRuntime() || !files.length) {
-      return files.map(() => '');
-    }
-
-    const languages = ocrLanguagesForSubject(options?.subjectName);
-    let workers: OcrWorker[];
-    try {
-      workers = await this.getPool(languages);
-    } catch (error) {
-      if (languages !== 'eng') {
         workers = await this.getPool('eng');
       } else {
         throw error;
@@ -178,11 +187,112 @@ export class PageOcrService implements OnModuleDestroy {
       const source = this.toDataUrl(file);
       try {
         const result = await worker.recognize(source);
-        return result.data.text?.replace(/\u000c/g, '').trim() ?? '';
-      } catch {
+        const text = result.data.text?.replace(/\u000c/g, '').trim() ?? '';
+        this.logger.log(
+          `Tesseract page ${index + 1}: ${text.length} characters from ${file.originalname ?? 'photo'} (${this.poolLangs})`,
+        );
+        return text;
+      } catch (error) {
+        this.logger.warn(
+          `Tesseract failed for page ${index + 1}: ${error instanceof Error ? error.message : String(error)}`,
+        );
         return '';
       }
     });
+  }
+
+  private async readWithPaddle(
+    files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
+    options?: { subjectName?: string | null },
+  ): Promise<string[]> {
+    if (!paddleOcrEnabled() || !files.length) {
+      return files.map(() => '');
+    }
+    return mapPool(files, 1, async (file, index) => {
+      const result = await runPaddleOcrOnBuffer(file, { subjectName: options?.subjectName });
+      if (!result.ok) {
+        if (!this.paddleMissingLogged) {
+          this.paddleMissingLogged = true;
+          this.logger.warn(
+            `PaddleOCR not used (${result.error ?? 'unavailable'}); keeping Tesseract. Install backend/ocr/requirements-paddle.txt to enable.`,
+          );
+        }
+        return '';
+      }
+      this.logger.log(
+        `PaddleOCR page ${index + 1}: ${result.text.length} characters from ${file.originalname ?? 'photo'}`,
+      );
+      return result.text;
+    });
+  }
+
+  /**
+   * Dual-engine OCR: Tesseract stays available; Paddle is preferred when its
+   * transcript scores better (OCR_ENGINE=auto|paddle). Use OCR_ENGINE=tesseract to force Tesseract only.
+   */
+  private async readPageTextsDual(
+    files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
+    options?: { subjectName?: string | null },
+  ): Promise<string[]> {
+    const mode = ocrEngineMode();
+
+    if (mode === 'tesseract') {
+      return this.readWithTesseract(files, options);
+    }
+
+    if (mode === 'paddle') {
+      const paddleTexts = await this.readWithPaddle(files, options);
+      // Hard fallback so lesson upload never dies if Paddle is missing.
+      const needsFallback = paddleTexts.some((t) => !t.trim());
+      if (!needsFallback) return paddleTexts;
+      const tessTexts = await this.readWithTesseract(files, options);
+      return paddleTexts.map((paddle, i) => preferOcrTranscript(paddle, tessTexts[i] ?? '').text);
+    }
+
+    // auto: run both when Paddle is enabled; pick the better transcript per page.
+    const [paddleTexts, tessTexts] = await Promise.all([
+      this.readWithPaddle(files, options),
+      this.readWithTesseract(files, options),
+    ]);
+
+    return files.map((_, index) => {
+      const chosen = preferOcrTranscript(paddleTexts[index] ?? '', tessTexts[index] ?? '');
+      if (chosen.engine !== 'none') {
+        this.logger.log(
+          `OCR page ${index + 1} chose ${chosen.engine} (paddle=${(paddleTexts[index] ?? '').length}ch tess=${(tessTexts[index] ?? '').length}ch)`,
+        );
+      }
+      return chosen.text;
+    });
+  }
+
+  async readPages(
+    files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
+    options?: { subjectName?: string | null },
+  ) {
+    if (isServerlessRuntime()) {
+      this.logger.log('Skipping local OCR on serverless to avoid function timeouts');
+      return '';
+    }
+    if (!files.length) return '';
+
+    const texts = await this.readPageTextsDual(files, options);
+    const pages = texts.map((text, index) => {
+      if (!text) return '';
+      return files.length > 1 ? `Page ${index + 1}\n${text}` : text;
+    });
+    return pages.filter(Boolean).join('\n\n').trim();
+  }
+
+  /** One OCR string per file (no "Page N" prefix), same order as input files. */
+  async readPageTexts(
+    files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
+    options?: { subjectName?: string | null },
+  ): Promise<string[]> {
+    if (isServerlessRuntime() || !files.length) {
+      return files.map(() => '');
+    }
+    return this.readPageTextsDual(files, options);
   }
 
   async onModuleDestroy() {

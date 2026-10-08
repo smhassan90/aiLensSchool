@@ -1,0 +1,14 @@
+# Optional OCR engine (keep Tesseract as fallback until Paddle proves better in prod).
+# Windows:
+#   python -m venv .venv-paddle
+#   .venv-paddle\Scripts\pip install -r requirements-paddle.txt
+#   set PADDLE_OCR_PYTHON=%CD%\.venv-paddle\Scripts\python.exe
+#   set OCR_ENGINE=auto
+#
+# Linux/macOS:
+#   python3 -m venv .venv-paddle
+#   .venv-paddle/bin/pip install -r requirements-paddle.txt
+#   export PADDLE_OCR_PYTHON=$PWD/.venv-paddle/bin/python
+#   export OCR_ENGINE=auto
+paddlepaddle==2.6.2
+paddleocr==2.10.0
