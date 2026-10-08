@@ -84,8 +84,11 @@ import {
   isPagePhotoTextReadable,
   pageOcrAcceptThreshold,
   englishPageTranscriptLooksIncomplete,
+  looksLikePoemOrReadingPage,
   mergeEnglishPageVisionWithOcr,
   pageHasStructuredLessonContent,
+  pickBetterPageTranscript,
+  scorePageOcrCandidate,
   scorePageOcrQuality,
   pageTextNeedsVisionRetry,
 } from './page-text-sanitize';
@@ -509,18 +512,22 @@ export class LessonsService {
 
     let best:
       | {
-          text: string;
-          readyFile: Express.Multer.File;
+          ocrFile: Express.Multer.File;
+          visionFile: Express.Multer.File;
+          ocrText: string;
           score: number;
           readable: boolean;
+          degrees: number;
         }
       | undefined;
     let lastError: unknown;
+    let tried = 0;
 
+    // Cheap Tesseract over greyscale + color per orientation; full vision merge once at the end.
     for (const degrees of degreesList) {
       try {
         const variant = await prepareOrientedVariant(file, degrees);
-        const readyFile = {
+        const greyFile = {
           ...file,
           buffer: variant.ocr.buffer,
           mimetype: variant.ocr.mimeType,
@@ -534,27 +541,35 @@ export class LessonsService {
           originalname: variant.vision.originalname,
           size: variant.vision.size,
         } as Express.Multer.File;
-        const text = await this.transcribeTextbookPhoto(
-          readyFile,
-          subject,
-          grade,
-          schoolId,
-          userId,
-          { visionFile },
-        );
-        const score = scorePageOcrQuality(text);
+        const [greyText, colorText] = await Promise.all([
+          this.pageOcr
+            .readPageTexts([greyFile], { subjectName: subject.name })
+            .then((rows) => (rows[0] ?? '').trim()),
+          this.pageOcr
+            .readPageTexts([visionFile], { subjectName: subject.name })
+            .then((rows) => (rows[0] ?? '').trim()),
+        ]);
+        const greyScore = scorePageOcrCandidate(greyText);
+        const colorScore = scorePageOcrCandidate(colorText);
+        const useColor = colorScore > greyScore;
+        const ocrText = useColor ? colorText : greyText;
+        const ocrFile = useColor ? visionFile : greyFile;
+        tried += 1;
+        const score = Math.max(greyScore, colorScore);
         const readable =
-          isPagePhotoTextReadable(text) && !englishPageTranscriptLooksIncomplete(text);
+          isPagePhotoTextReadable(ocrText) && !englishPageTranscriptLooksIncomplete(ocrText);
         if (!best || (readable && !best.readable) || score > best.score) {
-          best = { text, readyFile, score, readable };
+          best = { ocrFile, visionFile, ocrText, score, readable, degrees };
         }
-        if (readable && score >= 58) {
-          if (degrees !== 0) {
-            this.logger.log(
-              `Page orientation: using ${degrees}° rotation for ${file.originalname ?? 'photo'}`,
-            );
-          }
-          return { text, readyFile };
+        // Poem/reading pages: try every orientation — a short clean mid-page can beat a fuller one.
+        if (
+          !looksLikePoemOrReadingPage(ocrText) &&
+          readable &&
+          scorePageOcrQuality(ocrText) >= 78 &&
+          ocrText.length >= 900 &&
+          tried >= 2
+        ) {
+          break;
         }
       } catch (error) {
         lastError = error;
@@ -566,8 +581,36 @@ export class LessonsService {
       }
     }
 
-    if (best?.text?.trim()) {
-      return { text: best.text, readyFile: best.readyFile };
+    if (best?.ocrText?.trim()) {
+      if (best.degrees !== 0) {
+        this.logger.log(
+          `Page orientation: using ${best.degrees}° rotation for ${file.originalname ?? 'photo'}`,
+        );
+      }
+      try {
+        const text = await this.transcribeTextbookPhoto(
+          best.ocrFile,
+          subject,
+          grade,
+          schoolId,
+          userId,
+          { visionFile: best.visionFile },
+        );
+        // Prefer orientation OCR when it is richer (color buffer often keeps final stanzas).
+        const merged = pickBetterPageTranscript(text, best.ocrText);
+        return {
+          text: filterPageTextForLessonAssembly(merged),
+          readyFile: best.ocrFile,
+        };
+      } catch (error) {
+        if (isPagePhotoTextReadable(best.ocrText)) {
+          return {
+            text: filterPageTextForLessonAssembly(best.ocrText),
+            readyFile: best.ocrFile,
+          };
+        }
+        lastError = error;
+      }
     }
     if (lastError instanceof BadRequestException) {
       throw lastError;
@@ -1147,10 +1190,9 @@ export class LessonsService {
     const assembled = this.assemblePageTexts(refreshed.sources);
     const rawCandidate =
       dto.sourceText?.trim() || this.chapterDraftFromSources(refreshed.sources) || assembled;
-    // Keep poem lines intact for compile; only fall back to filtered text if needed.
-    const compileSource = (
-      rawCandidate.trim() ||
-      filterPageTextForLessonAssembly(rawCandidate)
+    // Strip any accidental JSON blobs, then light-filter (poem pages keep stanzas).
+    const compileSource = filterPageTextForLessonAssembly(
+      coerceLessonDisplayText(rawCandidate),
     ).trim();
     if (!compileSource) {
       throw new BadRequestException({

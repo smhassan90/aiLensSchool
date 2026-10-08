@@ -5,10 +5,7 @@ import {
   AiProvider,
   LessonImageInput,
 } from './ai.provider';
-import {
-  ChapterCompileOutput,
-  ChapterCompileOutputSchema,
-} from '../schemas/chapter-compile.schema';
+import { ChapterCompileOutput } from '../schemas/chapter-compile.schema';
 import { LessonOutput, LessonOutputSchema } from '../schemas/lesson-output.schema';
 import { QuizOutput, QuizOutputSchema } from '../schemas/quiz-output.schema';
 import {
@@ -23,6 +20,7 @@ import {
 import { difficultyInstruction, mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
 import { isMathSubject } from '../../homework/homework-questions';
 import { parseModelJson } from '../parse-model-json';
+import { normalizeCompileModelOutput } from '../normalize-compile-output';
 
 interface OpenAiChatResponse {
   choices?: Array<{ message?: { content?: string } }>;
@@ -108,7 +106,7 @@ export class OpenAiProvider implements AiProvider {
       .filter((line) => line !== '')
       .join('\n');
     const content = await this.chat(CHAPTER_COMPILE_PROMPT, user);
-    const parsed = ChapterCompileOutputSchema.parse(parseModelJson(content.text));
+    const parsed = normalizeCompileModelOutput(content.text, input.sourceText);
     return {
       data: parsed,
       provider: 'openai',

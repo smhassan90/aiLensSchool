@@ -110,13 +110,15 @@ Tasks:
 - Remove scanner artifacts: standalone lines like "Page 1", "Page 2", "صفحہ 1", repeated photo-stitch headers.
 - DELETE only clear OCR garbage: reversed/mirrored Latin (e.g. "aj0N"), random symbol runs, and lines with no real words. Do NOT delete exercise instructions just because they say "jumbled", "compare your answers", or "work in pairs".
 - For poems / reading texts: keep the title, author line, AND every stanza in order from the first line through the last. Never skip the opening stanza or jump into the middle of the poem.
+- If a poem line is partly garbled, KEEP it (best-effort). Never omit a stanza because OCR is imperfect.
 - Keep "Pre-reading" questions with the lesson body (before the reading text) when present.
 - Merge paragraphs split across pages; keep logical reading order.
-- lessonBody = narrative only: unit/reading headers, pre-reading, title, author, full poem/story.
+- lessonBody = narrative only: unit/reading headers, pre-reading, title, author, full poem/story. Never put Exercise sections in lessonBody.
 - exercises = all practice sections starting at the first "Exercise 1" / "Exercise" / "Activity" / "سوالات" through the end (Exercise 2, 3, 4, …). Copy their questions and instructions; clean tables lightly but do not drop whole exercises.
 - If the source has no exercises, return an empty string for exercises.
 - concepts: 4-8 short key points from the lesson (not from exercises).
 - Keep Urdu/Arabic in Unicode script when the source uses it.
+- Do NOT use a "summary" field. Do NOT wrap the result in markdown. Return ONLY the JSON object below.
 
 Return ONLY valid JSON:
 {

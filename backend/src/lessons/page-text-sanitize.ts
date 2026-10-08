@@ -61,7 +61,27 @@ export function scorePageOcrQuality(text: string | undefined | null): number {
 }
 
 const POEM_STORY_LINE_CUES =
-  /\b(heart|sink|beginning|begining|flung|monarch|crown|steeple|sought|dwell|mood|spider|scotland|voice of god)\b/i;
+  /\b(heart|sink|beginning|begining|flung|monarch|crown|steeple|sought|dwell|mood|spider|scotland|voice of god|grieved|despair|endeavour|endeavor|cobweb|silken|bravo|foolish|tumbles|pondered|dizzy|faint|native|honour|honor|gossips|braced)\b/i;
+
+/** English verse / story line — keep even when many short words ("As grieved as man could be"). */
+function looksLikeVerseOrStoryLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed.length < 14 || trimmed.length > 90) return false;
+  if (/\?|exercise\b|tick the|options below|column [ab]\b|central idea/i.test(trimmed)) {
+    return false;
+  }
+  const w = words(trimmed);
+  const latin = countLatinLetters(trimmed);
+  if (w.length < 3 || latin < 12) return false;
+  const junk = trimmed.replace(/[A-Za-z0-9\s'’"“”.,;:!()\-—–]/g, '');
+  if (junk.length > 3) return false;
+  if (latin / Math.max(trimmed.length, 1) < 0.55) return false;
+  if (POEM_STORY_LINE_CUES.test(trimmed)) return true;
+  // Typical poem cadence: mid length, ends with comma/semicolon, or quoted speech.
+  if (/[,;]\s*$/.test(trimmed) && w.length >= 4 && trimmed.length <= 72) return true;
+  if (/^["'“]/.test(trimmed) && w.length >= 4) return true;
+  return false;
+}
 
 function lineLooksLikeGibberish(line: string): boolean {
   const trimmed = line.trim();
@@ -83,7 +103,10 @@ function lineLooksLikeGibberish(line: string): boolean {
   const latin = countLatinLetters(trimmed);
   // OCR often drops the first letter ("ut his heart…") or appends a stanza number ("sink. 1").
   // Keep real poem/story lines instead of treating short-word noise as gibberish.
-  if (POEM_STORY_LINE_CUES.test(trimmed) && w.length >= 4 && latin >= 18) {
+  if (POEM_STORY_LINE_CUES.test(trimmed) && w.length >= 3 && latin >= 12) {
+    return false;
+  }
+  if (looksLikeVerseOrStoryLine(trimmed)) {
     return false;
   }
   if (/[.!?;:'"]\s*\d{1,2}\s*$/.test(trimmed) && w.length >= 4 && latin >= 18) {
@@ -136,10 +159,105 @@ export function isSuspectParagraph(block: string): boolean {
   return looksLikeGarbledLatinOcr(trimmed) && trimmed.length < 400;
 }
 
+/** Poem / reading-comprehension pages — aggressive filtering deletes whole stanzas. */
+export function looksLikePoemOrReadingPage(text: string): boolean {
+  const value = (text ?? '').trim();
+  if (!value) return false;
+  if (/reading text|pre-reading|reading comprehension|eliza cook|king bruce/i.test(value)) {
+    return true;
+  }
+  const poemHits = (
+    value.match(
+      /\b(flung|spider|monarch|crown|sink|endeavour|cobweb|bravo|despair|silken|stanza|verse)\b/gi,
+    ) ?? []
+  ).length;
+  if (poemHits >= 3) return true;
+  const lines = value.split(/\n/).map((l) => l.trim()).filter(Boolean);
+  const verseLike = lines.filter((l) => l.length >= 18 && l.length <= 72).length;
+  return lines.length >= 8 && verseLike / lines.length >= 0.5 && poemHits >= 1;
+}
+
+function lightCleanPoemOrReadingPage(text: string): string {
+  return text
+    .replace(/^\s*Page\s+\d+\s*$/gim, '')
+    .replace(/^\s*صفحہ\s*\d+\s*$/gim, '')
+    // Common Tesseract splits / misreads on these pages
+    .replace(/\bflung\s+h\s+imself\b/gi, 'flung himself')
+    .replace(/\bwore\s+[a2]\s+[Cc]rown\b/g, 'wore a Crown')
+    .replace(/\bEzercise\b/gi, 'Exercise')
+    .replace(/\bExercise[\u2018\u2019'`´']\s*(?=\d)/gi, 'Exercise ')
+    .replace(/\bKing Bruce:\s+/g, 'King Bruce ')
+    .replace(/\bwhy should not\s+1\?/gi, 'why should not I?')
+    .replace(/\bthat time did not\s*$/im, 'that time did not fail.')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+const CRITICAL_PAGE_CUES = [
+  /\btime did not fail\b/i,
+  /\bnine\b/i,
+  /\be[xz]ercise\s*6\b/i,
+  /\be[xz]ercise\s*5\b/i,
+  /\bbravo\b/i,
+  /\bcobweb home\b/i,
+  /\bgive it all up\b/i,
+  /\bbeginning to sink\b/i,
+  /\bsilken filmy\b/i,
+  /\bwhy should not\b/i,
+] as const;
+
+function criticalPageCueHits(text: string): number {
+  return CRITICAL_PAGE_CUES.filter((re) => re.test(text)).length;
+}
+
+/** Score a page OCR candidate for orientation / greyscale-vs-color picking. */
+export function scorePageOcrCandidate(text: string): number {
+  const value = (text ?? '').trim();
+  if (!value) return 0;
+  const quality = scorePageOcrQuality(value);
+  const readable = isPagePhotoTextReadable(value) && !englishPageTranscriptLooksIncomplete(value);
+  const cueBonus =
+    (
+      value.match(
+        /\b(bravo|fail|cobweb|silken|endeavour|native cot|give it all up|e[xz]ercise\s*[1-6]|flung|beginning to sink|nine\s+brave|anxious minute)\b/gi,
+      ) ?? []
+    ).length * 10;
+  return (
+    quality * 2 +
+    Math.min(140, Math.floor(value.length / 7)) +
+    (readable ? 30 : 0) +
+    cueBonus +
+    criticalPageCueHits(value) * 22
+  );
+}
+
+/** Prefer the richer of two OCR transcripts (greyscale prep vs color). */
+export function pickBetterPageTranscript(a: string, b: string): string {
+  const left = (a ?? '').trim();
+  const right = (b ?? '').trim();
+  if (!left) return right;
+  if (!right) return left;
+  const leftScore = scorePageOcrCandidate(left);
+  const rightScore = scorePageOcrCandidate(right);
+  const leftCrit = criticalPageCueHits(left);
+  const rightCrit = criticalPageCueHits(right);
+  // Keep the transcript that retains unique lesson cues even if slightly noisier.
+  if (rightCrit > leftCrit && rightScore >= leftScore - 45) return right;
+  if (leftCrit > rightCrit && leftScore >= rightScore - 45) return left;
+  return rightScore > leftScore ? right : left;
+}
+
 /** Drop sidebar / mirrored OCR paragraphs before assembly or compile. */
 export function filterPageTextForLessonAssembly(text: string): string {
   const value = (text ?? '').trim();
   if (!value) return '';
+
+  // King Bruce–style poem pages: keep OCR stanzas. Block filtering was deleting
+  // most of pages 2–3 (cobweb home, Bravo, slipping sprawl, etc.).
+  if (looksLikePoemOrReadingPage(value)) {
+    return lightCleanPoemOrReadingPage(value);
+  }
 
   const blocks = value.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
   const keptBlocks = blocks.filter((b) => !isSuspectParagraph(b));
@@ -150,7 +268,9 @@ export function filterPageTextForLessonAssembly(text: string): string {
       isPagePhotoTextReadable(value) &&
       (!isPagePhotoTextReadable(joined) ||
         (englishPageTranscriptLooksIncomplete(joined) &&
-          !englishPageTranscriptLooksIncomplete(value)))
+          !englishPageTranscriptLooksIncomplete(value)) ||
+        (looksLikePoemOrReadingPage(value) &&
+          countLatinLetters(value) > countLatinLetters(joined) + 60))
     ) {
       return value;
     }
@@ -198,10 +318,18 @@ const POEM_PAGE_BODY_MARKERS = [
   'dwell among',
   'a. notes',
   'voice of god',
+  'beginning to sink',
+  'cobweb home',
+  'silken filmy',
+  'bravo',
+  'native cot',
+  'great deed',
+  'give it all up',
 ] as const;
 
+// Do NOT include "spider" — it appears in pre-reading questions and the title alone.
 const READING_BODY_CUES =
-  /\b(flung|lonely mood|wore a crown|beginning to sink|scotland|sought to|topmost|dwell among|steeple)\b/i;
+  /\b(flung|lonely mood|wore a crown|beginning to sink|scotland flung|sought to|topmost|dwell among|steeple|cobweb|endeavour|bravo|native cot|great deed)\b/i;
 
 /**
  * Vision often stops after "Reading text" + title and skips the poem/story body.
@@ -364,6 +492,14 @@ export function isPagePhotoTextReadable(text: string | undefined | null): boolea
   if (value.length < minLen) return false;
   const score = scorePageOcrQuality(value);
   if (score < pageOcrAcceptThreshold(value)) return false;
+  if (
+    !structured &&
+    !looksLikePoemOrReadingPage(value) &&
+    score < PAGE_OCR_ACCEPT_THRESHOLD &&
+    ocrSymbolHits >= 2
+  ) {
+    return false;
+  }
   const blocks = value.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
   const good = blocks.filter((b) => !isSuspectParagraph(b));
   if (good.length === 0) return false;

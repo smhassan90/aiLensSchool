@@ -4,10 +4,7 @@ import { mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { AiCompletionResult, AiProvider, LessonImageInput } from './ai.provider';
-import {
-  ChapterCompileOutput,
-  ChapterCompileOutputSchema,
-} from '../schemas/chapter-compile.schema';
+import { ChapterCompileOutput } from '../schemas/chapter-compile.schema';
 import { LessonOutput, LessonOutputSchema } from '../schemas/lesson-output.schema';
 import { QuizOutput, QuizOutputSchema } from '../schemas/quiz-output.schema';
 import {
@@ -21,6 +18,7 @@ import {
 } from '../prompts';
 import { difficultyInstruction, mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
 import { parseModelJson } from '../parse-model-json';
+import { normalizeCompileModelOutput } from '../normalize-compile-output';
 import { deriveKeyPointsFromLesson } from '../../lessons/lesson-text-formatter';
 import {
   isFakeExtractText,
@@ -150,7 +148,7 @@ export class CursorProvider implements AiProvider {
         this.jsonTimeoutMs,
         'Chapter compile',
       );
-      const parsed = ChapterCompileOutputSchema.parse(parseModelJson(content.text));
+      const parsed = normalizeCompileModelOutput(content.text, input.sourceText);
       return { data: parsed, ...content.meta };
     } catch (error) {
       this.logger.warn(
@@ -456,7 +454,25 @@ export class CursorProvider implements AiProvider {
         } catch {
           // fall through — avoid nesting JSON blobs in summary
         }
-        summaries.push(shrunk.length > 1 ? `Page ${index + 1}\n${raw}` : raw);
+        // If the model still returned a JSON blob, unwrap to plain text only.
+        let plain = raw;
+        if (raw.includes('"summary"') || raw.includes('"lessonBody"')) {
+          try {
+            const again = LessonOutputSchema.parse(parseModelJson(raw));
+            plain = again.summary?.trim() || raw;
+          } catch {
+            plain = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+            if (plain.trimStart().startsWith('{')) {
+              try {
+                const obj = parseModelJson(plain) as { summary?: string; lessonBody?: string };
+                plain = (obj.summary || obj.lessonBody || '').trim() || raw;
+              } catch {
+                // keep raw
+              }
+            }
+          }
+        }
+        summaries.push(shrunk.length > 1 ? `Page ${index + 1}\n${plain}` : plain);
       }
     }
 
@@ -464,6 +480,8 @@ export class CursorProvider implements AiProvider {
     if (!summary) {
       throw new Error('Cursor agent returned an empty result for the page photos.');
     }
+    // Return plain lesson text to callers. Call sites that need LessonOutput parse JSON;
+    // storing stringify(JSON) in OCR/draft caused raw JSON to show in the UI.
     const merged = JSON.stringify({
       chapterName,
       topicName,

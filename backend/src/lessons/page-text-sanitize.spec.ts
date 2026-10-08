@@ -1,4 +1,4 @@
-import {
+﻿import {
   englishPageTranscriptLooksIncomplete,
   filterPageTextForLessonAssembly,
   isPagePhotoTextReadable,
@@ -18,7 +18,7 @@ oem is written by Louis I. Newman (189   y
 1972). He was horn in Providence Rhode leland (USA).  \\
 | He studied at Brown University and after his doctorate
 jectured at Columbia. He is the author of many books
-igious subject. This poem. brings ‘out his religious
+igious subject. This poem. brings ΓÇÿout his religious
 
 [This p
 
@@ -53,6 +53,39 @@ Reading text
 
 King Bruce and the Spider`;
     expect(englishPageTranscriptLooksIncomplete(vision)).toBe(true);
+  });
+
+  it('keeps short-word verse lines like As grieved as man could be', () => {
+    const line = 'As grieved as man could be,';
+    const page = `READING COMPREHENSION\n\nHe flung himself down in a low despair,\n${line}\nAnd after a while he pondered there,`;
+    const filtered = filterPageTextForLessonAssembly(page);
+    expect(filtered).toContain('As grieved as man could be');
+  });
+
+  it('does not shred mid-poem stanzas on reading pages', () => {
+    const ocr = `READING COMPREHENSION
+
+For he had been trying to do a great deed,
+To make his people glad;
+He had tried and tried, but couldn't succeed,
+And so became quite sad.
+
+'Twas a long way up to the ceiling dome,
+And it hung by a rope so fine,
+That how it would get to its cobweb home
+King Bruce could not divine.
+
+"Bravo! bravo!" the King cried out;
+"All honour to those who try;
+The spider up there defied despair;
+He conquered, and why should not I?"
+
+And that time did not fail.`;
+    const filtered = filterPageTextForLessonAssembly(ocr);
+    expect(filtered).toMatch(/cobweb home/i);
+    expect(filtered).toMatch(/Bravo/i);
+    expect(filtered).toMatch(/time did not fail/i);
+    expect(filtered.length).toBeGreaterThan(ocr.length * 0.85);
   });
 
   it('keeps mangled last poem line that OCR dropped a leading letter on', () => {
@@ -207,7 +240,7 @@ What do you think is the central idea of the text? From the options
 given below, tick the correct answer.
 2. One should be ashamed of doing work.
 b. One should be worried when asked to do work.
-«One should have respect for all people who work.
+┬½One should have respect for all people who work.
 
 Exercise 2
 Match column A words with their corresponding meaning in column
@@ -222,10 +255,10 @@ t treating everyone  ol on one of the page`.trim();
   it('rejects heavily damaged OCR with symbols and fragments', () => {
     const text = `
 7. In China, it is mandatory for everyone to work in the field orina ___-
-a, school       b. factory ©. restaurant      d. government office
+a, school       b. factory ┬⌐. restaurant      d. government office
 The son of a high US government official used to deliver newspapers
 tobe, | ote
-a. useful      b. independent ~~ ¢: dependent      d. punctual
+a. useful      b. independent ~~ ┬ó: dependent      d. punctual
 |  5 | People in developed countries normally do
 their own work.
 BE   [Tn the present time, it is accepted that people | and another was 7. What lesso!

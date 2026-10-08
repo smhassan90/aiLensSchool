@@ -38,4 +38,18 @@ And so became quite sad.
     expect(repaired.exercises).toMatch(/Exercise 1/i);
     expect(repaired.exercises).toMatch(/Why was King Bruce so sad/i);
   });
+
+  it('restores poem when model returns only Exercise 5/6 in the body', () => {
+    const compiledBody = `
+9. The king realized that those who try, succeed.
+10. It was very far from its home.
+
+**Exercise 5**
+1. Why was King Bruce so sad?
+`.trim();
+    const repaired = repairCompiledChapterFromSource(source, compiledBody, '');
+    expect(repaired.lessonBody).toMatch(/flung himself/i);
+    expect(repaired.lessonBody).not.toMatch(/Exercise 5/i);
+    expect(repaired.exercises).toMatch(/Exercise 1/i);
+  });
 });
