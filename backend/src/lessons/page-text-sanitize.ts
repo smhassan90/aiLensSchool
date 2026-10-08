@@ -2,6 +2,7 @@ import {
   countArabicScriptChars,
   countLatinLetters,
   englishOnlyFromMixedOcr,
+  isPoorLessonOcr,
   looksLikeRealLessonText,
 } from '../common/extract-quality';
 import { looksLikeGarbledLatinOcr } from '../common/garbled-latin-ocr';
@@ -306,12 +307,26 @@ export function compareOrientationOcrResults(
   return 0;
 }
 
+function countLikelyEnglishWords(text: string): number {
+  return (text.match(/\b[a-z]{2,}\b/gi) ?? []).length;
+}
+
 /** Score a page OCR candidate for orientation / greyscale-vs-color picking. */
-export function scorePageOcrCandidate(text: string): number {
+export function scorePageOcrCandidate(
+  text: string,
+  options?: { englishPrimary?: boolean },
+): number {
   const value = (text ?? '').trim();
   if (!value) return 0;
   const quality = scorePageOcrQuality(value);
   const readable = isPagePhotoTextReadable(value) && !englishPageTranscriptLooksIncomplete(value);
+  const englishPrimary = options?.englishPrimary === true;
+  if (englishPrimary && isPoorLessonOcr(value, { expectArabicScript: false })) {
+    return Math.max(0, Math.floor(quality / 4));
+  }
+  const englishWordBonus = englishPrimary
+    ? Math.min(180, countLikelyEnglishWords(value) * 3)
+    : 0;
   const cueBonus =
     (
       value.match(
@@ -322,6 +337,7 @@ export function scorePageOcrCandidate(text: string): number {
     quality * 2 +
     Math.min(140, Math.floor(value.length / 7)) +
     (readable ? 30 : 0) +
+    englishWordBonus +
     cueBonus +
     criticalPageCueHits(value) * 22
   );
@@ -551,8 +567,13 @@ export function mergeEnglishPageVisionWithOcr(vision: string, ocr: string): stri
   if (!ocrTrim) return v;
 
   const visionIncomplete = englishPageTranscriptLooksIncomplete(v);
+  const ocrPoor = isPoorLessonOcr(ocrTrim, { expectArabicScript: false });
+  const visionReadable = isPagePhotoTextReadable(v) && !visionIncomplete;
+  const visionMissingBody = visionTranscriptMissingOcrContent(v, ocrTrim);
+  if (visionReadable && ocrPoor && !visionMissingBody) return v;
+
   const ocrHasMoreBody =
-    visionTranscriptMissingOcrContent(v, ocrTrim) ||
+    visionMissingBody ||
     (visionIncomplete && countLatinLetters(ocrTrim) > countLatinLetters(v));
 
   if (!ocrHasMoreBody) return v;
@@ -581,7 +602,17 @@ export function mergeEnglishPageVisionWithOcr(vision: string, ocr: string): stri
   if (isPagePhotoTextReadable(ocrTrim)) return ocrTrim;
   const filtered = filterPageTextForLessonAssembly(ocrTrim);
   if (isPagePhotoTextReadable(filtered)) return filtered;
+  if (visionReadable && ocrPoor) return v;
   return combined;
+}
+
+/** English lessons: vision transcription wins over noisy Tesseract unless OCR is clearly better. */
+export function preferEnglishLessonPageTranscript(vision: string, ocr: string): string {
+  const v = (vision ?? '').trim();
+  const o = (ocr ?? '').trim();
+  if (!v) return filterPageTextForLessonAssembly(o) || o;
+  if (!o) return v;
+  return mergeEnglishPageVisionWithOcr(v, o);
 }
 
 /** Poems, notes, and exercises on decorative/colored textbook pages. */

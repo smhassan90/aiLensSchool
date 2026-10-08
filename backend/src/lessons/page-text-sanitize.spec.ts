@@ -151,6 +151,23 @@ But his heart was beginning to sink.`;
     expect(merged).toMatch(/beginning to sink/i);
   });
 
+  it('keeps clean vision when English OCR is garbled (mixed Arabic quotes)', () => {
+    const vision = `Pre-reading
+
+1. What are home chores?
+2. Guess the content relating to 'Dignity of Work'.
+
+Akhtar came home looking cross. When his family asked him the reason, he did not answer.
+
+Uncle: Is the sweeper not a human being?`;
+    const ocr = `Pre-reading      ho £570 home CHF   oe Jou don't want to do       VE
+Akhtar came ROT bel asked him the reason, he did not
+and looked pn I ite | to find him. SO cross.`;
+    const merged = mergeEnglishPageVisionWithOcr(vision, ocr);
+    expect(merged).toMatch(/Akhtar came home looking cross/i);
+    expect(merged).not.toMatch(/Akhtar came ROT/i);
+  });
+
   it('detects when vision skipped poem body present in OCR', () => {
     const vision = `[This poem is written by Louis I. Newman (1893-1972). He was born in Providence Rhode Island (USA).]
 

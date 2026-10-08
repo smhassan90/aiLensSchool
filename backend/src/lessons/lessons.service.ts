@@ -91,6 +91,7 @@ import {
   OrientationOcrCandidate,
   mergeDualChannelPageOcr,
   pickBetterPageTranscript,
+  preferEnglishLessonPageTranscript,
   scorePageOcrCandidate,
   scorePageOcrQuality,
   pageTextNeedsVisionRetry,
@@ -512,6 +513,7 @@ export class LessonsService {
       (sharpModule as unknown as (i: Buffer) => import('sharp').Sharp);
     const afterExif = await sharpFn(file.buffer).rotate().toBuffer({ resolveWithObject: true });
     const degreesList = orientationCandidates(afterExif.info.width, afterExif.info.height);
+    const englishPrimary = ocrLanguagesForSubject(subject.name) === 'eng';
 
     let best:
       | {
@@ -558,7 +560,7 @@ export class LessonsService {
             ? greyFile
             : visionFile;
         tried += 1;
-        const score = scorePageOcrCandidate(ocrText);
+        const score = scorePageOcrCandidate(ocrText, { englishPrimary });
         const readable =
           isPagePhotoTextReadable(ocrText) && !englishPageTranscriptLooksIncomplete(ocrText);
         const orientCandidate: OrientationOcrCandidate = {
@@ -613,8 +615,9 @@ export class LessonsService {
           userId,
           { visionFile: best.visionFile },
         );
-        // Prefer orientation OCR when it is richer (color buffer often keeps final stanzas).
-        const merged = pickBetterPageTranscript(text, best.ocrText);
+        const merged = englishPrimary
+          ? preferEnglishLessonPageTranscript(text, best.ocrText)
+          : pickBetterPageTranscript(text, best.ocrText);
         return {
           text: filterPageTextForLessonAssembly(merged),
           readyFile: best.ocrFile,
@@ -723,7 +726,7 @@ export class LessonsService {
     const resolvedOcr = (tesseractText ?? '').trim();
     const ocrGarbled = isPoorLessonOcr(resolvedOcr, { expectArabicScript: expectsArabicScript });
     const usableOcr = isUsableLessonOcr(resolvedOcr, {
-      expectArabicScript: expectsArabicScript || countArabicScriptChars(resolvedOcr) >= 40,
+      expectArabicScript: expectsArabicScript,
     });
     const needsPhotoVision = expectsArabicScript || isGarbledRtlOcr(resolvedOcr) || ocrGarbled;
     const usePhotoVision = canVision && (needsPhotoVision || !usableOcr);
@@ -889,7 +892,11 @@ export class LessonsService {
       ),
     );
     final = filterPageTextForLessonAssembly(final);
-    if (englishPageTranscriptLooksIncomplete(final) && ocrHasReadingBody) {
+    if (
+      englishPageTranscriptLooksIncomplete(final) &&
+      ocrHasReadingBody &&
+      !isPoorLessonOcr(resolvedOcr, { expectArabicScript: false })
+    ) {
       const ocrKept = filterPageTextForLessonAssembly(resolvedOcr);
       final =
         ocrKept.trim() && !englishPageTranscriptLooksIncomplete(ocrKept)
@@ -920,7 +927,11 @@ export class LessonsService {
         );
       }
     }
-    if (englishPageTranscriptLooksIncomplete(final) && ocrHasReadingBody) {
+    if (
+      englishPageTranscriptLooksIncomplete(final) &&
+      ocrHasReadingBody &&
+      !isPoorLessonOcr(resolvedOcr, { expectArabicScript: false })
+    ) {
       final = mergeEnglishPageVisionWithOcr(final, resolvedOcr);
     }
     if (!isPagePhotoTextReadable(final)) {
@@ -1367,6 +1378,7 @@ export class LessonsService {
     // Urdu Tesseract retry and go straight to photo reading.
     let resolvedOcr = ocrText;
     if (
+      expectsArabicScript &&
       !preferVisionOcr &&
       files.length &&
       (isPoorLessonOcr(resolvedOcr, { expectArabicScript: expectsArabicScript }) ||
@@ -1395,7 +1407,7 @@ export class LessonsService {
     const images = this.toLessonImages(files);
     const ocrGarbled = isPoorLessonOcr(resolvedOcr, { expectArabicScript: expectsArabicScript });
     const usableOcr = isUsableLessonOcr(resolvedOcr, {
-      expectArabicScript: expectsArabicScript || countArabicScriptChars(resolvedOcr) >= 40,
+      expectArabicScript: expectsArabicScript,
     });
     const ocrMissingScript =
       expectsArabicScript &&
