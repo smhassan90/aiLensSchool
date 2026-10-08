@@ -60,6 +60,9 @@ export function scorePageOcrQuality(text: string | undefined | null): number {
   return Math.round((weighted / total) * 100);
 }
 
+const POEM_STORY_LINE_CUES =
+  /\b(heart|sink|beginning|begining|flung|monarch|crown|steeple|sought|dwell|mood|spider|scotland|voice of god)\b/i;
+
 function lineLooksLikeGibberish(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return false;
@@ -78,6 +81,14 @@ function lineLooksLikeGibberish(line: string): boolean {
 
   const w = words(trimmed);
   const latin = countLatinLetters(trimmed);
+  // OCR often drops the first letter ("ut his heart…") or appends a stanza number ("sink. 1").
+  // Keep real poem/story lines instead of treating short-word noise as gibberish.
+  if (POEM_STORY_LINE_CUES.test(trimmed) && w.length >= 4 && latin >= 18) {
+    return false;
+  }
+  if (/[.!?;:'"]\s*\d{1,2}\s*$/.test(trimmed) && w.length >= 4 && latin >= 18) {
+    return false;
+  }
   if (latin < 8 && w.length <= 2) return true;
   if (REVERSED_OR_MIRROR.test(trimmed) && w.length <= 6) return true;
   if (/^»/.test(trimmed)) return true;

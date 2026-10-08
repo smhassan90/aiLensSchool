@@ -55,6 +55,21 @@ King Bruce and the Spider`;
     expect(englishPageTranscriptLooksIncomplete(vision)).toBe(true);
   });
 
+  it('keeps mangled last poem line that OCR dropped a leading letter on', () => {
+    const noisy = `Reading text
+King Bruce and the Spider
+Eliza Cook (1818-1889)
+
+King Bruce of Scotland flung himself down
+In a lonely mood to think;
+'Tis true he was monarch and wore a crown,
+
+ut his heart was beginning to sink.                        1`;
+    const filtered = filterPageTextForLessonAssembly(noisy);
+    expect(filtered).toMatch(/beginning to sink/i);
+    expect(filtered).toMatch(/flung himself/i);
+  });
+
   it('keeps pre-reading questions and poem title when filtering OCR', () => {
     const ocr = `pre-reading
 1. Have you seen a spider? Are you afraid of it?
