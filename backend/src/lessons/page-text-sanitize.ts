@@ -61,7 +61,10 @@ export function scorePageOcrQuality(text: string | undefined | null): number {
 }
 
 const POEM_STORY_LINE_CUES =
-  /\b(heart|sink|beginning|begining|flung|monarch|crown|steeple|sought|dwell|mood|spider|scotland|voice of god|grieved|despair|endeavour|endeavor|cobweb|silken|bravo|foolish|tumbles|pondered|dizzy|faint|native|honour|honor|gossips|braced)\b/i;
+  /\b(heart|sink|beginning|begining|flung|monarch|crown|steeple|sought|dwell|mood|spider|scotland|voice of god|grieved|despair|endeavour|endeavor|cobweb|silken|bravo|foolish|tumbles|pondered|dizzy|faint|native|honour|honor|gossips|braced|akhtar|rukhsana|inayat|prophet|khandaq|khandag|medina|tycoon|menial|discrimination|dignity)\b/i;
+
+const STORY_DIALOGUE_BODY_CUES =
+  /\b(akhtar|rukhsana|uncle inayat|dignity of work|social service|holy prophet|khandaq|khandag|business tycoon|pre-reading|note for teachers|central idea|column a|true or false)\b/i;
 
 /** English verse / story line — keep even when many short words ("As grieved as man could be"). */
 function looksLikeVerseOrStoryLine(line: string): boolean {
@@ -94,6 +97,9 @@ function lineLooksLikeGibberish(line: string): boolean {
   if (/^(pre-reading|reading text|unit\b|exercise|notes|reading comprehension)\b/i.test(trimmed)) {
     return false;
   }
+  if (/^(akhtar|rukhsana|uncle|aitar|akhtar's)\b/i.test(trimmed)) {
+    return false;
+  }
   if (/\(\d{4}\s*[-–]\s*\d{4}\)/.test(trimmed)) return false;
   if (/^[A-Z][\w'’.-]+(?:\s+[A-Z][\w'’.-]+){1,8}\.?$/.test(trimmed) && trimmed.length >= 12) {
     return false;
@@ -101,6 +107,9 @@ function lineLooksLikeGibberish(line: string): boolean {
 
   const w = words(trimmed);
   const latin = countLatinLetters(trimmed);
+  if (/^(uncle|akhtar|rukhsana)\s{2,}/i.test(trimmed) && latin >= 10) {
+    return false;
+  }
   // OCR often drops the first letter ("ut his heart…") or appends a stanza number ("sink. 1").
   // Keep real poem/story lines instead of treating short-word noise as gibberish.
   if (POEM_STORY_LINE_CUES.test(trimmed) && w.length >= 3 && latin >= 12) {
@@ -159,13 +168,19 @@ export function isSuspectParagraph(block: string): boolean {
   return looksLikeGarbledLatinOcr(trimmed) && trimmed.length < 400;
 }
 
-/** Poem / reading-comprehension pages — aggressive filtering deletes whole stanzas. */
+/** Poem / dialogue / reading-comprehension — aggressive filtering deletes stanzas and exercises. */
 export function looksLikePoemOrReadingPage(text: string): boolean {
   const value = (text ?? '').trim();
   if (!value) return false;
   if (/reading text|pre-reading|reading comprehension|eliza cook|king bruce/i.test(value)) {
     return true;
   }
+  if (STORY_DIALOGUE_BODY_CUES.test(value)) return true;
+  if (/reading comprehension/i.test(value) && /\bexercise\b/i.test(value)) return true;
+  const speakerLines = value
+    .split(/\n/)
+    .filter((l) => /^(akhtar|rukhsana|uncle)\b/i.test(l.trim())).length;
+  if (speakerLines >= 4) return true;
   const poemHits = (
     value.match(
       /\b(flung|spider|monarch|crown|sink|endeavour|cobweb|bravo|despair|silken|stanza|verse)\b/gi,
@@ -177,6 +192,10 @@ export function looksLikePoemOrReadingPage(text: string): boolean {
   return lines.length >= 8 && verseLike / lines.length >= 0.5 && poemHits >= 1;
 }
 
+export function looksLikeStructuredTextbookPage(text: string): boolean {
+  return looksLikePoemOrReadingPage(text);
+}
+
 function lightCleanPoemOrReadingPage(text: string): string {
   return text
     .replace(/^\s*Page\s+\d+\s*$/gim, '')
@@ -185,6 +204,10 @@ function lightCleanPoemOrReadingPage(text: string): string {
     .replace(/\bflung\s+h\s+imself\b/gi, 'flung himself')
     .replace(/\bwore\s+[a2]\s+[Cc]rown\b/g, 'wore a Crown')
     .replace(/\bEzercise\b/gi, 'Exercise')
+    .replace(/\bE\s*[zx]\s*ercise\s*([1-9])/gi, 'Exercise $1')
+    .replace(/\bUsiness\s+tycoon\b/gi, 'business tycoon')
+    .replace(/\bPre\s*[-–]?\s*reading\b/gi, 'Pre-reading')
+    .replace(/\bNote\s+for\s+teachers?\b/gi, 'Note for teachers')
     .replace(/\bExercise[\u2018\u2019'`´']\s*(?=\d)/gi, 'Exercise ')
     .replace(/\bKing Bruce:\s+/g, 'King Bruce ')
     .replace(/\bwhy should not\s+1\?/gi, 'why should not I?')
@@ -197,18 +220,90 @@ function lightCleanPoemOrReadingPage(text: string): string {
 const CRITICAL_PAGE_CUES = [
   /\btime did not fail\b/i,
   /\bnine\b/i,
-  /\be[xz]ercise\s*6\b/i,
-  /\be[xz]ercise\s*5\b/i,
+  /\be[xz]ercise\s*[1-7]\b/i,
   /\bbravo\b/i,
   /\bcobweb home\b/i,
   /\bgive it all up\b/i,
   /\bbeginning to sink\b/i,
   /\bsilken filmy\b/i,
   /\bwhy should not\b/i,
+  /\bpre-reading\b/i,
+  /\bakhtar came home\b/i,
+  /\bbusiness tycoon\b/i,
+  /\bdeliver newspapers\b/i,
+  /\bmotto of my life\b/i,
+  /\brespect for all people who work\b/i,
+  /\bnote for teachers\b/i,
+  /\bkhandaq|khandag\b/i,
+  /\bfetched water\b/i,
 ] as const;
 
-function criticalPageCueHits(text: string): number {
+export function criticalPageCueHits(text: string): number {
   return CRITICAL_PAGE_CUES.filter((re) => re.test(text)).length;
+}
+
+export type OrientationOcrCandidate = {
+  text: string;
+  score: number;
+  readable: boolean;
+  degrees: number;
+};
+
+/** Prefer upright photos and transcripts that retain lesson cues (not a higher-scoring wrong rotation). */
+export function compareOrientationOcrResults(
+  current: OrientationOcrCandidate | undefined,
+  candidate: OrientationOcrCandidate,
+): number {
+  if (!current?.text?.trim()) return candidate.text?.trim() ? 1 : 0;
+  if (!candidate.text?.trim()) return -1;
+  if (candidate.readable && !current.readable) {
+    if (current.text.length >= candidate.text.length * 1.12) return -1;
+    if (candidate.text.length >= current.text.length * 0.72) return 1;
+    return -1;
+  }
+  if (current.readable && !candidate.readable) return -1;
+
+  const critCurrent = criticalPageCueHits(current.text);
+  const critCandidate = criticalPageCueHits(candidate.text);
+  if (critCandidate !== critCurrent) {
+    if (critCandidate > critCurrent) {
+      // Wrong 90°/270° rotations often hit sidebar cues with a shorter, jumbled transcript.
+      if (candidate.text.length >= current.text.length * 0.82) return 1;
+      return -1;
+    }
+    return -1;
+  }
+
+  const lengthRatio = candidate.text.length / Math.max(1, current.text.length);
+  if (lengthRatio >= 1.12) return 1;
+  if (lengthRatio <= 0.88) return -1;
+
+  const richer = pickBetterPageTranscript(current.text, candidate.text);
+  if (richer === candidate.text && richer !== current.text && candidate.score >= current.score - 55) {
+    return 1;
+  }
+  if (richer === current.text && richer !== candidate.text && current.score >= candidate.score - 55) {
+    return -1;
+  }
+
+  if (current.degrees === 0 && candidate.degrees !== 0 && candidate.score <= current.score + 40) {
+    return -1;
+  }
+  if (candidate.degrees === 0 && current.degrees !== 0 && current.score <= candidate.score + 40) {
+    return 1;
+  }
+
+  if (Math.abs(candidate.score - current.score) <= 40) {
+    if (richer === current.text && richer !== candidate.text) return -1;
+    if (richer === candidate.text && richer !== current.text) return 1;
+    if (candidate.degrees === 0 && current.degrees !== 0) return 1;
+    if (current.degrees === 0 && candidate.degrees !== 0) return -1;
+  }
+
+  if (candidate.score !== current.score) {
+    return candidate.score > current.score ? 1 : -1;
+  }
+  return 0;
 }
 
 /** Score a page OCR candidate for orientation / greyscale-vs-color picking. */
@@ -220,7 +315,7 @@ export function scorePageOcrCandidate(text: string): number {
   const cueBonus =
     (
       value.match(
-        /\b(bravo|fail|cobweb|silken|endeavour|native cot|give it all up|e[xz]ercise\s*[1-6]|flung|beginning to sink|nine\s+brave|anxious minute)\b/gi,
+        /\b(bravo|fail|cobweb|silken|endeavour|native cot|give it all up|e[xz]ercise\s*[1-7]|flung|beginning to sink|nine\s+brave|anxious minute|akhtar|rukhsana|dignity of work|business tycoon|pre-reading|note for teachers|khandaq|khandag)\b/gi,
       ) ?? []
     ).length * 10;
   return (
@@ -230,6 +325,22 @@ export function scorePageOcrCandidate(text: string): number {
     cueBonus +
     criticalPageCueHits(value) * 22
   );
+}
+
+/** Grey + color OCR on the same orientation — keep cues from the longer channel when close in score. */
+export function mergeDualChannelPageOcr(grey: string, color: string): string {
+  const g = (grey ?? '').trim();
+  const c = (color ?? '').trim();
+  if (!g) return c;
+  if (!c) return g;
+  const longer = g.length >= c.length ? g : c;
+  const shorter = g.length >= c.length ? c : g;
+  if (longer.length >= shorter.length * 1.12) {
+    const pick = pickBetterPageTranscript(longer, shorter);
+    if (pick.length < longer.length - 180) return longer;
+    return pick;
+  }
+  return pickBetterPageTranscript(g, c);
 }
 
 /** Prefer the richer of two OCR transcripts (greyscale prep vs color). */
@@ -253,9 +364,9 @@ export function filterPageTextForLessonAssembly(text: string): string {
   const value = (text ?? '').trim();
   if (!value) return '';
 
-  // King Bruce–style poem pages: keep OCR stanzas. Block filtering was deleting
-  // most of pages 2–3 (cobweb home, Bravo, slipping sprawl, etc.).
-  if (looksLikePoemOrReadingPage(value)) {
+  // Poem / dialogue / exercise pages: keep full OCR. Block filtering was deleting
+  // stanzas (King Bruce) and exercise tables (Dignity of Work).
+  if (looksLikeStructuredTextbookPage(value)) {
     return lightCleanPoemOrReadingPage(value);
   }
 
@@ -329,7 +440,7 @@ const POEM_PAGE_BODY_MARKERS = [
 
 // Do NOT include "spider" — it appears in pre-reading questions and the title alone.
 const READING_BODY_CUES =
-  /\b(flung|lonely mood|wore a crown|beginning to sink|scotland flung|sought to|topmost|dwell among|steeple|cobweb|endeavour|bravo|native cot|great deed)\b/i;
+  /\b(flung|lonely mood|wore a crown|beginning to sink|scotland flung|sought to|topmost|dwell among|steeple|cobweb|endeavour|bravo|native cot|great deed|akhtar|rukhsana|dignity of work|social service|holy prophet|khandaq|khandag|tycoon|exercise\s*1)\b/i;
 
 /**
  * Vision often stops after "Reading text" + title and skips the poem/story body.
@@ -340,8 +451,17 @@ export function englishPageTranscriptLooksIncomplete(text: string): boolean {
   if (!value) return true;
   const lower = value.toLowerCase();
   const readingLayout =
-    /reading text|reading comprehension|pre-reading|king bruce|voice of god/i.test(lower);
+    /reading text|reading comprehension|pre-reading|king bruce|voice of god|dignity of work/i.test(
+      lower,
+    );
   if (!readingLayout) return false;
+
+  if (STORY_DIALOGUE_BODY_CUES.test(value) || READING_BODY_CUES.test(value)) {
+    return false;
+  }
+  if (/\bExercise\s*[1-9]/i.test(value) && countLatinLetters(value) >= 120) {
+    return false;
+  }
 
   if (/king bruce and the spider\s*\.?$/i.test(value) && !READING_BODY_CUES.test(value)) {
     return true;
@@ -365,6 +485,12 @@ export function englishPageTranscriptLooksIncomplete(text: string): boolean {
     !READING_BODY_CUES.test(value)
   ) {
     return true;
+  }
+  if (/pre-reading/i.test(value) && countLatinLetters(value) >= 320) {
+    return false;
+  }
+  if (/\bunit\s+\d+/i.test(value) && countLatinLetters(value) >= 400) {
+    return false;
   }
   return false;
 }
@@ -494,7 +620,7 @@ export function isPagePhotoTextReadable(text: string | undefined | null): boolea
   if (score < pageOcrAcceptThreshold(value)) return false;
   if (
     !structured &&
-    !looksLikePoemOrReadingPage(value) &&
+    !looksLikeStructuredTextbookPage(value) &&
     score < PAGE_OCR_ACCEPT_THRESHOLD &&
     ocrSymbolHits >= 2
   ) {

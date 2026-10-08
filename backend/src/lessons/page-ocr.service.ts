@@ -6,6 +6,7 @@ import { isServerlessRuntime } from '../common/env';
 import {
   englishPageTranscriptLooksIncomplete,
   isPagePhotoTextReadable,
+  pickBetterPageTranscript,
   scorePageOcrQuality,
 } from './page-text-sanitize';
 import {
@@ -84,19 +85,8 @@ export function preferOcrTranscript(paddleText: string, tesseractText: string): 
   if (paddleLen >= tessLen + 80) return { text: paddle, engine: 'paddle' };
   if (tessLen >= paddleLen + 80) return { text: tess, engine: 'tesseract' };
 
-  const paddleScore = scorePageOcrQuality(paddle);
-  const tessScore = scorePageOcrQuality(tess);
-  if (paddleScore !== tessScore) {
-    return paddleScore > tessScore
-      ? { text: paddle, engine: 'paddle' }
-      : { text: tess, engine: 'tesseract' };
-  }
-
-  // Prefer Paddle on ties when both look usable — that is the candidate to replace Tesseract.
-  if (paddleReadable || paddleScore >= 62 || paddleLen >= tessLen) {
-    return { text: paddle, engine: 'paddle' };
-  }
-  return { text: tess, engine: 'tesseract' };
+  const better = pickBetterPageTranscript(paddle, tess);
+  return { text: better, engine: better === tess ? 'tesseract' : 'paddle' };
 }
 
 @Injectable()
@@ -186,8 +176,19 @@ export class PageOcrService implements OnModuleDestroy {
       const worker = workers[index % workers.length];
       const source = this.toDataUrl(file);
       try {
-        const result = await worker.recognize(source);
-        const text = result.data.text?.replace(/\u000c/g, '').trim() ?? '';
+        const tesseract = await import('tesseract.js');
+        const clean = (raw: string) => raw.replace(/\u000c/g, '').trim();
+        const resultAuto = await worker.recognize(source);
+        const autoText = clean(resultAuto.data.text ?? '');
+        await worker.setParameters({
+          tessedit_pageseg_mode: String(tesseract.PSM.SINGLE_BLOCK),
+        });
+        const resultBlock = await worker.recognize(source);
+        const blockText = clean(resultBlock.data.text ?? '');
+        await worker.setParameters({
+          tessedit_pageseg_mode: String(tesseract.PSM.AUTO),
+        });
+        const text = pickBetterPageTranscript(autoText, blockText);
         this.logger.log(
           `Tesseract page ${index + 1}: ${text.length} characters from ${file.originalname ?? 'photo'} (${this.poolLangs})`,
         );

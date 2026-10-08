@@ -87,6 +87,8 @@ import {
   looksLikePoemOrReadingPage,
   mergeEnglishPageVisionWithOcr,
   pageHasStructuredLessonContent,
+  compareOrientationOcrResults,
+  mergeDualChannelPageOcr,
   pickBetterPageTranscript,
   scorePageOcrCandidate,
   scorePageOcrQuality,
@@ -549,17 +551,18 @@ export class LessonsService {
             .readPageTexts([visionFile], { subjectName: subject.name })
             .then((rows) => (rows[0] ?? '').trim()),
         ]);
-        const greyScore = scorePageOcrCandidate(greyText);
-        const colorScore = scorePageOcrCandidate(colorText);
-        const useColor = colorScore > greyScore;
-        const ocrText = useColor ? colorText : greyText;
-        const ocrFile = useColor ? visionFile : greyFile;
+        const ocrText = mergeDualChannelPageOcr(greyText, colorText);
+        const ocrFile =
+          ocrText === greyText || (ocrText !== colorText && greyText.length >= colorText.length)
+            ? greyFile
+            : visionFile;
         tried += 1;
-        const score = Math.max(greyScore, colorScore);
+        const score = scorePageOcrCandidate(ocrText);
         const readable =
           isPagePhotoTextReadable(ocrText) && !englishPageTranscriptLooksIncomplete(ocrText);
-        if (!best || (readable && !best.readable) || score > best.score) {
-          best = { ocrFile, visionFile, ocrText, score, readable, degrees };
+        const candidate = { ocrFile, visionFile, ocrText, score, readable, degrees };
+        if (compareOrientationOcrResults(best, candidate) > 0) {
+          best = candidate;
         }
         // Poem/reading pages: try every orientation — a short clean mid-page can beat a fuller one.
         if (
