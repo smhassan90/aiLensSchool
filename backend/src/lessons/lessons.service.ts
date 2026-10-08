@@ -88,6 +88,7 @@ import {
   mergeEnglishPageVisionWithOcr,
   pageHasStructuredLessonContent,
   compareOrientationOcrResults,
+  OrientationOcrCandidate,
   mergeDualChannelPageOcr,
   pickBetterPageTranscript,
   scorePageOcrCandidate,
@@ -560,9 +561,22 @@ export class LessonsService {
         const score = scorePageOcrCandidate(ocrText);
         const readable =
           isPagePhotoTextReadable(ocrText) && !englishPageTranscriptLooksIncomplete(ocrText);
-        const candidate = { ocrFile, visionFile, ocrText, score, readable, degrees };
-        if (compareOrientationOcrResults(best, candidate) > 0) {
-          best = candidate;
+        const orientCandidate: OrientationOcrCandidate = {
+          text: ocrText,
+          score,
+          readable,
+          degrees,
+        };
+        const orientBest: OrientationOcrCandidate | undefined = best
+          ? {
+              text: best.ocrText,
+              score: best.score,
+              readable: best.readable,
+              degrees: best.degrees,
+            }
+          : undefined;
+        if (compareOrientationOcrResults(orientBest, orientCandidate) > 0) {
+          best = { ocrFile, visionFile, ocrText, score, readable, degrees };
         }
         // Poem/reading pages: try every orientation — a short clean mid-page can beat a fuller one.
         if (
