@@ -356,7 +356,7 @@ export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admi
 
             {isDraft ? (
 
-              <div className="mt-6 space-y-4 print:hidden">
+              <div className="mt-6 space-y-4">
 
                 <ExamQuestionEditor quizId={quizId} quiz={quiz} onChange={updateQuiz} />
 
@@ -374,21 +374,23 @@ export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admi
 
               </div>
 
-            ) : null}
+            ) : (
 
-            <div className={isDraft ? "hidden print:block" : isPending ? "mt-6 print:hidden" : "mt-6"}>
+              <div className={isPending ? "mt-6 print:hidden" : "mt-6"}>
 
-              {printSolution ? (
+                {printSolution ? (
 
-                <ExamSolutionSheet quiz={quiz} />
+                  <ExamSolutionSheet quiz={quiz} />
 
-              ) : (
+                ) : (
 
-                <ExamPrintView quiz={quiz} showAnswers={false} />
+                  <ExamPrintView quiz={quiz} showAnswers={false} />
 
-              )}
+                )}
 
-            </div>
+              </div>
+
+            )}
 
           </>
 
