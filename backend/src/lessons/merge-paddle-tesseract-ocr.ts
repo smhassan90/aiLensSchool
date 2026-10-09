@@ -1,9 +1,14 @@
 import { countLatinLetters } from '../common/extract-quality';
 import { latinOcrWordLooksPlausible } from '../common/garbled-latin-ocr';
 import {
+  lineLooksLikeMathOrFormula,
+  tokenLooksLikeMathSymbol,
+} from '../common/math-lesson-text';
+import {
   criticalPageCueHits,
   englishPageTranscriptLooksIncomplete,
 } from './page-text-sanitize';
+import { stripInterleavedWeblinkSidebar } from './sidebar-layout-ocr';
 
 function normalizeLineKey(line: string): string {
   return line
@@ -42,10 +47,16 @@ export function ocrLinesDuplicate(a: string, b: string): boolean {
 function tokenLooksGarbage(token: string, alternateAtPosition?: string): boolean {
   const raw = token.trim();
   if (!raw) return false;
+  if (tokenLooksLikeMathSymbol(raw)) return false;
   if (/^[\dW]+[.)]?$/.test(raw)) return false;
+  if (/^[\d.,+\-×÷=/%]+$/u.test(raw)) return false;
   if ((raw.match(/[|£€©®@#\\<>{}]/g) ?? []).length >= 1) return true;
   const letters = raw.match(/[A-Za-z]+/g) ?? [];
-  if (!letters.length) return (raw.match(/[^\s]/g) ?? []).length <= 2;
+  if (!letters.length) {
+    // Keep Greek / math punctuation fragments; only drop tiny unknown junk.
+    if (/[\u0370-\u03FF∪∩∈∅λμνπω°±×÷≈≠≤≥√∞=]/u.test(raw)) return false;
+    return (raw.match(/[^\s]/g) ?? []).length <= 2;
+  }
   const altLetters = alternateAtPosition?.match(/[A-Za-z]+/g)?.[0];
   for (const part of letters) {
     if (/^[A-Z]{3,6}$/.test(part) && part !== 'THE' && part !== 'AND') return true;
@@ -66,6 +77,7 @@ function tokenLooksGarbage(token: string, alternateAtPosition?: string): boolean
 function lineIsMostlyGarbage(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return true;
+  if (lineLooksLikeMathOrFormula(trimmed)) return false;
   const latin = countLatinLetters(trimmed);
   if (latin < 6 && (trimmed.match(/[|£€©®@#\\]/g) ?? []).length >= 1) return true;
   const words = trimmed.match(/\S+/g) ?? [];
@@ -199,7 +211,8 @@ function mergePrimaryWithAlternate(primary: string, alternate: string): string {
     if (usedAlt.has(i)) continue;
     const tl = altLines[i];
     if (lineIsMostlyGarbage(tl)) continue;
-    if (tl.length < 10 && countLatinLetters(tl) < 8) continue;
+    const isMathLine = lineLooksLikeMathOrFormula(tl);
+    if (tl.length < 10 && countLatinLetters(tl) < 8 && !isMathLine) continue;
     if (out.some((line) => ocrLinesDuplicate(line, tl))) continue;
     out.push(tl);
     usedAlt.add(i);
@@ -218,12 +231,13 @@ function mergePrimaryWithAlternate(primary: string, alternate: string): string {
 export function mergePaddleAndTesseractPageOcr(paddle: string, tesseract: string): string {
   const p = (paddle ?? '').trim();
   const t = (tesseract ?? '').trim();
-  if (!p) return t;
-  if (!t) return p;
+  if (!p && !t) return '';
+  if (!p) return stripInterleavedWeblinkSidebar(t);
+  if (!t) return stripInterleavedWeblinkSidebar(p);
 
   const primary = pickOcrMergePrimary(p, t);
-  if (primary === 'tesseract') {
-    return mergePrimaryWithAlternate(t, p);
-  }
-  return mergePrimaryWithAlternate(p, t);
+  const merged =
+    primary === 'tesseract' ? mergePrimaryWithAlternate(t, p) : mergePrimaryWithAlternate(p, t);
+  // Drop interleaved Weblinks/YouTube sidebars after merge (no-op on literary pages).
+  return stripInterleavedWeblinkSidebar(merged);
 }

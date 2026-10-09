@@ -6,6 +6,8 @@ import {
   looksLikeRealLessonText,
 } from '../common/extract-quality';
 import { looksLikeGarbledLatinOcr } from '../common/garbled-latin-ocr';
+import { lineLooksLikeMathOrFormula } from '../common/math-lesson-text';
+import { lineLooksLikeWeblinkSidebar } from './sidebar-layout-ocr';
 
 const SIDEBAR_ACTIVITY =
   /jumbled order|correct words\.?\s*the first|compare your|fill in the blank|circle the|thing as true|something\s*$/i;
@@ -22,6 +24,8 @@ export const PAGE_OCR_ACCEPT_THRESHOLD = 90;
 function lineQualityWeight(line: string): number {
   const trimmed = line.trim();
   if (trimmed.length < 3) return 1;
+  if (lineLooksLikeWeblinkSidebar(trimmed)) return 0.05;
+  if (lineLooksLikeMathOrFormula(trimmed)) return 1;
   if (lineLooksLikeGibberish(trimmed)) return 0;
   if (isSuspectParagraph(trimmed)) {
     const latin = countLatinLetters(trimmed);
@@ -90,6 +94,7 @@ function looksLikeVerseOrStoryLine(line: string): boolean {
 function lineLooksLikeGibberish(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return false;
+  if (lineLooksLikeMathOrFormula(trimmed)) return false;
   if (/^Page\s+\d+$/i.test(trimmed)) return false;
   if (/^\*\*[^*]+\*\*$/.test(trimmed)) return false;
   if (trimmed.length >= 40 && /^[A-Z][a-z].*[.!?]"?\s*$/.test(trimmed)) return false;

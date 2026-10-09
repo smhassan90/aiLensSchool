@@ -69,4 +69,37 @@ But think of the sweeper doing the bathroom.
       ),
     ).toBe(true);
   });
+
+  it('strips interleaved weblink sidebars from physics pages after merge', () => {
+    const paddle = `
+Step 2: Write down the formula
+Encourage students to
+T is the time taken
+visit below link for
+v = f × λ
+https://www.youtube.com/watch?v=abc
+Result = 1.0 m/s
+wavelength of the waves are 8.0 m
+`.trim();
+    const tess = `
+Step 2: Write down the formula
+T is the time taken
+v = f × λ
+Result = 1.0 m/s
+wavelength of the waves are 8.0 m
+`.trim();
+    const merged = mergePaddleAndTesseractPageOcr(paddle, tess);
+    expect(merged).toMatch(/Step/i);
+    expect(merged).toMatch(/λ|wavelength/i);
+    expect(merged).not.toMatch(/youtube\.com/i);
+    expect(merged).not.toMatch(/Encourage students/i);
+  });
+
+  it('keeps Greek lambda tokens instead of treating them as garbage', () => {
+    const paddle = 'λ is the distance between the two consecutive crests\nv = f × λ';
+    const tess = 'λ is the distance between the two consecutive crests\nv = f × λ';
+    const merged = mergePaddleAndTesseractPageOcr(paddle, tess);
+    expect(merged).toMatch(/λ/);
+    expect(merged).toMatch(/v = f/);
+  });
 });
