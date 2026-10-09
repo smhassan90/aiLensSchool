@@ -168,9 +168,13 @@ function looksLikeLatinGibberishLine(trimmed: string, words: string[]): boolean 
   return false;
 }
 
-export function englishOnlyFromMixedOcr(text: string | undefined | null): string {
+export function englishOnlyFromMixedOcr(
+  text: string | undefined | null,
+  options?: { keepArabicScript?: boolean },
+): string {
   const value = (text ?? '').trim();
   if (!value) return '';
+  const keepArabic = options?.keepArabicScript === true;
   const kept: string[] = [];
   for (const line of value.split(/\r?\n/)) {
     const trimmed = line.trim();
@@ -188,7 +192,19 @@ export function englishOnlyFromMixedOcr(text: string | undefined | null): string
     const words = trimmed.match(/[A-Za-z]{2,}/g) ?? [];
     const weirdPunct = (trimmed.match(/[)(@£€«»#]{1,}/g) ?? []).length;
     if (junk > 0) continue;
-    if (arabic >= 3) continue;
+    // Keep real Arabic/Urdu lines (and mixed lines with usable Latin). Never drop
+    // clean Arabic solely because the UI is LTR — that removed Islamiat quotes.
+    if (arabic >= 3) {
+      if (keepArabic || (arabic >= 8 && arabic >= latin && weirdPunct === 0)) {
+        kept.push(trimmed);
+        continue;
+      }
+      if (latin >= 12 && !looksLikeLatinGibberishLine(trimmed, words) && weirdPunct < 2) {
+        kept.push(trimmed);
+        continue;
+      }
+      continue;
+    }
     if (latin < 12) continue;
     if (words.length < 3 && !/^(Equality|Brotherhood|Sovereignty|Justice)\b/i.test(trimmed)) {
       continue;
@@ -227,7 +243,9 @@ export function englishOnlyFromMixedOcr(text: string | undefined | null): string
     )
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  if (compactTextLength(out) < 120) return '';
+  const arabicKept = countArabicScriptChars(out);
+  const minCompact = arabicKept >= 8 || keepArabic ? 40 : 120;
+  if (compactTextLength(out) < minCompact) return '';
   return out;
 }
 

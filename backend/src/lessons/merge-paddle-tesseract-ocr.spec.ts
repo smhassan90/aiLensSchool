@@ -1,6 +1,7 @@
 import {
   mergePaddleAndTesseractPageOcr,
   ocrLinesDuplicate,
+  pickOcrMergePrimary,
 } from './merge-paddle-tesseract-ocr';
 
 describe('mergePaddleAndTesseractPageOcr', () => {
@@ -26,6 +27,38 @@ describe('mergePaddleAndTesseractPageOcr', () => {
     const tess = 'Exercise 1\nWhat is the central idea of the text?';
     const merged = mergePaddleAndTesseractPageOcr(paddle, tess);
     expect(merged).toMatch(/central idea/i);
+  });
+
+  it('uses tesseract as base when paddle is short and missing reading body', () => {
+    const paddle = `
+Pre-reading
+Reading text
+Dignity of Work
+Uncle Inayat looked at him and asked him what had happened.
+Akhtar
+Uncle, we are having a social service week at school
+25`.trim();
+    const tess = `
+Pre-reading
+1. What are the two home chores you like to do, and why?
+Reading text
+Dignity of Work
+Akhtar came home from school one day. He was feeling cross.
+Akhtar's sister, Rukhsana, told Uncle Inayat that Akhtar had come home unhappy.
+Uncle Inayat looked at him and asked him what had happened.
+Akhtar Uncle, we are having a social service week at school, so we all have to do the work of servants and gardeners.
+Uncle Is it work that makes you cross?
+Akhtar Should I not be cross if I am made to work like a servant?
+Uncle Did your teacher do anything himself?
+Yes, he did. After taking out the desks and chairs, the headmaster swept the room and emptied the dustbin.
+Is it a matter of shame to clean what we make dirty?
+But think of the sweeper doing the bathroom.
+`.trim();
+    expect(pickOcrMergePrimary(paddle, tess)).toBe('tesseract');
+    const merged = mergePaddleAndTesseractPageOcr(paddle, tess);
+    expect(merged).toMatch(/Akhtar came home from school/i);
+    expect(merged).toMatch(/feeling cross/i);
+    expect(merged.length).toBeGreaterThan(paddle.length);
   });
 
   it('ocrLinesDuplicate treats high word overlap as duplicate', () => {

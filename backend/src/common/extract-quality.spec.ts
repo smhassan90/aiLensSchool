@@ -86,6 +86,24 @@ The principle. of brotherhood is.an important aspect of Islamic society.
     expect(out).not.toMatch(/fos dir/i);
     expect(out).not.toMatch(/0A 221/);
   });
+
+  it('keeps clean Arabic lines when keepArabicScript is set (LTR must not delete Arabic)', () => {
+    const mixed = `
+Pre-reading
+1. What does the verse teach?
+بسم الله الرحمن الرحيم
+The Holy Quran teaches justice and equality.
+`;
+    const kept = englishOnlyFromMixedOcr(mixed, { keepArabicScript: true });
+    expect(kept).toMatch(/بسم الله الرحمن الرحيم/);
+    expect(kept).toMatch(/justice and equality/i);
+  });
+
+  it('keeps predominantly Arabic lines without junk even without the flag', () => {
+    const line = 'بسم الله الرحمن الرحيم والصلوة والسلام';
+    const out = englishOnlyFromMixedOcr(`English intro sentence here about justice.\n${line}`);
+    expect(out).toMatch(/بسم الله الرحمن الرحيم/);
+  });
 });
 
 describe('garbled English/Math textbook OCR', () => {

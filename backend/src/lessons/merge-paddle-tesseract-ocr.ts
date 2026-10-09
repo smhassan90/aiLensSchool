@@ -1,5 +1,9 @@
 import { countLatinLetters } from '../common/extract-quality';
 import { latinOcrWordLooksPlausible } from '../common/garbled-latin-ocr';
+import {
+  criticalPageCueHits,
+  englishPageTranscriptLooksIncomplete,
+} from './page-text-sanitize';
 
 function normalizeLineKey(line: string): string {
   return line
@@ -93,17 +97,17 @@ function mergeLineWords(primary: string, alternate: string): string {
   return merged.join(' ');
 }
 
-function findBestTessLineIndex(
-  paddleLine: string,
-  tessLines: string[],
+function findBestAlternateLineIndex(
+  primaryLine: string,
+  alternateLines: string[],
   used: Set<number>,
   minOverlap: number,
 ): number {
   let bestIdx = -1;
   let bestScore = 0;
-  for (let i = 0; i < tessLines.length; i += 1) {
+  for (let i = 0; i < alternateLines.length; i += 1) {
     if (used.has(i)) continue;
-    const score = wordOverlapRatio(paddleLine, tessLines[i]);
+    const score = wordOverlapRatio(primaryLine, alternateLines[i]);
     if (score >= minOverlap && score > bestScore) {
       bestScore = score;
       bestIdx = i;
@@ -112,41 +116,71 @@ function findBestTessLineIndex(
   return bestIdx;
 }
 
+/** Coverage used to decide which engine is the merge base. */
+export function scoreOcrMergeCoverage(text: string): number {
+  const value = (text ?? '').trim();
+  if (!value) return 0;
+  const latin = countLatinLetters(value);
+  const cues = criticalPageCueHits(value);
+  const incompletePenalty = englishPageTranscriptLooksIncomplete(value) ? 180 : 0;
+  return latin + cues * 90 + Math.min(400, Math.floor(value.length / 4)) - incompletePenalty;
+}
+
 /**
- * Paddle-first transcript with Tesseract filling gaps: dedupe lines, swap garbage
- * tokens/lines from the alternate engine, append Tesseract-only content.
+ * Prefer Tesseract as merge base when it has fuller reading-body coverage
+ * (incomplete Paddle must not erase a longer story transcript).
  */
-export function mergePaddleAndTesseractPageOcr(paddle: string, tesseract: string): string {
+export function pickOcrMergePrimary(
+  paddle: string,
+  tesseract: string,
+): 'paddle' | 'tesseract' {
   const p = (paddle ?? '').trim();
   const t = (tesseract ?? '').trim();
-  if (!p) return t;
-  if (!t) return p;
+  if (!p) return 'tesseract';
+  if (!t) return 'paddle';
+  const pScore = scoreOcrMergeCoverage(p);
+  const tScore = scoreOcrMergeCoverage(t);
+  const pIncomplete = englishPageTranscriptLooksIncomplete(p);
+  const tIncomplete = englishPageTranscriptLooksIncomplete(t);
+  if (pIncomplete && !tIncomplete && countLatinLetters(t) >= countLatinLetters(p) * 0.85) {
+    return 'tesseract';
+  }
+  if (tIncomplete && !pIncomplete && countLatinLetters(p) >= countLatinLetters(t) * 0.85) {
+    return 'paddle';
+  }
+  if (tScore >= pScore + 80) return 'tesseract';
+  if (countLatinLetters(t) >= countLatinLetters(p) + 220 && criticalPageCueHits(t) >= criticalPageCueHits(p)) {
+    return 'tesseract';
+  }
+  return 'paddle';
+}
 
-  const paddleLines = p.split(/\r?\n/);
-  const tessLines = t.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const usedTess = new Set<number>();
+function mergePrimaryWithAlternate(primary: string, alternate: string): string {
+  const primaryLines = primary.split(/\r?\n/);
+  const altLines = alternate.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const usedAlt = new Set<number>();
   const out: string[] = [];
 
-  for (const rawLine of paddleLines) {
+  for (const rawLine of primaryLines) {
     const pl = rawLine.trim();
     if (!pl) {
       out.push('');
       continue;
     }
 
-    const matchIdx = findBestTessLineIndex(pl, tessLines, usedTess, 0.5);
-    if (matchIdx >= 0) usedTess.add(matchIdx);
+    const matchIdx = findBestAlternateLineIndex(pl, altLines, usedAlt, 0.5);
+    if (matchIdx >= 0) usedAlt.add(matchIdx);
 
     if (lineIsMostlyGarbage(pl)) {
-      const tessLine = matchIdx >= 0 ? tessLines[matchIdx] : undefined;
-      if (tessLine && !lineIsMostlyGarbage(tessLine)) {
-        out.push(tessLine);
+      const altLine = matchIdx >= 0 ? altLines[matchIdx] : undefined;
+      if (altLine && !lineIsMostlyGarbage(altLine)) {
+        out.push(altLine);
         continue;
       }
-      const fallbackIdx = findBestTessLineIndex(pl, tessLines, usedTess, 0.28);
+      const fallbackIdx = findBestAlternateLineIndex(pl, altLines, usedAlt, 0.28);
       if (fallbackIdx >= 0) {
-        usedTess.add(fallbackIdx);
-        const fb = tessLines[fallbackIdx];
+        usedAlt.add(fallbackIdx);
+        const fb = altLines[fallbackIdx];
         out.push(!lineIsMostlyGarbage(fb) ? fb : pl);
       } else {
         out.push(pl);
@@ -155,24 +189,41 @@ export function mergePaddleAndTesseractPageOcr(paddle: string, tesseract: string
     }
 
     if (matchIdx >= 0) {
-      out.push(mergeLineWords(pl, tessLines[matchIdx]));
+      out.push(mergeLineWords(pl, altLines[matchIdx]));
     } else {
       out.push(pl);
     }
   }
 
-  for (let i = 0; i < tessLines.length; i += 1) {
-    if (usedTess.has(i)) continue;
-    const tl = tessLines[i];
+  for (let i = 0; i < altLines.length; i += 1) {
+    if (usedAlt.has(i)) continue;
+    const tl = altLines[i];
     if (lineIsMostlyGarbage(tl)) continue;
     if (tl.length < 10 && countLatinLetters(tl) < 8) continue;
     if (out.some((line) => ocrLinesDuplicate(line, tl))) continue;
     out.push(tl);
-    usedTess.add(i);
+    usedAlt.add(i);
   }
 
   return out
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+/**
+ * Merge Paddle + Tesseract. Uses the fuller transcript as the base when Paddle
+ * is incomplete or Tesseract has substantially more reading-body coverage.
+ */
+export function mergePaddleAndTesseractPageOcr(paddle: string, tesseract: string): string {
+  const p = (paddle ?? '').trim();
+  const t = (tesseract ?? '').trim();
+  if (!p) return t;
+  if (!t) return p;
+
+  const primary = pickOcrMergePrimary(p, t);
+  if (primary === 'tesseract') {
+    return mergePrimaryWithAlternate(t, p);
+  }
+  return mergePrimaryWithAlternate(p, t);
 }

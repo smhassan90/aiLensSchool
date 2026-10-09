@@ -76,7 +76,10 @@ import {
   looksLikeRealLessonText,
 } from '../common/extract-quality';
 import { looksLikeGarbledLatinOcr } from '../common/garbled-latin-ocr';
-import { assembleChapterLessonFromPageTexts } from './merge-page-ocr-with-ai';
+import {
+  assembleChapterLessonFromPageTexts,
+  intelligentMergePageOcrTranscripts,
+} from './merge-page-ocr-with-ai';
 import { mergePaddleAndTesseractPageOcr } from './merge-paddle-tesseract-ocr';
 import { OcrUploadProgressService } from './ocr-upload-progress.service';
 import { ocrLanguagesForSubject } from './page-ocr.service';
@@ -714,15 +717,25 @@ export class LessonsService {
     };
   }
 
-  /** Rule-based Paddle + Tesseract merge (no AI / vision). */
+  private assemblyFilterOptions(subject: { name: string }) {
+    return {
+      keepArabicScript: ocrLanguagesForSubject(subject.name) !== 'eng',
+    };
+  }
+
+  /**
+   * Rule merge (coverage-aware Paddle/Tesseract). Used as the sync baseline;
+   * English reading pages also get AI/vision fill via finalizeChapterPageOcrMerge.
+   */
   private ruleMergeChapterPageOcr(
     paddle: string,
     tesseract: string,
     orientOcrText: string,
     subject: { name: string },
   ): { text: string; merged: string } {
+    const filterOpts = this.assemblyFilterOptions(subject);
     const mergedRaw = mergePaddleAndTesseractPageOcr(paddle, tesseract);
-    let merged = filterPageTextForLessonAssembly(mergedRaw);
+    let merged = filterPageTextForLessonAssembly(mergedRaw, filterOpts);
     if (looksLikeGarbledLatinOcr(merged)) {
       const paddleClean = (paddle ?? '').trim();
       const tessClean = (tesseract ?? '').trim();
@@ -731,7 +744,7 @@ export class LessonsService {
         looksLikeGarbledLatinOcr(tessClean) ? '' : tessClean,
       );
       if (fallback.trim()) {
-        merged = filterPageTextForLessonAssembly(fallback);
+        merged = filterPageTextForLessonAssembly(fallback, filterOpts);
       }
     }
     const englishPrimary = ocrLanguagesForSubject(subject.name) === 'eng';
@@ -740,17 +753,106 @@ export class LessonsService {
     const lessonSource = englishPrimary
       ? preferEnglishLessonPageTranscript(merged, orientHint)
       : pickBetterPageTranscript(merged, orientHint);
-    const text = filterPageTextForLessonAssembly(lessonSource);
+    const text = filterPageTextForLessonAssembly(lessonSource, filterOpts);
     if (text.trim() || merged.trim()) {
       return { text, merged };
     }
     if (isPagePhotoTextReadable(orientOcrText)) {
       return {
-        text: filterPageTextForLessonAssembly(orientOcrText),
+        text: filterPageTextForLessonAssembly(orientOcrText, filterOpts),
         merged,
       };
     }
     return { text: '', merged };
+  }
+
+  /**
+   * Portal upload finalize: coverage-aware rule merge, then AI merge (and vision
+   * fill when English reading OCR is still incomplete). Same path for append/replace/refresh.
+   */
+  private async finalizeChapterPageOcrMerge(
+    paddle: string,
+    tesseract: string,
+    orientOcrText: string,
+    subject: { name: string },
+    options?: {
+      visionFile?: Express.Multer.File;
+      gradeName?: string;
+      schoolId?: string;
+      userId?: string;
+    },
+  ): Promise<{ text: string; merged: string; usedAi: boolean }> {
+    const filterOpts = this.assemblyFilterOptions(subject);
+    const englishPrimary = ocrLanguagesForSubject(subject.name) === 'eng';
+    const rule = this.ruleMergeChapterPageOcr(paddle, tesseract, orientOcrText, subject);
+
+    const wantsAiFill =
+      englishPrimary &&
+      (looksLikePoemOrReadingPage(paddle) ||
+        looksLikePoemOrReadingPage(tesseract) ||
+        looksLikePoemOrReadingPage(rule.merged) ||
+        englishPageTranscriptLooksIncomplete(rule.merged) ||
+        englishPageTranscriptLooksIncomplete(rule.text));
+
+    let visionText = '';
+    if (
+      wantsAiFill &&
+      options?.visionFile &&
+      options.gradeName &&
+      options.schoolId &&
+      options.userId &&
+      this.visionAvailable() &&
+      (englishPageTranscriptLooksIncomplete(rule.merged) ||
+        englishPageTranscriptLooksIncomplete(rule.text) ||
+        pageTextNeedsVisionRetry(rule.merged))
+    ) {
+      try {
+        visionText = (
+          await this.transcribeTextbookPhoto(
+            options.visionFile,
+            subject,
+            { name: options.gradeName },
+            options.schoolId,
+            options.userId,
+            { visionFile: options.visionFile },
+          )
+        ).trim();
+      } catch (error) {
+        this.logger.warn(
+          `Vision fill for OCR merge skipped: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+
+    const skipAi = readEnv('OCR_AI_MERGE') === '0' || !wantsAiFill;
+    const { merged: aiMerged, usedAi } = await intelligentMergePageOcrTranscripts({
+      paddle,
+      tesseract,
+      orientHint: looksLikeGarbledLatinOcr(orientOcrText) ? '' : orientOcrText,
+      visionText: visionText || undefined,
+      subjectName: subject.name,
+      skipAi,
+    });
+
+    let merged = filterPageTextForLessonAssembly(aiMerged || rule.merged, filterOpts);
+    if (!merged.trim()) merged = rule.merged;
+    if (visionText) {
+      merged = mergeEnglishPageVisionWithOcr(visionText, merged);
+      merged = filterPageTextForLessonAssembly(merged, filterOpts);
+    }
+
+    const orientHint =
+      looksLikeGarbledLatinOcr(orientOcrText) ? '' : (orientOcrText ?? '').trim();
+    const lessonSource = englishPrimary
+      ? preferEnglishLessonPageTranscript(merged, orientHint)
+      : pickBetterPageTranscript(merged, orientHint);
+    const text = filterPageTextForLessonAssembly(lessonSource, filterOpts);
+    if (text.trim() || merged.trim()) {
+      return { text: text || merged, merged, usedAi: usedAi || Boolean(visionText) };
+    }
+    return { text: rule.text, merged: rule.merged, usedAi: false };
   }
 
   private async persistChapterPageEngineOcr(
@@ -761,19 +863,26 @@ export class LessonsService {
     subject: { name: string },
     uploadId?: string,
     lessonId?: string,
+    finalizeOpts?: {
+      visionFile?: Express.Multer.File;
+      gradeName?: string;
+      schoolId?: string;
+      userId?: string;
+    },
   ): Promise<void> {
     if (uploadId && lessonId) {
       this.patchOcrUploadProgress(uploadId, lessonId, {
         phase: 'merging',
         merge: 'running',
-        message: 'Merging PaddleOCR and Tesseract (no AI)…',
+        message: 'Merging PaddleOCR and Tesseract (AI fill when needed)…',
       });
     }
-    const { text, merged } = this.ruleMergeChapterPageOcr(
+    const { text, merged, usedAi } = await this.finalizeChapterPageOcrMerge(
       paddle,
       tesseract,
       orientOcrText,
       subject,
+      finalizeOpts,
     );
     await this.prisma.lessonSource.update({
       where: { id: sourceId },
@@ -785,7 +894,9 @@ export class LessonsService {
     if (uploadId && lessonId) {
       this.patchOcrUploadProgress(uploadId, lessonId, {
         merge: 'done',
-        message: 'Merge complete. Page text saved.',
+        message: usedAi
+          ? 'AI-assisted merge complete. Page text saved.'
+          : 'Merge complete. Page text saved.',
       });
     }
   }
@@ -811,11 +922,17 @@ export class LessonsService {
       [orient.ocrFile],
       { subjectName: subject.name },
     );
-    const { text, merged } = this.ruleMergeChapterPageOcr(
+    const { text, merged } = await this.finalizeChapterPageOcrMerge(
       paddle,
       tesseract,
       orient.ocrText,
       subject,
+      {
+        visionFile: orient.visionFile,
+        gradeName: grade.name,
+        schoolId,
+        userId,
+      },
     );
     return {
       text,
@@ -1344,6 +1461,12 @@ export class LessonsService {
             lesson.subject,
             uploadId,
             id,
+            {
+              visionFile: orient.visionFile,
+              gradeName: grade.name,
+              schoolId,
+              userId: user.id,
+            },
           ),
         );
       }
@@ -1406,6 +1529,13 @@ export class LessonsService {
     if (!source) {
       throw new NotFoundException({ code: 'PAGE_NOT_FOUND', message: 'Page photo not found' });
     }
+    const grade = await this.prisma.grade.findUnique({ where: { id: lesson.gradeId } });
+    if (!grade) {
+      throw new BadRequestException({
+        code: 'CLASS_NOT_FOUND',
+        message: 'Grade was not found for this chapter',
+      });
+    }
     if (uploadId) {
       this.ocrProgress.start(uploadId, lessonId, file.originalname);
     }
@@ -1461,11 +1591,17 @@ export class LessonsService {
         },
       },
     );
-    const { text, merged } = this.ruleMergeChapterPageOcr(
+    const { text, merged } = await this.finalizeChapterPageOcrMerge(
       paddle,
       tesseract,
       orient.ocrText,
       lesson.subject,
+      {
+        visionFile: orient.visionFile,
+        gradeName: grade.name,
+        schoolId: lesson.schoolId,
+        userId: user.id,
+      },
     );
     const asset = await this.filesService.saveSchoolUpload(
       lesson.schoolId,
@@ -1572,6 +1708,12 @@ export class LessonsService {
       lesson.subject,
       uploadId,
       lessonId,
+      {
+        visionFile: orient.visionFile,
+        gradeName: grade.name,
+        schoolId: lesson.schoolId,
+        userId: user.id,
+      },
     );
 
     await this.prisma.dailyLesson.update({

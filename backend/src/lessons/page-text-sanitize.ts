@@ -390,9 +390,13 @@ export function pickBetterPageTranscript(a: string, b: string): string {
 }
 
 /** Drop sidebar / mirrored OCR paragraphs before assembly or compile. */
-export function filterPageTextForLessonAssembly(text: string): string {
+export function filterPageTextForLessonAssembly(
+  text: string,
+  options?: { keepArabicScript?: boolean },
+): string {
   const value = (text ?? '').trim();
   if (!value) return '';
+  const keepArabic = options?.keepArabicScript === true;
 
   // Poem / dialogue / exercise pages: keep full OCR. Block filtering was deleting
   // stanzas (King Bruce) and exercise tables (Dignity of Work).
@@ -424,7 +428,7 @@ export function filterPageTextForLessonAssembly(text: string): string {
     return keptLines.join('\n').trim();
   }
 
-  const english = englishOnlyFromMixedOcr(value);
+  const english = englishOnlyFromMixedOcr(value, { keepArabicScript: keepArabic });
   if (english.trim().length >= 80) {
     return english.trim();
   }
