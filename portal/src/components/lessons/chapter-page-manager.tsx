@@ -955,7 +955,7 @@ export function ChapterPageManager({
                           size="sm"
                           variant="outline"
                           className="h-8 shrink-0 gap-1.5"
-                          disabled={orientationBusy || item.status === "uploading"}
+                          disabled={orientationBusy}
                           onClick={() => void rotateQueueItem(item.id, 90)}
                         >
                           <RotateCw className="h-3.5 w-3.5" aria-hidden />
