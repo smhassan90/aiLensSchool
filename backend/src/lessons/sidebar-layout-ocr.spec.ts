@@ -71,6 +71,11 @@ describe('stripInterleavedWeblinkSidebar', () => {
     expect(cleaned).not.toMatch(/Encourage students to/i);
     expect(cleaned).not.toMatch(/ab channel/i);
     expect(cleaned).not.toMatch(/b_channel/i);
+    expect(cleaned).not.toMatch(/Waves Ripple/i);
+    expect(cleaned).not.toMatch(/Tank Interference/i);
+    expect(cleaned).not.toMatch(/^and Wavelength$/im);
+    expect(cleaned).not.toMatch(/Waves-Frequency/i);
+    expect(cleaned).not.toMatch(/watch\?v/i);
   });
 
   it('does not strip Dignity of Work literary pages', () => {
@@ -92,6 +97,9 @@ describe('lineLooksLikeWeblinkSidebar', () => {
     expect(lineLooksLikeWeblinkSidebar('Encourage students to')).toBe(true);
     expect(lineLooksLikeWeblinkSidebar('https://www.youtube.com/')).toBe(true);
     expect(lineLooksLikeWeblinkSidebar('watch?v=4ytXp1jNBn8&a')).toBe(true);
+    expect(lineLooksLikeWeblinkSidebar('watch?v-0c0gvy OOKc&')).toBe(true);
+    expect(lineLooksLikeWeblinkSidebar('Waves Ripple')).toBe(true);
+    expect(lineLooksLikeWeblinkSidebar('Tank Interference')).toBe(true);
     expect(lineLooksLikeWeblinkSidebar('Step 2: Write down the formula')).toBe(false);
   });
 });

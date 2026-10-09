@@ -14,7 +14,8 @@ _ENGINE = None
 
 WEBLINK_RE = re.compile(
     r"weblinks?|encourage students to(?:\s*visit)?|visit below link|youtube\.com|youtu\.be|"
-    r"https?://|watch\?v=|[ab]+[_\s-]?channel|_channel",
+    r"https?://|watch\?v[=-]|[ab]+[_\s-]?channel|_channel|"
+    r"^(?:Waves[\s-].{0,40}|Tank Interference|and Wavelength|launchSCIEN\w*)$",
     re.I,
 )
 
@@ -130,8 +131,13 @@ def pick_main_column(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
             best_gap = gap
             split_at = (mids[i] + mids[i - 1]) / 2.0
 
-    if best_gap < page_width * 0.12 or split_at < 0:
-        return sorted(lines, key=lambda r: (r["y0"], r["x0"]))
+    weblink_count = sum(1 for r in lines if WEBLINK_RE.search(r.get("text") or ""))
+    gap_ok = best_gap >= page_width * 0.08 and split_at >= 0
+    if not gap_ok:
+        if weblink_count < 2:
+            return sorted(lines, key=lambda r: (r["y0"], r["x0"]))
+        # Typical textbook left rail when OCR midpoints do not show a wide gutter
+        split_at = page_left + page_width * 0.34
 
     left = [r for r in lines if (r["x0"] + r["x1"]) / 2.0 < split_at]
     right = [r for r in lines if (r["x0"] + r["x1"]) / 2.0 >= split_at]
@@ -146,13 +152,13 @@ def pick_main_column(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
     right_body = _body_chars(right)
 
     main = None
-    if left_w <= page_width * 0.42 and left_web >= 0.28 and right_body > left_body:
+    if left_w <= page_width * 0.48 and left_web >= 0.22 and right_body > left_body:
         main = right
-    elif right_w <= page_width * 0.42 and right_web >= 0.28 and left_body > right_body:
+    elif right_w <= page_width * 0.48 and right_web >= 0.22 and left_body > right_body:
         main = left
-    elif left_web >= 0.4 and right_web < 0.15 and right_body >= left_body:
+    elif left_web >= 0.32 and right_web < 0.18 and right_body >= left_body:
         main = right
-    elif right_web >= 0.4 and left_web < 0.15 and left_body >= right_body:
+    elif right_web >= 0.32 and left_web < 0.18 and left_body >= right_body:
         main = left
 
     chosen = main if main and len(main) >= 4 else lines

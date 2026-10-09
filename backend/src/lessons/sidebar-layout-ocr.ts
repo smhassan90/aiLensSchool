@@ -4,7 +4,7 @@
  */
 
 const WEBLINK_LINE =
-  /\bweblinks?\b|encourage students to(?:\s*visit)?|visit below link|youtube\.com|youtu\.be|https?:\/\/|watch\?v=|[ab]+[_\s-]?channel|_channel/i;
+  /\bweblinks?\b|encourage students to(?:\s*visit)?|visit below link|youtube\.com|youtu\.be|https?:\/\/|watch\?v[=-]|[ab]+[_\s-]?channel|_channel/i;
 
 const SCIENCE_BODY_CUE =
   /\b(?:step\s*\d|result\s*=|self[- ]?assessment|wavelength|frequency|amplitude|ripple\s*tank|displacement|wave\s*speed|formula|calculate|hz\b|m\/s)\b|[λμνπωΔ]|v\s*=\s*f|[∪∩∈∅]/i;
@@ -21,6 +21,12 @@ export function lineLooksLikeWeblinkSidebar(line: string): boolean {
     return true;
   }
   if (/^[a-z]+SCIEN/i.test(trimmed) || /^CE\s*$/i.test(trimmed)) return true;
+  // Orphan YouTube/sidebar titles left after URL lines are removed
+  if (
+    /^(Waves[\s-].{0,40}|Tank Interference|and Wavelength|launchSCIEN\w*)$/i.test(trimmed)
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -96,8 +102,14 @@ export function pickMainColumnLines(lines: OcrBoxLine[]): OcrBoxLine[] | null {
       splitAt = (sortedMids[i] + sortedMids[i - 1]) / 2;
     }
   }
-  // Need a clear vertical gutter (~12% of page width)
-  if (bestGap < pageWidth * 0.12 || splitAt < 0) return null;
+  // Prefer a clear gutter; if weak, still try a left-sidebar cut when weblinks cluster left.
+  const weblinkCount = lines.filter((l) => lineLooksLikeWeblinkSidebar(l.text)).length;
+  const gapOk = bestGap >= pageWidth * 0.08 && splitAt >= 0;
+  if (!gapOk) {
+    if (weblinkCount < 2) return null;
+    // Typical textbook left rail (~28–38% of page)
+    splitAt = pageLeft + pageWidth * 0.34;
+  }
 
   const left = lines.filter((l) => (l.x0 + l.x1) / 2 < splitAt);
   const right = lines.filter((l) => (l.x0 + l.x1) / 2 >= splitAt);
@@ -125,13 +137,13 @@ export function pickMainColumnLines(lines: OcrBoxLine[]): OcrBoxLine[] | null {
 
   let main: OcrBoxLine[] | null = null;
   // Narrow left sidebar of weblinks → keep right body
-  if (leftW <= pageWidth * 0.42 && leftWeb >= 0.28 && bodyChars(right) > bodyChars(left)) {
+  if (leftW <= pageWidth * 0.48 && leftWeb >= 0.22 && bodyChars(right) > bodyChars(left)) {
     main = right;
-  } else if (rightW <= pageWidth * 0.42 && rightWeb >= 0.28 && bodyChars(left) > bodyChars(right)) {
+  } else if (rightW <= pageWidth * 0.48 && rightWeb >= 0.22 && bodyChars(left) > bodyChars(right)) {
     main = left;
-  } else if (leftWeb >= 0.4 && rightWeb < 0.15 && bodyChars(right) >= bodyChars(left)) {
+  } else if (leftWeb >= 0.32 && rightWeb < 0.18 && bodyChars(right) >= bodyChars(left)) {
     main = right;
-  } else if (rightWeb >= 0.4 && leftWeb < 0.15 && bodyChars(left) >= bodyChars(right)) {
+  } else if (rightWeb >= 0.32 && leftWeb < 0.18 && bodyChars(left) >= bodyChars(right)) {
     main = left;
   }
 
