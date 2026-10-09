@@ -54,23 +54,26 @@ jobs:
         run: |
           set -euo pipefail
           echo "GET ${WEBHOOK_HEALTH_URL}"
-          webhook_code="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 "${WEBHOOK_HEALTH_URL}" 2>/dev/null || true)"
-          webhook_code="${webhook_code:-000}"
-          echo "Webhook health HTTP ${webhook_code}"
+          webhook_code="000"
+          for attempt in $(seq 1 8); do
+            webhook_code="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 25 "${WEBHOOK_HEALTH_URL}" 2>/dev/null || true)"
+            webhook_code="${webhook_code:-000}"
+            echo "Webhook health HTTP ${webhook_code} (attempt ${attempt}/8)"
+            if [ "${webhook_code}" = "200" ]; then
+              break
+            fi
+            sleep 10
+          done
           echo "code=${webhook_code}" >> "$GITHUB_OUTPUT"
           if [ "${webhook_code}" = "200" ]; then
             echo "healthy=true" >> "$GITHUB_OUTPUT"
           else
             echo "healthy=false" >> "$GITHUB_OUTPUT"
-            if [ "${webhook_code}" = "000" ] || [ "${webhook_code}" = "000000" ]; then
-              echo "HTTP 000 = VPS ports 80/443 are not reachable from GitHub (Hostinger firewall)."
-              echo "Will fall back to SSH deploy on port 22 when HAWKNEXA_VPS_SSH_KEY is configured."
-            else
-              echo "Webhook unhealthy; will try SSH deploy fallback."
-            fi
+            echo "Health check failed after retries; will try POST /internal/deploy before SSH (port 22 is often blocked from GitHub runners)."
           fi
 
       - name: Trigger deploy on VPS (webhook)
+        id: webhook_deploy
         if: steps.webhook.outputs.healthy == 'true'
         env:
           DEPLOY_URL: ${{ vars.HAWKNEXA_DEPLOY_URL || 'https://hawknexabackend.fynals.com/internal/deploy' }}
@@ -121,9 +124,51 @@ jobs:
             echo "::error::Could not trigger deploy after retries (last HTTP ${http_code})."
             exit 1
           fi
+          echo "triggered=true" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger deploy on VPS (webhook retry when health failed)
+        id: webhook_deploy_retry
+        if: steps.webhook.outputs.healthy != 'true'
+        env:
+          DEPLOY_URL: ${{ vars.HAWKNEXA_DEPLOY_URL || 'https://hawknexabackend.fynals.com/internal/deploy' }}
+          DEPLOY_SECRET: ${{ env.DEPLOY_SECRET }}
+          BUILD_BACKEND: ${{ steps.changes.outputs.backend }}
+          BUILD_PORTAL: ${{ steps.changes.outputs.portal }}
+        run: |
+          set -euo pipefail
+          TARGETS=""
+          if [ "${BUILD_BACKEND}" = "true" ]; then TARGETS="backend"; fi
+          if [ "${BUILD_PORTAL}" = "true" ]; then
+            if [ -n "${TARGETS}" ]; then TARGETS="${TARGETS},portal"; else TARGETS="portal"; fi
+          fi
+          BODY="{}"
+          if [ -n "${TARGETS}" ]; then BODY="{\"targets\":\"${TARGETS}\"}"; fi
+          http_code="000"
+          for attempt in $(seq 1 12); do
+            http_code=$(curl -sS -o deploy-response-retry.txt -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer ${DEPLOY_SECRET}" \
+              -H "Content-Type: application/json" \
+              -d "${BODY}" \
+              --max-time 60 \
+              "${DEPLOY_URL}" 2>/dev/null || echo "000")
+            echo "POST ${DEPLOY_URL} HTTP ${http_code} (attempt ${attempt}/12)"
+            cat deploy-response-retry.txt 2>/dev/null || true
+            if [ "${http_code}" = "202" ] || [ "${http_code}" = "200" ]; then
+              echo "triggered=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "${http_code}" = "409" ]; then
+              sleep 30
+              continue
+            fi
+            sleep 10
+          done
+          echo "triggered=false" >> "$GITHUB_OUTPUT"
+          echo "Webhook POST did not succeed (last HTTP ${http_code})."
 
       - name: Deploy on VPS over SSH (webhook blocked)
-        if: steps.webhook.outputs.healthy != 'true'
+        if: steps.webhook.outputs.healthy != 'true' && steps.webhook_deploy_retry.outputs.triggered != 'true'
         env:
           SSH_KEY: ${{ secrets.HAWKNEXA_VPS_SSH_KEY }}
           BUILD_BACKEND: ${{ steps.changes.outputs.backend }}
@@ -147,11 +192,14 @@ jobs:
           SSH_USER="${{ vars.HAWKNEXA_VPS_USER || 'root' }}"
           ssh-keyscan -H "${SSH_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
           echo "SSH deploy to ${SSH_USER}@${SSH_HOST} (targets=${TARGETS:-all})"
-          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" \
-            "DEPLOY_TARGETS='${TARGETS}' bash /opt/apps/hawknexa/deploy/deploy.sh"
+          if ! ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=25 "${SSH_USER}@${SSH_HOST}" \
+            "DEPLOY_TARGETS='${TARGETS}' bash /opt/apps/hawknexa/deploy/deploy.sh"; then
+            echo "::error::SSH deploy failed (port 22 often blocked from GitHub). Open HTTPS to the deploy webhook or allow SSH from GitHub IPs."
+            exit 1
+          fi
 
       - name: Wait for VPS deploy to finish (webhook)
-        if: steps.webhook.outputs.healthy == 'true'
+        if: steps.webhook.outputs.healthy == 'true' || steps.webhook_deploy_retry.outputs.triggered == 'true'
         env:
           STATUS_URL: ${{ vars.HAWKNEXA_DEPLOY_STATUS_URL || 'https://hawknexabackend.fynals.com/internal/deploy/status' }}
           HEALTH_URL: ${{ vars.HAWKNEXA_HEALTH_URL || 'https://hawknexabackend.fynals.com/api/v1/health' }}
@@ -193,7 +241,7 @@ jobs:
           exit 1
 
       - name: Verify VPS deploy over SSH
-        if: steps.webhook.outputs.healthy != 'true'
+        if: steps.webhook.outputs.healthy != 'true' && steps.webhook_deploy_retry.outputs.triggered != 'true'
         env:
           SSH_KEY: ${{ secrets.HAWKNEXA_VPS_SSH_KEY }}
           EXPECTED_SHA: ${{ github.sha }}
