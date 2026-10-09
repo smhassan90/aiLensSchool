@@ -324,9 +324,6 @@ export function scorePageOcrCandidate(
 ): number {
   const value = (text ?? '').trim();
   if (!value) return 0;
-  if (looksLikeGarbledLatinOcr(value)) {
-    return Math.max(0, Math.floor(scorePageOcrQuality(value) / 6));
-  }
   const quality = scorePageOcrQuality(value);
   const readable = isPagePhotoTextReadable(value) && !englishPageTranscriptLooksIncomplete(value);
   const englishPrimary = options?.englishPrimary === true;
@@ -347,6 +344,8 @@ export function scorePageOcrCandidate(
   if (/note for teach/i.test(value) && (value.match(/[|£€©®@#\\]/g) ?? []).length >= 3) {
     layoutPenalty += 80;
   }
+  // Soft penalty only — hard crush made every textbook page look equally bad.
+  if (looksLikeGarbledLatinOcr(value)) layoutPenalty += 90;
   return (
     quality * 2 +
     Math.min(140, Math.floor(value.length / 7)) +

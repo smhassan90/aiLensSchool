@@ -689,16 +689,17 @@ export class LessonsService {
         message: this.unclearPagePhotoMessage(file.originalname),
       });
     }
-    if (looksLikeGarbledLatinOcr(best.ocrText) && bestNonGarbled?.ocrText?.trim()) {
+    // Prefer a cleaner rotation when available, but never hard-reject here —
+    // textbook OCR is often noisy yet still produces a usable lesson (~90%).
+    if (
+      looksLikeGarbledLatinOcr(best.ocrText) &&
+      bestNonGarbled?.ocrText?.trim() &&
+      bestNonGarbled.degrees !== best.degrees
+    ) {
       this.logger.warn(
-        `Page orientation: rejected garbled ${best.degrees}° OCR; using ${bestNonGarbled.degrees}° for ${file.originalname ?? 'photo'}`,
+        `Page orientation: preferring less-noisy ${bestNonGarbled.degrees}° over ${best.degrees}° for ${file.originalname ?? 'photo'}`,
       );
       best = bestNonGarbled;
-    } else if (looksLikeGarbledLatinOcr(best.ocrText)) {
-      throw new BadRequestException({
-        code: 'PAGE_PHOTO_UNCLEAR',
-        message: this.unclearPagePhotoMessage(file.originalname),
-      });
     }
     if (best.degrees !== 0) {
       this.logger.log(
