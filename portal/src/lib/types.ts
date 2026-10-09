@@ -363,6 +363,8 @@ export interface Lesson {
   concepts?: Array<{ id: string; name: string }>;
   sources?: Array<{ ocrText?: string | null; manualText?: string | null }>;
   pageSources?: LessonPageSource[];
+  /** Reading lesson from merged per-page OCR (exercises excluded). */
+  chapterLessonText?: string;
   section?: { id: string; name: string; grade?: { id: string; name: string } | null };
   subject?: { id: string; name: string };
   grade?: { id: string; name: string };

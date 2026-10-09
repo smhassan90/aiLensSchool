@@ -75,7 +75,10 @@ import {
   looksLikeMangledRtlOcr,
   looksLikeRealLessonText,
 } from '../common/extract-quality';
-import { mergePaddleAndTesseractPageOcr } from './merge-paddle-tesseract-ocr';
+import {
+  assembleChapterLessonFromPageTexts,
+  intelligentMergePageOcrTranscripts,
+} from './merge-page-ocr-with-ai';
 import { ocrLanguagesForSubject } from './page-ocr.service';
 import { isServerlessRuntime, readEnv } from '../common/env';
 import { FilesService } from '../files/files.service';
@@ -355,6 +358,21 @@ export class LessonsService {
       chapterCompiledExercises: compiledParts?.exercises,
       extractedText: compiledFull || draftText || pageText,
       pageSources: sources ? this.mapPageSources(sources) : [],
+      chapterLessonText: sources
+        ? assembleChapterLessonFromPageTexts(
+            sources
+              .filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE)
+              .sort((a, b) => (a.pageFrom ?? 0) - (b.pageFrom ?? 0))
+              .map((s) => {
+                const row = s as {
+                  mergedOcrText?: string | null;
+                  ocrText?: string | null;
+                };
+                return (row.mergedOcrText?.trim() || row.ocrText?.trim() || '').trim();
+              })
+              .filter(Boolean),
+          )
+        : '',
     };
   }
 
@@ -648,8 +666,6 @@ export class LessonsService {
     schoolId: string,
     userId: string,
   ): Promise<{ text: string; merged: string }> {
-    const mergedRaw = mergePaddleAndTesseractPageOcr(paddle, tesseract);
-    const merged = filterPageTextForLessonAssembly(mergedRaw);
     const englishPrimary = ocrLanguagesForSubject(subject.name) === 'eng';
     try {
       const visionText = await this.transcribeTextbookPhoto(
@@ -660,13 +676,32 @@ export class LessonsService {
         userId,
         { visionFile: orient.visionFile },
       );
+      const { merged } = await intelligentMergePageOcrTranscripts({
+        paddle,
+        tesseract,
+        orientHint: orient.ocrText,
+        visionText,
+        subjectName: subject.name,
+      });
       const lessonText = englishPrimary
         ? preferEnglishLessonPageTranscript(visionText, orient.ocrText)
         : pickBetterPageTranscript(visionText, orient.ocrText);
-      return { text: filterPageTextForLessonAssembly(lessonText), merged };
+      return {
+        text: filterPageTextForLessonAssembly(lessonText),
+        merged: filterPageTextForLessonAssembly(merged),
+      };
     } catch (error) {
+      const { merged } = await intelligentMergePageOcrTranscripts({
+        paddle,
+        tesseract,
+        orientHint: orient.ocrText,
+        subjectName: subject.name,
+      });
       if (isPagePhotoTextReadable(orient.ocrText)) {
-        return { text: filterPageTextForLessonAssembly(orient.ocrText), merged };
+        return {
+          text: filterPageTextForLessonAssembly(orient.ocrText),
+          merged: filterPageTextForLessonAssembly(merged),
+        };
       }
       throw error;
     }
