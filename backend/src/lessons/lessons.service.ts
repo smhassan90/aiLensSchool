@@ -794,9 +794,11 @@ export class LessonsService {
         englishPageTranscriptLooksIncomplete(rule.merged) ||
         englishPageTranscriptLooksIncomplete(rule.text));
 
+    // Vision on every page is slow; default off. Set OCR_MERGE_VISION=1 to enable.
     let visionText = '';
     if (
       wantsAiFill &&
+      readEnv('OCR_MERGE_VISION') === '1' &&
       options?.visionFile &&
       options.gradeName &&
       options.schoolId &&
