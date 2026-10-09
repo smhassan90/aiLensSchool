@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { LessonsService } from './lessons.service';
 import { LessonsController } from './lessons.controller';
 import { PageOcrService } from './page-ocr.service';
+import { OcrUploadProgressService } from './ocr-upload-progress.service';
 import { CommonModule } from '../common/common.module';
 import { AuditModule } from '../audit/audit.module';
 import { AiModule } from '../ai/ai.module';
@@ -12,7 +13,7 @@ import { DocumentsModule } from '../documents/documents.module';
 
 @Module({
   imports: [CommonModule, AuditModule, AiModule, ParentsModule, FilesModule, HomeworkModule, DocumentsModule],
-  providers: [LessonsService, PageOcrService],
+  providers: [LessonsService, PageOcrService, OcrUploadProgressService],
   controllers: [LessonsController],
   exports: [LessonsService],
 })

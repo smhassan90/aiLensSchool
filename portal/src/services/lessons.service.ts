@@ -185,21 +185,32 @@ export const lessonsService = {
     });
   },
 
-  appendChapterPhotos(lessonId: string, pages: File[]) {
+  appendChapterPhotos(lessonId: string, pages: File[], uploadId?: string) {
     const body = new FormData();
     for (const page of pages) {
       body.append("pages", page);
     }
-    return apiForm<Lesson>(`/lessons/chapters/${lessonId}/append-photos`, body, "POST", {
-      timeoutMs: lessonExtractTimeoutMs(pages.length),
-    });
+    const query = uploadId ? `?uploadId=${encodeURIComponent(uploadId)}` : "";
+    return apiForm<Lesson>(
+      `/lessons/chapters/${lessonId}/append-photos${query}`,
+      body,
+      "POST",
+      { timeoutMs: lessonExtractTimeoutMs(pages.length) },
+    );
   },
 
-  replaceChapterPagePhoto(lessonId: string, sourceId: string, page: File) {
+  getChapterOcrUploadProgress(lessonId: string, uploadId: string) {
+    return apiClient<import("@/lib/ocr-upload-progress").OcrUploadProgressSnapshot>(
+      `/lessons/chapters/${lessonId}/ocr-upload-progress/${encodeURIComponent(uploadId)}`,
+    );
+  },
+
+  replaceChapterPagePhoto(lessonId: string, sourceId: string, page: File, uploadId?: string) {
     const body = new FormData();
     body.append("pages", page);
+    const query = uploadId ? `?uploadId=${encodeURIComponent(uploadId)}` : "";
     return apiForm<Lesson>(
-      `/lessons/chapters/${lessonId}/pages/${sourceId}/replace-photo`,
+      `/lessons/chapters/${lessonId}/pages/${sourceId}/replace-photo${query}`,
       body,
       "POST",
       { timeoutMs: lessonExtractTimeoutMs(1) },

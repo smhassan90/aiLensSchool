@@ -327,6 +327,9 @@ export interface LessonPageSource {
   /** Raw Tesseract output from DB. */
   tesseractOcrText?: string;
   mergedOcrText?: string;
+  ocrPaddleReady?: boolean;
+  ocrTesseractReady?: boolean;
+  ocrMergedReady?: boolean;
   /** 0–100 clarity score from OCR quality check. */
   textQualityPercent?: number;
   /** True when at least ~90% of page text read cleanly. */

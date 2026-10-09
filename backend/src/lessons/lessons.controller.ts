@@ -237,8 +237,18 @@ export class LessonsController {
     @Param('id') id: string,
     @UploadedFiles() files: Express.Multer.File[],
     @CurrentUser() user: AuthUser,
+    @Query('uploadId') uploadId?: string,
   ) {
-    return this.lessonsService.appendChapterPhotos(id, files ?? [], user);
+    return this.lessonsService.appendChapterPhotos(id, files ?? [], user, uploadId?.trim() || undefined);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Get('chapters/:id/ocr-upload-progress/:uploadId')
+  getChapterOcrUploadProgress(
+    @Param('uploadId') uploadId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.lessonsService.getOcrUploadProgress(uploadId, user);
   }
 
   @Roles(RoleName.TEACHER)
@@ -282,6 +292,7 @@ export class LessonsController {
     @Param('sourceId') sourceId: string,
     @UploadedFiles() files: Express.Multer.File[],
     @CurrentUser() user: AuthUser,
+    @Query('uploadId') uploadId?: string,
   ) {
     const file = files?.[0];
     if (!file) {
@@ -290,7 +301,13 @@ export class LessonsController {
         message: 'Choose a photo to upload',
       });
     }
-    return this.lessonsService.replaceChapterPagePhoto(id, sourceId, file, user);
+    return this.lessonsService.replaceChapterPagePhoto(
+      id,
+      sourceId,
+      file,
+      user,
+      uploadId?.trim() || undefined,
+    );
   }
 
   @Roles(RoleName.TEACHER)

@@ -4,12 +4,15 @@ import type { Lesson } from "@/lib/types";
 
 export type ChapterPageUploadStatus = "queued" | "uploading" | "failed";
 
+import type { OcrUploadProgressSnapshot } from "@/lib/ocr-upload-progress";
+
 export type ChapterPageUploadItem = {
   id: string;
   file: File;
   previewUrl: string;
   status: ChapterPageUploadStatus;
   error?: string;
+  ocrProgress?: OcrUploadProgressSnapshot | null;
 };
 
 export function createChapterPageUploadItems(files: File[]): ChapterPageUploadItem[] {
@@ -30,8 +33,9 @@ export function releaseChapterPageUploadPreviews(items: ChapterPageUploadItem[])
 export async function uploadSingleChapterPage(
   lessonId: string,
   file: File,
+  uploadId: string,
 ): Promise<Lesson> {
-  return lessonsService.appendChapterPhotos(lessonId, [file]);
+  return lessonsService.appendChapterPhotos(lessonId, [file], uploadId);
 }
 
 export function uploadErrorMessage(err: unknown): string {

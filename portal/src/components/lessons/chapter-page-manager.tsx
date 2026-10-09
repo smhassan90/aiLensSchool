@@ -42,6 +42,11 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  type OcrEngineStepStatus,
+  type OcrUploadProgressSnapshot,
+  ocrStepLabel,
+} from "@/lib/ocr-upload-progress";
 
 type PagePreviewEntry = {
   key: string;
@@ -70,6 +75,55 @@ function chapterPageOcrPreviewText(page: LessonPageSource, kind: OcrPreviewKind)
   if (kind === "paddle") return page.paddleOcrText?.trim() ?? "";
   if (kind === "tesseract") return page.tesseractOcrText?.trim() ?? "";
   return page.mergedOcrText?.trim() ?? page.fetchedText?.trim() ?? "";
+}
+
+function chapterPageEngineReady(page: LessonPageSource, kind: OcrPreviewKind): boolean {
+  if (kind === "paddle") return Boolean(page.ocrPaddleReady ?? page.paddleOcrText?.trim());
+  if (kind === "tesseract") return Boolean(page.ocrTesseractReady ?? page.tesseractOcrText?.trim());
+  return Boolean(page.ocrMergedReady ?? page.mergedOcrText?.trim() ?? page.fetchedText?.trim());
+}
+
+function OcrPipelineStatus({
+  progress,
+  compact,
+}: {
+  progress: OcrUploadProgressSnapshot;
+  compact?: boolean;
+}) {
+  const rows: Array<{ key: string; status: OcrEngineStepStatus }> = [
+    { key: "PaddleOCR", status: progress.paddle },
+    { key: "Tesseract", status: progress.tesseract },
+    { key: "Merge", status: progress.merge },
+  ];
+  return (
+    <div className={cn("space-y-1", compact ? "text-[11px]" : "text-xs")}>
+      <p className="font-medium text-foreground">{progress.message}</p>
+      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
+        {rows.map((row) => (
+          <li key={row.key} className="inline-flex items-center gap-1">
+            {row.status === "running" ? (
+              <Loader2 className="h-3 w-3 animate-spin text-primary" aria-hidden />
+            ) : null}
+            <span>{row.key}:</span>
+            <span className="text-foreground">{ocrStepLabel(row.status)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function startOcrProgressPolling(
+  lessonId: string,
+  uploadId: string,
+  onUpdate: (snap: OcrUploadProgressSnapshot) => void,
+) {
+  const timer = window.setInterval(() => {
+    void lessonsService.getChapterOcrUploadProgress(lessonId, uploadId).then(onUpdate).catch(() => {
+      /* ignore poll errors */
+    });
+  }, 450);
+  return () => window.clearInterval(timer);
 }
 
 export function ChapterPageManager({
@@ -103,6 +157,9 @@ export function ChapterPageManager({
   const orderSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [orderSaving, setOrderSaving] = useState(false);
   const [reuploadSourceId, setReuploadSourceId] = useState<string | null>(null);
+  const [reuploadOcrProgress, setReuploadOcrProgress] = useState<OcrUploadProgressSnapshot | null>(
+    null,
+  );
   const reuploadInputRef = useRef<HTMLInputElement>(null);
   type ReuploadTarget =
     | { kind: "saved"; sourceId: string }
@@ -153,8 +210,19 @@ export function ChapterPageManager({
       ),
     );
 
+    const uploadId =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `upload-${Date.now()}`;
+    const stopPoll = startOcrProgressPolling(lessonId, uploadId, (snap) => {
+      applyQueue((current) =>
+        current.map((item) =>
+          item.id === next.id ? { ...item, ocrProgress: snap } : item,
+        ),
+      );
+    });
     try {
-      const lesson = await uploadSingleChapterPage(lessonId, next.file);
+      const lesson = await uploadSingleChapterPage(lessonId, next.file, uploadId);
       URL.revokeObjectURL(next.previewUrl);
       applyQueue((current) => current.filter((item) => item.id !== next.id));
       invalidate();
@@ -172,6 +240,7 @@ export function ChapterPageManager({
         variant: "error",
       });
     } finally {
+      stopPoll();
       uploadRunning.current = false;
       if (uploadQueueRef.current.some((item) => item.status === "queued")) {
         void runNextUpload();
@@ -206,12 +275,19 @@ export function ChapterPageManager({
 
   const reuploadPage = async (sourceId: string, file: File) => {
     setReuploadSourceId(sourceId);
+    setReuploadOcrProgress(null);
+    const uploadId =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `reupload-${Date.now()}`;
+    const stopPoll = startOcrProgressPolling(lessonId, uploadId, setReuploadOcrProgress);
     try {
       const compressed = await compressPhotosForUpload([file]);
       const lesson = await lessonsService.replaceChapterPagePhoto(
         lessonId,
         sourceId,
         compressed[0] ?? file,
+        uploadId,
       );
       invalidate();
       onContentUpdated(lesson);
@@ -247,7 +323,9 @@ export function ChapterPageManager({
         variant: "error",
       });
     } finally {
+      stopPoll();
       setReuploadSourceId(null);
+      setReuploadOcrProgress(null);
       reuploadTargetRef.current = null;
     }
   };
@@ -435,6 +513,8 @@ export function ChapterPageManager({
                 const src = assetUrl(page.url);
                 const accepted = pageTextAccepted(page);
                 const reading = reuploadSourceId === page.id;
+                const liveOcr =
+                  reading && reuploadOcrProgress ? reuploadOcrProgress : null;
                 const quality = page.textQualityPercent;
                 return (
                   <li
@@ -491,6 +571,11 @@ export function ChapterPageManager({
                           </Badge>
                         )}
                       </div>
+                      {liveOcr ? (
+                        <div className="rounded-md border border-primary/20 bg-primary/5 p-2">
+                          <OcrPipelineStatus progress={liveOcr} compact />
+                        </div>
+                      ) : null}
                       <div className="flex flex-wrap gap-2">
                         {(
                           [
@@ -505,7 +590,9 @@ export function ChapterPageManager({
                             size="sm"
                             variant="outline"
                             className="h-8"
-                            disabled={reading || !accepted}
+                            disabled={
+                              reading || !chapterPageEngineReady(page, preview.key)
+                            }
                             onClick={() => {
                               const text = chapterPageOcrPreviewText(page, preview.key);
                               if (!text) {
@@ -623,7 +710,7 @@ export function ChapterPageManager({
                       {item.status === "uploading" ? (
                         <Badge variant="secondary" className="gap-1 border-primary/30 bg-primary/10 text-primary">
                           <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                          Reading text…
+                          OCR in progress…
                         </Badge>
                       ) : item.status === "failed" ? (
                         <>
@@ -635,6 +722,11 @@ export function ChapterPageManager({
                       )}
                       <span className="truncate text-muted-foreground">{item.file.name}</span>
                     </div>
+                    {item.ocrProgress ? (
+                      <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 p-2">
+                        <OcrPipelineStatus progress={item.ocrProgress} compact />
+                      </div>
+                    ) : null}
                     {item.error ? (
                       <p className="mt-1 line-clamp-2 text-xs text-destructive">{item.error}</p>
                     ) : null}

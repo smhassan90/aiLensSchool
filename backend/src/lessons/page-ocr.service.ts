@@ -276,18 +276,35 @@ export class PageOcrService implements OnModuleDestroy {
   /** Paddle and Tesseract on the same image in parallel (merge is separate). */
   async readPageOcrEnginesParallel(
     files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
-    options?: { subjectName?: string | null },
+    options?: {
+      subjectName?: string | null;
+      onEngineProgress?: (engine: 'paddle' | 'tesseract', status: 'running' | 'done' | 'skipped') => void;
+    },
   ): Promise<Array<{ paddle: string; tesseract: string }>> {
     if (isServerlessRuntime() || !files.length) {
       return files.map(() => ({ paddle: '', tesseract: '' }));
     }
     const mode = ocrEngineMode();
-    const [paddleTexts, tessTexts] = await Promise.all([
+    const onProg = options?.onEngineProgress;
+    const paddlePromise =
       mode === 'tesseract'
         ? Promise.resolve(files.map(() => ''))
-        : this.readWithPaddle(files, options),
-      this.readWithTesseract(files, options),
-    ]);
+        : (async () => {
+            onProg?.('paddle', 'running');
+            const rows = await this.readWithPaddle(files, { subjectName: options?.subjectName });
+            onProg?.('paddle', 'done');
+            return rows;
+          })();
+    const tessPromise = (async () => {
+      onProg?.('tesseract', 'running');
+      const rows = await this.readWithTesseract(files, { subjectName: options?.subjectName });
+      onProg?.('tesseract', 'done');
+      return rows;
+    })();
+    if (mode === 'tesseract') {
+      onProg?.('paddle', 'skipped');
+    }
+    const [paddleTexts, tessTexts] = await Promise.all([paddlePromise, tessPromise]);
     return files.map((_, index) => ({
       paddle: (paddleTexts[index] ?? '').trim(),
       tesseract: (tessTexts[index] ?? '').trim(),
