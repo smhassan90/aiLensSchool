@@ -289,6 +289,9 @@ export class LessonsService {
       type: LessonSourceType;
       pageFrom?: number | null;
       ocrText?: string | null;
+      paddleOcrText?: string | null;
+      tesseractOcrText?: string | null;
+      mergedOcrText?: string | null;
       fileAsset?: { url: string; originalFilename: string | null } | null;
     }>,
   ) {
@@ -300,12 +303,18 @@ export class LessonsService {
         const fetchedText = raw ? filterPageTextForLessonAssembly(raw) : '';
         const textForAcceptance = fetchedText.trim() || raw;
         const textQualityPercent = raw ? scorePageOcrQuality(raw) : 0;
+        const paddleRaw = s.paddleOcrText?.trim() ?? '';
+        const tessRaw = s.tesseractOcrText?.trim() ?? '';
+        const mergedRaw = s.mergedOcrText?.trim() ?? '';
         return {
           id: s.id,
           pageOrder: s.pageFrom ?? 0,
           url: s.fileAsset!.url,
           label: s.fileAsset!.originalFilename ?? 'Page photo',
           fetchedText,
+          paddleOcrText: paddleRaw ? filterPageTextForLessonAssembly(paddleRaw) : '',
+          tesseractOcrText: tessRaw ? filterPageTextForLessonAssembly(tessRaw) : '',
+          mergedOcrText: mergedRaw ? filterPageTextForLessonAssembly(mergedRaw) : '',
           textQualityPercent,
           textAccepted: Boolean(textForAcceptance) && isPagePhotoTextReadable(textForAcceptance),
         };
@@ -506,7 +515,11 @@ export class LessonsService {
     grade: { name: string },
     schoolId: string,
     userId: string,
-  ): Promise<{ text: string; readyFile: Express.Multer.File }> {
+  ): Promise<{
+    text: string;
+    readyFile: Express.Multer.File;
+    ocrEngines?: { paddle: string; tesseract: string; merged: string };
+  }> {
     const sharpModule = await import('sharp');
     const sharpFn =
       (sharpModule as unknown as { default?: (i: Buffer) => import('sharp').Sharp }).default ??
@@ -607,6 +620,9 @@ export class LessonsService {
         );
       }
       try {
+        const [ocrEngines] = await this.pageOcr.readPageOcrBreakdown([best.ocrFile], {
+          subjectName: subject.name,
+        });
         const text = await this.transcribeTextbookPhoto(
           best.ocrFile,
           subject,
@@ -621,12 +637,17 @@ export class LessonsService {
         return {
           text: filterPageTextForLessonAssembly(merged),
           readyFile: best.ocrFile,
+          ocrEngines,
         };
       } catch (error) {
         if (isPagePhotoTextReadable(best.ocrText)) {
+          const [ocrEngines] = await this.pageOcr.readPageOcrBreakdown([best.ocrFile], {
+            subjectName: subject.name,
+          });
           return {
             text: filterPageTextForLessonAssembly(best.ocrText),
             readyFile: best.ocrFile,
+            ocrEngines,
           };
         }
         lastError = error;
@@ -1003,11 +1024,14 @@ export class LessonsService {
         message: 'Grade was not found for this chapter',
       });
     }
-    const perPageTexts: string[] = [];
+    const perPageTexts: Array<{
+      text: string;
+      ocrEngines?: { paddle: string; tesseract: string; merged: string };
+    }> = [];
     const preparedFiles: Express.Multer.File[] = [];
     for (const file of files) {
       try {
-        const { text, readyFile } = await this.prepareAndTranscribePagePhoto(
+        const { text, readyFile, ocrEngines } = await this.prepareAndTranscribePagePhoto(
           file,
           lesson.subject,
           grade,
@@ -1015,7 +1039,7 @@ export class LessonsService {
           user.id,
         );
         preparedFiles.push(readyFile);
-        perPageTexts.push(text);
+        perPageTexts.push({ text, ocrEngines });
       } catch (error) {
         if (error instanceof BadRequestException) {
           throw error;
@@ -1036,13 +1060,18 @@ export class LessonsService {
     );
     await this.prisma.$transaction(async (tx) => {
       for (let index = 0; index < pageAssets.length; index++) {
+        const pageEntry = perPageTexts[index];
+        const engines = pageEntry?.ocrEngines;
         await tx.lessonSource.create({
           data: {
             lessonId: id,
             type: LessonSourceType.TEXTBOOK_IMAGE,
             fileAssetId: pageAssets[index].id,
             pageFrom: startPage + index,
-            ocrText: perPageTexts[index]?.trim() || null,
+            ocrText: pageEntry?.text?.trim() || null,
+            paddleOcrText: engines?.paddle?.trim() || null,
+            tesseractOcrText: engines?.tesseract?.trim() || null,
+            mergedOcrText: engines?.merged?.trim() || null,
           },
         });
       }
@@ -1084,7 +1113,7 @@ export class LessonsService {
         message: 'Grade was not found for this chapter',
       });
     }
-    const { text, readyFile } = await this.prepareAndTranscribePagePhoto(
+    const { text, readyFile, ocrEngines } = await this.prepareAndTranscribePagePhoto(
       file,
       lesson.subject,
       grade,
@@ -1103,6 +1132,9 @@ export class LessonsService {
         data: {
           fileAssetId: asset.id,
           ocrText: text.trim() || null,
+          paddleOcrText: ocrEngines?.paddle?.trim() || null,
+          tesseractOcrText: ocrEngines?.tesseract?.trim() || null,
+          mergedOcrText: ocrEngines?.merged?.trim() || null,
         },
       });
       await tx.dailyLesson.update({

@@ -97,6 +97,12 @@ export function preferOcrTranscript(paddleText: string, tesseractText: string): 
   return { text: better, engine: better === tess ? 'tesseract' : 'paddle' };
 }
 
+export type PageOcrEngineBreakdown = {
+  paddle: string;
+  tesseract: string;
+  merged: string;
+};
+
 @Injectable()
 export class PageOcrService implements OnModuleDestroy {
   private readonly logger = new Logger(PageOcrService.name);
@@ -262,6 +268,26 @@ export class PageOcrService implements OnModuleDestroy {
         );
       }
       return merged;
+    });
+  }
+
+  /** Paddle and Tesseract on the same image buffer (no pick-one). */
+  async readPageOcrBreakdown(
+    files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
+    options?: { subjectName?: string | null },
+  ): Promise<PageOcrEngineBreakdown[]> {
+    if (isServerlessRuntime() || !files.length) {
+      return files.map(() => ({ paddle: '', tesseract: '', merged: '' }));
+    }
+    const mode = ocrEngineMode();
+    const paddleTexts =
+      mode === 'tesseract' ? files.map(() => '') : await this.readWithPaddle(files, options);
+    const tessTexts = await this.readWithTesseract(files, options);
+    return files.map((_, index) => {
+      const paddle = (paddleTexts[index] ?? '').trim();
+      const tesseract = (tessTexts[index] ?? '').trim();
+      const merged = mergePaddleAndTesseractPageOcr(paddle, tesseract);
+      return { paddle, tesseract, merged };
     });
   }
 

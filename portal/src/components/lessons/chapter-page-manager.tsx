@@ -86,6 +86,7 @@ export function ChapterPageManager({
   const [pageTextView, setPageTextView] = useState<{
     pageNumber: number;
     label: string;
+    title: string;
     text: string;
   } | null>(null);
   const uploadQueueRef = useRef<ChapterPageUploadItem[]>([]);
@@ -483,31 +484,53 @@ export function ChapterPageManager({
                         )}
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-8"
-                          disabled={reading || !accepted}
-                          onClick={() => {
-                            const text = page.fetchedText?.trim() ?? "";
-                            if (!text) {
-                              toast({
-                                title: "No text for this page",
-                                description: "Re-upload a clearer photo of this page.",
-                                variant: "error",
+                        {(
+                          [
+                            {
+                              key: "paddle" as const,
+                              label: "Text from PaddleOCR",
+                              text: page.paddleOcrText?.trim() ?? "",
+                            },
+                            {
+                              key: "tesseract" as const,
+                              label: "Text from Tesseract",
+                              text: page.tesseractOcrText?.trim() ?? "",
+                            },
+                            {
+                              key: "merged" as const,
+                              label: "Merged text",
+                              text: page.mergedOcrText?.trim() ?? "",
+                            },
+                          ] as const
+                        ).map((preview) => (
+                          <Button
+                            key={preview.key}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8"
+                            disabled={reading || !accepted}
+                            onClick={() => {
+                              if (!preview.text) {
+                                toast({
+                                  title: "No OCR breakdown for this page",
+                                  description:
+                                    "Re-upload this page photo to capture Paddle, Tesseract, and merged text.",
+                                  variant: "error",
+                                });
+                                return;
+                              }
+                              setPageTextView({
+                                pageNumber: index + 1,
+                                label: page.label,
+                                title: preview.label,
+                                text: preview.text,
                               });
-                              return;
-                            }
-                            setPageTextView({
-                              pageNumber: index + 1,
-                              label: page.label,
-                              text,
-                            });
-                          }}
-                        >
-                          Preview text
-                        </Button>
+                            }}
+                          >
+                            {preview.label}
+                          </Button>
+                        ))}
                         {!accepted && !reading ? (
                           <Button
                             type="button"
@@ -737,7 +760,9 @@ export function ChapterPageManager({
           {pageTextView ? (
             <>
               <DialogHeader>
-                <DialogTitle>Page {pageTextView.pageNumber}</DialogTitle>
+                <DialogTitle>
+                  Page {pageTextView.pageNumber} — {pageTextView.title}
+                </DialogTitle>
                 <DialogDescription>{pageTextView.label}</DialogDescription>
               </DialogHeader>
               <Textarea

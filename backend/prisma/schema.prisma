@@ -1275,7 +1275,10 @@ model LessonSource {
   lessonId    String           @map("lesson_id")
   type        LessonSourceType
   fileAssetId String?          @map("file_asset_id")
-  ocrText     String?          @map("ocr_text") @db.LongText
+  ocrText          String?          @map("ocr_text") @db.LongText
+  paddleOcrText    String?          @map("paddle_ocr_text") @db.LongText
+  tesseractOcrText String?          @map("tesseract_ocr_text") @db.LongText
+  mergedOcrText    String?          @map("merged_ocr_text") @db.LongText
   pageFrom    Int?             @map("page_from")
   pageTo      Int?             @map("page_to")
   manualText  String?          @map("manual_text") @db.Text
