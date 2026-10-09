@@ -5,6 +5,7 @@ import { AiWait } from "@/components/layout/ai-wait";
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -60,6 +61,7 @@ type GenerateForm = z.infer<typeof generateSchema>;
 
 export default function TeacherQuizzesPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -128,11 +130,17 @@ export default function TeacherQuizzesPage() {
       });
     },
     onSuccess: (quiz) => {
+      const quizId = quiz?.id?.trim();
+      if (quizId) {
+        queryClient.setQueryData(["quiz", quizId], quiz);
+      }
       toast({ title: "Quiz generated", description: "Review questions before publishing.", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["teacher-quizzes"] });
       setDialogOpen(false);
       reset();
-      window.location.href = `/teacher/quizzes/${quiz.id}`;
+      if (quizId) {
+        router.replace(`/teacher/quizzes/${quizId}`);
+      }
     },
     onError: (err) => {
       toast({

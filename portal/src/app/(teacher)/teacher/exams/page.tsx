@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ExamDeadlineRequestDialog } from "@/components/exams/exam-deadline-request-dialog";
 import type { TeacherExamAssignment } from "@/components/exams/teacher-exam-assignments";
 import { useForm } from "react-hook-form";
@@ -17,6 +18,7 @@ import { quizzesService } from "@/services/quizzes.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { buildQuestionSpecForMarks, defaultQuestionSpec } from "@/lib/exam-paper-question-spec";
+import type { Quiz } from "@/lib/types";
 
 const schema = z
   .object({
@@ -86,6 +88,7 @@ const defaultValues: FormValues = {
 
 export default function TeacherExamsPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
@@ -174,14 +177,31 @@ export default function TeacherExamsPage() {
         longAnswerMarks: values.longAnswerMarks,
       });
     },
-    onSuccess: (paper) => {
-      toast({ title: "Paper generated", description: "Review it, then submit for approval.", variant: "success" });
-      queryClient.invalidateQueries({ queryKey: ["my-exam-paper-assignments"] });
-      queryClient.invalidateQueries({ queryKey: ["teacher-dashboard"] });
+    onSuccess: (paper: Quiz) => {
+      const paperId = paper?.id?.trim();
+      if (!paperId) {
+        toast({
+          title: "Paper generated",
+          description: "Open it from your exam assignments list to review.",
+          variant: "success",
+        });
+        setOpen(false);
+        setActiveAssignmentId(null);
+        form.reset(defaultValues);
+        void queryClient.invalidateQueries({ queryKey: ["my-exam-paper-assignments"] });
+        void queryClient.invalidateQueries({ queryKey: ["teacher-dashboard"] });
+        return;
+      }
+
+      // Soft-navigate so auth state stays warm (hard reload was bouncing some sessions to dashboard).
+      queryClient.setQueryData(["quiz", paperId], paper);
       setOpen(false);
       setActiveAssignmentId(null);
       form.reset(defaultValues);
-      window.location.href = `/teacher/exams/${paper.id}`;
+      toast({ title: "Paper generated", description: "Review it, then submit for approval.", variant: "success" });
+      router.replace(`/teacher/exams/${paperId}`);
+      void queryClient.invalidateQueries({ queryKey: ["my-exam-paper-assignments"] });
+      void queryClient.invalidateQueries({ queryKey: ["teacher-dashboard"] });
     },
     onError: (err) => {
       toast({
@@ -258,7 +278,7 @@ export default function TeacherExamsPage() {
       return;
     }
     if (row.quizId && row.status !== "NOT_STARTED") {
-      window.location.assign(`/teacher/exams/${row.quizId}`);
+      router.push(`/teacher/exams/${row.quizId}`);
       return;
     }
     const suggested = buildQuestionSpecForMarks(row.maxMarks);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
 import { getRoleRedirectPath } from "@/lib/auth";
@@ -15,9 +15,15 @@ interface AuthGuardProps {
 export function AuthGuard({ allowedRoles, loginPath, children }: AuthGuardProps) {
   const { user, isLoading, isAuthenticated, hasAnyRole } = useAuth();
   const router = useRouter();
+  // Avoid SSR/first-paint redirects before localStorage session is readable.
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (isLoading) return;
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!ready || isLoading) return;
 
     if (!isAuthenticated) {
       router.replace(loginPath ?? "/login");
@@ -27,9 +33,9 @@ export function AuthGuard({ allowedRoles, loginPath, children }: AuthGuardProps)
     if (!hasAnyRole(allowedRoles)) {
       router.replace(getRoleRedirectPath(user));
     }
-  }, [isLoading, isAuthenticated, hasAnyRole, allowedRoles, loginPath, router, user]);
+  }, [ready, isLoading, isAuthenticated, hasAnyRole, allowedRoles, loginPath, router, user]);
 
-  if (isLoading) {
+  if (!ready || isLoading) {
     return <div className="min-h-screen bg-background" aria-busy="true" aria-label="Loading" />;
   }
 
