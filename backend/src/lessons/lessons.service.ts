@@ -94,18 +94,13 @@ import {
   looksLikePoemOrReadingPage,
   mergeEnglishPageVisionWithOcr,
   pageHasStructuredLessonContent,
-  compareOrientationOcrResults,
-  OrientationOcrCandidate,
-  mergeDualChannelPageOcr,
   pickBetterPageTranscript,
   preferEnglishLessonPageTranscript,
-  scorePageOcrCandidate,
   scorePageOcrQuality,
   pageTextNeedsVisionRetry,
 } from './page-text-sanitize';
 import { repairCompiledChapterFromSource } from './chapter-compile-repair';
 import {
-  orientationCandidates,
   prepareLessonPagePhoto,
   prepareLessonPagePhotoForVision,
   prepareOrientedVariant,
@@ -559,6 +554,11 @@ export class LessonsService {
     );
   }
 
+  /**
+   * Teachers rotate pages upright in the portal before upload.
+   * Skip the old multi-angle Tesseract search (~4 rotations × 2 channels ≈ 50s+).
+   * Only apply EXIF upright + prep buffers; OCR engines run once afterward.
+   */
   private async pickBestOrientedPagePhoto(
     file: Express.Multer.File,
     subject: { name: string },
@@ -568,152 +568,27 @@ export class LessonsService {
     ocrText: string;
     degrees: number;
   }> {
-    const sharpModule = await import('sharp');
-    const sharpFn =
-      (sharpModule as unknown as { default?: (i: Buffer) => import('sharp').Sharp }).default ??
-      (sharpModule as unknown as (i: Buffer) => import('sharp').Sharp);
-    const afterExif = await sharpFn(file.buffer).rotate().toBuffer({ resolveWithObject: true });
-    const degreesList = orientationCandidates(afterExif.info.width, afterExif.info.height);
-    const englishPrimary = ocrLanguagesForSubject(subject.name) === 'eng';
-
-    let best:
-      | {
-          ocrFile: Express.Multer.File;
-          visionFile: Express.Multer.File;
-          ocrText: string;
-          score: number;
-          readable: boolean;
-          degrees: number;
-        }
-      | undefined;
-    let bestNonGarbled:
-      | {
-          ocrFile: Express.Multer.File;
-          visionFile: Express.Multer.File;
-          ocrText: string;
-          score: number;
-          readable: boolean;
-          degrees: number;
-        }
-      | undefined;
-    let lastError: unknown;
-    let tried = 0;
-
-    for (const degrees of degreesList) {
-      try {
-        const variant = await prepareOrientedVariant(file, degrees);
-        const greyFile = {
-          ...file,
-          buffer: variant.ocr.buffer,
-          mimetype: variant.ocr.mimeType,
-          originalname: variant.ocr.originalname,
-          size: variant.ocr.size,
-        } as Express.Multer.File;
-        const visionFile = {
-          ...file,
-          buffer: variant.vision.buffer,
-          mimetype: variant.vision.mimeType,
-          originalname: variant.vision.originalname,
-          size: variant.vision.size,
-        } as Express.Multer.File;
-        const [greyText, colorText] = await Promise.all([
-          this.pageOcr
-            .readTesseractPageTexts([greyFile], { subjectName: subject.name })
-            .then((rows) => (rows[0] ?? '').trim()),
-          this.pageOcr
-            .readTesseractPageTexts([visionFile], { subjectName: subject.name })
-            .then((rows) => (rows[0] ?? '').trim()),
-        ]);
-        const ocrText = mergeDualChannelPageOcr(greyText, colorText);
-        const ocrFile =
-          ocrText === greyText || (ocrText !== colorText && greyText.length >= colorText.length)
-            ? greyFile
-            : visionFile;
-        tried += 1;
-        const score = scorePageOcrCandidate(ocrText, { englishPrimary });
-        const readable =
-          isPagePhotoTextReadable(ocrText) && !englishPageTranscriptLooksIncomplete(ocrText);
-        const orientCandidate: OrientationOcrCandidate = {
-          text: ocrText,
-          score,
-          readable,
-          degrees,
-        };
-        const orientBest: OrientationOcrCandidate | undefined = best
-          ? {
-              text: best.ocrText,
-              score: best.score,
-              readable: best.readable,
-              degrees: best.degrees,
-            }
-          : undefined;
-        if (compareOrientationOcrResults(orientBest, orientCandidate) > 0) {
-          best = { ocrFile, visionFile, ocrText, score, readable, degrees };
-        }
-        if (!looksLikeGarbledLatinOcr(ocrText)) {
-          const orientBestClean: OrientationOcrCandidate | undefined = bestNonGarbled
-            ? {
-                text: bestNonGarbled.ocrText,
-                score: bestNonGarbled.score,
-                readable: bestNonGarbled.readable,
-                degrees: bestNonGarbled.degrees,
-              }
-            : undefined;
-          if (compareOrientationOcrResults(orientBestClean, orientCandidate) > 0) {
-            bestNonGarbled = { ocrFile, visionFile, ocrText, score, readable, degrees };
-          }
-        }
-        if (
-          !looksLikePoemOrReadingPage(ocrText) &&
-          !looksLikeGarbledLatinOcr(ocrText) &&
-          readable &&
-          scorePageOcrQuality(ocrText) >= 78 &&
-          ocrText.length >= 900 &&
-          tried >= 2
-        ) {
-          break;
-        }
-      } catch (error) {
-        lastError = error;
-        this.logger.warn(
-          `Orientation ${degrees}° failed for ${file.originalname ?? 'photo'}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
-    }
-
-    if (!best?.ocrText?.trim()) {
-      if (lastError instanceof BadRequestException) {
-        throw lastError;
-      }
-      throw new BadRequestException({
-        code: 'PAGE_PHOTO_UNCLEAR',
-        message: this.unclearPagePhotoMessage(file.originalname),
-      });
-    }
-    // Prefer a cleaner rotation when available, but never hard-reject here —
-    // textbook OCR is often noisy yet still produces a usable lesson (~90%).
-    if (
-      looksLikeGarbledLatinOcr(best.ocrText) &&
-      bestNonGarbled?.ocrText?.trim() &&
-      bestNonGarbled.degrees !== best.degrees
-    ) {
-      this.logger.warn(
-        `Page orientation: preferring less-noisy ${bestNonGarbled.degrees}° over ${best.degrees}° for ${file.originalname ?? 'photo'}`,
-      );
-      best = bestNonGarbled;
-    }
-    if (best.degrees !== 0) {
-      this.logger.log(
-        `Page orientation: using ${best.degrees}° rotation for ${file.originalname ?? 'photo'}`,
-      );
-    }
+    void subject;
+    const variant = await prepareOrientedVariant(file, 0);
+    const ocrFile = {
+      ...file,
+      buffer: variant.ocr.buffer,
+      mimetype: variant.ocr.mimeType,
+      originalname: variant.ocr.originalname,
+      size: variant.ocr.size,
+    } as Express.Multer.File;
+    const visionFile = {
+      ...file,
+      buffer: variant.vision.buffer,
+      mimetype: variant.vision.mimeType,
+      originalname: variant.vision.originalname,
+      size: variant.vision.size,
+    } as Express.Multer.File;
     return {
-      ocrFile: best.ocrFile,
-      visionFile: best.visionFile,
-      ocrText: best.ocrText,
-      degrees: best.degrees,
+      ocrFile,
+      visionFile,
+      ocrText: '',
+      degrees: 0,
     };
   }
 
@@ -1340,7 +1215,7 @@ export class LessonsService {
             phase: 'orienting',
             fileName: file.originalname,
             pageLabel: `Page ${startPage + index}`,
-            message: 'Finding correct page orientation…',
+            message: 'Preparing page photo…',
             paddle: 'pending',
             tesseract: 'pending',
             merge: 'pending',
@@ -1544,7 +1419,7 @@ export class LessonsService {
     if (uploadId) {
       this.patchOcrUploadProgress(uploadId, lessonId, {
         phase: 'orienting',
-        message: 'Finding correct page orientation…',
+        message: 'Preparing page photo…',
       });
     }
     let orient: {
