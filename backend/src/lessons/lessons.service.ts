@@ -75,6 +75,7 @@ import {
   looksLikeMangledRtlOcr,
   looksLikeRealLessonText,
 } from '../common/extract-quality';
+import { mergePaddleAndTesseractPageOcr } from './merge-paddle-tesseract-ocr';
 import { ocrLanguagesForSubject } from './page-ocr.service';
 import { isServerlessRuntime, readEnv } from '../common/env';
 import { FilesService } from '../files/files.service';
@@ -306,15 +307,22 @@ export class LessonsService {
         const paddleRaw = s.paddleOcrText?.trim() ?? '';
         const tessRaw = s.tesseractOcrText?.trim() ?? '';
         const mergedRaw = s.mergedOcrText?.trim() ?? '';
+        const paddlePreview = paddleRaw ? coerceLessonDisplayText(paddleRaw) : '';
+        const tessPreview = tessRaw ? coerceLessonDisplayText(tessRaw) : '';
+        const mergedPreview = mergedRaw
+          ? coerceLessonDisplayText(mergedRaw)
+          : fetchedText.trim()
+            ? fetchedText
+            : '';
         return {
           id: s.id,
           pageOrder: s.pageFrom ?? 0,
           url: s.fileAsset!.url,
           label: s.fileAsset!.originalFilename ?? 'Page photo',
           fetchedText,
-          paddleOcrText: paddleRaw ? filterPageTextForLessonAssembly(paddleRaw) : '',
-          tesseractOcrText: tessRaw ? filterPageTextForLessonAssembly(tessRaw) : '',
-          mergedOcrText: mergedRaw ? filterPageTextForLessonAssembly(mergedRaw) : '',
+          paddleOcrText: paddlePreview,
+          tesseractOcrText: tessPreview,
+          mergedOcrText: mergedPreview,
           textQualityPercent,
           textAccepted: Boolean(textForAcceptance) && isPagePhotoTextReadable(textForAcceptance),
         };
@@ -504,21 +512,14 @@ export class LessonsService {
     );
   }
 
-  /**
-   * Prepare + read a page. Tries alternate rotations when the first pass is unreadable —
-   * phones often capture textbook pages sideways; a blind landscape→portrait turn
-   * used to make OCR fail with mirrored junk.
-   */
-  private async prepareAndTranscribePagePhoto(
+  private async pickBestOrientedPagePhoto(
     file: Express.Multer.File,
     subject: { name: string },
-    grade: { name: string },
-    schoolId: string,
-    userId: string,
   ): Promise<{
-    text: string;
-    readyFile: Express.Multer.File;
-    ocrEngines?: { paddle: string; tesseract: string; merged: string };
+    ocrFile: Express.Multer.File;
+    visionFile: Express.Multer.File;
+    ocrText: string;
+    degrees: number;
   }> {
     const sharpModule = await import('sharp');
     const sharpFn =
@@ -541,7 +542,6 @@ export class LessonsService {
     let lastError: unknown;
     let tried = 0;
 
-    // Cheap Tesseract over greyscale + color per orientation; full vision merge once at the end.
     for (const degrees of degreesList) {
       try {
         const variant = await prepareOrientedVariant(file, degrees);
@@ -593,7 +593,6 @@ export class LessonsService {
         if (compareOrientationOcrResults(orientBest, orientCandidate) > 0) {
           best = { ocrFile, visionFile, ocrText, score, readable, degrees };
         }
-        // Poem/reading pages: try every orientation — a short clean mid-page can beat a fuller one.
         if (
           !looksLikePoemOrReadingPage(ocrText) &&
           readable &&
@@ -613,53 +612,133 @@ export class LessonsService {
       }
     }
 
-    if (best?.ocrText?.trim()) {
-      if (best.degrees !== 0) {
-        this.logger.log(
-          `Page orientation: using ${best.degrees}° rotation for ${file.originalname ?? 'photo'}`,
-        );
+    if (!best?.ocrText?.trim()) {
+      if (lastError instanceof BadRequestException) {
+        throw lastError;
       }
-      try {
-        const [ocrEngines] = await this.pageOcr.readPageOcrBreakdown([best.ocrFile], {
-          subjectName: subject.name,
-        });
-        const text = await this.transcribeTextbookPhoto(
-          best.ocrFile,
-          subject,
-          grade,
-          schoolId,
-          userId,
-          { visionFile: best.visionFile },
-        );
-        const merged = englishPrimary
-          ? preferEnglishLessonPageTranscript(text, best.ocrText)
-          : pickBetterPageTranscript(text, best.ocrText);
-        return {
-          text: filterPageTextForLessonAssembly(merged),
-          readyFile: best.ocrFile,
-          ocrEngines,
-        };
-      } catch (error) {
-        if (isPagePhotoTextReadable(best.ocrText)) {
-          const [ocrEngines] = await this.pageOcr.readPageOcrBreakdown([best.ocrFile], {
-            subjectName: subject.name,
-          });
-          return {
-            text: filterPageTextForLessonAssembly(best.ocrText),
-            readyFile: best.ocrFile,
-            ocrEngines,
-          };
-        }
-        lastError = error;
+      throw new BadRequestException({
+        code: 'PAGE_PHOTO_UNCLEAR',
+        message: this.unclearPagePhotoMessage(file.originalname),
+      });
+    }
+    if (best.degrees !== 0) {
+      this.logger.log(
+        `Page orientation: using ${best.degrees}° rotation for ${file.originalname ?? 'photo'}`,
+      );
+    }
+    return {
+      ocrFile: best.ocrFile,
+      visionFile: best.visionFile,
+      ocrText: best.ocrText,
+      degrees: best.degrees,
+    };
+  }
+
+  /** Merge paddle+tesseract and vision into lesson page text (CPU merge + vision API). */
+  private async finalizeChapterPageAfterEngineOcr(
+    orient: {
+      ocrFile: Express.Multer.File;
+      visionFile: Express.Multer.File;
+      ocrText: string;
+    },
+    paddle: string,
+    tesseract: string,
+    subject: { name: string },
+    grade: { name: string },
+    schoolId: string,
+    userId: string,
+  ): Promise<{ text: string; merged: string }> {
+    const mergedRaw = mergePaddleAndTesseractPageOcr(paddle, tesseract);
+    const merged = filterPageTextForLessonAssembly(mergedRaw);
+    const englishPrimary = ocrLanguagesForSubject(subject.name) === 'eng';
+    try {
+      const visionText = await this.transcribeTextbookPhoto(
+        orient.ocrFile,
+        subject,
+        grade,
+        schoolId,
+        userId,
+        { visionFile: orient.visionFile },
+      );
+      const lessonText = englishPrimary
+        ? preferEnglishLessonPageTranscript(visionText, orient.ocrText)
+        : pickBetterPageTranscript(visionText, orient.ocrText);
+      return { text: filterPageTextForLessonAssembly(lessonText), merged };
+    } catch (error) {
+      if (isPagePhotoTextReadable(orient.ocrText)) {
+        return { text: filterPageTextForLessonAssembly(orient.ocrText), merged };
       }
+      throw error;
     }
-    if (lastError instanceof BadRequestException) {
-      throw lastError;
-    }
-    throw new BadRequestException({
-      code: 'PAGE_PHOTO_UNCLEAR',
-      message: this.unclearPagePhotoMessage(file.originalname),
+  }
+
+  private async persistChapterPageEngineOcr(
+    sourceId: string,
+    paddle: string,
+    tesseract: string,
+    orient: {
+      ocrFile: Express.Multer.File;
+      visionFile: Express.Multer.File;
+      ocrText: string;
+    },
+    subject: { name: string },
+    grade: { name: string },
+    schoolId: string,
+    userId: string,
+  ): Promise<void> {
+    const { text, merged } = await this.finalizeChapterPageAfterEngineOcr(
+      orient,
+      paddle,
+      tesseract,
+      subject,
+      grade,
+      schoolId,
+      userId,
+    );
+    await this.prisma.lessonSource.update({
+      where: { id: sourceId },
+      data: {
+        ocrText: text.trim() || null,
+        mergedOcrText: merged.trim() || null,
+      },
     });
+  }
+
+  /**
+   * Prepare + read a page. Tries alternate rotations when the first pass is unreadable —
+   * phones often capture textbook pages sideways; a blind landscape→portrait turn
+   * used to make OCR fail with mirrored junk.
+   */
+  private async prepareAndTranscribePagePhoto(
+    file: Express.Multer.File,
+    subject: { name: string },
+    grade: { name: string },
+    schoolId: string,
+    userId: string,
+  ): Promise<{
+    text: string;
+    readyFile: Express.Multer.File;
+    ocrEngines?: { paddle: string; tesseract: string; merged: string };
+  }> {
+    const orient = await this.pickBestOrientedPagePhoto(file, subject);
+    const [{ paddle, tesseract }] = await this.pageOcr.readPageOcrEnginesParallel(
+      [orient.ocrFile],
+      { subjectName: subject.name },
+    );
+    const { text, merged } = await this.finalizeChapterPageAfterEngineOcr(
+      orient,
+      paddle,
+      tesseract,
+      subject,
+      grade,
+      schoolId,
+      userId,
+    );
+    return {
+      text,
+      readyFile: orient.ocrFile,
+      ocrEngines: { paddle, tesseract, merged },
+    };
   }
 
   /** OCR + vision for a single textbook photo (used when appending chapter pages one at a time). */
@@ -1024,22 +1103,22 @@ export class LessonsService {
         message: 'Grade was not found for this chapter',
       });
     }
-    const perPageTexts: Array<{
-      text: string;
-      ocrEngines?: { paddle: string; tesseract: string; merged: string };
-    }> = [];
-    const preparedFiles: Express.Multer.File[] = [];
-    for (const file of files) {
+    const existingImages = lesson.sources.filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE);
+    const startPage =
+      existingImages.reduce((max, s) => Math.max(max, s.pageFrom ?? 0), 0) + 1;
+
+    const finalizeJobs: Promise<void>[] = [];
+
+    for (let index = 0; index < files.length; index++) {
+      const file = files[index];
+      let orient: {
+        ocrFile: Express.Multer.File;
+        visionFile: Express.Multer.File;
+        ocrText: string;
+        degrees: number;
+      };
       try {
-        const { text, readyFile, ocrEngines } = await this.prepareAndTranscribePagePhoto(
-          file,
-          lesson.subject,
-          grade,
-          schoolId,
-          user.id,
-        );
-        preparedFiles.push(readyFile);
-        perPageTexts.push({ text, ocrEngines });
+        orient = await this.pickBestOrientedPagePhoto(file, lesson.subject);
       } catch (error) {
         if (error instanceof BadRequestException) {
           throw error;
@@ -1049,39 +1128,73 @@ export class LessonsService {
           message: this.unclearPagePhotoMessage(file.originalname),
         });
       }
-    }
-    const existingImages = lesson.sources.filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE);
-    const startPage =
-      existingImages.reduce((max, s) => Math.max(max, s.pageFrom ?? 0), 0) + 1;
-    const pageAssets = await Promise.all(
-      preparedFiles.map((file) =>
-        this.filesService.saveSchoolUpload(schoolId, user.id, file, 'lesson-pages'),
-      ),
-    );
-    await this.prisma.$transaction(async (tx) => {
-      for (let index = 0; index < pageAssets.length; index++) {
-        const pageEntry = perPageTexts[index];
-        const engines = pageEntry?.ocrEngines;
-        await tx.lessonSource.create({
-          data: {
-            lessonId: id,
-            type: LessonSourceType.TEXTBOOK_IMAGE,
-            fileAssetId: pageAssets[index].id,
-            pageFrom: startPage + index,
-            ocrText: pageEntry?.text?.trim() || null,
-            paddleOcrText: engines?.paddle?.trim() || null,
-            tesseractOcrText: engines?.tesseract?.trim() || null,
-            mergedOcrText: engines?.merged?.trim() || null,
-          },
+
+      let paddle: string;
+      let tesseract: string;
+      try {
+        [{ paddle, tesseract }] = await this.pageOcr.readPageOcrEnginesParallel(
+          [orient.ocrFile],
+          { subjectName: lesson.subject.name },
+        );
+      } catch (error) {
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+        throw new BadRequestException({
+          code: 'PAGE_PHOTO_UNCLEAR',
+          message: this.unclearPagePhotoMessage(file.originalname),
         });
       }
-      await tx.dailyLesson.update({
-        where: { id },
+
+      const asset = await this.filesService.saveSchoolUpload(
+        schoolId,
+        user.id,
+        orient.ocrFile,
+        'lesson-pages',
+      );
+      const source = await this.prisma.lessonSource.create({
         data: {
-          contentConfirmed: false,
-          status: LessonStatus.READY_FOR_REVIEW,
+          lessonId: id,
+          type: LessonSourceType.TEXTBOOK_IMAGE,
+          fileAssetId: asset.id,
+          pageFrom: startPage + index,
+          paddleOcrText: paddle.trim() || null,
+          tesseractOcrText: tesseract.trim() || null,
         },
       });
+
+      finalizeJobs.push(
+        this.persistChapterPageEngineOcr(
+          source.id,
+          paddle,
+          tesseract,
+          orient,
+          lesson.subject,
+          grade,
+          schoolId,
+          user.id,
+        ),
+      );
+    }
+
+    try {
+      await Promise.all(finalizeJobs);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException({
+        code: 'PAGE_PHOTO_UNCLEAR',
+        message: 'One or more page photos could not be read clearly. Re-upload the failed pages.',
+      });
+    }
+
+    await this.prisma.dailyLesson.update({
+      where: { id },
+      data: {
+        contentConfirmed: false,
+        status: LessonStatus.READY_FOR_REVIEW,
+      },
     });
 
     return this.loadPresented(id);
@@ -1145,6 +1258,83 @@ export class LessonsService {
         },
       });
     });
+    return this.loadPresented(lessonId);
+  }
+
+  /** Re-run Paddle + Tesseract on the stored page image (legacy pages or missing breakdown). */
+  async refreshChapterPageOcrBreakdown(lessonId: string, sourceId: string, user: AuthUser) {
+    const lesson = await this.requireOwnedChapterLesson(lessonId, user);
+    const source = lesson.sources.find(
+      (s) => s.id === sourceId && s.type === LessonSourceType.TEXTBOOK_IMAGE,
+    );
+    if (!source?.fileAsset?.storageKey) {
+      throw new NotFoundException({ code: 'PAGE_NOT_FOUND', message: 'Page photo not found' });
+    }
+    const grade = await this.prisma.grade.findUnique({ where: { id: lesson.gradeId } });
+    if (!grade) {
+      throw new BadRequestException({
+        code: 'CLASS_NOT_FOUND',
+        message: 'Grade was not found for this chapter',
+      });
+    }
+    const buffer = await this.filesService.readBufferForAsset(source.fileAsset);
+    const raw = {
+      buffer,
+      mimetype: source.fileAsset.mimeType ?? 'image/jpeg',
+      originalname: source.fileAsset.originalFilename ?? 'page.jpg',
+      size: buffer.length,
+    } as Express.Multer.File;
+
+    let orient: {
+      ocrFile: Express.Multer.File;
+      visionFile: Express.Multer.File;
+      ocrText: string;
+      degrees: number;
+    };
+    try {
+      orient = await this.pickBestOrientedPagePhoto(raw, lesson.subject);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException({
+        code: 'PAGE_PHOTO_UNCLEAR',
+        message: this.unclearPagePhotoMessage(source.fileAsset.originalFilename ?? undefined),
+      });
+    }
+
+    const [{ paddle, tesseract }] = await this.pageOcr.readPageOcrEnginesParallel(
+      [orient.ocrFile],
+      { subjectName: lesson.subject.name },
+    );
+
+    await this.prisma.lessonSource.update({
+      where: { id: sourceId },
+      data: {
+        paddleOcrText: paddle.trim() || null,
+        tesseractOcrText: tesseract.trim() || null,
+      },
+    });
+
+    await this.persistChapterPageEngineOcr(
+      sourceId,
+      paddle,
+      tesseract,
+      orient,
+      lesson.subject,
+      grade,
+      lesson.schoolId,
+      user.id,
+    );
+
+    await this.prisma.dailyLesson.update({
+      where: { id: lessonId },
+      data: {
+        contentConfirmed: false,
+        status: LessonStatus.READY_FOR_REVIEW,
+      },
+    });
+
     return this.loadPresented(lessonId);
   }
 

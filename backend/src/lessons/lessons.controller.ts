@@ -242,6 +242,16 @@ export class LessonsController {
   }
 
   @Roles(RoleName.TEACHER)
+  @Post('chapters/:id/pages/:sourceId/refresh-ocr')
+  refreshChapterPageOcr(
+    @Param('id') id: string,
+    @Param('sourceId') sourceId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.lessonsService.refreshChapterPageOcrBreakdown(id, sourceId, user);
+  }
+
+  @Roles(RoleName.TEACHER)
   @Post('chapters/:id/pages/:sourceId/replace-photo')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(

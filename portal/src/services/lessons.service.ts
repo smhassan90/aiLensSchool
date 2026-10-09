@@ -206,6 +206,15 @@ export const lessonsService = {
     );
   },
 
+  refreshChapterPageOcr(lessonId: string, sourceId: string) {
+    return apiForm<Lesson>(
+      `/lessons/chapters/${lessonId}/pages/${sourceId}/refresh-ocr`,
+      new FormData(),
+      "POST",
+      { timeoutMs: lessonExtractTimeoutMs(1) },
+    );
+  },
+
   deleteChapterPagePhoto(lessonId: string, sourceId: string) {
     return apiClient<Lesson>(`/lessons/chapters/${lessonId}/pages/${sourceId}`, {
       method: "DELETE",

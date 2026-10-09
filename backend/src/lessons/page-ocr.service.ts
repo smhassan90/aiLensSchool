@@ -255,8 +255,10 @@ export class PageOcrService implements OnModuleDestroy {
       return this.readWithTesseract(files, options);
     }
 
-    const paddleTexts = await this.readWithPaddle(files, options);
-    const tessTexts = await this.readWithTesseract(files, options);
+    const [paddleTexts, tessTexts] = await Promise.all([
+      this.readWithPaddle(files, options),
+      this.readWithTesseract(files, options),
+    ]);
 
     return files.map((_, index) => {
       const paddle = paddleTexts[index] ?? '';
@@ -271,24 +273,38 @@ export class PageOcrService implements OnModuleDestroy {
     });
   }
 
-  /** Paddle and Tesseract on the same image buffer (no pick-one). */
+  /** Paddle and Tesseract on the same image in parallel (merge is separate). */
+  async readPageOcrEnginesParallel(
+    files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
+    options?: { subjectName?: string | null },
+  ): Promise<Array<{ paddle: string; tesseract: string }>> {
+    if (isServerlessRuntime() || !files.length) {
+      return files.map(() => ({ paddle: '', tesseract: '' }));
+    }
+    const mode = ocrEngineMode();
+    const [paddleTexts, tessTexts] = await Promise.all([
+      mode === 'tesseract'
+        ? Promise.resolve(files.map(() => ''))
+        : this.readWithPaddle(files, options),
+      this.readWithTesseract(files, options),
+    ]);
+    return files.map((_, index) => ({
+      paddle: (paddleTexts[index] ?? '').trim(),
+      tesseract: (tessTexts[index] ?? '').trim(),
+    }));
+  }
+
+  /** Paddle and Tesseract on the same image buffer (engines in parallel, then merge). */
   async readPageOcrBreakdown(
     files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
     options?: { subjectName?: string | null },
   ): Promise<PageOcrEngineBreakdown[]> {
-    if (isServerlessRuntime() || !files.length) {
-      return files.map(() => ({ paddle: '', tesseract: '', merged: '' }));
-    }
-    const mode = ocrEngineMode();
-    const paddleTexts =
-      mode === 'tesseract' ? files.map(() => '') : await this.readWithPaddle(files, options);
-    const tessTexts = await this.readWithTesseract(files, options);
-    return files.map((_, index) => {
-      const paddle = (paddleTexts[index] ?? '').trim();
-      const tesseract = (tessTexts[index] ?? '').trim();
-      const merged = mergePaddleAndTesseractPageOcr(paddle, tesseract);
-      return { paddle, tesseract, merged };
-    });
+    const engines = await this.readPageOcrEnginesParallel(files, options);
+    return engines.map(({ paddle, tesseract }) => ({
+      paddle,
+      tesseract,
+      merged: mergePaddleAndTesseractPageOcr(paddle, tesseract),
+    }));
   }
 
   async readPages(

@@ -64,6 +64,14 @@ function pageTextAccepted(page: LessonPageSource): boolean {
   return Boolean(page.fetchedText?.trim());
 }
 
+type OcrPreviewKind = "paddle" | "tesseract" | "merged";
+
+function chapterPageOcrPreviewText(page: LessonPageSource, kind: OcrPreviewKind): string {
+  if (kind === "paddle") return page.paddleOcrText?.trim() ?? "";
+  if (kind === "tesseract") return page.tesseractOcrText?.trim() ?? "";
+  return page.mergedOcrText?.trim() ?? page.fetchedText?.trim() ?? "";
+}
+
 export function ChapterPageManager({
   lessonId,
   pageSources,
@@ -95,6 +103,7 @@ export function ChapterPageManager({
   const orderSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [orderSaving, setOrderSaving] = useState(false);
   const [reuploadSourceId, setReuploadSourceId] = useState<string | null>(null);
+  const [ocrRefreshSourceId, setOcrRefreshSourceId] = useState<string | null>(null);
   const reuploadInputRef = useRef<HTMLInputElement>(null);
   type ReuploadTarget =
     | { kind: "saved"; sourceId: string }
@@ -426,7 +435,7 @@ export function ChapterPageManager({
               {ordered.map((page, index) => {
                 const src = assetUrl(page.url);
                 const accepted = pageTextAccepted(page);
-                const reading = reuploadSourceId === page.id;
+                const reading = reuploadSourceId === page.id || ocrRefreshSourceId === page.id;
                 const quality = page.textQualityPercent;
                 return (
                   <li
@@ -486,21 +495,9 @@ export function ChapterPageManager({
                       <div className="flex flex-wrap gap-2">
                         {(
                           [
-                            {
-                              key: "paddle" as const,
-                              label: "Text from PaddleOCR",
-                              text: page.paddleOcrText?.trim() ?? "",
-                            },
-                            {
-                              key: "tesseract" as const,
-                              label: "Text from Tesseract",
-                              text: page.tesseractOcrText?.trim() ?? "",
-                            },
-                            {
-                              key: "merged" as const,
-                              label: "Merged text",
-                              text: page.mergedOcrText?.trim() ?? "",
-                            },
+                            { key: "paddle" as const, label: "Text from PaddleOCR" },
+                            { key: "tesseract" as const, label: "Text from Tesseract" },
+                            { key: "merged" as const, label: "Merged text" },
                           ] as const
                         ).map((preview) => (
                           <Button
@@ -511,21 +508,58 @@ export function ChapterPageManager({
                             className="h-8"
                             disabled={reading || !accepted}
                             onClick={() => {
-                              if (!preview.text) {
-                                toast({
-                                  title: "No OCR breakdown for this page",
-                                  description:
-                                    "Re-upload this page photo to capture Paddle, Tesseract, and merged text.",
-                                  variant: "error",
+                              void (async () => {
+                                let current = page;
+                                let text = chapterPageOcrPreviewText(current, preview.key);
+                                const needsEngineRefresh =
+                                  (preview.key === "paddle" || preview.key === "tesseract") &&
+                                  !text;
+                                if (needsEngineRefresh) {
+                                  setOcrRefreshSourceId(page.id);
+                                  try {
+                                    const lesson = await lessonsService.refreshChapterPageOcr(
+                                      lessonId,
+                                      page.id,
+                                    );
+                                    invalidate();
+                                    onContentUpdated(lesson);
+                                    const updated = lesson.pageSources?.find((p) => p.id === page.id);
+                                    if (updated) {
+                                      current = updated;
+                                      text = chapterPageOcrPreviewText(updated, preview.key);
+                                    }
+                                  } catch (err) {
+                                    toast({
+                                      title: "Could not read OCR breakdown",
+                                      description:
+                                        err instanceof ApiClientError
+                                          ? err.message
+                                          : "Try again or re-upload a clearer photo.",
+                                      variant: "error",
+                                    });
+                                    return;
+                                  } finally {
+                                    setOcrRefreshSourceId(null);
+                                  }
+                                }
+                                if (!text) {
+                                  toast({
+                                    title: "No text for this engine",
+                                    description:
+                                      preview.key === "paddle"
+                                        ? "PaddleOCR returned nothing for this page. Check server OCR settings or re-upload the photo."
+                                        : "Re-upload a clearer photo if this engine should have text.",
+                                    variant: "error",
+                                  });
+                                  return;
+                                }
+                                setPageTextView({
+                                  pageNumber: index + 1,
+                                  label: current.label,
+                                  title: preview.label,
+                                  text,
                                 });
-                                return;
-                              }
-                              setPageTextView({
-                                pageNumber: index + 1,
-                                label: page.label,
-                                title: preview.label,
-                                text: preview.text,
-                              });
+                              })();
                             }}
                           >
                             {preview.label}
