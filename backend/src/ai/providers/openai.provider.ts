@@ -17,7 +17,14 @@ import {
   STUDENT_ANALYSIS_PROMPT,
   TEACHER_COACH_PROMPT,
 } from '../prompts';
-import { difficultyInstruction, mockQuestionsForMix, quizMixInstructions, resolveQuizMix } from '../quiz-mix';
+import {
+  difficultyInstruction,
+  examChapterWeightInstructions,
+  examDifficultyInstructions,
+  mockQuestionsForMix,
+  quizMixInstructions,
+  resolveQuizMix,
+} from '../quiz-mix';
 import { isMathSubject } from '../../homework/homework-questions';
 import { parseModelJson } from '../parse-model-json';
 import { normalizeCompileModelOutput } from '../normalize-compile-output';
@@ -126,10 +133,14 @@ export class OpenAiProvider implements AiProvider {
       return this.mockQuiz(input.subjectName, mix);
     }
 
-    const difficultyLine = difficultyInstruction(input.difficulty);
+    const difficultyLine =
+      mix.mode === 'exam'
+        ? examDifficultyInstructions(input.difficulty)
+        : difficultyInstruction(input.difficulty);
+    const weightLine = mix.mode === 'exam' ? `${examChapterWeightInstructions()}\n` : '';
     const content = await this.chat(
       mix.mode === 'exam' ? EXAM_GENERATION_PROMPT : QUIZ_GENERATION_PROMPT,
-      `Subject: ${input.subjectName ?? 'General'}\n${difficultyLine ? `${difficultyLine}\n` : ''}${quizMixInstructions(mix)}\n\nLectures:\n${input.lessonSummaries.join('\n---\n')}`,
+      `Subject: ${input.subjectName ?? 'General'}\n${difficultyLine ? `${difficultyLine}\n` : ''}${weightLine}${quizMixInstructions(mix)}\n\nLectures:\n${input.lessonSummaries.join('\n---\n')}`,
     );
     const parsed = QuizOutputSchema.parse(parseModelJson(content.text));
     return {

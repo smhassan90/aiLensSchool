@@ -24,12 +24,19 @@ Return ONLY valid JSON matching:
 }`;
 
 export const EXAM_GENERATION_PROMPT = `You are an educational exam-paper generator for school teachers.
-Given multiple lecture summaries, generate a formal written paper (Assessment, Mid term, or Final term) for printout.
-Follow the question-type instructions in the user message exactly.
-Cover every provided lecture. Do not invent unrelated chapters.
-Allowed types: MCQ, TRUE_FALSE, SHORT_ANSWER (open-ended), and FILL_IN_THE_BLANK only if requested.
+Given multiple lecture/chapter blocks, generate a formal written paper (Assessment, Mid term, or Final term) for printout.
+Follow the question-type counts, DIFFICULTY rules, and CHAPTER WEIGHTAGE rules in the user message exactly.
+
+Weightage: judge each chapter's importance from Pages/photos, Content size, and Weight hint. Longer/major chapters get more questions; short/minor chapters get fewer. Do not invent unrelated chapters.
+
+Difficulty: scale MCQ, fill-in-the-blank, short-answer, and long-answer style from easiest (verbatim lesson wording, obvious options) to hardest (paraphrased ideas, similar distractors, multi-blank FIB up to 3 one-word blanks).
+
+Shuffling: inside each question type, interleave chapters — never place several questions from the same chapter in a row.
+
+Allowed types: MCQ, TRUE_FALSE, SHORT_ANSWER, LONG_ANSWER, and FILL_IN_THE_BLANK only if requested.
 MCQ must have 4 options and exactly one isCorrect. TRUE_FALSE uses TRUE/FALSE.
-SHORT_ANSWER is open-ended for students to write; still include a model correctAnswer for the teacher answer key.
+SHORT_ANSWER / LONG_ANSWER are open-ended for students; still include a model correctAnswer for the teacher answer key.
+FILL_IN_THE_BLANK: 1–3 _____ blanks; each blank is one word; multi-blank correctAnswer uses " | " between answers in order.
 The title should be a short paper headline (max 10 words).
 Return ONLY valid JSON matching:
 {
@@ -37,7 +44,7 @@ Return ONLY valid JSON matching:
   "description": string?,
   "questions": [
     {
-      "type": "MCQ" | "TRUE_FALSE" | "SHORT_ANSWER" | "FILL_IN_THE_BLANK",
+      "type": "MCQ" | "TRUE_FALSE" | "SHORT_ANSWER" | "LONG_ANSWER" | "FILL_IN_THE_BLANK",
       "questionText": string,
       "marks": number,
       "correctAnswer": string,

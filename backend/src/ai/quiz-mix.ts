@@ -1,17 +1,69 @@
 import type { QuizOutput, QuizQuestionOutput } from './schemas/quiz-output.schema';
 
+function clampDifficulty(level?: number): number {
+  if (!level || !Number.isFinite(level)) return 5;
+  return Math.min(10, Math.max(1, Math.round(level)));
+}
+
 export function difficultyInstruction(level?: number) {
   if (!level) return '';
-  if (level <= 3) {
-    return `Difficulty: ${level}/10 (easy — direct recall, simple wording, obvious distractors).`;
+  const d = clampDifficulty(level);
+  if (d <= 3) {
+    return `Difficulty: ${d}/10 (easy — direct recall, simple wording, obvious distractors).`;
   }
-  if (level <= 6) {
-    return `Difficulty: ${level}/10 (medium — application and clear reasoning).`;
+  if (d <= 6) {
+    return `Difficulty: ${d}/10 (medium — application and clear reasoning).`;
   }
-  if (level <= 8) {
-    return `Difficulty: ${level}/10 (challenging — analysis, multi-step thinking).`;
+  if (d <= 8) {
+    return `Difficulty: ${d}/10 (challenging — analysis, multi-step thinking).`;
   }
-  return `Difficulty: ${level}/10 (hard — synthesis, subtle distractors, higher-order thinking).`;
+  return `Difficulty: ${d}/10 (hard — synthesis, subtle distractors, higher-order thinking).`;
+}
+
+/**
+ * Detailed exam difficulty rules. Level 1 = easiest, 10 = hardest.
+ * Intermediate levels blend toward the nearer extreme.
+ */
+export function examDifficultyInstructions(level?: number): string {
+  const d = clampDifficulty(level);
+  const band =
+    d <= 3 ? 'EASY' : d <= 6 ? 'MEDIUM' : d <= 8 ? 'HARD' : 'HARDEST';
+
+  return `EXAM DIFFICULTY TARGET: ${d}/10 (${band}). Apply ALL of the following for this level.
+
+MCQ ("choose the best answer"):
+- Level 1–3 (easiest): Stem is a sentence taken nearly verbatim from the lesson. Four options; distractors are clearly different / unrelated. Exactly one option is the exact match from the lesson.
+- Level 4–6: Stem mostly from lesson ideas with light rephrasing. Distractors plausible but not near-duplicates.
+- Level 7–10 (hardest): Stem must NOT copy lesson wording — rephrase the meaning/idea in other words. All four options must be similar / close in meaning so the correct one is hard to spot; only one is truly correct.
+
+FILL_IN_THE_BLANK:
+- Level 1–3: Exactly one _____ blank; answer is one word taken from the lesson wording.
+- Level 4–6: Usually one blank; may use one paraphrased sentence.
+- Level 7–10: Prefer 2–3 blanks in one question (maximum 3 _____). Each blank is exactly ONE word. correctAnswer lists answers in order separated by " | " (e.g. "dignity | work | respect"). Never put more than one word in a single blank.
+
+SHORT_ANSWER:
+- Level 1–3: Very short question using lesson wording; model answer is short and drawn from the text.
+- Level 4–6: Short applied questions; answer still grounded in the lesson.
+- Level 7–10: Ask about the idea/meaning of the lesson in fresh wording (not copied phrases). Model answer explains the idea, not a quote.
+
+LONG_ANSWER:
+- Level 1–3: Prompt is not too long; expects a short paragraph from lesson facts.
+- Level 4–6: Moderate length prompt and answer.
+- Level 7–10: Longer, demanding prompt (analysis / explain / compare ideas); model answer is a fuller paragraph.
+
+TRUE_FALSE (if requested): Scale similarly — easy statements near the text; hard ones rephrase subtle ideas so True/False is less obvious.
+
+Scale intensity continuously with ${d}/10 — do not jump to max hardness unless the level is 9–10.`;
+}
+
+export function examChapterWeightInstructions(): string {
+  return `CHAPTER WEIGHTAGE (critical):
+Each lecture block may include Pages/photos, Content size, and a Weight hint (MAJOR / STANDARD / MINOR).
+- Allocate MORE questions to MAJOR / longer chapters (many pages, rich content).
+- Allocate FEWER questions to MINOR / short chapters (1–2 pages, thin content).
+- Do NOT give equal counts per chapter when sizes differ.
+- Within each question type, INTERLEAVE chapters — never dump several questions from the same chapter in a row.
+- After choosing counts per chapter, SHUFFLE the final order of questions inside each section so the paper does not follow chapter sequence.`;
 }
 
 export type QuizMixRequest = {
@@ -139,13 +191,13 @@ Every question MUST include correctAnswer.`;
     const shortSectionMarks = mix.shortAnswerCount * mix.shortAnswerMarks;
     const longSectionMarks = mix.longAnswerCount * mix.longAnswerMarks;
     return `This is a formal written exam paper for printout, not an app quiz.
-Cover ALL provided lectures. Do not invent unrelated chapters.
-Generate EXACTLY ${mix.questionCount} questions, in this order (each group is a section: Section A, Section B, etc.):
+Cover the provided lectures with WEIGHTAGE by chapter size/importance (see chapter weight rules).
+Generate EXACTLY ${mix.questionCount} questions as typed sections (Section A, B, …). Inside each section, SHUFFLE so consecutive items are not from the same chapter:
 - ${mix.mcqCount} MCQ questions (type MCQ). Section A. Each MUST have 4 options, exactly one isCorrect, and correctAnswer set. Each question is worth ${mix.mcqMarks} marks (section total ${mcqSectionMarks}).
 - ${mix.trueFalseCount} true/false questions (type TRUE_FALSE). Section B. correctAnswer must be TRUE or FALSE. Each question is worth ${mix.trueFalseMarks} marks (section total ${tfSectionMarks}).
-${mix.fillBlankCount ? `- ${mix.fillBlankCount} fill-in-the-blank questions (type FILL_IN_THE_BLANK). One _____ per question; correctAnswer must be exactly one word. Each question is worth ${mix.fillBlankMarks} marks (section total ${fillSectionMarks}).` : ''}
-- ${mix.shortAnswerCount} short-answer questions (type SHORT_ANSWER). Brief answers (2-4 lines). Include model correctAnswer. Each question is worth ${mix.shortAnswerMarks} marks (section total ${shortSectionMarks}).
-- ${mix.longAnswerCount} long-answer questions (type LONG_ANSWER). Extended answers (paragraph). Include model correctAnswer. Each question is worth ${mix.longAnswerMarks} marks (section total ${longSectionMarks}).
+${mix.fillBlankCount ? `- ${mix.fillBlankCount} fill-in-the-blank questions (type FILL_IN_THE_BLANK). Use 1–3 _____ blanks per difficulty rules; each blank is one word; multi-blank correctAnswer uses " | " between words. Each question is worth ${mix.fillBlankMarks} marks (section total ${fillSectionMarks}).` : ''}
+- ${mix.shortAnswerCount} short-answer questions (type SHORT_ANSWER). Length/wording follow difficulty rules. Include model correctAnswer. Each question is worth ${mix.shortAnswerMarks} marks (section total ${shortSectionMarks}).
+- ${mix.longAnswerCount} long-answer questions (type LONG_ANSWER). Prompt length follows difficulty rules. Include model correctAnswer. Each question is worth ${mix.longAnswerMarks} marks (section total ${longSectionMarks}).
 Skip a type if its count is 0.
 Set marks on every question to the per-question value for its section (do not split section totals across questions).`;
   }
@@ -312,6 +364,15 @@ export function sectionLabelForQuestionType(
   return `Section ${String.fromCharCode(65 + index)}`;
 }
 
+/** Fisher–Yates shuffle (in place). */
+export function shuffleInPlace<T>(items: T[]): T[] {
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
 export function sanitizeGeneratedExam(quiz: QuizOutput, mix: Extract<ResolvedQuizMix, { mode: 'exam' }>): QuizOutput {
   const questions = quiz.questions
     .map(normalizeGeneratedQuestion)
@@ -319,25 +380,37 @@ export function sanitizeGeneratedExam(quiz: QuizOutput, mix: Extract<ResolvedQui
       ['MCQ', 'TRUE_FALSE', 'SHORT_ANSWER', 'LONG_ANSWER', 'FILL_IN_THE_BLANK'].includes(question.type),
     );
 
-  const mcqs = applyMarksEach(
-    questions.filter((question) => question.type === 'MCQ'),
-    mix.mcqMarks,
+  // Keep section order for print layout, but shuffle within each type so
+  // consecutive questions are not stuck in chapter sequence.
+  const mcqs = shuffleInPlace(
+    applyMarksEach(
+      questions.filter((question) => question.type === 'MCQ'),
+      mix.mcqMarks,
+    ),
   );
-  const trueFalse = applyMarksEach(
-    questions.filter((question) => question.type === 'TRUE_FALSE'),
-    mix.trueFalseMarks,
+  const trueFalse = shuffleInPlace(
+    applyMarksEach(
+      questions.filter((question) => question.type === 'TRUE_FALSE'),
+      mix.trueFalseMarks,
+    ),
   );
-  const fillBlanks = applyMarksEach(
-    questions.filter((question) => question.type === 'FILL_IN_THE_BLANK'),
-    mix.fillBlankMarks,
+  const fillBlanks = shuffleInPlace(
+    applyMarksEach(
+      questions.filter((question) => question.type === 'FILL_IN_THE_BLANK'),
+      mix.fillBlankMarks,
+    ),
   );
-  const shortAnswers = applyMarksEach(
-    questions.filter((question) => question.type === 'SHORT_ANSWER'),
-    mix.shortAnswerMarks || mix.openEndedMarks,
+  const shortAnswers = shuffleInPlace(
+    applyMarksEach(
+      questions.filter((question) => question.type === 'SHORT_ANSWER'),
+      mix.shortAnswerMarks || mix.openEndedMarks,
+    ),
   );
-  const longAnswers = applyMarksEach(
-    questions.filter((question) => question.type === 'LONG_ANSWER'),
-    mix.longAnswerMarks,
+  const longAnswers = shuffleInPlace(
+    applyMarksEach(
+      questions.filter((question) => question.type === 'LONG_ANSWER'),
+      mix.longAnswerMarks,
+    ),
   );
 
   const ordered = [...mcqs, ...trueFalse, ...fillBlanks, ...shortAnswers, ...longAnswers];

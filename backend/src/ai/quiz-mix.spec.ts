@@ -1,9 +1,11 @@
 import {
+  examDifficultyInstructions,
   isAutoGradableQuestion,
   mockQuestionsForMix,
   resolveQuizMix,
   sanitizeGeneratedExam,
   sanitizeGeneratedQuiz,
+  shuffleInPlace,
 } from './quiz-mix';
 
 describe('resolveQuizMix', () => {
@@ -119,6 +121,25 @@ describe('sanitizeGeneratedQuiz', () => {
       true,
     );
     expect(questions.some((q) => q.type === 'FILL_IN_THE_BLANK')).toBe(true);
+  });
+});
+
+describe('examDifficultyInstructions', () => {
+  it('describes easiest vs hardest behaviour by question type', () => {
+    const hard = examDifficultyInstructions(10);
+    expect(hard).toMatch(/HARD/i);
+    expect(hard).toMatch(/NOT copy lesson wording/i);
+    expect(hard).toMatch(/2–3 blanks|2-3 blanks|maximum 3/i);
+    const easy = examDifficultyInstructions(1);
+    expect(easy).toMatch(/verbatim|exact match/i);
+  });
+});
+
+describe('shuffleInPlace', () => {
+  it('keeps the same items', () => {
+    const items = [1, 2, 3, 4, 5];
+    const shuffled = shuffleInPlace([...items]);
+    expect(shuffled.sort()).toEqual(items);
   });
 });
 

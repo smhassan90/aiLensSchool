@@ -248,6 +248,7 @@ export class QuizzesService {
           chapterName: true,
           aiSummary: true,
           concepts: { select: { name: true }, take: 12 },
+          _count: { select: { sources: true } },
         },
         orderBy: { date: 'asc' },
       });
@@ -259,13 +260,9 @@ export class QuizzesService {
         });
       }
       topicSummaries.push(
-        ...lessons.map((l) => {
-          const concepts = l.concepts.map((c) => c.name).filter(Boolean);
-          const body = concepts.length
-            ? `Key points: ${concepts.join('; ')}`
-            : this.slimTopicText(l.aiSummary ?? l.topicName ?? l.chapterName ?? 'Lecture');
-          return `${l.date.toISOString().slice(0, 10)}: ${l.topicName ?? l.chapterName ?? 'Lecture'}\n${body}`;
-        }),
+        ...lessons.map((l) =>
+          this.formatLectureBlock(l, { forExam: examPaperRequested }),
+        ),
       );
       rangeFrom ??= lessons[0]?.date;
       rangeTo ??= lessons[lessons.length - 1]?.date;
@@ -290,17 +287,14 @@ export class QuizzesService {
           chapterName: true,
           aiSummary: true,
           concepts: { select: { name: true }, take: 12 },
+          _count: { select: { sources: true } },
         },
         orderBy: { date: 'asc' },
       });
       topicSummaries.push(
-        ...lessons.map((l) => {
-          const concepts = l.concepts.map((c) => c.name).filter(Boolean);
-          const body = concepts.length
-            ? `Key points: ${concepts.join('; ')}`
-            : this.slimTopicText(l.aiSummary ?? l.topicName ?? l.chapterName ?? 'Lesson');
-          return `${l.date.toISOString().slice(0, 10)}: ${l.topicName ?? l.chapterName ?? 'Lesson'}\n${body}`;
-        }),
+        ...lessons.map((l) =>
+          this.formatLectureBlock(l, { forExam: examPaperRequested }),
+        ),
       );
     }
 
@@ -1116,6 +1110,7 @@ export class QuizzesService {
         chapterName: true,
         aiSummary: true,
         concepts: { select: { name: true }, take: 12 },
+        _count: { select: { sources: true } },
       },
       orderBy: { date: 'asc' },
     });
@@ -1125,13 +1120,7 @@ export class QuizzesService {
         message: 'No confirmed lessons found for this quiz. Add questions manually.',
       });
     }
-    return lessons.map((l) => {
-      const concepts = l.concepts.map((c) => c.name).filter(Boolean);
-      const body = concepts.length
-        ? `Key points: ${concepts.join('; ')}`
-        : this.slimTopicText(l.aiSummary ?? l.topicName ?? l.chapterName ?? 'Lesson');
-      return `${l.date.toISOString().slice(0, 10)}: ${l.topicName ?? l.chapterName ?? 'Lesson'}\n${body}`;
-    });
+    return lessons.map((l) => this.formatLectureBlock(l, { forExam: true }));
   }
 
   private async recalculateQuizMarksInTx(tx: Prisma.TransactionClient, quizId: string) {
@@ -1426,6 +1415,50 @@ export class QuizzesService {
   }
 
   /** Prefer key points; otherwise keep a short slice of lesson text for the AI prompt. */
+  /**
+   * Build a lecture block the exam AI can weight: page count + content size +
+   * MAJOR/MINOR hint so longer chapters get more questions.
+   */
+  private formatLectureBlock(
+    lesson: {
+      date: Date;
+      topicName: string | null;
+      chapterName: string | null;
+      aiSummary: string | null;
+      concepts: Array<{ name: string }>;
+      _count?: { sources: number };
+    },
+    options?: { forExam?: boolean },
+  ): string {
+    const pages = lesson._count?.sources ?? 0;
+    const summary = (lesson.aiSummary ?? '').trim();
+    const summaryLen = summary.length;
+    const weight =
+      pages >= 8 || summaryLen >= 2500
+        ? 'MAJOR (long / high priority — generate MORE questions from this)'
+        : pages > 0 && pages <= 2 && summaryLen < 900
+          ? 'MINOR (short / lower priority — generate FEWER questions from this)'
+          : 'STANDARD';
+    const concepts = lesson.concepts.map((c) => c.name).filter(Boolean);
+    const excerptMax = options?.forExam ? 1400 : 500;
+    const bodyParts = [
+      concepts.length ? `Key points: ${concepts.join('; ')}` : '',
+      this.slimTopicText(
+        summary || lesson.topicName || lesson.chapterName || 'Lesson',
+        excerptMax,
+      ),
+    ].filter(Boolean);
+    return [
+      `Date: ${lesson.date.toISOString().slice(0, 10)}`,
+      `Chapter: ${lesson.chapterName ?? lesson.topicName ?? 'Lecture'}`,
+      `Topic: ${lesson.topicName ?? lesson.chapterName ?? 'Lecture'}`,
+      `Pages/photos: ${pages}`,
+      `Content size: ${summaryLen} chars`,
+      `Weight hint: ${weight}`,
+      ...bodyParts,
+    ].join('\n');
+  }
+
   private slimTopicText(text: string, max = 500) {
     const trimmed = text.trim();
     if (!trimmed) return '';
