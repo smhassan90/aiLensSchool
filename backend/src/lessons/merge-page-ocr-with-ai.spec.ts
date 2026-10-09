@@ -87,10 +87,33 @@ Uncle: Is it work that makes you cross?
 });
 
 describe('stripWorkbookExercisesFromPage', () => {
-  it('stops before Exercise 1', () => {
-    const text = 'Reading text\nAkhtar came home.\n\nExercise 1\nWhat is the central idea?';
+  it('stops before Exercise 1 on story pages', () => {
+    const text =
+      'Reading text\nAkhtar came home late from school one day and told uncle about social service week.\n\nExercise 1\nWhat is the central idea?';
     expect(stripWorkbookExercisesFromPage(text)).toMatch(/Akhtar came home/);
     expect(stripWorkbookExercisesFromPage(text)).not.toMatch(/central idea/i);
+  });
+
+  it('keeps exercise-only worksheet pages instead of collapsing to Unit', () => {
+    const text = `
+Unit
+READING COMPREHENSION
+2.1
+Exercise 1
+What do you think is the central idea of the text?
+a. One should be ashamed of doing work.
+b. One should be worried when asked to do work.
+c. One should have respect for all people who work.
+Exercise 2
+Match column A words with their corresponding meaning in column B.
+1. cross
+2. fetch
+`.trim();
+    const kept = stripWorkbookExercisesFromPage(text);
+    expect(kept).toMatch(/Exercise 1/i);
+    expect(kept).toMatch(/central idea/i);
+    expect(kept).toMatch(/Match column A/i);
+    expect(kept.length).toBeGreaterThan(80);
   });
 });
 

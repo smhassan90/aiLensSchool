@@ -21,12 +21,45 @@ Hard rules:
 - Format dialogue as:
   Akhtar: ...
   Uncle: ...
-- STOP before "Exercise 1" / workbook exercises / "Note for teachers".
+- On story/reading pages, STOP before "Exercise 1" / workbook exercises / "Note for teachers".
+- On exercise-only pages (page is mostly Exercise 1/2 matching/MCQ), KEEP the full exercise text.
 - Fix obvious OCR typos only. Do NOT invent plot.`;
 
+/**
+ * Drop trailing workbook exercises from a *reading* page.
+ * Exercise-only pages (header + Exercise 1…) must be kept intact — otherwise
+ * merge collapses to "Unit" / empty after stripping.
+ */
 export function stripWorkbookExercisesFromPage(text: string): string {
   const value = (text ?? '').trim();
   if (!value) return '';
+
+  const exerciseMatch = value.match(/(?:^|\n)\s*Exercise\s*1\b/i);
+  const exerciseStart = exerciseMatch?.index ?? -1;
+  if (exerciseStart < 0) {
+    return value
+      .replace(/^\s*Note for teachers?\b[\s\S]*$/im, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  const before = value.slice(0, exerciseStart).trim();
+  const beforeBody = before
+    .replace(/^\s*Unit\b/gim, '')
+    .replace(/^\s*READING\s+COMPREHENSION\s*$/gim, '')
+    .replace(/^\s*\d+(\.\d+)?\s*$/gim, '')
+    .trim();
+  const beforeLatin = countLatinLetters(beforeBody);
+  const hasReadingStoryBody =
+    beforeLatin >= 220 ||
+    /\b(akhtar|rukhsana|came home|pre-?reading|reading\s*text|dignity of work|king bruce|uncle inayat)\b/i.test(
+      beforeBody,
+    );
+  // Worksheet / comprehension-only page: keep exercises (matching tables, MCQs).
+  if (!hasReadingStoryBody) {
+    return value.replace(/\n{3,}/g, '\n\n').trim();
+  }
+
   const lines = value.split(/\r?\n/);
   const kept: string[] = [];
   for (const line of lines) {
@@ -38,17 +71,11 @@ export function stripWorkbookExercisesFromPage(text: string): string {
     }
     kept.push(line);
   }
-  const trimmed = kept
+  return kept
     .join('\n')
     .replace(/^\s*READING\s+COMPREHENSION\s*$/gim, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  if (trimmed) return trimmed;
-  const exerciseStart = value.search(/\bExercise\s*1\b/i);
-  if (exerciseStart > 40) {
-    return value.slice(0, exerciseStart).trim();
-  }
-  return value;
 }
 
 /** Prefer coverage-aware rule merge; never let short clean Paddle erase fuller Combined OCR. */
