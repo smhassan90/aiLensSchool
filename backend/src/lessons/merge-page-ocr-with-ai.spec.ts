@@ -1,5 +1,7 @@
 import {
   assembleChapterLessonFromPageTexts,
+  buildGroundedStoryOpening,
+  groundEnglishReadingMerge,
   pickStrongerRuleMerge,
   stripWorkbookExercisesFromPage,
 } from './merge-page-ocr-with-ai';
@@ -30,6 +32,57 @@ Is it a matter of shame to clean what we make dirty?
     const picked = pickStrongerRuleMerge(paddle, tess, rule);
     expect(picked).toMatch(/Akhtar came home/i);
     expect(picked.length).toBeGreaterThan(paddle.length);
+  });
+});
+
+describe('groundEnglishReadingMerge', () => {
+  const paddle = `
+Unit
+Pre-reading
+I. What are the two home chores you like to do, and why?
+Guess the content of the text.
+Reading tert
+Dignity of Work
+down to lunch, the children's favourite uncle, Mr.Inayat, came to visit
+them.Children were very happy to see him because he had been to
+many countries and always told them interesting stories.
+Akhtar's sister Rukhsana, told Uncle Inayat that Akhtar had come
+home unhappy.
+Akhtar
+Uncle,we are having a social service week at school, so we
+all have to do the work of servants and gardeners.
+Uncle
+Is it work that makes you cross?
+`.trim();
+
+  const tess = `
+Akhtar came home late from scl
+feeling CLOSS
+looked untidy
+MI Inayat, came to visit
+interesting stories
+social service week
+`.trim();
+
+  it('repairs invented opening and keeps Akhtar came home', () => {
+    const badAi = `
+Pre-reading
+Name some home chores you don't want to do.
+Reading text
+Dignity of Work
+One day he was feeling cross because he did not want to go down to lunch. They were very happy to see him because he had been to many countries and always told them interesting stories.
+
+Akhtar's sister, Rukhsana, told Uncle Inayat that Akhtar had come home unhappy.
+
+Akhtar: Uncle, we are having a social service week at school, so we all have to do the work of servants and gardeners.
+Uncle: Is it work that makes you cross?
+`.trim();
+    const grounded = groundEnglishReadingMerge(badAi, paddle, tess);
+    expect(grounded).toMatch(/Akhtar came home/i);
+    expect(grounded).not.toMatch(/did not want to go down to lunch/i);
+    expect(grounded).toMatch(/two home chores you like/i);
+    expect(grounded).toMatch(/social service week/i);
+    expect(buildGroundedStoryOpening(paddle, tess)).toMatch(/Akhtar came home late from school/i);
   });
 });
 
