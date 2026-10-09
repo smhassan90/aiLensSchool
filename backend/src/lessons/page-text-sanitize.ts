@@ -257,6 +257,12 @@ export function compareOrientationOcrResults(
 ): number {
   if (!current?.text?.trim()) return candidate.text?.trim() ? 1 : 0;
   if (!candidate.text?.trim()) return -1;
+
+  const currentGarbled = looksLikeGarbledLatinOcr(current.text);
+  const candidateGarbled = looksLikeGarbledLatinOcr(candidate.text);
+  if (candidateGarbled && !currentGarbled) return -1;
+  if (currentGarbled && !candidateGarbled) return 1;
+
   if (candidate.readable && !current.readable) {
     if (current.text.length >= candidate.text.length * 1.12) return -1;
     if (candidate.text.length >= current.text.length * 0.72) return 1;
@@ -318,6 +324,9 @@ export function scorePageOcrCandidate(
 ): number {
   const value = (text ?? '').trim();
   if (!value) return 0;
+  if (looksLikeGarbledLatinOcr(value)) {
+    return Math.max(0, Math.floor(scorePageOcrQuality(value) / 6));
+  }
   const quality = scorePageOcrQuality(value);
   const readable = isPagePhotoTextReadable(value) && !englishPageTranscriptLooksIncomplete(value);
   const englishPrimary = options?.englishPrimary === true;
@@ -333,13 +342,19 @@ export function scorePageOcrCandidate(
         /\b(bravo|fail|cobweb|silken|endeavour|native cot|give it all up|e[xz]ercise\s*[1-7]|flung|beginning to sink|nine\s+brave|anxious minute|akhtar|rukhsana|dignity of work|business tycoon|pre-reading|note for teachers|khandaq|khandag)\b/gi,
       ) ?? []
     ).length * 10;
+  let layoutPenalty = 0;
+  if (/\bfrom\s+\d+\.jpe?g\b/i.test(value)) layoutPenalty += 120;
+  if (/note for teach/i.test(value) && (value.match(/[|£€©®@#\\]/g) ?? []).length >= 3) {
+    layoutPenalty += 80;
+  }
   return (
     quality * 2 +
     Math.min(140, Math.floor(value.length / 7)) +
     (readable ? 30 : 0) +
     englishWordBonus +
     cueBonus +
-    criticalPageCueHits(value) * 22
+    criticalPageCueHits(value) * 22 -
+    layoutPenalty
   );
 }
 

@@ -75,6 +75,7 @@ import {
   looksLikeMangledRtlOcr,
   looksLikeRealLessonText,
 } from '../common/extract-quality';
+import { looksLikeGarbledLatinOcr } from '../common/garbled-latin-ocr';
 import { assembleChapterLessonFromPageTexts } from './merge-page-ocr-with-ai';
 import { mergePaddleAndTesseractPageOcr } from './merge-paddle-tesseract-ocr';
 import { OcrUploadProgressService } from './ocr-upload-progress.service';
@@ -582,6 +583,16 @@ export class LessonsService {
           degrees: number;
         }
       | undefined;
+    let bestNonGarbled:
+      | {
+          ocrFile: Express.Multer.File;
+          visionFile: Express.Multer.File;
+          ocrText: string;
+          score: number;
+          readable: boolean;
+          degrees: number;
+        }
+      | undefined;
     let lastError: unknown;
     let tried = 0;
 
@@ -604,10 +615,10 @@ export class LessonsService {
         } as Express.Multer.File;
         const [greyText, colorText] = await Promise.all([
           this.pageOcr
-            .readPageTexts([greyFile], { subjectName: subject.name })
+            .readTesseractPageTexts([greyFile], { subjectName: subject.name })
             .then((rows) => (rows[0] ?? '').trim()),
           this.pageOcr
-            .readPageTexts([visionFile], { subjectName: subject.name })
+            .readTesseractPageTexts([visionFile], { subjectName: subject.name })
             .then((rows) => (rows[0] ?? '').trim()),
         ]);
         const ocrText = mergeDualChannelPageOcr(greyText, colorText);
@@ -636,8 +647,22 @@ export class LessonsService {
         if (compareOrientationOcrResults(orientBest, orientCandidate) > 0) {
           best = { ocrFile, visionFile, ocrText, score, readable, degrees };
         }
+        if (!looksLikeGarbledLatinOcr(ocrText)) {
+          const orientBestClean: OrientationOcrCandidate | undefined = bestNonGarbled
+            ? {
+                text: bestNonGarbled.ocrText,
+                score: bestNonGarbled.score,
+                readable: bestNonGarbled.readable,
+                degrees: bestNonGarbled.degrees,
+              }
+            : undefined;
+          if (compareOrientationOcrResults(orientBestClean, orientCandidate) > 0) {
+            bestNonGarbled = { ocrFile, visionFile, ocrText, score, readable, degrees };
+          }
+        }
         if (
           !looksLikePoemOrReadingPage(ocrText) &&
+          !looksLikeGarbledLatinOcr(ocrText) &&
           readable &&
           scorePageOcrQuality(ocrText) >= 78 &&
           ocrText.length >= 900 &&
@@ -664,6 +689,17 @@ export class LessonsService {
         message: this.unclearPagePhotoMessage(file.originalname),
       });
     }
+    if (looksLikeGarbledLatinOcr(best.ocrText) && bestNonGarbled?.ocrText?.trim()) {
+      this.logger.warn(
+        `Page orientation: rejected garbled ${best.degrees}° OCR; using ${bestNonGarbled.degrees}° for ${file.originalname ?? 'photo'}`,
+      );
+      best = bestNonGarbled;
+    } else if (looksLikeGarbledLatinOcr(best.ocrText)) {
+      throw new BadRequestException({
+        code: 'PAGE_PHOTO_UNCLEAR',
+        message: this.unclearPagePhotoMessage(file.originalname),
+      });
+    }
     if (best.degrees !== 0) {
       this.logger.log(
         `Page orientation: using ${best.degrees}° rotation for ${file.originalname ?? 'photo'}`,
@@ -685,11 +721,24 @@ export class LessonsService {
     subject: { name: string },
   ): { text: string; merged: string } {
     const mergedRaw = mergePaddleAndTesseractPageOcr(paddle, tesseract);
-    const merged = filterPageTextForLessonAssembly(mergedRaw);
+    let merged = filterPageTextForLessonAssembly(mergedRaw);
+    if (looksLikeGarbledLatinOcr(merged)) {
+      const paddleClean = (paddle ?? '').trim();
+      const tessClean = (tesseract ?? '').trim();
+      const fallback = pickBetterPageTranscript(
+        looksLikeGarbledLatinOcr(paddleClean) ? '' : paddleClean,
+        looksLikeGarbledLatinOcr(tessClean) ? '' : tessClean,
+      );
+      if (fallback.trim()) {
+        merged = filterPageTextForLessonAssembly(fallback);
+      }
+    }
     const englishPrimary = ocrLanguagesForSubject(subject.name) === 'eng';
+    const orientHint =
+      looksLikeGarbledLatinOcr(orientOcrText) ? '' : (orientOcrText ?? '').trim();
     const lessonSource = englishPrimary
-      ? preferEnglishLessonPageTranscript(merged, orientOcrText)
-      : pickBetterPageTranscript(merged, orientOcrText);
+      ? preferEnglishLessonPageTranscript(merged, orientHint)
+      : pickBetterPageTranscript(merged, orientHint);
     const text = filterPageTextForLessonAssembly(lessonSource);
     if (text.trim() || merged.trim()) {
       return { text, merged };

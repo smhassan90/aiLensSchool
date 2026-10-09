@@ -1,4 +1,5 @@
 ﻿import {
+  compareOrientationOcrResults,
   englishPageTranscriptLooksIncomplete,
   filterPageTextForLessonAssembly,
   isPagePhotoTextReadable,
@@ -8,6 +9,31 @@
   scorePageOcrQuality,
   visionTranscriptMissingOcrContent,
 } from './page-text-sanitize';
+import { looksLikeGarbledLatinOcr } from '../common/garbled-latin-ocr';
+
+describe('compareOrientationOcrResults', () => {
+  it('prefers a clean upright transcript over a longer garbled rotation', () => {
+    const garbled = `
+hy? ;    to do, and w                   i
+pre-reading      ho £570 home CHF   oe Jou don't want to do       VE
+Akhtar came ROT bel asked him the reason
+Note for teache  5    — wr     SrA of     10: Ask all
+from 1.jpeg`.trim();
+    const clean = `
+Pre-reading
+1. Why do you think Akhtar came home unhappy?
+Reading text
+Akhtar came home from school one day. He was feeling cross.
+Uncle Inayat looked at him and asked him what had happened.`.trim();
+    expect(looksLikeGarbledLatinOcr(garbled)).toBe(true);
+    expect(looksLikeGarbledLatinOcr(clean)).toBe(false);
+    const cmp = compareOrientationOcrResults(
+      { text: garbled, score: 400, readable: true, degrees: 90 },
+      { text: clean, score: 120, readable: true, degrees: 0 },
+    );
+    expect(cmp).toBeGreaterThan(0);
+  });
+});
 
 describe('scorePageOcrQuality', () => {
   it('keeps readable poem OCR when paragraph filter would drop the stanza', () => {

@@ -342,6 +342,17 @@ export class PageOcrService implements OnModuleDestroy {
     return pages.filter(Boolean).join('\n\n').trim();
   }
 
+  /** Fast Tesseract-only pass (orientation probes — skip Paddle). */
+  async readTesseractPageTexts(
+    files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
+    options?: { subjectName?: string | null },
+  ): Promise<string[]> {
+    if (isServerlessRuntime()) {
+      return files.map(() => '');
+    }
+    return this.readWithTesseract(files, options);
+  }
+
   /** One OCR string per file (no "Page N" prefix), same order as input files. */
   async readPageTexts(
     files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
