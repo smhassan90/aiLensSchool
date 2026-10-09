@@ -34,7 +34,12 @@ export function ExamSolutionSheet({ quiz }: { quiz: Quiz }) {
       </header>
       <ol className="mt-4 columns-1 gap-x-8 text-sm sm:columns-2">
         {included.map((question, index) => (
-          <li key={question.id} className="mb-2 break-inside-avoid">
+          <li
+            key={question.id}
+            className={`mb-2 break-inside-avoid ${
+              question.type === "LONG_ANSWER" ? "whitespace-pre-wrap" : ""
+            }`}
+          >
             <span className="font-semibold">{index + 1}.</span> {answerForQuestion(question)}
           </li>
         ))}

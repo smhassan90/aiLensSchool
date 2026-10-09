@@ -196,7 +196,7 @@ function DraftQuestionFields({
             />
           </div>
         ) : null}
-        {question.type === "SHORT_ANSWER" || question.type === "LONG_ANSWER" ? (
+        {question.type === "SHORT_ANSWER" ? (
           <div>
             <Label htmlFor={`model-${question.id}`}>Model answer (optional)</Label>
             <Input
@@ -205,6 +205,19 @@ function DraftQuestionFields({
               onChange={(e) => onPatch({ correctAnswer: e.target.value })}
               onBlur={onBlurSave}
               className="mt-1"
+            />
+          </div>
+        ) : null}
+        {question.type === "LONG_ANSWER" ? (
+          <div>
+            <Label htmlFor={`model-${question.id}`}>Model answer (optional)</Label>
+            <Textarea
+              id={`model-${question.id}`}
+              value={question.correctAnswer ?? ""}
+              onChange={(e) => onPatch({ correctAnswer: e.target.value })}
+              onBlur={onBlurSave}
+              rows={6}
+              className="mt-1 max-h-48 resize-y overflow-y-auto"
             />
           </div>
         ) : null}

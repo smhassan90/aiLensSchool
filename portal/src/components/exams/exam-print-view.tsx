@@ -125,7 +125,11 @@ export function ExamPrintView({
                       <div className="mt-3 h-8 border-b border-neutral-400" />
                     )}
                     {showAnswers && question.correctAnswer ? (
-                      <p className="mt-2 text-xs text-neutral-700 print:hidden">
+                      <p
+                        className={`mt-2 text-xs text-neutral-700 print:hidden ${
+                          question.type === "LONG_ANSWER" ? "max-h-40 overflow-y-auto whitespace-pre-wrap" : ""
+                        }`}
+                      >
                         Answer key: {question.correctAnswer}
                       </p>
                     ) : null}
