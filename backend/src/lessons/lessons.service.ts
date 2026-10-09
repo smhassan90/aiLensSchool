@@ -310,8 +310,6 @@ export class LessonsService {
         const paddleRaw = s.paddleOcrText?.trim() ?? '';
         const tessRaw = s.tesseractOcrText?.trim() ?? '';
         const mergedRaw = s.mergedOcrText?.trim() ?? '';
-        const paddlePreview = paddleRaw ? coerceLessonDisplayText(paddleRaw) : '';
-        const tessPreview = tessRaw ? coerceLessonDisplayText(tessRaw) : '';
         const mergedPreview = mergedRaw
           ? coerceLessonDisplayText(mergedRaw)
           : fetchedText.trim()
@@ -323,8 +321,10 @@ export class LessonsService {
           url: s.fileAsset!.url,
           label: s.fileAsset!.originalFilename ?? 'Page photo',
           fetchedText,
-          paddleOcrText: paddlePreview,
-          tesseractOcrText: tessPreview,
+          /** Exact PaddleOCR output from DB — no lesson cleanup or vision merge. */
+          paddleOcrText: paddleRaw,
+          /** Exact Tesseract output from DB. */
+          tesseractOcrText: tessRaw,
           mergedOcrText: mergedPreview,
           textQualityPercent,
           textAccepted: Boolean(textForAcceptance) && isPagePhotoTextReadable(textForAcceptance),

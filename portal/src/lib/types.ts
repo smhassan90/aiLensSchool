@@ -322,7 +322,9 @@ export interface LessonPageSource {
   label: string;
   /** Text read from this page photo (OCR / vision). */
   fetchedText?: string;
+  /** Raw PaddleOCR output from DB (not vision / merged lesson text). */
   paddleOcrText?: string;
+  /** Raw Tesseract output from DB. */
   tesseractOcrText?: string;
   mergedOcrText?: string;
   /** 0–100 clarity score from OCR quality check. */
