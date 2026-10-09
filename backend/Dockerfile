@@ -40,8 +40,8 @@ COPY --from=builder /app/dist ./dist
 COPY ocr ./ocr
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# Optional PaddleOCR (keeps Tesseract). Set BUILD_PADDLE_OCR=1 when building the image.
-ARG BUILD_PADDLE_OCR=0
+# PaddleOCR + Tesseract (set BUILD_PADDLE_OCR=0 for a smaller image without Python/Paddle).
+ARG BUILD_PADDLE_OCR=1
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
   && mkdir -p /app/uploads \
   && if [ "$BUILD_PADDLE_OCR" = "1" ]; then \

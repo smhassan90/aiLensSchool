@@ -86,6 +86,13 @@ export function preferOcrTranscript(paddleText: string, tesseractText: string): 
   if (tessLen >= paddleLen + 80) return { text: tess, engine: 'tesseract' };
 
   const better = pickBetterPageTranscript(paddle, tess);
+  if (better === tess && paddleLen >= tessLen * 0.9) {
+    const pScore = scorePageOcrQuality(paddle);
+    const tScore = scorePageOcrQuality(tess);
+    if (pScore >= tScore - 10) {
+      return { text: paddle, engine: 'paddle' };
+    }
+  }
   return { text: better, engine: better === tess ? 'tesseract' : 'paddle' };
 }
 

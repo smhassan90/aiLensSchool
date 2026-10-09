@@ -49,10 +49,13 @@ services:
       dockerfile: Dockerfile
       args:
         BUILD_SHA: local
+        BUILD_PADDLE_OCR: ${BUILD_PADDLE_OCR:-1}
     restart: unless-stopped
     env_file:
       - .env.local
     environment:
+      OCR_ENGINE: ${OCR_ENGINE:-auto}
+      PADDLE_OCR_PYTHON: /opt/paddleocr/bin/python
       RUN_SEED: ${RUN_SEED:-false}
       SKIP_DB_PUSH: ${SKIP_DB_PUSH:-false}
       DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}?connection_limit=10&pool_timeout=30&connect_timeout=15

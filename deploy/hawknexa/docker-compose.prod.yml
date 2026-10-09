@@ -42,12 +42,14 @@ services:
       dockerfile: Dockerfile
       args:
         BUILD_SHA: ${BUILD_SHA:-unknown}
-        # Set BUILD_PADDLE_OCR=1 in .env to bake PaddleOCR into the backend image (Tesseract stays as fallback).
-        BUILD_PADDLE_OCR: ${BUILD_PADDLE_OCR:-0}
+        # BUILD_PADDLE_OCR=0 skips Python/Paddle in the image (Tesseract-only, smaller build).
+        BUILD_PADDLE_OCR: ${BUILD_PADDLE_OCR:-1}
     restart: unless-stopped
     env_file:
       - .env
     environment:
+      OCR_ENGINE: ${OCR_ENGINE:-auto}
+      PADDLE_OCR_PYTHON: /opt/paddleocr/bin/python
       RUN_SEED: ${RUN_SEED:-false}
       # Apply additive Prisma schema changes during every production restart.
       # This keeps the VPS database aligned with the shipped Prisma client.
