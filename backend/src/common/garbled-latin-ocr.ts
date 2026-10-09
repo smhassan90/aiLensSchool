@@ -99,7 +99,7 @@ export function looksLikeIllustrationPollutedLatinOcr(text: string | undefined |
   return false;
 }
 
-function latinWordLooksPlausible(word: string): boolean {
+export function latinOcrWordLooksPlausible(word: string): boolean {
   const w = word.toLowerCase();
   if (w.length <= 2) return true;
   if (COMMON_ENGLISH_WORDS.has(w)) return true;
@@ -150,7 +150,7 @@ export function looksLikeGarbledLatinOcr(text: string | undefined | null): boole
       weakLines += 1;
       continue;
     }
-    const implausible = words.filter((w) => w.length >= 3 && !latinWordLooksPlausible(w));
+    const implausible = words.filter((w) => w.length >= 3 && !latinOcrWordLooksPlausible(w));
     if (words.length >= 4 && implausible.length / words.length >= 0.45) {
       weakLines += 1;
     }
@@ -159,7 +159,7 @@ export function looksLikeGarbledLatinOcr(text: string | undefined | null): boole
 
   const allWords = value.match(/[A-Za-z]{3,}/g) ?? [];
   if (allWords.length >= 14) {
-    const bad = allWords.filter((w) => !latinWordLooksPlausible(w)).length;
+    const bad = allWords.filter((w) => !latinOcrWordLooksPlausible(w)).length;
     if (bad / allWords.length >= 0.38) return true;
   }
 

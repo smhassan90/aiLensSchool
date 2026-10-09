@@ -3,6 +3,7 @@ import { mkdir } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { isServerlessRuntime } from '../common/env';
+import { mergePaddleAndTesseractPageOcr } from './merge-paddle-tesseract-ocr';
 import {
   englishPageTranscriptLooksIncomplete,
   isPagePhotoTextReadable,
@@ -235,8 +236,8 @@ export class PageOcrService implements OnModuleDestroy {
   }
 
   /**
-   * Dual-engine OCR: Tesseract stays available; Paddle is preferred when its
-   * transcript scores better (OCR_ENGINE=auto|paddle). Use OCR_ENGINE=tesseract to force Tesseract only.
+   * Dual-engine OCR: Paddle first, then Tesseract; merge transcripts (no pick-one).
+   * OCR_ENGINE=tesseract skips Paddle. OCR_ENGINE=paddle|auto runs both when Paddle is installed.
    */
   private async readPageTextsDual(
     files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
@@ -248,29 +249,19 @@ export class PageOcrService implements OnModuleDestroy {
       return this.readWithTesseract(files, options);
     }
 
-    if (mode === 'paddle') {
-      const paddleTexts = await this.readWithPaddle(files, options);
-      // Hard fallback so lesson upload never dies if Paddle is missing.
-      const needsFallback = paddleTexts.some((t) => !t.trim());
-      if (!needsFallback) return paddleTexts;
-      const tessTexts = await this.readWithTesseract(files, options);
-      return paddleTexts.map((paddle, i) => preferOcrTranscript(paddle, tessTexts[i] ?? '').text);
-    }
-
-    // auto: run both when Paddle is enabled; pick the better transcript per page.
-    const [paddleTexts, tessTexts] = await Promise.all([
-      this.readWithPaddle(files, options),
-      this.readWithTesseract(files, options),
-    ]);
+    const paddleTexts = await this.readWithPaddle(files, options);
+    const tessTexts = await this.readWithTesseract(files, options);
 
     return files.map((_, index) => {
-      const chosen = preferOcrTranscript(paddleTexts[index] ?? '', tessTexts[index] ?? '');
-      if (chosen.engine !== 'none') {
+      const paddle = paddleTexts[index] ?? '';
+      const tess = tessTexts[index] ?? '';
+      const merged = mergePaddleAndTesseractPageOcr(paddle, tess);
+      if (paddle.trim() || tess.trim()) {
         this.logger.log(
-          `OCR page ${index + 1} chose ${chosen.engine} (paddle=${(paddleTexts[index] ?? '').length}ch tess=${(tessTexts[index] ?? '').length}ch)`,
+          `OCR page ${index + 1} merged paddle+tesseract (paddle=${paddle.length}ch tess=${tess.length}ch out=${merged.length}ch)`,
         );
       }
-      return chosen.text;
+      return merged;
     });
   }
 
