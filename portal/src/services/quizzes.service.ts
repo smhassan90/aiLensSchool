@@ -72,6 +72,8 @@ export const quizzesService = {
     return apiClient<Quiz>("/quizzes/generate", {
       method: "POST",
       body: JSON.stringify(payload),
+      // Exam papers can take 2–4 minutes of AI work; default fetch has no long budget.
+      timeoutMs: payload.paperKind === "EXAM" || payload.examPaper ? 270_000 : 120_000,
     });
   },
 
@@ -93,6 +95,7 @@ export const quizzesService = {
     return apiClient<Quiz>(`/quizzes/${id}/generate-more`, {
       method: "POST",
       body: JSON.stringify(payload),
+      timeoutMs: 180_000,
     });
   },
 

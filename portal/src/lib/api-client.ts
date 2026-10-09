@@ -133,7 +133,7 @@ async function authorizedFetch<T>(path: string, init: RequestInit, baseUrl = get
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {
       throw new ApiClientError(
-        "The request took too long. Try fewer photos, a stronger connection, or try again.",
+        "The request took too long. Please try again (exam papers can take a few minutes).",
         408,
         "REQUEST_TIMEOUT",
       );
@@ -179,13 +179,34 @@ async function authorizedFetch<T>(path: string, init: RequestInit, baseUrl = get
 
 export async function apiClient<T>(
   path: string,
-  options: RequestInit = {},
+  options: RequestInit & { timeoutMs?: number } = {},
 ): Promise<T> {
-  const headers = new Headers(options.headers);
-  if (!headers.has("Content-Type") && options.body) {
+  const { timeoutMs, ...init } = options;
+  const headers = new Headers(init.headers);
+  if (!headers.has("Content-Type") && init.body) {
     headers.set("Content-Type", "application/json");
   }
-  return authorizedFetch<T>(path, { ...options, headers });
+  if (!timeoutMs || timeoutMs <= 0) {
+    return authorizedFetch<T>(path, { ...init, headers });
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const upstream = init.signal;
+  const onUpstreamAbort = () => controller.abort();
+  if (upstream) {
+    if (upstream.aborted) controller.abort();
+    else upstream.addEventListener("abort", onUpstreamAbort, { once: true });
+  }
+  try {
+    return await authorizedFetch<T>(path, {
+      ...init,
+      headers,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+    upstream?.removeEventListener("abort", onUpstreamAbort);
+  }
 }
 
 export async function apiUpload<T>(path: string, file: File, fieldName = "file"): Promise<T> {

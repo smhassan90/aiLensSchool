@@ -200,7 +200,7 @@ export class CursorProvider implements AiProvider {
         mix.mode === 'exam' ? EXAM_GENERATION_PROMPT : QUIZ_GENERATION_PROMPT,
         `Subject: ${input.subjectName ?? 'General'}\n${difficultyLine ? `${difficultyLine}\n` : ''}${quizMixInstructions(mix)}\n\nLectures:\n${input.lessonSummaries.join('\n---\n')}`,
       ),
-      this.jsonTimeoutMs,
+      this.quizGenerationTimeoutMs(mix),
       mix.mode === 'exam' ? 'Exam generation' : 'Quiz generation',
     );
     try {
@@ -395,6 +395,22 @@ export class CursorProvider implements AiProvider {
   private lessonPageVisionTimeoutMs(pageCount: number): number {
     const count = Math.max(1, pageCount);
     return Math.min(240_000, 90_000 + (count - 1) * 12_000);
+  }
+
+  /**
+   * Exam papers (many MCQ + short/long answers) routinely exceed the 40s JSON budget
+   * and surface as "Exam generation timed out" / 502 to the portal.
+   */
+  private quizGenerationTimeoutMs(mix: { mode: string; questionCount: number }): number {
+    const envRaw = Number(readEnv('EXAM_GENERATION_TIMEOUT_MS') ?? 0);
+    if (mix.mode === 'exam') {
+      if (Number.isFinite(envRaw) && envRaw > 0) return envRaw;
+      const q = Math.max(1, mix.questionCount || 1);
+      return Math.min(240_000, Math.max(150_000, 90_000 + q * 4_000));
+    }
+    const quizEnv = Number(readEnv('QUIZ_GENERATION_TIMEOUT_MS') ?? 0);
+    if (Number.isFinite(quizEnv) && quizEnv > 0) return quizEnv;
+    return Math.max(this.jsonTimeoutMs, 60_000);
   }
 
   private async completeWithImages(system: string, user: string, images: LessonImageInput[]) {
