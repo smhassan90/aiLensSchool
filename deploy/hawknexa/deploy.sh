@@ -183,7 +183,10 @@ compose_up() {
 
 if ! compose_up 1; then
   echo "WARN: compose up failed, pruning stale containers and retrying once..." >&2
-  docker compose -f "${COMPOSE_FILE}" rm -sf backend portal 2>/dev/null || true
+  # Name conflicts leave containers like 2403a3fa…_hawknexa-backend-1 that block reuse.
+  docker compose -f "${COMPOSE_FILE}" rm -sf backend portal mysql redis 2>/dev/null || true
+  docker ps -a --format '{{.ID}} {{.Names}}' | awk '/hawknexa-(backend|portal|mysql|redis)/ {print $1}' | xargs -r docker rm -f
+  docker container prune -f >/dev/null 2>&1 || true
   sleep 3
   compose_up 2
 fi
