@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { FileText, Send } from "lucide-react";
+import { FileText, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -62,6 +62,7 @@ export function QuizEditorActions({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [publishOpen, setPublishOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const [publishMode, setPublishMode] = useState<"immediate" | "schedule">("immediate");
   const [dueAt, setDueAt] = useState("");
   const examPaper = isExamPaper(quiz.paperKind);
@@ -150,9 +151,37 @@ export function QuizEditorActions({
     },
   });
 
+  const discardDraft = useMutation({
+    mutationFn: () => quizzesService.discardDraft(quizId),
+    onSuccess: () => {
+      toast({
+        title: examPaper ? "Draft exam discarded" : "Draft quiz discarded",
+        description: examPaper
+          ? "You can generate a new paper from the exam assignment."
+          : "The draft was removed.",
+        variant: "success",
+      });
+      setDiscardOpen(false);
+      queryClient.removeQueries({ queryKey: ["quiz", quizId] });
+      queryClient.invalidateQueries({ queryKey: ["teacher-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["my-exam-paper-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["teacher-exam-papers"] });
+      queryClient.invalidateQueries({ queryKey: listQueryKey });
+      router.push(listHref);
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not discard draft",
+        description: err instanceof ApiClientError ? err.message : (err as Error).message,
+        variant: "error",
+      });
+    },
+  });
+
   if (quiz.status === "PUBLISHED" || quiz.status === "CLOSED") return null;
 
-  const busy = saveDraft.isPending || publish.isPending || submitPaper.isPending;
+  const busy =
+    saveDraft.isPending || publish.isPending || submitPaper.isPending || discardDraft.isPending;
 
   return (
     <>
@@ -173,6 +202,16 @@ export function QuizEditorActions({
         </div>
       ) : null}
       <div className="mt-6 flex flex-wrap justify-end gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+          disabled={busy}
+          onClick={() => setDiscardOpen(true)}
+        >
+          <Trash2 className="h-4 w-4" />
+          Discard draft
+        </Button>
         <Button
           type="button"
           variant="outline"
@@ -203,6 +242,37 @@ export function QuizEditorActions({
             : "Publish"}
         </Button>
       </div>
+
+      <Dialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <DialogContent onClose={() => setDiscardOpen(false)}>
+          <DialogHeader>
+            <DialogTitle>{examPaper ? "Discard this draft exam?" : "Discard this draft quiz?"}</DialogTitle>
+            <DialogDescription>
+              {examPaper
+                ? "All generated questions will be permanently removed. You can generate a new paper from the same exam assignment afterward."
+                : "All generated questions will be permanently removed. This cannot be undone."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={discardDraft.isPending}
+              onClick={() => setDiscardOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={discardDraft.isPending}
+              onClick={() => discardDraft.mutate()}
+            >
+              {discardDraft.isPending ? "Discarding…" : "Discard draft"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {!examPaper ? (
       <Dialog open={publishOpen} onOpenChange={setPublishOpen}>

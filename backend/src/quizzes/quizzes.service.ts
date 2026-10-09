@@ -1034,6 +1034,86 @@ export class QuizzesService {
     return this.findQuizForEdit(id, user);
   }
 
+  /**
+   * Permanently delete a draft quiz / exam paper so the teacher can generate again.
+   * Submitted, pending-review, and approved papers cannot be discarded.
+   */
+  async discardDraft(id: string, user: AuthUser) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        schoolId: true,
+        branchId: true,
+        status: true,
+        paperKind: true,
+        reviewStatus: true,
+        createdById: true,
+        examPaperAssignmentId: true,
+        questions: { select: { id: true } },
+      },
+    });
+    if (!quiz) {
+      throw new NotFoundException({ code: 'QUIZ_NOT_FOUND', message: 'Quiz not found' });
+    }
+    this.tenant.assertSchoolAccess(user, quiz.schoolId);
+
+    const isAdmin = this.tenant.isSchoolAdmin(user);
+    if (!isAdmin && quiz.createdById !== user.id) {
+      throw new ForbiddenException({
+        code: 'QUIZ_DISCARD_FORBIDDEN',
+        message: 'You can only discard your own draft',
+      });
+    }
+
+    if (quiz.status !== QuizStatus.DRAFT) {
+      throw new BadRequestException({
+        code: 'QUIZ_NOT_DRAFT',
+        message: 'Only draft papers can be discarded',
+      });
+    }
+
+    if (isExamPaperKind(quiz.paperKind)) {
+      if (
+        quiz.reviewStatus !== ExamPaperReviewStatus.NOT_SUBMITTED &&
+        quiz.reviewStatus !== ExamPaperReviewStatus.REJECTED
+      ) {
+        throw new BadRequestException({
+          code: 'EXAM_PAPER_NOT_DISCARDABLE',
+          message: 'Submitted or approved papers cannot be discarded',
+        });
+      }
+    }
+
+    const questionIds = quiz.questions.map((q) => q.id);
+    await this.prisma.$transaction(async (tx) => {
+      if (questionIds.length) {
+        await tx.quizAnswer.deleteMany({ where: { questionId: { in: questionIds } } });
+        await tx.quizOption.deleteMany({ where: { questionId: { in: questionIds } } });
+      }
+      await tx.quizResult.deleteMany({ where: { quizId: id } });
+      await tx.quizAttempt.deleteMany({ where: { quizId: id } });
+      await tx.quizAssignment.deleteMany({ where: { quizId: id } });
+      await tx.quizQuestion.deleteMany({ where: { quizId: id } });
+      await tx.quiz.delete({ where: { id } });
+    });
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId: quiz.schoolId,
+      branchId: quiz.branchId,
+      action: 'QUIZ_DRAFT_DISCARDED',
+      entityType: 'Quiz',
+      entityId: id,
+      metadata: {
+        paperKind: quiz.paperKind,
+        examPaperAssignmentId: quiz.examPaperAssignmentId,
+      },
+    });
+
+    return { success: true as const, id };
+  }
+
   private totalMarksFromUpdates(
     questions: UpdateQuizQuestionsDto['questions'],
     owned: Map<string, { included: boolean; marks: Prisma.Decimal }>,

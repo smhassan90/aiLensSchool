@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { QuizStatus, RoleName } from '@prisma/client';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
@@ -114,6 +114,13 @@ export class QuizzesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.quizzesService.submitForPrint(id, user, dto);
+  }
+
+  @Roles(RoleName.TEACHER, RoleName.SCHOOL_ADMIN)
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  discardDraft(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.quizzesService.discardDraft(id, user);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.PRINCIPAL, RoleName.TEACHER)

@@ -123,4 +123,10 @@ export const quizzesService = {
       body: JSON.stringify({ reason }),
     });
   },
+
+  discardDraft(id: string) {
+    return apiClient<{ success: true; id: string }>(`/quizzes/${id}`, {
+      method: "DELETE",
+    });
+  },
 };
