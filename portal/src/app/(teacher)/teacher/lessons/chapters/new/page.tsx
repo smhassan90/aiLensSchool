@@ -18,10 +18,11 @@ import { teachersService } from "@/services/teachers.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { compressPhotosForUpload } from "@/lib/page-ocr";
+import { rotateImageFile, type RotateDegrees } from "@/lib/rotate-image";
 import { stashPendingChapterPhotos } from "@/lib/chapter-pending-uploads";
 import { localDateISO } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, ImagePlus, X } from "lucide-react";
+import { ArrowLeft, ImagePlus, RotateCcw, RotateCw, X } from "lucide-react";
 
 const IMAGE_EXT = /\.(jpe?g|png|webp|heic|heif)$/i;
 
@@ -40,11 +41,30 @@ export default function NewChapterPage() {
   const [chapterName, setChapterName] = useState("");
   const [topicName, setTopicName] = useState("");
   const [pasteText, setPasteText] = useState("");
+  const [rotatingIndex, setRotatingIndex] = useState<number | null>(null);
 
   const previews = useMemo(
     () => photos.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })),
     [photos],
   );
+
+  const rotatePhoto = async (index: number, degrees: RotateDegrees) => {
+    const file = photos[index];
+    if (!file) return;
+    setRotatingIndex(index);
+    try {
+      const rotated = await rotateImageFile(file, degrees);
+      setPhotos((current) => current.map((f, i) => (i === index ? rotated : f)));
+    } catch (err) {
+      toast({
+        title: "Could not rotate photo",
+        description: err instanceof Error ? err.message : "Unexpected error",
+        variant: "error",
+      });
+    } finally {
+      setRotatingIndex(null);
+    }
+  };
 
   useEffect(() => {
     return () => previews.forEach((p) => URL.revokeObjectURL(p.url));
@@ -159,7 +179,8 @@ export default function NewChapterPage() {
           <CardHeader>
             <CardTitle>{tab === "photos" ? "Page photos" : "Paste text"}</CardTitle>
             <CardDescription>
-              Confirm content on the next screen. Each page uploads separately so successful pages are saved even if one fails.
+              Photos must be large enough to see orientation. Rotate any sideways page upright before continuing.
+              Each page uploads separately so successful pages are saved even if one fails.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -209,24 +230,65 @@ export default function NewChapterPage() {
                     }}
                   />
                 </label>
-                {previews.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {previews.map((p, i) => (
-                      <div key={p.url} className="relative">
-                        <img src={p.url} alt="" className="h-20 w-16 rounded object-cover" />
-                        <button
-                          type="button"
-                          className="absolute -right-1 -top-1 rounded-full bg-background p-0.5 shadow"
-                          onClick={() => setPhotos((c) => c.filter((_, j) => j !== i))}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
+                {previews.length > 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Check each page is upright. Use Rotate if text looks sideways or upside-down.
+                    </p>
+                    <ul className="grid gap-3 sm:grid-cols-2">
+                      {previews.map((p, i) => (
+                        <li key={p.url} className="relative overflow-hidden rounded-lg border bg-muted/20 p-2">
+                          <button
+                            type="button"
+                            className="absolute right-2 top-2 z-10 rounded-full bg-background p-1 shadow"
+                            onClick={() => setPhotos((c) => c.filter((_, j) => j !== i))}
+                            aria-label={`Remove ${p.name}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                          <div className="flex min-h-[240px] items-center justify-center rounded-md bg-background/80 p-2 sm:min-h-[320px]">
+                            <img
+                              src={p.url}
+                              alt={p.name}
+                              className="max-h-[min(55vh,480px)] w-auto max-w-full object-contain"
+                            />
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                            <span className="truncate text-xs text-muted-foreground">
+                              Page {i + 1} · {p.name}
+                            </span>
+                            <div className="flex gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 gap-1"
+                                disabled={rotatingIndex !== null}
+                                onClick={() => void rotatePhoto(i, 270)}
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                Left
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 gap-1"
+                                disabled={rotatingIndex !== null}
+                                onClick={() => void rotatePhoto(i, 90)}
+                              >
+                                <RotateCw className="h-3.5 w-3.5" />
+                                Right
+                              </Button>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                )}
+                ) : null}
                 <Button
-                  disabled={!classKey || !photos.length}
+                  disabled={!classKey || !photos.length || rotatingIndex !== null}
                   onClick={() => startPhotoChapterMutation.mutate()}
                 >
                   Read text from photos

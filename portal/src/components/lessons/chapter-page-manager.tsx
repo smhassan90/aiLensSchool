@@ -12,6 +12,7 @@ import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { assetUrl } from "@/lib/api-client";
 import { compressPhotosForUpload } from "@/lib/page-ocr";
+import { fetchImageUrlAsFile, rotateImageFile, type RotateDegrees } from "@/lib/rotate-image";
 import { PageLoader } from "@/components/layout/page-loader";
 import type { Lesson, LessonPageSource } from "@/lib/types";
 import {
@@ -40,6 +41,8 @@ import {
   FileImage,
   Sparkles,
   Trash2,
+  RotateCw,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -152,6 +155,7 @@ export function ChapterPageManager({
     text: string;
   } | null>(null);
   const uploadQueueRef = useRef<ChapterPageUploadItem[]>([]);
+  const orderedIdsRef = useRef<Set<string>>(new Set());
   const uploadRunning = useRef(false);
   const initialStarted = useRef(false);
   const orderSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -165,6 +169,43 @@ export function ChapterPageManager({
     | { kind: "saved"; sourceId: string }
     | { kind: "queue"; itemId: string };
   const reuploadTargetRef = useRef<ReuploadTarget | null>(null);
+  type OrientationPrompt =
+    | {
+        kind: "saved";
+        sourceId: string;
+        pageNumber: number;
+        label: string;
+        src: string;
+        reason: string;
+      }
+    | {
+        kind: "queue";
+        itemId: string;
+        pageNumber: number;
+        label: string;
+        src: string;
+        reason: string;
+      }
+    | {
+        kind: "pending";
+        index: number;
+        pageNumber: number;
+        label: string;
+        src: string;
+        reason: string;
+      };
+  const [orientationPrompt, setOrientationPrompt] = useState<OrientationPrompt | null>(null);
+  const [orientationBusy, setOrientationBusy] = useState(false);
+  const [pendingPreviews, setPendingPreviews] = useState<{ name: string; url: string }[]>([]);
+
+  useEffect(() => {
+    const next = pendingPhotos.map((file) => ({
+      name: file.name,
+      url: URL.createObjectURL(file),
+    }));
+    setPendingPreviews(next);
+    return () => next.forEach((p) => URL.revokeObjectURL(p.url));
+  }, [pendingPhotos]);
 
   /** Update queue state and ref synchronously so runNextUpload never sees a stale "failed" list. */
   const applyQueue = useCallback(
@@ -180,6 +221,7 @@ export function ChapterPageManager({
 
   useEffect(() => {
     setOrdered(pageSources);
+    orderedIdsRef.current = new Set(pageSources.map((p) => p.id));
   }, [pageSources]);
 
   useEffect(() => {
@@ -227,6 +269,25 @@ export function ChapterPageManager({
       applyQueue((current) => current.filter((item) => item.id !== next.id));
       invalidate();
       onContentUpdated(lesson);
+      const newest =
+        lesson.pageSources?.find((p) => !orderedIdsRef.current.has(p.id)) ??
+        lesson.pageSources?.[lesson.pageSources.length - 1];
+      if (newest && !pageTextAccepted(newest)) {
+        const src = assetUrl(newest.url);
+        if (src) {
+          const pageNumber =
+            (lesson.pageSources?.findIndex((p) => p.id === newest.id) ?? -1) + 1 || 1;
+          setOrientationPrompt({
+            kind: "saved",
+            sourceId: newest.id,
+            pageNumber,
+            label: newest.label || next.file.name,
+            src,
+            reason:
+              "The text result is not good enough. Check that the page is upright, then rotate if needed and read again.",
+          });
+        }
+      }
     } catch (err) {
       const message = uploadErrorMessage(err);
       applyQueue((current) =>
@@ -238,6 +299,15 @@ export function ChapterPageManager({
         title: `Page “${next.file.name}” failed`,
         description: message,
         variant: "error",
+      });
+      setOrientationPrompt({
+        kind: "queue",
+        itemId: next.id,
+        pageNumber: ordered.length + uploadQueueRef.current.findIndex((i) => i.id === next.id) + 1,
+        label: next.file.name,
+        src: next.previewUrl,
+        reason:
+          "Could not read this photo clearly. Check its orientation — rotate it upright, then try again.",
       });
     } finally {
       stopPoll();
@@ -306,15 +376,39 @@ export function ChapterPageManager({
         toast({
           title: "Partial text captured",
           description:
-            "Some of this page was read. Edit the draft or re-upload a sharper photo if lines are missing.",
+            "Some of this page was read. Check orientation or re-upload a sharper photo if lines are missing.",
           variant: "warning",
         });
+        const src = assetUrl(updated.url);
+        if (src) {
+          setOrientationPrompt({
+            kind: "saved",
+            sourceId: sourceId,
+            pageNumber: (ordered.findIndex((p) => p.id === sourceId) + 1) || 1,
+            label: updated.label,
+            src,
+            reason:
+              "The text result is not good enough. Check that the page is upright, then rotate if needed and read again.",
+          });
+        }
       } else {
         toast({
           title: "Photo still unclear",
-          description: "Try a sharper photo with the full page flat and well lit.",
+          description: "Check orientation, or try a sharper photo with the full page flat and well lit.",
           variant: "error",
         });
+        const src = assetUrl(updated?.url) ?? assetUrl(ordered.find((p) => p.id === sourceId)?.url);
+        if (src) {
+          setOrientationPrompt({
+            kind: "saved",
+            sourceId,
+            pageNumber: (ordered.findIndex((p) => p.id === sourceId) + 1) || 1,
+            label: updated?.label ?? "Page photo",
+            src,
+            reason:
+              "Could not read this page clearly. Check its orientation — rotate it upright, then read again.",
+          });
+        }
       }
     } catch (err) {
       toast({
@@ -322,6 +416,19 @@ export function ChapterPageManager({
         description: uploadErrorMessage(err),
         variant: "error",
       });
+      const page = ordered.find((p) => p.id === sourceId);
+      const src = assetUrl(page?.url);
+      if (src && page) {
+        setOrientationPrompt({
+          kind: "saved",
+          sourceId,
+          pageNumber: (ordered.findIndex((p) => p.id === sourceId) + 1) || 1,
+          label: page.label,
+          src,
+          reason:
+            "Could not read this page clearly. Check its orientation — rotate it upright, then read again.",
+        });
+      }
     } finally {
       stopPoll();
       setReuploadSourceId(null);
@@ -364,6 +471,100 @@ export function ChapterPageManager({
       const target = current.find((item) => item.id === itemId);
       if (target) URL.revokeObjectURL(target.previewUrl);
       return current.filter((item) => item.id !== itemId);
+    });
+  };
+
+  const rotatePendingPhoto = async (index: number, degrees: RotateDegrees) => {
+    const file = pendingPhotos[index];
+    if (!file) return;
+    setOrientationBusy(true);
+    try {
+      const rotated = await rotateImageFile(file, degrees);
+      setPendingPhotos((current) => current.map((f, i) => (i === index ? rotated : f)));
+    } catch (err) {
+      toast({
+        title: "Could not rotate photo",
+        description: err instanceof Error ? err.message : "Unexpected error",
+        variant: "error",
+      });
+    } finally {
+      setOrientationBusy(false);
+    }
+  };
+
+  const rotateQueueItem = async (itemId: string, degrees: RotateDegrees) => {
+    const target = uploadQueueRef.current.find((item) => item.id === itemId);
+    if (!target || target.status === "uploading") return;
+    setOrientationBusy(true);
+    try {
+      const rotated = await rotateImageFile(target.file, degrees);
+      const previewUrl = URL.createObjectURL(rotated);
+      applyQueue((current) =>
+        current.map((item) => {
+          if (item.id !== itemId) return item;
+          URL.revokeObjectURL(item.previewUrl);
+          return {
+            ...item,
+            file: rotated,
+            previewUrl,
+            status: item.status === "failed" ? ("queued" as const) : item.status,
+            error: undefined,
+          };
+        }),
+      );
+      if (target.status === "failed") {
+        setOrientationPrompt(null);
+        void runNextUpload();
+      } else {
+        setOrientationPrompt((prev) =>
+          prev?.kind === "queue" && prev.itemId === itemId
+            ? { ...prev, src: previewUrl, label: rotated.name }
+            : prev,
+        );
+      }
+    } catch (err) {
+      toast({
+        title: "Could not rotate photo",
+        description: err instanceof Error ? err.message : "Unexpected error",
+        variant: "error",
+      });
+    } finally {
+      setOrientationBusy(false);
+    }
+  };
+
+  const rotateSavedPageAndReread = async (sourceId: string, degrees: RotateDegrees) => {
+    const page = ordered.find((p) => p.id === sourceId);
+    const src = assetUrl(page?.url);
+    if (!page || !src) return;
+    setOrientationBusy(true);
+    try {
+      const original = await fetchImageUrlAsFile(src, page.label || "page.jpg");
+      const rotated = await rotateImageFile(original, degrees);
+      setOrientationPrompt(null);
+      await reuploadPage(sourceId, rotated);
+    } catch (err) {
+      toast({
+        title: "Could not rotate page",
+        description: err instanceof Error ? err.message : "Unexpected error",
+        variant: "error",
+      });
+    } finally {
+      setOrientationBusy(false);
+    }
+  };
+
+  const openOrientationCheck = (page: LessonPageSource, pageNumber: number) => {
+    const src = assetUrl(page.url);
+    if (!src) return;
+    setOrientationPrompt({
+      kind: "saved",
+      sourceId: page.id,
+      pageNumber,
+      label: page.label,
+      src,
+      reason:
+        "Text result is not good. Check that the page is upright. Rotate if needed, then read again.",
     });
   };
 
@@ -480,9 +681,9 @@ export function ChapterPageManager({
       <CardHeader>
         <CardTitle className="text-base">Pages &amp; more content</CardTitle>
         <CardDescription>
-          Each photo is read automatically. A green badge means the page is clear enough to compile (poem and
-          exercise pages may show a lower %). Re-upload if you see “needs clearer photo”. Reorder photos so compile
-          follows the book.
+          Each photo is read automatically. Make sure pages look upright before reading — use Rotate if a photo is
+          sideways. A green badge means the page is clear enough to compile. If text looks wrong, check orientation
+          and rotate, or re-upload a clearer photo.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -531,17 +732,17 @@ export function ChapterPageManager({
                     {src ? (
                       <button
                         type="button"
-                        className="group relative h-16 w-12 shrink-0 overflow-hidden rounded ring-offset-2 transition hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        className="group relative h-44 w-32 shrink-0 overflow-hidden rounded-md border bg-muted/20 ring-offset-2 transition hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:h-52 sm:w-36"
                         onClick={() => openPreview(page.id)}
                         aria-label={`Enlarge page ${index + 1}: ${page.label}`}
                       >
-                        <img src={src} alt="" className="h-full w-full object-cover" />
+                        <img src={src} alt="" className="h-full w-full object-contain" />
                         <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
                           <ZoomIn className="h-5 w-5 text-white opacity-0 drop-shadow group-hover:opacity-100" />
                         </span>
                       </button>
                     ) : (
-                      <div className="h-16 w-12 shrink-0 rounded bg-muted" />
+                      <div className="h-44 w-32 shrink-0 rounded-md bg-muted sm:h-52 sm:w-36" />
                     )}
                     <div className="min-w-0 flex-1 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
@@ -617,18 +818,33 @@ export function ChapterPageManager({
                             {preview.label}
                           </Button>
                         ))}
-                        {!accepted && !reading ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="secondary"
-                            className="h-8 gap-1.5"
-                            disabled={queueBusy}
-                            onClick={() => promptReupload(page.id)}
-                          >
-                            <FileImage className="h-3.5 w-3.5" aria-hidden />
-                            Re-upload picture
-                          </Button>
+                        {!reading ? (
+                          <>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 gap-1.5"
+                              disabled={queueBusy || orientationBusy}
+                              onClick={() => openOrientationCheck(page, index + 1)}
+                            >
+                              <RotateCw className="h-3.5 w-3.5" aria-hidden />
+                              Check orientation
+                            </Button>
+                            {!accepted ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                className="h-8 gap-1.5"
+                                disabled={queueBusy}
+                                onClick={() => promptReupload(page.id)}
+                              >
+                                <FileImage className="h-3.5 w-3.5" aria-hidden />
+                                Re-upload picture
+                              </Button>
+                            ) : null}
+                          </>
                         ) : null}
                       </div>
                     </div>
@@ -696,11 +912,11 @@ export function ChapterPageManager({
                   </span>
                   <button
                     type="button"
-                    className="group relative h-16 w-12 shrink-0 overflow-hidden rounded ring-offset-2 transition hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="group relative h-44 w-32 shrink-0 overflow-hidden rounded-md border bg-muted/20 ring-offset-2 transition hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:h-52 sm:w-36"
                     onClick={() => openPreview(item.id)}
                     aria-label={`Enlarge ${item.file.name}`}
                   >
-                    <img src={item.previewUrl} alt="" className="h-full w-full object-cover" />
+                    <img src={item.previewUrl} alt="" className="h-full w-full object-contain" />
                     <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
                       <ZoomIn className="h-5 w-5 text-white opacity-0 drop-shadow group-hover:opacity-100" />
                     </span>
@@ -731,19 +947,34 @@ export function ChapterPageManager({
                       <p className="mt-1 line-clamp-2 text-xs text-destructive">{item.error}</p>
                     ) : null}
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {item.status === "failed" ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        className="h-8 shrink-0 gap-1.5"
-                        disabled={queueBusy}
-                        onClick={() => promptFailedQueueReupload(item.id)}
-                      >
-                        <FileImage className="h-3.5 w-3.5" aria-hidden />
-                        Re-upload picture
-                      </Button>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                    {item.status === "failed" || item.status === "queued" ? (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 shrink-0 gap-1.5"
+                          disabled={orientationBusy || item.status === "uploading"}
+                          onClick={() => void rotateQueueItem(item.id, 90)}
+                        >
+                          <RotateCw className="h-3.5 w-3.5" aria-hidden />
+                          Rotate
+                        </Button>
+                        {item.status === "failed" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-8 shrink-0 gap-1.5"
+                            disabled={queueBusy}
+                            onClick={() => promptFailedQueueReupload(item.id)}
+                          >
+                            <FileImage className="h-3.5 w-3.5" aria-hidden />
+                            Re-upload picture
+                          </Button>
+                        ) : null}
+                      </>
                     ) : null}
                     {item.status !== "uploading" ? (
                       <Button
@@ -794,11 +1025,71 @@ export function ChapterPageManager({
               }}
             />
           </label>
-          {pendingPhotos.length > 0 && (
-            <Button type="button" disabled={busy} onClick={() => void enqueueUploads(pendingPhotos)}>
-              Read text from {pendingPhotos.length} new photo{pendingPhotos.length === 1 ? "" : "s"}
-            </Button>
-          )}
+          {pendingPhotos.length > 0 ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Check each photo is upright before reading. Tap Rotate if text looks sideways or upside-down.
+              </p>
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {pendingPreviews.map((preview, index) => (
+                  <li key={preview.url} className="overflow-hidden rounded-lg border bg-muted/20 p-2">
+                    <div className="flex min-h-[220px] items-center justify-center rounded-md bg-background/80 p-2 sm:min-h-[280px]">
+                      <img
+                        src={preview.url}
+                        alt={preview.name}
+                        className="max-h-[min(50vh,420px)] w-auto max-w-full object-contain"
+                      />
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                      <span className="truncate text-xs text-muted-foreground">{preview.name}</span>
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1"
+                          disabled={busy || orientationBusy}
+                          onClick={() => void rotatePendingPhoto(index, 270)}
+                          aria-label={`Rotate ${preview.name} left`}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Left
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1"
+                          disabled={busy || orientationBusy}
+                          onClick={() => void rotatePendingPhoto(index, 90)}
+                          aria-label={`Rotate ${preview.name} right`}
+                        >
+                          <RotateCw className="h-3.5 w-3.5" />
+                          Right
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive"
+                          disabled={busy}
+                          onClick={() =>
+                            setPendingPhotos((current) => current.filter((_, i) => i !== index))
+                          }
+                          aria-label={`Remove ${preview.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <Button type="button" disabled={busy || orientationBusy} onClick={() => void enqueueUploads(pendingPhotos)}>
+                Read text from {pendingPhotos.length} new photo{pendingPhotos.length === 1 ? "" : "s"}
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-2 border-t pt-4">
@@ -870,24 +1161,26 @@ export function ChapterPageManager({
 
       <Dialog open={activePreview !== null} onOpenChange={(open) => !open && setPreviewIndex(null)}>
         <DialogContent
-          className="max-h-[95vh] max-w-4xl overflow-y-auto"
+          className="max-h-[98vh] max-w-5xl overflow-y-auto"
           onClose={() => setPreviewIndex(null)}
         >
           {activePreview ? (
             <>
               <DialogHeader>
                 <DialogTitle>Page {activePreview.pageNumber}</DialogTitle>
-                <DialogDescription>{activePreview.label}</DialogDescription>
+                <DialogDescription>
+                  {activePreview.label}. Check that the page is upright before reading.
+                </DialogDescription>
               </DialogHeader>
-              <div className="flex justify-center rounded-lg border bg-muted/30 p-2 sm:p-4">
+              <div className="flex min-h-[50vh] justify-center rounded-lg border bg-muted/30 p-2 sm:p-4">
                 <img
                   src={activePreview.src}
                   alt={activePreview.label}
-                  className="max-h-[min(70vh,720px)] w-auto max-w-full object-contain"
+                  className="max-h-[min(78vh,900px)] w-auto max-w-full object-contain"
                 />
               </div>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
                     size="sm"
@@ -912,6 +1205,64 @@ export function ChapterPageManager({
                     Next
                     <ChevronRight className="h-4 w-4" />
                   </Button>
+                  {activePreview.kind === "queue" ? (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={orientationBusy}
+                        onClick={() => void rotateQueueItem(activePreview.key, 270)}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Rotate left
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={orientationBusy}
+                        onClick={() => void rotateQueueItem(activePreview.key, 90)}
+                      >
+                        <RotateCw className="h-4 w-4" />
+                        Rotate right
+                      </Button>
+                    </>
+                  ) : null}
+                  {activePreview.kind === "saved" && activePreview.savedIndex !== undefined ? (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={orientationBusy || queueBusy || Boolean(reuploadSourceId)}
+                        onClick={() =>
+                          void rotateSavedPageAndReread(
+                            ordered[activePreview.savedIndex!]?.id ?? activePreview.key,
+                            270,
+                          )
+                        }
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Rotate left &amp; read
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={orientationBusy || queueBusy || Boolean(reuploadSourceId)}
+                        onClick={() =>
+                          void rotateSavedPageAndReread(
+                            ordered[activePreview.savedIndex!]?.id ?? activePreview.key,
+                            90,
+                          )
+                        }
+                      >
+                        <RotateCw className="h-4 w-4" />
+                        Rotate right &amp; read
+                      </Button>
+                    </>
+                  ) : null}
                 </div>
                 {activePreview.kind === "saved" && activePreview.savedIndex !== undefined ? (
                   <div className="flex gap-2">
@@ -950,6 +1301,121 @@ export function ChapterPageManager({
               </div>
               {orderSaving ? (
                 <p className="mt-2 text-center text-xs text-muted-foreground">Saving new page order…</p>
+              ) : null}
+              {orientationBusy ? (
+                <p className="mt-2 text-center text-xs text-muted-foreground">Rotating photo…</p>
+              ) : null}
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={orientationPrompt !== null}
+        onOpenChange={(open) => !open && !orientationBusy && setOrientationPrompt(null)}
+      >
+        <DialogContent
+          className="max-h-[98vh] max-w-3xl overflow-y-auto"
+          onClose={() => !orientationBusy && setOrientationPrompt(null)}
+        >
+          {orientationPrompt ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-amber-600" aria-hidden />
+                  Check page orientation
+                </DialogTitle>
+                <DialogDescription>
+                  Page {orientationPrompt.pageNumber} — {orientationPrompt.label}
+                </DialogDescription>
+              </DialogHeader>
+              <p className="text-sm text-foreground">{orientationPrompt.reason}</p>
+              <div className="mt-3 flex min-h-[45vh] justify-center rounded-lg border bg-muted/30 p-3">
+                <img
+                  src={orientationPrompt.src}
+                  alt={orientationPrompt.label}
+                  className="max-h-[min(70vh,800px)] w-auto max-w-full object-contain"
+                />
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={orientationBusy}
+                  onClick={() => {
+                    if (orientationPrompt.kind === "saved") {
+                      void rotateSavedPageAndReread(orientationPrompt.sourceId, 270);
+                    } else if (orientationPrompt.kind === "queue") {
+                      void rotateQueueItem(orientationPrompt.itemId, 270);
+                    } else {
+                      void rotatePendingPhoto(orientationPrompt.index, 270);
+                    }
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Rotate left
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={orientationBusy}
+                  onClick={() => {
+                    if (orientationPrompt.kind === "saved") {
+                      void rotateSavedPageAndReread(orientationPrompt.sourceId, 90);
+                    } else if (orientationPrompt.kind === "queue") {
+                      void rotateQueueItem(orientationPrompt.itemId, 90);
+                    } else {
+                      void rotatePendingPhoto(orientationPrompt.index, 90);
+                    }
+                  }}
+                >
+                  <RotateCw className="h-4 w-4" />
+                  Rotate right
+                </Button>
+                {orientationPrompt.kind === "saved" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={orientationBusy || queueBusy}
+                    onClick={() => {
+                      const id = orientationPrompt.sourceId;
+                      setOrientationPrompt(null);
+                      promptReupload(id);
+                    }}
+                  >
+                    <FileImage className="h-4 w-4" />
+                    Re-upload different photo
+                  </Button>
+                ) : null}
+                {orientationPrompt.kind === "queue" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={orientationBusy || queueBusy}
+                    onClick={() => {
+                      const id = orientationPrompt.itemId;
+                      setOrientationPrompt(null);
+                      promptFailedQueueReupload(id);
+                    }}
+                  >
+                    <FileImage className="h-4 w-4" />
+                    Re-upload different photo
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={orientationBusy}
+                  onClick={() => setOrientationPrompt(null)}
+                >
+                  Dismiss
+                </Button>
+              </div>
+              {orientationBusy ? (
+                <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  Applying rotation…
+                </p>
               ) : null}
             </>
           ) : null}
