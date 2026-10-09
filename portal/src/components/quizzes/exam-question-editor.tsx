@@ -16,7 +16,7 @@ import { quizzesService } from "@/services/quizzes.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 
-type QuestionType = "MCQ" | "TRUE_FALSE" | "FILL_IN_THE_BLANK" | "SHORT_ANSWER";
+type QuestionType = "MCQ" | "TRUE_FALSE" | "FILL_IN_THE_BLANK" | "SHORT_ANSWER" | "LONG_ANSWER";
 type McqChoice = "A" | "B" | "C" | "D";
 
 const MCQ_CHOICES: McqChoice[] = ["A", "B", "C", "D"];
@@ -506,7 +506,8 @@ export function ExamQuestionEditor({
                 <option value="MCQ">Multiple choice</option>
                 <option value="TRUE_FALSE">True / False</option>
                 <option value="FILL_IN_THE_BLANK">Fill in the blank</option>
-                <option value="SHORT_ANSWER">Open-ended</option>
+                <option value="SHORT_ANSWER">Short answer</option>
+                <option value="LONG_ANSWER">Long answer</option>
               </Select>
             </div>
             <div>
@@ -573,6 +574,13 @@ export function ExamQuestionEditor({
                   <option value="TRUE">TRUE</option>
                   <option value="FALSE">FALSE</option>
                 </Select>
+              ) : customType === "LONG_ANSWER" ? (
+                <Textarea
+                  value={customAnswer}
+                  onChange={(e) => setCustomAnswer(e.target.value)}
+                  rows={5}
+                  className="mt-1 max-h-48 resize-y overflow-y-auto"
+                />
               ) : (
                 <Input value={customAnswer} onChange={(e) => setCustomAnswer(e.target.value)} />
               )}

@@ -6,16 +6,17 @@ import type { Quiz, QuizQuestion } from "@/lib/types";
 import { formatMarks, quizOptionLabel, quizQuestionTypeLabel } from "@/lib/utils";
 import { personFullName } from "@/lib/person-name";
 
-function sectionTitle(type: string) {
-  if (type === "MCQ") return "Section A — Multiple choice";
-  if (type === "TRUE_FALSE") return "Section B — True / False";
-  if (type === "SHORT_ANSWER") return "Section C — Open-ended";
-  if (type === "FILL_IN_THE_BLANK") return "Fill in the blanks";
-  return quizQuestionTypeLabel(type);
+function sectionHeading(type: string, letter: string) {
+  if (type === "MCQ") return `Section ${letter} — Multiple choice`;
+  if (type === "TRUE_FALSE") return `Section ${letter} — True / False`;
+  if (type === "FILL_IN_THE_BLANK") return `Section ${letter} — Fill in the blanks`;
+  if (type === "SHORT_ANSWER") return `Section ${letter} — Short answer`;
+  if (type === "LONG_ANSWER") return `Section ${letter} — Long answer`;
+  return `Section ${letter} — ${quizQuestionTypeLabel(type)}`;
 }
 
 function groupedQuestions(questions: QuizQuestion[]) {
-  const order = ["MCQ", "TRUE_FALSE", "FILL_IN_THE_BLANK", "SHORT_ANSWER"];
+  const order = ["MCQ", "TRUE_FALSE", "FILL_IN_THE_BLANK", "SHORT_ANSWER", "LONG_ANSWER"];
   const included = questions.filter((question) => question.included !== false);
   return order
     .map((type) => ({
@@ -88,19 +89,22 @@ export function ExamPrintView({
         </p>
       </div>
 
-      {groups.map((group) => {
+      {groups.map((group, groupIndex) => {
+        const sectionLetter = String.fromCharCode(65 + groupIndex);
         const sectionMarks = formatMarks(
           group.items.reduce((sum, item) => sum + Number(item.marks ?? 0), 0),
         );
         return (
           <section key={group.type} className="mt-8">
             <h2 className="mb-3 border-b border-neutral-400 pb-1 text-base font-semibold">
-              {sectionTitle(group.type)} ({sectionMarks} marks)
+              {sectionHeading(group.type, sectionLetter)} ({sectionMarks} marks)
             </h2>
             <ol className="space-y-5">
               {group.items.map((question) => {
                 const n = number++;
                 const options = question.options ?? [];
+                const answerLines =
+                  question.type === "LONG_ANSWER" ? 8 : question.type === "SHORT_ANSWER" ? 3 : 1;
                 return (
                   <li key={question.id} className="text-sm">
                     <p className="font-medium">
@@ -115,14 +119,12 @@ export function ExamPrintView({
                           </li>
                         ))}
                       </ul>
-                    ) : question.type === "SHORT_ANSWER" ? (
-                      <div className="mt-3 space-y-3">
-                        <div className="h-8 border-b border-neutral-400" />
-                        <div className="h-8 border-b border-neutral-400" />
-                        <div className="h-8 border-b border-neutral-400" />
-                      </div>
                     ) : (
-                      <div className="mt-3 h-8 border-b border-neutral-400" />
+                      <div className="mt-3 space-y-3">
+                        {Array.from({ length: answerLines }, (_, line) => (
+                          <div key={line} className="h-8 border-b border-neutral-400" />
+                        ))}
+                      </div>
                     )}
                     {showAnswers && question.correctAnswer ? (
                       <p
