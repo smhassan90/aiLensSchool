@@ -66,16 +66,18 @@ export function looksLikeMathScienceLessonText(text: string | undefined | null):
   const setWords = (value.match(/\b(?:union|intersection|subset|disjoint|exhaustive)\b/gi) ?? []).length;
   if (braces >= 2 && setWords >= 2) return true;
   if (
-    /\b(?:wavelength|frequency|amplitude|ripple\s*tank|wave\s*speed|self[- ]?assessment|numericals?|slinky|pendulum|worked\s*example|simple\s*harmonic|transverse|longitudinal|diffraction|concept\s*map)\b/i.test(
+    /\b(?:wavelength|frequency|amplitude|ripple\s*tank|wave\s*speed|self[- ]?assessment|numericals?|slinky|pendulum|worked\s*example|simple\s*harmonic|transverse|longitudinal|diffraction|concept\s*map|electrostatics?|coulomb|electroscope|capacitor|capacitance|dielectric|electric\s*field|electric\s*potential)\b/i.test(
       value,
     ) &&
-    (/\d+\s*(?:Hz|m\/s|ms|m\b|s\b|cm)\b/i.test(value) ||
+    (/\d+\s*(?:Hz|m\/s|ms|m\b|s\b|cm|μF|uF|μC|N\/C|C\b)\b/i.test(value) ||
       /v\s*=\s*f/i.test(value) ||
       /T\s*=\s*2/i.test(value) ||
+      /Q\s*=\s*C\s*V|F\s*=\s*[kK]|C\s*=\s*Q\s*\/\s*V/i.test(value) ||
       /step\s*\d/i.test(value) ||
       /fig[:.]?\s*\d/i.test(value) ||
-      /\(\d+\.?\d*\s*(?:m|s|Hz)/i.test(value) ||
-      /section\s*\(\s*[a-c]\s*\)/i.test(value))
+      /\(\d+\.?\d*\s*(?:m|s|Hz|N|C|μF)/i.test(value) ||
+      /section\s*\(\s*[a-c]\s*\)/i.test(value) ||
+      /10\s*\^?\s*-?\s*19/i.test(value))
   ) {
     return true;
   }

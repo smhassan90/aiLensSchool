@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Download, Printer } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLoader } from "@/components/layout/page-loader";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -23,6 +23,7 @@ import {
   teacherExamPaperStatusLabel,
   teacherExamPaperStatusVariant,
 } from "@/lib/exam-paper";
+import { downloadExamPaperDocx } from "@/lib/exam-paper-docx";
 import { difficultyColorClass, difficultyDescription, difficultyLabel } from "@/lib/difficulty";
 import { personFullName } from "@/lib/person-name";
 import { formatDate, localDateISO } from "@/lib/utils";
@@ -48,6 +49,7 @@ export function ExamPaperPrintScreen({
   const [examDateOpen, setExamDateOpen] = useState(false);
   const [examDate, setExamDate] = useState(localDateISO());
   const [pendingPrintSolution, setPendingPrintSolution] = useState<boolean | null>(null);
+  const [docxBusy, setDocxBusy] = useState(false);
 
   const paper = useQuery({
     queryKey: ["quiz", quizId],
@@ -132,6 +134,24 @@ export function ExamPaperPrintScreen({
     runPrint(solution);
   };
 
+  const handleDownloadDocx = async () => {
+    const quiz = paper.data;
+    if (!quiz) return;
+    setDocxBusy(true);
+    try {
+      await downloadExamPaperDocx(quiz);
+      toast({ title: "Question paper downloaded", variant: "success" });
+    } catch (err) {
+      toast({
+        title: "Could not download DOCX",
+        description: err instanceof Error ? err.message : "Please try again",
+        variant: "error",
+      });
+    } finally {
+      setDocxBusy(false);
+    }
+  };
+
   if (paper.isLoading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
@@ -185,6 +205,10 @@ export function ExamPaperPrintScreen({
                   </Button>
                 </>
               ) : null}
+              <Button variant="outline" onClick={() => void handleDownloadDocx()} disabled={docxBusy}>
+                <Download className="h-4 w-4" />
+                {docxBusy ? "Preparing…" : "Download DOCX"}
+              </Button>
               {canPrint ? (
                 <>
                   <Button variant="outline" onClick={() => handlePrint(false)}>

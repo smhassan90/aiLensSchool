@@ -5,10 +5,10 @@
  */
 
 const WEBLINK_LINE =
-  /\bweblinks?\b|encourage students to(?:\s*visit)?|visit(?:\s+the)?\s+below\s+link|youtube\.com|youtu\.be|myphysicslab\.com|phet\.colorado\.edu|sciencelearn\.org\.nz|https?:\/\/|watch\?v[=-]|[ab]+[_\s-]?channel|_channel|org\.nz\/resources/i;
+  /\bweblinks?\b|encourage\s*s[tu](?:udents|dents|idents)?\s*to(?:\s*visit)?|encouragy\s*students|visit(?:\s+the)?\s+below\s+link|visit\s+belo\b|youtube\.com|youtu\.be|myphysicslab\.com|phet\.colorado\.edu|sciencelearn\.org\.nz|globaleduc|https?:\/\/|watch\?v[=-]|[ab]+[_\s-]?channel|_channel|org\.nz\/resources|ab_channel|channel-physicsvideos/i;
 
 const SCIENCE_BODY_CUE =
-  /\b(?:step\s*\d|result\s*=|self[- ]?assessment|wavelength|frequency|amplitude|ripple\s*tank|displacement|wave\s*speed|formula|calculate|hz\b|m\/s|worked\s*example|simple\s*harmonic|pendulum|transverse|longitudinal|diffraction|concept\s*map|summary|slinky|refraction)\b|[λμνπωθΔ]|v\s*=\s*f|T\s*=\s*2|[∪∩∈∅]/i;
+  /\b(?:step\s*\d|result\s*=|self[- ]?assessment|wavelength|frequency|amplitude|ripple\s*tank|displacement|wave\s*speed|formula|calculate|hz\b|m\/s|worked\s*example|simple\s*harmonic|pendulum|transverse|longitudinal|diffraction|concept\s*map|summary|slinky|refraction|electrostatics?|coulomb|electroscope|capacitor|capacitance|dielectric|electric\s*field|electric\s*potential)\b|[λμνπωθΔε]|v\s*=\s*f|T\s*=\s*2|Q\s*=\s*C\s*V|[∪∩∈∅]/i;
 
 const LITERARY_KEEP_CUE =
   /\b(?:dignity of work|pre-reading|akhtar|rukhsana|uncle inayat|prophet|khandaq|central idea|note for teachers|cobweb|spider|scotland)\b/i;
@@ -16,13 +16,13 @@ const LITERARY_KEEP_CUE =
 /** Short diagram / margin labels that OCR often injects into the reading column. */
 // Diagram chrome only — do NOT list real MCQ vocabulary (Frequency, Wavelength, Reflection…).
 const FIGURE_COLUMN_LABEL =
-  /^(?:Lamp|Vibrator|Elastic\s*bands?|White\s*screen(?:\s+on\s+screen)?|Shallow(?:\s+water)?(?:\s+tray)?|Upand|Cpes|Trongha|Amplitl|Dire|vibrallo|wayefron|Transter|Spherical(?:\s+dipper)?|dipper|Other\s+end\.?|other\s+end\.?)$/i;
+  /^(?:Lamp|Vibrator|Elastic\s*bands?|White\s*screen(?:\s+on\s+screen)?|Shallow(?:\s+water)?(?:\s+tray)?|Upand|Cpes|Trongha|Amplitl|Dire|vibrallo|wayefron|Transter|Spherical(?:\s+dipper)?|dipper|Other\s+end\.?|other\s+end\.?|Brass\s*disc|Brass\s*rod|Gold\s*leaves?|Insulator\s*plug|Metal\s*foil|Glass\s*bottle|Pre-?filter|Ionizer|Collector|Air\s*filter|Dirty\s*air|Clean\s*air|Battery|Conductor)$/i;
 
 const DIAGRAM_DIRECTION_JUNK =
   /^Direction\s*of\s*i?vibration!?$|^Directionc?of\s*wave\s*propagation!?$|^Ditection[- ]?off?wave[- ]?propagation!?$|^Direction\s+of\s+particle\s+motion$|^Direction\s+of\s*waves?$/i;
 
 const UNIT_HEADER_LINE =
-  /^(?:Unit\s*\d{1,2}\s*:?\s*|General\s+Wave\s+propert(?:y|ies|ie|e)?s?\.?|tmt10:\s*|wdnita:\s*|GeneralWave)$/i;
+  /^(?:Unit\s*\d{1,2}\s*:?\s*|Unit\s*\d{1,2}\s*:\s*Electrostatics\.?|Electrostatics\.?|General\s+Wave\s+propert(?:y|ies|ie|e)?s?\.?|tmt10:\s*|wdnita:\s*|GeneralWave)$/i;
 
 export function lineLooksLikeWeblinkSidebar(line: string): boolean {
   const trimmed = line.trim();
@@ -60,14 +60,20 @@ export function lineLooksLikeAssistSidebar(line: string): boolean {
   if (DIAGRAM_DIRECTION_JUNK.test(trimmed)) return true;
   // Tiny OCR crumbs from left/right boxes
   if (/^[|£€©®@#\\<>{}]{1,6}$/.test(trimmed)) return true;
-  if (/^(?:Do\s+You\s+K[an]ow!+|Do\s+ronKnow!+)$/i.test(trimmed)) return true;
+  if (/^(?:Do\s+You\s+K[an]ow!+|Do\s+You\s+knon!+|Do\s+ronKnow!+|DaYenKny|Do\s+Yon\s+Know!?)$/i.test(trimmed)) {
+    return true;
+  }
+  // Historical synonym chrome only — keep real formula side-facts (q = I·t, etc.)
+  if (/^(?:Capacitor also called|Condensor|Condenser is a term used)/i.test(trimmed) && trimmed.length < 80) {
+    return true;
+  }
   return false;
 }
 
 function weblinkSignalCount(text: string): number {
   return (
     text.match(
-      /youtube\.com|youtu\.be|myphysicslab\.com|phet\.colorado\.edu|sciencelearn\.org\.nz|weblinks?|encourage students to(?:\s*visit)?|visit(?:\s+the)?\s+below\s+link|https?:\/\/|watch\?v=|org\.nz\/resources/gi,
+      /youtube\.com|youtu\.be|myphysicslab\.com|phet\.colorado\.edu|sciencelearn\.org\.nz|weblinks?|encourage\s*s[tu](?:udents|dents|idents)?\s*to|encouragy\s*students|visit(?:\s+the)?\s+below\s+link|visit\s+belo\b|https?:\/\/|watch\?v=|org\.nz\/resources|ab_channel|globaleduc/gi,
     ) ?? []
   ).length;
 }
@@ -94,6 +100,12 @@ export function collapseRepeatedUnitHeaders(text: string): string {
       if (seenTitle) continue;
       seenTitle = true;
       out.push('General Wave properties');
+      continue;
+    }
+    if (/^Unit\s*14\s*:?\s*Electrostatics\.?$/i.test(trimmed) || /^Electrostatics\.?$/i.test(trimmed)) {
+      if (seenTitle) continue;
+      seenTitle = true;
+      out.push(trimmed.replace(/^Electrostatics\.?$/i, 'Unit 14: Electrostatics'));
       continue;
     }
     out.push(line);

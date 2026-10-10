@@ -2,6 +2,7 @@ import {
   cleanMergedPageOcrText,
   collapseRepeatedNumericTokens,
   normalizeScienceNotationArtifacts,
+  restoreElectrostaticsFormulas,
   restorePhysicsMathSymbols,
   restoreWavelengthLambdaSymbols,
   stripConfidenceLikeJunk,
@@ -154,5 +155,35 @@ Uncle Inayat said the Holy Prophet (PBUH) taught dignity of labour at Khandaq.`;
     expect(filterPageTextForLessonAssembly(literary)).toMatch(/Dignity of Work/);
     expect(filterPageTextForLessonAssembly(literary)).toMatch(/Khandaq/);
     expect(cleanMergedPageOcrText(literary)).toBe(literary);
+  });
+
+  it('restores electrostatics formulas and scientific notation', () => {
+    const raw = `
+14.4 Coulomb's law
+Electrostatics
+F=K992
+K9.0x10N-m/C2
+=8.85x10-12C/N-m
+of1.60217663410-19coulomb.
+Result: The required force of attraction between two point charge is F=54x108N
+q=I
+q=n
+C = Q / V
+1uF and connected parallel.
+Cnet=1+1+1+1F
+C oc A
+`.trim();
+    const restored = restoreElectrostaticsFormulas(raw);
+    expect(restored).toMatch(/F = k q₁ q₂ \/ r²/);
+    expect(restored).toMatch(/1\.602176634 × 10\^-19 C/);
+    expect(restored).toMatch(/F = 5\.4 × 10\^8 N/);
+    expect(restored).toMatch(/q = I · t/);
+    expect(restored).toMatch(/q = n · e/);
+    expect(restored).toMatch(/1 μF/);
+    expect(restored).toMatch(/C ∝ A/);
+
+    const cleaned = cleanMergedPageOcrText(raw);
+    expect(cleaned).toMatch(/10\^-19/);
+    expect(cleaned).toMatch(/μF|F = k/);
   });
 });

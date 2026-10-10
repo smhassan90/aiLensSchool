@@ -8,7 +8,7 @@ const STEM_ACRONYM_KEEP =
   /^(?:THE|AND|FOR|SHM|RMS|LHS|RHS|DNA|OCR|USB|PDF|HTTP|HTML|CSS|API|CPU|GPU|NASA|WHO|UN|USA|UAE|UK|SI|KE|PE|EMF|AC|DC)$/;
 
 const SCIENCE_PAGE_CUE =
-  /\b(?:numericals?|wavelength|frequency|amplitude|pendulum|slinky|ripple\s*tank|ms\^-?1|m\/s|kHz|section\s*\(\s*[a-c]\s*\)|worked\s*example|simple\s*harmonic|transverse|longitudinal|diffraction|refraction|concept\s*map|self[- ]?assessment|summary|angular\s*displacement|restoring\s*force|square\s*root|infty|infinity)\b|ms[™®]|v\s*=\s*f|T\s*=\s*2|sin\s*(?:θ|the?ta)|cos\s*(?:θ|the?ta)|a\s*∝|[λμνπωθπ√∞≅≈]/i;
+  /\b(?:numericals?|wavelength|frequency|amplitude|pendulum|slinky|ripple\s*tank|ms\^-?1|m\/s|kHz|section\s*\(\s*[a-c]\s*\)|worked\s*example|simple\s*harmonic|transverse|longitudinal|diffraction|refraction|concept\s*map|self[- ]?assessment|summary|angular\s*displacement|restoring\s*force|square\s*root|infty|infinity|electrostatics?|coulomb|electroscope|capacitor|capacitance|induction|dielectric|electric\s*field|electric\s*potential|potential\s*difference|point\s*charges?|μF|uF\b|farad)\b|ms[™®]|v\s*=\s*f|T\s*=\s*2|sin\s*(?:θ|the?ta)|cos\s*(?:θ|the?ta)|a\s*∝|Q\s*=\s*C\s*V|F\s*=\s*[kK]|[λμνπωθπ√∞≅≈ε₀]/i;
 
 /** Literary pages: skip science-only notation rewrites (safe line cleanups still OK). */
 const LITERARY_KEEP_CUE =
@@ -183,6 +183,79 @@ export function restorePhysicsMathSymbols(text: string): string {
   );
 }
 
+/**
+ * Electrostatics / capacitor OCR: restore Coulomb, E, V, C formulas and μ/ε/10^n.
+ * Safe only when the page already looks like science (caller gates).
+ */
+export function restoreElectrostaticsFormulas(text: string): string {
+  const value = (text ?? '').trim();
+  if (!value) return value;
+  const electro =
+    /\b(?:electrostatics?|coulomb|electroscope|capacitor|capacitance|dielectric|electric\s*field|electric\s*potential|point\s*charges?|μF|uF\b|farad|induction)\b/i.test(
+      value,
+    ) || /F\s*=\s*[kK]|Q\s*=\s*C\s*V|C\s*=\s*Q\s*\/\s*V|1\/C[eₑ]/i.test(value);
+  if (!electro) return value;
+
+  return (
+    value
+      // Glued elementary charge: 1.60217663410-19coulomb / of1.602… → 1.602… × 10^-19 C
+      .replace(
+        /\b(?:of)?(1\.602(?:176634)?)10\s*-?\s*19(?:coulomb|C)?\b/gi,
+        '$1 × 10^-19 C',
+      )
+      .replace(
+        /\b(?:of)?(1\.602(?:176634)?)\s*10\s*-?\s*19\s*(?:coulomb|C)?\b/gi,
+        '$1 × 10^-19 C',
+      )
+      .replace(/\b1\.6\s*[x×]\s*10\s*-?\s*19\s*(?:C|J|coulomb)?\b/gi, '1.6 × 10^-19 C')
+      .replace(/\b1\.6\s*x\s*10\s*-?\s*19\s*J\b/gi, '1.6 × 10^-19 J')
+      // k / ε₀ constants
+      .replace(/\bK\s*9\.0\s*[x×]\s*10\s*N\s*-?\s*m\s*\/?\s*C\s*2\b/gi, 'k = 9.0 × 10^9 N·m²/C²')
+      .replace(/\b9\.0?\s*[x×]\s*10\s*N\s*-?\s*m\s*\/?\s*C\s*2\b/gi, '9.0 × 10^9 N·m²/C²')
+      .replace(/\b8\.85\s*[x×]\s*10\s*-?\s*12\s*C\s*\/?\s*N\s*-?\s*m\b/gi, '8.85 × 10^-12 C²/N·m²')
+      .replace(/\b8\.99\s*[x×]\s*10\s*N\s*-?\s*m\s*\/?\s*C\s*2\b/gi, '8.99 × 10^9 N·m²/C²')
+      // Coulomb law smashed glyphs: Foq92 / F=K992 / F=kq1q2/r2
+      .replace(/\bF\s*=\s*K\s*9\s*9\s*2\b/gi, 'F = k q₁ q₂ / r²')
+      .replace(/\bFo\s*q\s*9\s*2\b/gi, 'F ∝ q₁ q₂')
+      .replace(/\bF\s*=\s*[kK]\s*q\s*1?\s*q\s*2?\s*\/?\s*r\s*2\b/gi, 'F = k q₁ q₂ / r²')
+      .replace(/\bF\s*=\s*[kK]\s*q\s*_?1\s*q\s*_?2\s*\/\s*r\s*\^?\s*2\b/gi, 'F = k q₁ q₂ / r²')
+      // Worked example force answer: 54x108N / 5.4x108N
+      .replace(/\bF\s*=\s*54\s*[x×]\s*10\s*8\s*N\b/gi, 'F = 5.4 × 10^8 N')
+      .replace(/\bF\s*=\s*5\.4\s*[x×]\s*10\s*8\s*N\b/gi, 'F = 5.4 × 10^8 N')
+      .replace(/\b54\s*[x×]\s*10\s*"?\s*8\s*N\b/gi, '5.4 × 10^8 N')
+      // Charge / current / quantization sidebars
+      .replace(/\bq\s*=\s*I\s*(?:·|\.|x|×)?\s*t\b/gi, 'q = I · t')
+      .replace(/\bq\s*=\s*n\s*(?:·|\.|x|×)?\s*e\b/gi, 'q = n · e')
+      .replace(/(^|\n)\s*q\s*=\s*I\s*$/gim, '$1q = I · t')
+      .replace(/(^|\n)\s*q\s*=\s*n\s*$/gim, '$1q = n · e')
+      // E, V, C core equations
+      .replace(/\bE\s*=\s*F\s*\/\s*Q\b/gi, 'E = F / Q')
+      .replace(/\bV\s*=\s*W\s*\/\s*q\b/gi, 'V = W / q')
+      .replace(/\bC\s*=\s*Q\s*\/\s*V\b/gi, 'C = Q / V')
+      .replace(/\bQ\s*=\s*C\s*V\b/gi, 'Q = C V')
+      .replace(/\bE\s*=\s*1\s*\/\s*2\s*C\s*V\s*(?:2|²|\^2)\b/gi, 'E = ½ C V²')
+      .replace(/\bE\s*=\s*½\s*C\s*V\s*(?:2|²|\^2)\b/gi, 'E = ½ C V²')
+      // Parallel / series capacitance
+      .replace(/\bC\s*(?:net|e|ₙₑₜ)\s*=\s*C\s*1\s*\+\s*C\s*2\s*\+\s*C\s*3(?:\s*\+\s*C\s*4)?\b/gi, 'Cₙₑₜ = C₁ + C₂ + C₃')
+      .replace(
+        /\b1\s*\/\s*C\s*(?:e|net)\s*=\s*1\s*\/\s*C\s*1\s*\+\s*1\s*\/\s*C\s*2\s*\+\s*1\s*\/\s*C\s*3\b/gi,
+        '1/Cₑ = 1/C₁ + 1/C₂ + 1/C₃',
+      )
+      // Capacitance factors: C oc A → C ∝ A
+      .replace(/\bC\s+oc\s+/gi, 'C ∝ ')
+      .replace(/\bHence\s+C\s+oc\b/gi, 'Hence C ∝')
+      .replace(/\bHence\s+C\s+c\s+E\b/gi, 'Hence C ∝ εᵣ')
+      // Microfarad / units
+      .replace(/\b(\d+(?:\.\d+)?)\s*uF\b/gi, '$1 μF')
+      .replace(/\b(\d+(?:\.\d+)?)\s*uC\b/gi, '$1 μC')
+      .replace(/\bNC\s*[-⁻]?\s*1\b/gi, 'N/C')
+      .replace(/\bN\s*C\s*[-⁻]?\s*1\b/gi, 'N/C')
+      .replace(/\b1\s*eV\s*=\s*1\.6\s*[x×]\s*10\s*-?\s*19\s*J\b/gi, '1 eV = 1.6 × 10^-19 J')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim()
+  );
+}
+
 /** Common unit / power-of-ten OCR artifacts from red superscripts. */
 export function normalizeScienceNotationArtifacts(text: string): string {
   let value = text
@@ -198,13 +271,20 @@ export function normalizeScienceNotationArtifacts(text: string): string {
     .replace(/\bWhere\s+1K\s+the\b/gi, 'Where 1K =')
     .replace(/\b10\s*[³3]\b(?!\d)/g, '10^3')
     .replace(/\b10\s*[⁸8]\b(?!\d)/g, '10^8')
+    // Glued exponent without ×: 10-19 / 10-12 / 109 as 10^9
+    .replace(/\b(\d+\.?\d*)\s*[x×]\s*10\s*-(\d+)\b/g, '$1 × 10^-$2')
+    .replace(/\b(\d+\.?\d*)\s*10\s*-(\d+)\b/g, '$1 × 10^-$2')
     .replace(/\b(\d+)\s*[x×]\s*10["”']\s*(ms|m\/s)\b/gi, '$1 × 10^8 $2')
     .replace(/\b(\d+)\s*[x×]\s*10\s*([0-9])\b/g, '$1 × 10^$2')
     .replace(/\b(\d+)\s*[x×]\s*10\^([0-9]+)\b/g, '$1 × 10^$2')
     .replace(/\bFrequeney\b/gi, 'Frequency')
     .replace(/\boppositive\b/gi, 'opposite')
+    .replace(/\bclecticty\b/gi, 'electricity')
+    .replace(/\bclectrometer\b/gi, 'electrometer')
     .replace(/\bFig[:.]?\s*(\d+\.\d+)/gi, 'Fig: $1')
     .replace(/\bDo You Know!?\b/gi, 'Do You Know!')
+    .replace(/\bDo\s+You\s+knon!?\b/gi, 'Do You Know!')
+    .replace(/\bDo\s+ronKnow!?\b/gi, 'Do You Know!')
     // Merge sometimes doubles "Step" when "1:" was treated as junk
     .replace(/\bStep\s+Step\s+(?=Write down the known)/gi, 'Step 1: ')
     .replace(/\bStep\s+Step\s+(?=Write down the formula)/gi, 'Step 2: ')
@@ -213,6 +293,7 @@ export function normalizeScienceNotationArtifacts(text: string): string {
     .trim();
   value = restorePhysicsMathSymbols(value);
   value = restoreWavelengthLambdaSymbols(value);
+  value = restoreElectrostaticsFormulas(value);
   return value;
 }
 

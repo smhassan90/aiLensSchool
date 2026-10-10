@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Download, Printer } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 
@@ -43,6 +43,7 @@ import {
   teacherExamPaperStatusLabel,
   teacherExamPaperStatusVariant,
 } from "@/lib/exam-paper";
+import { downloadExamPaperDocx } from "@/lib/exam-paper-docx";
 
 import { difficultyColorClass, difficultyDescription, difficultyLabel } from "@/lib/difficulty";
 
@@ -62,8 +63,7 @@ export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admi
   const queryClient = useQueryClient();
 
   const [printSolution, setPrintSolution] = useState(false);
-
-
+  const [docxBusy, setDocxBusy] = useState(false);
 
   const { data: quiz, isLoading, isError, error } = useQuery({
 
@@ -125,7 +125,15 @@ export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admi
 
   };
 
-
+  const handleDownloadDocx = async () => {
+    if (!quiz) return;
+    setDocxBusy(true);
+    try {
+      await downloadExamPaperDocx(quiz);
+    } finally {
+      setDocxBusy(false);
+    }
+  };
 
   if (isLoading) {
 
@@ -236,6 +244,17 @@ export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admi
           actions={
 
             <div className="flex flex-wrap gap-2">
+
+              {examPaper ? (
+                <Button
+                  variant="outline"
+                  onClick={() => void handleDownloadDocx()}
+                  disabled={docxBusy}
+                >
+                  <Download className="h-4 w-4" />
+                  {docxBusy ? "Preparing…" : "Download DOCX"}
+                </Button>
+              ) : null}
 
               {examPaper && canPrint ? (
                 <>

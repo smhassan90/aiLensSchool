@@ -145,6 +145,18 @@
   .exam-solution {
     display: block !important;
     visibility: visible !important;
+    color: #000 !important;
+    background: #fff !important;
+  }
+
+  .exam-print-frame {
+    border-color: #000 !important;
+  }
+
+  .exam-print * {
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .report-card-sheet {
