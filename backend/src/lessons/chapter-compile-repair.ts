@@ -1,4 +1,5 @@
 import { countLatinLetters } from '../common/extract-quality';
+import { stripInterleavedWeblinkSidebar } from './sidebar-layout-ocr';
 
 const EXERCISE_HEADING =
   /(?:^|\n)\s*(?:\*\*)?Exercise\s*[1-9][0-9]?(?:\*\*)?\b/i;
@@ -31,17 +32,19 @@ function cueHits(text: string): number {
 
 /** Light cleanup only — keep poem lines and exercise wording intact. */
 export function lightCleanCompiledText(text: string): string {
-  return (text ?? '')
-    .replace(/^\s*Page\s+\d+\s*$/gim, '')
-    .replace(/^\s*صفحہ\s*\d+\s*$/gim, '')
-    .replace(/\bflung\s+h\s+imself\b/gi, 'flung himself')
-    .replace(/\bEzercise\b/gi, 'Exercise')
-    .replace(/\bExercise[\u2018\u2019'`´']\s*(?=\d)/gi, 'Exercise ')
-    .replace(/\bKing Bruce:\s+/g, 'King Bruce ')
-    .replace(/\bwhy should not\s+1\?/gi, 'why should not I?')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  return stripInterleavedWeblinkSidebar(
+    (text ?? '')
+      .replace(/^\s*Page\s+\d+\s*$/gim, '')
+      .replace(/^\s*صفحہ\s*\d+\s*$/gim, '')
+      .replace(/\bflung\s+h\s+imself\b/gi, 'flung himself')
+      .replace(/\bEzercise\b/gi, 'Exercise')
+      .replace(/\bExercise[\u2018\u2019'`´']\s*(?=\d)/gi, 'Exercise ')
+      .replace(/\bKing Bruce:\s+/g, 'King Bruce ')
+      .replace(/\bwhy should not\s+1\?/gi, 'why should not I?')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim(),
+  );
 }
 
 export function splitSourceLessonAndExercises(sourceText: string): {

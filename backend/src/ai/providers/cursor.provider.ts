@@ -27,6 +27,7 @@ import {
 import { parseModelJson } from '../parse-model-json';
 import { normalizeCompileModelOutput } from '../normalize-compile-output';
 import { deriveKeyPointsFromLesson } from '../../lessons/lesson-text-formatter';
+import { stripInterleavedWeblinkSidebar } from '../../lessons/sidebar-layout-ocr';
 import {
   isFakeExtractText,
   isGarbledRtlOcr,
@@ -176,13 +177,15 @@ export class CursorProvider implements AiProvider {
   }
 
   private mockCompileChapter(sourceText: string): ChapterCompileOutput {
-    const cleaned = sourceText
-      .replace(/^\s*Page\s+\d+\s*$/gim, '')
-      .replace(/^\s*صفحہ\s*\d+\s*$/gim, '')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
+    const cleaned = stripInterleavedWeblinkSidebar(
+      sourceText
+        .replace(/^\s*Page\s+\d+\s*$/gim, '')
+        .replace(/^\s*صفحہ\s*\d+\s*$/gim, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim(),
+    );
     const exerciseMatch = cleaned.match(
-      /(Exercise|Exercises|Activity|ACTIVITIES|سوالات|مشق|سرگرمی)[\s\S]*$/i,
+      /(Exercise|Exercises|Activity|ACTIVITIES|SELF-?ASSESSMENT|Section\s*\(\s*[BC]\s*\)|سوالات|مشق|سرگرمی)[\s\S]*$/i,
     );
     const exercises = exerciseMatch ? exerciseMatch[0].trim() : '';
     const lessonBody = exerciseMatch ? cleaned.slice(0, exerciseMatch.index).trim() : cleaned;

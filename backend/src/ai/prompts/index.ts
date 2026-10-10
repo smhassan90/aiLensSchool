@@ -116,12 +116,14 @@ Tasks:
 - Fix small OCR/spelling issues and broken line breaks only (e.g. Crowi→Crown, begining→beginning).
 - Remove scanner artifacts: standalone lines like "Page 1", "Page 2", "صفحہ 1", repeated photo-stitch headers.
 - DELETE only clear OCR garbage: reversed/mirrored Latin (e.g. "aj0N"), random symbol runs, and lines with no real words. Do NOT delete exercise instructions just because they say "jumbled", "compare your answers", or "work in pairs".
+- For science/physics multi-column pages: treat LEFT/RIGHT assist boxes as OUT of the lesson body. DELETE Weblinks, "Encourage students to visit", YouTube/URL fragments, "visit below link", sciencelearn.org lines, and repeated "Unit 10 / General Wave properties" headers that are page chrome—not the taught paragraphs. Keep figure captions that are attached to the body (Fig: 10.x …) but drop orphan diagram labels that interrupt sentences (Lamp, Vibrator, Compressed region, Direction of vibration alone).
+- Keep Self-Assessment / Worked Example / Summary / MCQ / Numericals that are part of the chapter exercises or taught worked solutions.
 - For poems / reading texts: keep the title, author line, AND every stanza in order from the first line through the last. Never skip the opening stanza or jump into the middle of the poem.
 - If a poem line is partly garbled, KEEP it (best-effort). Never omit a stanza because OCR is imperfect.
 - Keep "Pre-reading" questions with the lesson body (before the reading text) when present.
 - Merge paragraphs split across pages; keep logical reading order.
 - lessonBody = narrative only: unit/reading headers, pre-reading, title, author, full poem/story. Never put Exercise sections in lessonBody.
-- exercises = all practice sections starting at the first "Exercise 1" / "Exercise" / "Activity" / "سوالات" through the end (Exercise 2, 3, 4, …). Copy their questions and instructions; clean tables lightly but do not drop whole exercises.
+- exercises = all practice sections starting at the first "Exercise 1" / "Exercise" / "Activity" / "سوالات" / "Section (B)" / "Section (C) Numericals" / "SELF-ASSESSMENT" through the end. Copy their questions and instructions; clean tables lightly but do not drop whole exercises.
 - If the source has no exercises, return an empty string for exercises.
 - concepts: 4-8 short key points from the lesson (not from exercises).
 - Keep Urdu/Arabic in Unicode script when the source uses it.

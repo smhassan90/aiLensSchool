@@ -136,9 +136,10 @@ export function restorePhysicsMathSymbols(text: string): string {
       // --- Square root / period formula ---
       // Live paddle often collapses T=2π√(L/g) to multiline "T=2\nVg"
       .replace(
-        /T\s*=\s*2\s*(?:\n+\s*)?(?:π|n|pie|pi)?\s*(?:\n+\s*)?[√vV]\s*(?:\(?\s*[Ll]\s*\/\s*g\s*\)?|g\b)/gi,
+        /T\s*=\s*2\s*(?:\n+\s*)?(?:π|n|pie|pi)?\s*(?:\n+\s*)?[√vVnN]\s*(?:\(?\s*[Ll]\s*\/\s*g\s*\)?|g\b)/gi,
         'T = 2π√(L/g)',
       )
+      .replace(/T\s*=\s*2\s*(?:\n+\s*)+N\s*g\b/gi, 'T = 2π√(L/g)')
       .replace(/T\s*=\s*2\s*(?:π|n|pie|pi)\s*[√vV]\s*\(?\s*[Ll]\s*\/\s*g\s*\)?/gi, 'T = 2π√(L/g)')
       .replace(/T\s*=\s*2\s*(?:π|n)\s+[√vV]\s*\(\s*[Ll]\s*\/\s*g\s*\)/gi, 'T = 2π√(L/g)')
       .replace(

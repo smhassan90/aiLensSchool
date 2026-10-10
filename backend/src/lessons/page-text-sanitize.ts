@@ -12,7 +12,10 @@ import {
   looksLikeScienceNumericalsPage,
   normalizeScienceNotationArtifacts,
 } from './science-ocr-clean';
-import { lineLooksLikeWeblinkSidebar } from './sidebar-layout-ocr';
+import {
+  lineLooksLikeWeblinkSidebar,
+  stripInterleavedWeblinkSidebar,
+} from './sidebar-layout-ocr';
 
 const SIDEBAR_ACTIVITY =
   /jumbled order|correct words\.?\s*the first|compare your|fill in the blank|circle the|thing as true|something\s*$/i;
@@ -410,12 +413,14 @@ export function filterPageTextForLessonAssembly(
 
   // Poem / dialogue / exercise pages: keep full OCR. Block filtering was deleting
   // stanzas (King Bruce) and exercise tables (Dignity of Work).
-  if (looksLikeStructuredTextbookPage(value)) {
+  // Science multi-column pages still need weblink/figure-sidebar stripping.
+  if (looksLikeStructuredTextbookPage(value) && !looksLikeMathScienceLessonText(value)) {
     return lightCleanPoemOrReadingPage(value);
   }
 
   const finish = (out: string) => {
-    const cleaned = cleanMergedPageOcrText(out);
+    const withoutAssist = stripInterleavedWeblinkSidebar(out);
+    const cleaned = cleanMergedPageOcrText(withoutAssist);
     if (
       looksLikeMathScienceLessonText(cleaned) ||
       looksLikeScienceNumericalsPage(cleaned)

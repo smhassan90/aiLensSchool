@@ -100,7 +100,38 @@ describe('lineLooksLikeWeblinkSidebar', () => {
     expect(lineLooksLikeWeblinkSidebar('watch?v-0c0gvy OOKc&')).toBe(true);
     expect(lineLooksLikeWeblinkSidebar('Waves Ripple')).toBe(true);
     expect(lineLooksLikeWeblinkSidebar('Tank Interference')).toBe(true);
+    expect(lineLooksLikeWeblinkSidebar('org.nz/resources/2681')).toBe(true);
     expect(lineLooksLikeWeblinkSidebar('Step 2: Write down the formula')).toBe(false);
+  });
+});
+
+describe('stripInterleavedWeblinkSidebar assist boxes', () => {
+  it('drops repeated Unit headers, youtube assist boxes, and figure-column labels', () => {
+    const raw = `
+Unit 10
+General Wave properties
+A ripple tank is a shallow glass tank of water used to
+Lamp
+demonstrate the basic properties of waves.
+Vibrator
+Unit 10
+General Wave properlies
+Encourage students to
+visit below link for
+https://www.youtube.com/
+watch?v-0c0gvy OOKc&
+Transverse waves are waves that travel in a direction
+perpendicular to the direction of wave motion.
+`.trim();
+    const cleaned = stripInterleavedWeblinkSidebar(raw);
+    expect(cleaned).toMatch(/ripple tank/i);
+    expect(cleaned).toMatch(/Transverse waves/i);
+    expect(cleaned).not.toMatch(/youtube\.com/i);
+    expect(cleaned).not.toMatch(/Encourage students/i);
+    expect(cleaned).not.toMatch(/^Lamp$/m);
+    expect(cleaned).not.toMatch(/^Vibrator$/m);
+    const unitHits = cleaned.match(/^Unit\s*10/gim) ?? [];
+    expect(unitHits.length).toBe(1);
   });
 });
 
