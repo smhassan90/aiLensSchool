@@ -1,0 +1,17 @@
+Unit 10: General Wave properties
+ii. f = 1/2.01 s = 0.50 Hz
+Result: The period of the pendulum is 2.01s and its frequency is 0.50 Hz.
+Worked Example 4
+Pendulum clocks with a pendulum measuring out the passing of a second. How long of a pendulum is required to have a period of 1 second? g = 9.8 m/s².
+Solution:
+Step 1: Write down the known quantities and quantities to be found.
+L = ?
+T = 1.0 s
+g = 9.8 m/s²
+Step 2: Write down the formula and rearrange if necessary.
+T = 2π√(L/g)
+Square both the sides
+L = (T²g) / (4π²)
+Step 3: Put the values and calculate
+L = 0.25m
+Result: The length of a pendulum should be 0.25 m.

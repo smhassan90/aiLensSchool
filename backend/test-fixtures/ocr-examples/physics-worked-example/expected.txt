@@ -1,0 +1,7 @@
+Worked Example 4
+Step 1: Write down the known quantities and quantities to be found.
+Step 2: Write down the formula and rearrange if necessary.
+T = 2π√(L/g)
+Step 3: Put the values and calculate
+L = 0.25m
+Result: The length of a pendulum should be 0.25 m.

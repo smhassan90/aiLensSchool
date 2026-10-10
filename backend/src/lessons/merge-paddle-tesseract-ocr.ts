@@ -50,6 +50,9 @@ function tokenLooksGarbage(token: string, alternateAtPosition?: string): boolean
   if (!raw) return false;
   if (tokenLooksLikeMathSymbol(raw)) return false;
   if (/^[\dW]+[.)]?$/.test(raw)) return false;
+  // Keep step/list markers: "1:" "2." "iii." — short digit tokens are NOT garbage.
+  if (/^\d{1,3}[.:)]?$/.test(raw)) return false;
+  if (/^(?:i{1,3}|iv|vi{0,3}|ix|xi{0,2})\.?$/i.test(raw)) return false;
   // Standalone "57%" is usually OCR junk next to units — keep real "50%" only with letters around.
   if (/^\d{1,3}%$/.test(raw)) return true;
   if (/^[\d.,+\-×÷=/]+$/u.test(raw)) return false;

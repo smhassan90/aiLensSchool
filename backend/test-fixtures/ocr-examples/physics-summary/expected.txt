@@ -1,0 +1,7 @@
+SUMMARY
+1. Up-and-down movements in the rope produce oscillations or vibrations.
+3. A ripple tank is a glass tank of water used to demonstrate the basic properties of waves.
+4. transverse wave
+6. longitudinal wave
+16. SHM
+19. damped system

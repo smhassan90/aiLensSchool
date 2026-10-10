@@ -1,0 +1,12 @@
+{
+  "id": "physics-intro-waves",
+  "subject": "physics",
+  "scienceFewShot": true,
+  "mustMatch": [
+    "Unit 10",
+    "Waves and nature of waves",
+    "slinky spring",
+    "Fig: 10.1"
+  ],
+  "mustNotMatch": []
+}

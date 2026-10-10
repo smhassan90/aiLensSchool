@@ -1,0 +1,17 @@
+{
+  "id": "physics-worked-example",
+  "subject": "physics",
+  "scienceFewShot": true,
+  "mustMatch": [
+    "Worked Example",
+    "Step 1",
+    "Step 2",
+    "Step 3",
+    "Result",
+    "0.25 m"
+  ],
+  "mustNotMatch": [
+    "youtube.com",
+    "Encourage students"
+  ]
+}

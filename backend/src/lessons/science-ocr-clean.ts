@@ -8,7 +8,7 @@ const STEM_ACRONYM_KEEP =
   /^(?:THE|AND|FOR|SHM|RMS|LHS|RHS|DNA|OCR|USB|PDF|HTTP|HTML|CSS|API|CPU|GPU|NASA|WHO|UN|USA|UAE|UK|SI|KE|PE|EMF|AC|DC)$/;
 
 const SCIENCE_PAGE_CUE =
-  /\b(?:numericals?|wavelength|frequency|amplitude|pendulum|slinky|ripple\s*tank|ms\^-?1|m\/s|kHz|section\s*\(\s*[a-c]\s*\))\b|ms[™®]|v\s*=\s*f|[λμνπω]/i;
+  /\b(?:numericals?|wavelength|frequency|amplitude|pendulum|slinky|ripple\s*tank|ms\^-?1|m\/s|kHz|section\s*\(\s*[a-c]\s*\)|worked\s*example|simple\s*harmonic|transverse|longitudinal|diffraction|refraction|concept\s*map|self[- ]?assessment|summary)\b|ms[™®]|v\s*=\s*f|T\s*=\s*2\s*π|a\s*∝|[λμνπωθ]/i;
 
 /** Literary pages: skip science-only notation rewrites (safe line cleanups still OK). */
 const LITERARY_KEEP_CUE =
@@ -65,6 +65,19 @@ export function normalizeScienceNotationArtifacts(text: string): string {
     .replace(/\b(\d+)\s*[x×]\s*10\^([0-9]+)\b/g, '$1 × 10^$2')
     .replace(/\bFrequeney\b/gi, 'Frequency')
     .replace(/\boppositive\b/gi, 'opposite')
+    // Common OCR mangling of pendulum period formula (π/√ often become n/V)
+    .replace(/T\s*=\s*2\s*(?:π|pi|n)\s*[√vV]?\s*\(?\s*[Ll]\s*\/\s*g\s*\)?/gi, 'T = 2π√(L/g)')
+    .replace(/T\s*=\s*2\s*(?:π|pi|n)\s+V\s*\(\s*[Ll]\s*\/\s*g\s*\)/gi, 'T = 2π√(L/g)')
+    .replace(/T\s*=\s*2π\s*[√vV]\s*\(?\s*[Ll]\s*\/\s*g\s*\)?/g, 'T = 2π√(L/g)')
+    .replace(/\bv\s*=\s*f\s*[x×*]\s*[λl]\b/gi, 'v = f × λ')
+    .replace(/\bf\s*=\s*1\s*\/\s*T\b/gi, 'f = 1/T')
+    .replace(/\ba\s*[∞∝]\s*-?\s*x\b/gi, 'a ∝ -x')
+    .replace(/\bFig[:.]?\s*(\d+\.\d+)/gi, 'Fig: $1')
+    .replace(/\bDo You Know!?\b/gi, 'Do You Know!')
+    // Merge sometimes doubles "Step" when "1:" was treated as junk
+    .replace(/\bStep\s+Step\s+(?=Write down the known)/gi, 'Step 1: ')
+    .replace(/\bStep\s+Step\s+(?=Write down the formula)/gi, 'Step 2: ')
+    .replace(/\bStep\s+Step\s+(?=Put the values)/gi, 'Step 3: ')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }

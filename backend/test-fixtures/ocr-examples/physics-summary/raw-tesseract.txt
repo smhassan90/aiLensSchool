@@ -1,0 +1,13 @@
+Unit 10: General Wave properties
+SUMMARY
+1. Up-and-down movements in the rope produce oscillations or vibrations.
+2. A slinky is a pre-compressed helical or coiled spring.
+3. A ripple tank is a glass tank of water used to demonstrate the basic properties of waves.
+4. The particle movement is at right angles to the direction of the wave motion is a transverse wave.
+5. A transverse wave is comprised of crest and trough.
+6. The particle movement is in the same direction as the direction of wave motion, a longitudinal wave.
+7. A longitudinal wave is comprised of compression and rarefaction.
+13. Ripple tank experiments demonstrate that water waves can be reflected, refracted, and diffracted.
+16. When an object oscillates about a fixed position its acceleration is directly proportional to its displacement and is directed towards the mean position, its motion is called SHM.
+17. A simple pendulum consists of a small metallic bob suspended from a light and inextensible string fixed at its upper end.
+19. An oscillating system in which friction has an effect is a damped system. The amplitude of freely oscillating objects progressively decreases.

@@ -1,0 +1,13 @@
+{
+  "id": "physics-summary",
+  "subject": "physics",
+  "scienceFewShot": false,
+  "mustMatch": [
+    "SUMMARY",
+    "transverse wave",
+    "longitudinal wave",
+    "ripple tank",
+    "damped system"
+  ],
+  "mustNotMatch": []
+}

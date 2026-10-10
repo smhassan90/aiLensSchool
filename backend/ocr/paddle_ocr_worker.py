@@ -14,8 +14,11 @@ _ENGINE = None
 
 WEBLINK_RE = re.compile(
     r"weblinks?|encourage students to(?:\s*visit)?|visit below link|youtube\.com|youtu\.be|"
+    r"myphysicslab\.com|phet\.colorado\.edu|sciencelearn\.org\.nz|"
     r"https?://|watch\?v[=-]|[ab]+[_\s-]?channel|_channel|"
-    r"^(?:Waves[\s-].{0,40}|Tank Interference|and Wavelength|launchSCIEN\w*)$",
+    r"^(?:Waves[\s-].{0,40}|Tank Interference|and Wavelength|launchSCIEN\w*|"
+    r"Pendulum clock invention.{0,40}|oscillation and periodic motion)$|"
+    r"pendulum-lab_en\.html|pendulum-en\.html|waves-and-energy",
     re.I,
 )
 

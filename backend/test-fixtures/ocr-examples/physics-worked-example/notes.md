@@ -1,0 +1,1 @@
+Worked examples: keep Step 1–3 and Result; strip Weblinks/YouTube sidebars interleaved into the solution.

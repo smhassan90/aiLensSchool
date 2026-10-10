@@ -66,13 +66,16 @@ export function looksLikeMathScienceLessonText(text: string | undefined | null):
   const setWords = (value.match(/\b(?:union|intersection|subset|disjoint|exhaustive)\b/gi) ?? []).length;
   if (braces >= 2 && setWords >= 2) return true;
   if (
-    /\b(?:wavelength|frequency|amplitude|ripple\s*tank|wave\s*speed|self[- ]?assessment|numericals?|slinky|pendulum)\b/i.test(
+    /\b(?:wavelength|frequency|amplitude|ripple\s*tank|wave\s*speed|self[- ]?assessment|numericals?|slinky|pendulum|worked\s*example|simple\s*harmonic|transverse|longitudinal|diffraction|concept\s*map)\b/i.test(
       value,
     ) &&
     (/\d+\s*(?:Hz|m\/s|ms|m\b|s\b|cm)\b/i.test(value) ||
       /v\s*=\s*f/i.test(value) ||
+      /T\s*=\s*2/i.test(value) ||
       /step\s*\d/i.test(value) ||
-      /\(\d+\.?\d*\s*(?:m|s|Hz)/i.test(value))
+      /fig[:.]?\s*\d/i.test(value) ||
+      /\(\d+\.?\d*\s*(?:m|s|Hz)/i.test(value) ||
+      /section\s*\(\s*[a-c]\s*\)/i.test(value))
   ) {
     return true;
   }

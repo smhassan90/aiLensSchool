@@ -1,0 +1,16 @@
+Unit 10: General Wave properties
+10.3 Simple Harmonic Motion (SHM)
+Periodic Motion
+A motion repeating itself in an equal time interval is referred to as periodic or oscillatory motion.
+Simple Harmonic Motion
+When an object oscillates about a fixed position (mean position) its acceleration is directly proportional to its displacement from the mean position.
+a ∝ -x
+Weblinks
+Encourage students to visit below link for
+https://www.myphysicslab.com/pendulum/pendulum-en.html
+https://phet.colorado.edu/sims/html/pendulum-lab/latest/pendulum-lab_en.html
+10.4 Simple pendulum
+Forces acting on a displaced pendulum
+Tension T along the string and Weight W = mg
+T = 2n V(L/g)
+The period depends on length and g, independent of mass and amplitude.

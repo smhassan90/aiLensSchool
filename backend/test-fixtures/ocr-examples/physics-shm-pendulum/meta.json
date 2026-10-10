@@ -1,0 +1,15 @@
+{
+  "id": "physics-shm-pendulum",
+  "subject": "physics",
+  "scienceFewShot": true,
+  "mustMatch": [
+    "Simple Harmonic Motion",
+    "simple pendulum",
+    "T = 2π√(L/g)",
+    "restoring force"
+  ],
+  "mustNotMatch": [
+    "myphysicslab",
+    "phet.colorado"
+  ]
+}

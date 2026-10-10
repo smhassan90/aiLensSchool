@@ -63,20 +63,21 @@ export function loadAllOcrExamplePacks(root = resolveOcrExamplesRoot()): OcrExam
 }
 
 /** Inlined when Docker/runtime has no test-fixtures on disk. */
-const EMBEDDED_SCIENCE_FEW_SHOTS = `Science/numericals OCR repair examples (imitate cleanup style; do not invent numbers):
+const EMBEDDED_SCIENCE_FEW_SHOTS = `Science/physics textbook OCR repair examples (imitate cleanup style; do not invent numbers):
 --- Example physics-numericals-section-c (messy) ---
 Ya What is the wavelength ... frequency of 1300 1300 1300 57% SRR 5
-Where 1K the 103, and the speed of the radio-wave is 3x10" ms. (230.76m)
-(1.28ms™)
+Where 1K the 103 ... 3x10" ms. (230.76m) (1.28ms™)
 --- Example physics-numericals-section-c (cleaned) ---
 What is the wavelength ... frequency of 1300 kHz?
-Where 1K = 10^3, and the speed of the radio-wave is 3 × 10^8 ms^-1. (230.76m)
-(1.28ms^-1)
---- Example physics-weblinks-waves (messy) ---
-Encourage students to visit below link for Waves Ripple
-https://www.youtube.com/ watch?v=... Result=1.0m/s
---- Example physics-weblinks-waves (cleaned) ---
-Step 2 / Step 3 body kept. Result = 1.0 m/s. No YouTube / Encourage students lines.`;
+Where 1K = 10^3 ... 3 × 10^8 ms^-1. (230.76m) (1.28ms^-1)
+--- Example physics-shm-pendulum (messy) ---
+Weblinks myphysicslab/phet URLs interleaved. T = 2n V(L/g)
+--- Example physics-shm-pendulum (cleaned) ---
+Keep SHM/pendulum body. T = 2π√(L/g). Strip Weblinks/sim URLs.
+--- Example physics-worked-example (messy) ---
+Encourage students / youtube between Step 1 and Step 2
+--- Example physics-worked-example (cleaned) ---
+Keep Worked Example Steps 1–3 and Result. No YouTube lines.`;
 
 /**
  * Short before/after snippets for science AI merge prompts.

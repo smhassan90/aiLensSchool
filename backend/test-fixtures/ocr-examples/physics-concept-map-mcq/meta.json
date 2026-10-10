@@ -1,0 +1,13 @@
+{
+  "id": "physics-concept-map-mcq",
+  "subject": "physics",
+  "scienceFewShot": false,
+  "mustMatch": [
+    "CONCEPT MAP",
+    "Transverse Waves",
+    "Longitudinal Waves",
+    "Section (A) Multiple Choice",
+    "frequency of the waves"
+  ],
+  "mustNotMatch": []
+}

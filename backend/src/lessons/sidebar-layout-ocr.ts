@@ -4,10 +4,10 @@
  */
 
 const WEBLINK_LINE =
-  /\bweblinks?\b|encourage students to(?:\s*visit)?|visit below link|youtube\.com|youtu\.be|https?:\/\/|watch\?v[=-]|[ab]+[_\s-]?channel|_channel/i;
+  /\bweblinks?\b|encourage students to(?:\s*visit)?|visit below link|youtube\.com|youtu\.be|myphysicslab\.com|phet\.colorado\.edu|sciencelearn\.org\.nz|https?:\/\/|watch\?v[=-]|[ab]+[_\s-]?channel|_channel/i;
 
 const SCIENCE_BODY_CUE =
-  /\b(?:step\s*\d|result\s*=|self[- ]?assessment|wavelength|frequency|amplitude|ripple\s*tank|displacement|wave\s*speed|formula|calculate|hz\b|m\/s)\b|[λμνπωΔ]|v\s*=\s*f|[∪∩∈∅]/i;
+  /\b(?:step\s*\d|result\s*=|self[- ]?assessment|wavelength|frequency|amplitude|ripple\s*tank|displacement|wave\s*speed|formula|calculate|hz\b|m\/s|worked\s*example|simple\s*harmonic|pendulum|transverse|longitudinal|diffraction|concept\s*map|summary)\b|[λμνπωθΔ]|v\s*=\s*f|T\s*=\s*2|[∪∩∈∅]/i;
 
 const LITERARY_KEEP_CUE =
   /\b(?:dignity of work|pre-reading|akhtar|rukhsana|uncle inayat|prophet|khandaq|central idea|note for teachers|cobweb|spider|scotland)\b/i;
@@ -23,7 +23,16 @@ export function lineLooksLikeWeblinkSidebar(line: string): boolean {
   if (/^[a-z]+SCIEN/i.test(trimmed) || /^CE\s*$/i.test(trimmed)) return true;
   // Orphan YouTube/sidebar titles left after URL lines are removed
   if (
-    /^(Waves[\s-].{0,40}|Tank Interference|and Wavelength|launchSCIEN\w*)$/i.test(trimmed)
+    /^(Waves[\s-].{0,40}|Tank Interference|and Wavelength|launchSCIEN\w*|Pendulum clock invention.{0,40}|oscillation and periodic motion)$/i.test(
+      trimmed,
+    )
+  ) {
+    return true;
+  }
+  // External sim/lab URLs often wrap without https:// on the same line
+  if (
+    /^(?:www\.)?(?:myphysicslab|phet\.colorado|sciencelearn\.org)/i.test(trimmed) ||
+    /pendulum-lab_en\.html|pendulum-en\.html|waves-and-energy/i.test(trimmed)
   ) {
     return true;
   }
@@ -33,7 +42,7 @@ export function lineLooksLikeWeblinkSidebar(line: string): boolean {
 function weblinkSignalCount(text: string): number {
   return (
     text.match(
-      /youtube\.com|youtu\.be|weblinks?|encourage students to(?:\s*visit)?|visit below link|https?:\/\/|watch\?v=/gi,
+      /youtube\.com|youtu\.be|myphysicslab\.com|phet\.colorado\.edu|sciencelearn\.org\.nz|weblinks?|encourage students to(?:\s*visit)?|visit below link|https?:\/\/|watch\?v=/gi,
     ) ?? []
   ).length;
 }

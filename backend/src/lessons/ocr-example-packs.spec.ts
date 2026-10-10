@@ -10,15 +10,22 @@ import {
 describe('ocr example packs (durable training fixtures)', () => {
   const packs = loadAllOcrExamplePacks();
 
-  it('loads the seeded Dignity + Physics packs', () => {
+  it('loads Dignity + Unit 10 Physics packs', () => {
     expect(resolveOcrExamplesRoot()).toContain('ocr-examples');
-    expect(packs.map((p) => p.meta.id).sort()).toEqual(
-      [
+    const ids = packs.map((p) => p.meta.id);
+    expect(ids).toEqual(
+      expect.arrayContaining([
         'english-dignity-page1',
         'physics-numericals-section-c',
         'physics-weblinks-waves',
-      ].sort(),
+        'physics-intro-waves',
+        'physics-shm-pendulum',
+        'physics-summary',
+        'physics-concept-map-mcq',
+        'physics-worked-example',
+      ]),
     );
+    expect(ids.length).toBeGreaterThanOrEqual(8);
   });
 
   it.each(packs.map((p) => [p.meta.id, p] as const))(
