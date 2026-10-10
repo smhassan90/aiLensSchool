@@ -65,7 +65,8 @@ function tokenLooksGarbage(token: string, alternateAtPosition?: string): boolean
   }
   const altLetters = alternateAtPosition?.match(/[A-Za-z]+/g)?.[0];
   for (const part of letters) {
-    if (/^[A-Z]{3,6}$/.test(part) && !isProtectedStemAcronym(part)) return true;
+    // ALL-CAPS OCR noise (DINPIESS, etc.) — not protected STEM acronyms
+    if (/^[A-Z]{3,12}$/.test(part) && !isProtectedStemAcronym(part)) return true;
     if (part.length >= 3 && !latinOcrWordLooksPlausible(part)) return true;
     if (
       altLetters &&
@@ -113,6 +114,64 @@ function mergeLineWords(primary: string, alternate: string): string {
     return word;
   });
   return merged.join(' ');
+}
+
+/** Primary word containment inside alternate (not symmetric overlap). */
+function primaryWordContainmentInAlternate(primary: string, alternate: string): number {
+  const pWords = normalizeLineKey(primary)
+    .split(' ')
+    .filter((w) => w.length > 2);
+  if (!pWords.length) return 0;
+  const aSet = new Set(
+    normalizeLineKey(alternate)
+      .split(' ')
+      .filter((w) => w.length > 2),
+  );
+  let hit = 0;
+  for (const w of pWords) {
+    if (aSet.has(w)) hit += 1;
+  }
+  return hit / pWords.length;
+}
+
+/**
+ * Prefer a longer alternate line when it already contains the primary reading
+ * (common when Paddle starts mid-sentence and Tess has the full clause).
+ */
+export function preferFullerOcrLine(primary: string, alternate: string): string {
+  const p = primary.trim();
+  const a = alternate.trim();
+  if (!a) return p;
+  if (!p) return a;
+  const containment = primaryWordContainmentInAlternate(p, a);
+  if (
+    containment >= 0.72 &&
+    (a.length >= p.length + 18 || countLatinLetters(a) >= countLatinLetters(p) + 20)
+  ) {
+    return a;
+  }
+  return mergeLineWords(p, a);
+}
+
+/** Trailing article/preposition with no sentence end → likely cut mid-clause. */
+export function lineLooksLikeIncompleteClause(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.length < 12) return false;
+  if (/[.!?]["')\]]*$/.test(trimmed)) return false;
+  return /\b(?:a|an|the|to|of|and|or|for|with|by|from|in|on|at|into|one|end)\s*$/i.test(
+    trimmed,
+  );
+}
+
+function lineContentMostlyPresentInOutput(line: string, out: string[]): boolean {
+  if (out.some((existing) => ocrLinesDuplicate(existing, line))) return true;
+  const words = normalizeLineKey(line)
+    .split(' ')
+    .filter((w) => w.length > 3);
+  if (words.length < 3) return false;
+  const blob = normalizeLineKey(out.join(' '));
+  const hit = words.filter((w) => blob.includes(w)).length;
+  return hit / words.length >= 0.78;
 }
 
 function findBestAlternateLineIndex(
@@ -207,7 +266,21 @@ function mergePrimaryWithAlternate(primary: string, alternate: string): string {
     }
 
     if (matchIdx >= 0) {
-      out.push(mergeLineWords(pl, altLines[matchIdx]));
+      // Paddle often drops the clause opener; Tess has it on the previous unused line.
+      let altSpan = altLines[matchIdx];
+      if (matchIdx > 0 && !usedAlt.has(matchIdx - 1)) {
+        const prev = altLines[matchIdx - 1];
+        if (
+          prev &&
+          !lineIsMostlyGarbage(prev) &&
+          lineLooksLikeIncompleteClause(prev) &&
+          primaryWordContainmentInAlternate(pl, `${prev} ${altSpan}`) >= 0.55
+        ) {
+          usedAlt.add(matchIdx - 1);
+          altSpan = `${prev} ${altSpan}`;
+        }
+      }
+      out.push(preferFullerOcrLine(pl, altSpan));
     } else {
       out.push(pl);
     }
@@ -219,7 +292,18 @@ function mergePrimaryWithAlternate(primary: string, alternate: string): string {
     if (lineIsMostlyGarbage(tl)) continue;
     const isMathLine = lineLooksLikeMathOrFormula(tl);
     if (tl.length < 10 && countLatinLetters(tl) < 8 && !isMathLine) continue;
-    if (out.some((line) => ocrLinesDuplicate(line, tl))) continue;
+    if (lineContentMostlyPresentInOutput(tl, out)) continue;
+    // Orphan opener: continuation was already consumed matching primary lines.
+    if (lineLooksLikeIncompleteClause(tl)) {
+      let continuationAlreadyMerged = false;
+      for (let j = i + 1; j < Math.min(i + 5, altLines.length); j += 1) {
+        if (usedAlt.has(j) && lineContentMostlyPresentInOutput(altLines[j], out)) {
+          continuationAlreadyMerged = true;
+          break;
+        }
+      }
+      if (continuationAlreadyMerged) continue;
+    }
     out.push(tl);
     usedAlt.add(i);
   }

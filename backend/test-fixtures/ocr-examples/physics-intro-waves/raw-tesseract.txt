@@ -1,12 +1,44 @@
-Unit 10: General Wave properties
-10.1 Waves and nature of waves
-A method transport energy from one point to another point without transfer of matter is called wave.
+Fig: 10.1 Up and down
+movements produce a
+wave
+
+Fig: 10.3
+Anupward pulse moves
+the right, followed by
+Bb wowvard pulse.
+
+We experience the impacts of waves every day in
+our daily life. Every sound we listen to depends on sound
+waves. Every sight we see depends on light waves. A little
+wave can travel across the water in a glass, and a very large
+tide can travel over the sea. Sound waves, light waves, and
+water waves appear very different. So, what similarities do
+all these different forms of waves have? What, exactly, is a
+wave? What are the characteristics of a wave? We will
+study it all in detail in this unit.
+
 Formation of waves
-Disturbances in a medium cause the formation of waves using a rope, a slinky spring, and water waves in ripple tanks.
-Wave Motion by using a Rope
-Attaching one end of a rope to a wall and moving the other end up and down produces oscillations or vibrations.
+Disturbance of medium cause of formation of wave like,
+we can produce waves by using a rope, slinky spring, and
+water waves in ripple tanks. Let us discuss them in detail.
+Wave Motion by using a Rope.
+
+We can produce waves on a rope by attaching one end to a
+wall and continuously moving the other end up and down,
+as shown in figure 10.1. These up-and-down movements
+produce oscillations or vibrations. We can observe that the
+generated rope waves travel towards the wall, whereas the
+rope itself moves only up and down. The rope is the
+medium through which the waves travel or propagate.
 Waves in a Slinky Spring
-A slinky spring is a pre-compressed helical or coiled spring as shown in fig 10.2.
-Fig: 10.1 Up and down movements produce a wave
-Fig: 10.2 slinky spring
-Fig: 10.3 An upward pulse moves to the right, followed by (b) A downward pulse.
+
+nly DINPIESS
+
+We can perform several experiments with a slinky
+in the laboratory to understand the phenomenon of
+different types of wave motion.
+Attach one end of the spring with a wall. Now
+free end of the slinky horizontally left and right
+on the table will be able to see the coils of the
+p left and right, whereas hutnps travel to the
+10.3) (a,b,c):

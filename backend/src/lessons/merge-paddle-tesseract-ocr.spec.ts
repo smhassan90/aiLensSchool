@@ -102,4 +102,40 @@ wavelength of the waves are 8.0 m
     expect(merged).toMatch(/λ/);
     expect(merged).toMatch(/v = f/);
   });
+
+  it('stitches Tess rope opener onto Paddle mid-sentence body instead of orphan truncation', () => {
+    const paddle = `
+WaveMotion byusing a Rope
+Fig10.2 slinky spring
+wall and continuously moving the other end up and down
+as shown in figure 10.1.These up-and-down movements
+produce oscillations or vibrations. We can observe that the
+generated rope waves travel towards the wall, whereas the
+rope itself moves only up and down. The rope is the
+medium through which the waves travel or propagate.
+Waves in a Slinky Spring
+A slinky spring is a pre-compressed helical or coiled spring
+as shown in fig 10.2.
+`.trim();
+    const tess = `
+Wave Motion by using a Rope.
+We can produce waves on a rope by attaching one end to a
+wall and continuously moving the other end up and down,
+as shown in figure 10.1. These up-and-down movements
+produce oscillations or vibrations. We can observe that the
+generated rope waves travel towards the wall, whereas the
+rope itself moves only up and down. The rope is the
+medium through which the waves travel or propagate.
+Waves in a Slinky Spring
+nly DINPIESS
+A slinky spring is a pre-compressed helical or coiled spring as shown in fig 10.2.
+`.trim();
+    const merged = mergePaddleAndTesseractPageOcr(paddle, tess);
+    expect(merged).toMatch(/We can produce waves on a rope by attaching one end to a/i);
+    expect(merged).toMatch(/wall and continuously moving the other end up and down/i);
+    expect(merged).toMatch(/medium through which the waves travel/i);
+    // Must not leave the Tess opener stranded without its continuation.
+    expect(merged).not.toMatch(/attaching one end to a\s*\n\s*nly/i);
+    expect(merged).not.toMatch(/DINPIESS/);
+  });
 });

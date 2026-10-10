@@ -4,9 +4,12 @@
   "scienceFewShot": true,
   "mustMatch": [
     "Unit 10",
-    "Waves and nature of waves",
     "slinky spring",
-    "Fig: 10.1"
+    "We can produce waves on a rope",
+    "wall and continuously moving",
+    "medium through which the waves travel"
   ],
-  "mustNotMatch": []
+  "mustNotMatch": [
+    "DINPIESS"
+  ]
 }

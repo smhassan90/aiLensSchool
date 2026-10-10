@@ -1,10 +1,13 @@
-Unit 10: General Wave properties
+Unit 10
+General Wave properties
+We experience the impacts of waves every day
 10.1 Waves and nature of waves
 A method transport energy from one point to another point without transfer of matter is called wave.
 Formation of waves
 Wave Motion by using a Rope
+We can produce waves on a rope by attaching one end to a wall and continuously moving the other end up and down
+produce oscillations or vibrations
+medium through which the waves travel or propagate
 Waves in a Slinky Spring
-A slinky spring is a pre-compressed helical or coiled spring as shown in fig 10.2.
-Fig: 10.1 Up and down movements produce a wave
-Fig: 10.2 slinky spring
-Fig: 10.3 An upward pulse moves to the right
+A slinky spring is a pre-compressed helical or coiled spring
+Attach one end of the spring with a wall
