@@ -1,0 +1,13 @@
+Unit 10: General Wave properties
+10.3 Simple Harmonic Motion
+a oc -x
+When displaced by small angle 'theeta':
+i. Tension T
+ii. Weight W = mg
+mg sin theeta and mg cos theeta
+T = 2n V(L/g)
+pie = 22/7 ≅ 3.141
+pie2 ≅ 9.86
+f = 1/T
+Infinity damping would reduce amplitude to infinity
+A = 1/2(3.0m) = 1.5m

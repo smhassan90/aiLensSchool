@@ -1,0 +1,12 @@
+Unit 10: General Wave properties
+10.3 Simple Harmonic Motion
+a ∝ -x
+When displaced by small angle 'theta':
+i. Tension T
+ii. Weight W = mg
+The weight is resolved into mg sin theta and mg cos theta
+For SHM: T = 2π√(L/g)
+π ≅ 22/7 ≅ 3.141 and π² ≅ 9.86
+ii. f = 1/T
+An oscillating system with friction is damped; amplitude tends to infinity only without damping in ideal models.
+A = 1/2(3.0m) = 1.5m

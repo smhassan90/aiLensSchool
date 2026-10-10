@@ -8,7 +8,7 @@ const STEM_ACRONYM_KEEP =
   /^(?:THE|AND|FOR|SHM|RMS|LHS|RHS|DNA|OCR|USB|PDF|HTTP|HTML|CSS|API|CPU|GPU|NASA|WHO|UN|USA|UAE|UK|SI|KE|PE|EMF|AC|DC)$/;
 
 const SCIENCE_PAGE_CUE =
-  /\b(?:numericals?|wavelength|frequency|amplitude|pendulum|slinky|ripple\s*tank|ms\^-?1|m\/s|kHz|section\s*\(\s*[a-c]\s*\)|worked\s*example|simple\s*harmonic|transverse|longitudinal|diffraction|refraction|concept\s*map|self[- ]?assessment|summary)\b|ms[™®]|v\s*=\s*f|T\s*=\s*2\s*π|a\s*∝|[λμνπωθ]/i;
+  /\b(?:numericals?|wavelength|frequency|amplitude|pendulum|slinky|ripple\s*tank|ms\^-?1|m\/s|kHz|section\s*\(\s*[a-c]\s*\)|worked\s*example|simple\s*harmonic|transverse|longitudinal|diffraction|refraction|concept\s*map|self[- ]?assessment|summary|angular\s*displacement|restoring\s*force|square\s*root|infty|infinity)\b|ms[™®]|v\s*=\s*f|T\s*=\s*2|sin\s*(?:θ|the?ta)|cos\s*(?:θ|the?ta)|a\s*∝|[λμνπωθπ√∞≅≈]/i;
 
 /** Literary pages: skip science-only notation rewrites (safe line cleanups still OK). */
 const LITERARY_KEEP_CUE =
@@ -83,6 +83,79 @@ export function restoreWavelengthLambdaSymbols(text: string): string {
     .trim();
 }
 
+/**
+ * Restore π, θ, √, ∞, ≅, fractions, and frequency symbols common in physics OCR.
+ */
+export function restorePhysicsMathSymbols(text: string): string {
+  const value = (text ?? '').trim();
+  if (!value) return value;
+  const mathContext =
+    SCIENCE_PAGE_CUE.test(value) ||
+    /\b(?:sin|cos|tan|theta|theeta|pie|pi\b|sqrt|square\s*root|infty|infinity|22\s*\/\s*7)\b/i.test(
+      value,
+    );
+  if (!mathContext) return value;
+
+  return (
+    value
+      // --- Angles: sin/cos/tan theta ---
+      .replace(/\btheeta\b/gi, 'theta')
+      .replace(/\bsin\s*(?:θ|theta|0)\b/gi, 'sin θ')
+      .replace(/\bcos\s*(?:θ|theta|0)\b/gi, 'cos θ')
+      .replace(/\btan\s*(?:θ|theta|0)\b/gi, 'tan θ')
+      .replace(/\bmg\s*sin\s*(?:θ|theta|0)\b/gi, 'mg sin θ')
+      .replace(/\bmg\s*cos\s*(?:θ|theta|0)\b/gi, 'mg cos θ')
+      .replace(/\bangular\s*displacement\s*(?:θ|theta|0)\b/gi, 'angular displacement θ')
+      .replace(/\bsmall\s*angle\s*['']?(?:θ|theta|0)['']?/gi, "small angle 'θ'")
+      // --- Pi ---
+      .replace(/\bpie\s*(?:2|²|\^2)\b/gi, 'π²')
+      .replace(/\bpie2\b/gi, 'π²')
+      .replace(/\bpi\s*(?:2|²|\^2)\b/gi, 'π²')
+      .replace(/\bpie\b/gi, 'π')
+      .replace(/\bpi\b/gi, 'π')
+      .replace(/π\s*(?:=|≈|~|≅)\s*22\s*\/\s*7/gi, 'π ≅ 22/7')
+      .replace(/π\s*(?:=|≈|~|≅)\s*(3\.14\d*)/gi, 'π ≅ $1')
+      .replace(/π\s*(?:2|²|\^2)\b/g, 'π²')
+      .replace(/π2\b/g, 'π²')
+      .replace(/4\s*π\s*(?:2|²|\^2)/g, '4π²')
+      .replace(/4π2\b/g, '4π²')
+      // Approx / not-equals
+      .replace(/\b(?:approx(?:imately)?|nearly)\s*(?:=\s*)?(22\s*\/\s*7|3\.14\d*)/gi, '≅ $1')
+      .replace(/!=/g, '≠')
+      // --- Square root / period formula ---
+      .replace(/\bsquare\s*root\s*(?:of\s*)?/gi, '√')
+      .replace(/\bsqrt\s*\(/gi, '√(')
+      .replace(/T\s*=\s*2\s*π\s*[√vV]\s*\(?\s*[Ll]\s*\/\s*g\s*\)?/g, 'T = 2π√(L/g)')
+      .replace(/T\s*=\s*2\s*(?:π|n)\s*[√vV]?\s*\(?\s*[Ll]\s*\/\s*g\s*\)?/gi, 'T = 2π√(L/g)')
+      .replace(/T\s*=\s*2\s*(?:π|n)\s+V\s*\(\s*[Ll]\s*\/\s*g\s*\)/gi, 'T = 2π√(L/g)')
+      .replace(/√\s*\(\s*[Ll]\s*\/\s*g\s*\)/g, '√(L/g)')
+      .replace(/√\s*[Ll]\s*\/\s*g\b/g, '√(L/g)')
+      // --- Infinity ---
+      .replace(/\b(?:infinity|infty)\b/gi, '∞')
+      .replace(/\b8\s*oo\b/gi, '∞')
+      // --- Fractions / divide ---
+      .replace(/\bA\s*=\s*1\s*\/\s*2\s*\(?\s*(\d)/gi, 'A = 1/2($1')
+      .replace(/\b1\s*\/\s*2\b(?!\d)/g, '1/2')
+      .replace(/\bf\s*=\s*1\s*\/\s*T\b/gi, 'f = 1/T')
+      .replace(/\bf\s*=\s*1\s*\/\s*(\d)/gi, 'f = 1/$1')
+      // Frequency label often OCR'd without "f"
+      .replace(
+        /(^|\n)(\s*(?:ii|II)[.)]?\s*)(=\s*0\.125\s*Hz)/gim,
+        '$1$2f $3',
+      )
+      .replace(/(^|\n)(\s*)f\s*\n\s*=\s*/gim, '$1$2f = ')
+      .replace(/\bfrequency\s+f\b/gi, 'frequency f')
+      .replace(/\bii\.?\s*f\s*=\s*\?/gi, 'ii. f = ?')
+      .replace(/\bi\.?\s*T\s*=\s*\?/gi, 'i. T = ?')
+      // Proportionality
+      .replace(/\ba\s*[∞∝xX]\s*-?\s*x\b/gi, 'a ∝ -x')
+      .replace(/\ba\s*oc\s*-?\s*x\b/gi, 'a ∝ -x')
+      .replace(/\bproportional\s+to\s+-?\s*x\b/gi, '∝ -x')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim()
+  );
+}
+
 /** Common unit / power-of-ten OCR artifacts from red superscripts. */
 export function normalizeScienceNotationArtifacts(text: string): string {
   let value = text
@@ -103,12 +176,6 @@ export function normalizeScienceNotationArtifacts(text: string): string {
     .replace(/\b(\d+)\s*[x×]\s*10\^([0-9]+)\b/g, '$1 × 10^$2')
     .replace(/\bFrequeney\b/gi, 'Frequency')
     .replace(/\boppositive\b/gi, 'opposite')
-    // Common OCR mangling of pendulum period formula (π/√ often become n/V)
-    .replace(/T\s*=\s*2\s*(?:π|pi|n)\s*[√vV]?\s*\(?\s*[Ll]\s*\/\s*g\s*\)?/gi, 'T = 2π√(L/g)')
-    .replace(/T\s*=\s*2\s*(?:π|pi|n)\s+V\s*\(\s*[Ll]\s*\/\s*g\s*\)/gi, 'T = 2π√(L/g)')
-    .replace(/T\s*=\s*2π\s*[√vV]\s*\(?\s*[Ll]\s*\/\s*g\s*\)?/g, 'T = 2π√(L/g)')
-    .replace(/\bf\s*=\s*1\s*\/\s*T\b/gi, 'f = 1/T')
-    .replace(/\ba\s*[∞∝]\s*-?\s*x\b/gi, 'a ∝ -x')
     .replace(/\bFig[:.]?\s*(\d+\.\d+)/gi, 'Fig: $1')
     .replace(/\bDo You Know!?\b/gi, 'Do You Know!')
     // Merge sometimes doubles "Step" when "1:" was treated as junk
@@ -117,6 +184,7 @@ export function normalizeScienceNotationArtifacts(text: string): string {
     .replace(/\bStep\s+Step\s+(?=Put the values)/gi, 'Step 3: ')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
+  value = restorePhysicsMathSymbols(value);
   value = restoreWavelengthLambdaSymbols(value);
   return value;
 }

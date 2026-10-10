@@ -1,0 +1,19 @@
+{
+  "id": "physics-math-symbols",
+  "subject": "physics",
+  "scienceFewShot": true,
+  "mustMatch": [
+    "sin θ",
+    "cos θ",
+    "π ≅ 22/7",
+    "π²",
+    "T = 2π√(L/g)",
+    "f = 1/T",
+    "∞",
+    "a ∝ -x"
+  ],
+  "mustNotMatch": [
+    "theeta",
+    "pie ="
+  ]
+}

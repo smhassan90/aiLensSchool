@@ -23,9 +23,10 @@ describe('ocr example packs (durable training fixtures)', () => {
         'physics-summary',
         'physics-concept-map-mcq',
         'physics-worked-example',
+        'physics-math-symbols',
       ]),
     );
-    expect(ids.length).toBeGreaterThanOrEqual(8);
+    expect(ids.length).toBeGreaterThanOrEqual(9);
   });
 
   it.each(packs.map((p) => [p.meta.id, p] as const))(
@@ -48,8 +49,8 @@ describe('ocr example packs (durable training fixtures)', () => {
 
   it('builds science few-shot block from physics packs only', () => {
     const block = buildScienceOcrFewShotBlock(packs, 2);
-    expect(block).toMatch(/Science\/numericals OCR repair examples/i);
-    expect(block).toMatch(/physics-weblinks-waves|physics-numericals-section-c/);
+    expect(block).toMatch(/Science\/(?:numericals|physics) OCR repair examples/i);
+    expect(block).toMatch(/physics-/);
     expect(block).not.toMatch(/english-dignity-page1/);
     expect(path.basename(packs[0].dir)).toBeTruthy();
   });

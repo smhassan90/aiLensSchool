@@ -2,6 +2,7 @@ import {
   cleanMergedPageOcrText,
   collapseRepeatedNumericTokens,
   normalizeScienceNotationArtifacts,
+  restorePhysicsMathSymbols,
   restoreWavelengthLambdaSymbols,
   stripConfidenceLikeJunk,
   stripLeadingMarkNoise,
@@ -63,6 +64,29 @@ Calculate the speed of these water waves. (1.28ms^-1)
       ),
     ).toBe(false);
     expect(lineLooksLikeMathOrFormula('f = 0.125 Hz')).toBe(true);
+  });
+
+  it('restores theta, pi, sqrt, infinity, approx, and frequency symbols', () => {
+    const raw = `
+mg sin theeta and mg cos theeta
+T = 2n V(L/g)
+pie = 22/7
+pie2 ≅ 9.86
+f = 1/T
+a oc -x
+amplitude tends to infinity
+A = 1/2(3.0m)
+`.trim();
+    const cleaned = restorePhysicsMathSymbols(raw);
+    expect(cleaned).toMatch(/sin θ/);
+    expect(cleaned).toMatch(/cos θ/);
+    expect(cleaned).toMatch(/T = 2π√\(L\/g\)/);
+    expect(cleaned).toMatch(/π ≅ 22\/7/);
+    expect(cleaned).toMatch(/π²/);
+    expect(cleaned).toMatch(/f = 1\/T/);
+    expect(cleaned).toMatch(/a ∝ -x/);
+    expect(cleaned).toMatch(/∞/);
+    expect(cleaned).toMatch(/1\/2\s*\(?3\.0m/);
   });
 
   it('restores Greek λ when OCR drops wavelength symbols', () => {

@@ -77,7 +77,11 @@ Keep SHM/pendulum body. T = 2π√(L/g). Strip Weblinks/sim URLs.
 --- Example physics-worked-example (messy) ---
 Encourage students / youtube between Step 1 and Step 2
 --- Example physics-worked-example (cleaned) ---
-Keep Worked Example Steps 1–3 and Result. No YouTube lines.`;
+Keep Worked Example Steps 1–3 and Result. No YouTube lines.
+--- Example physics-math-symbols (messy) ---
+mg sin theeta, pie=22/7, T=2n V(L/g), pie2, infinity
+--- Example physics-math-symbols (cleaned) ---
+mg sin θ, π ≅ 22/7, T = 2π√(L/g), π², ∞, f = 1/T`;
 
 /**
  * Short before/after snippets for science AI merge prompts.

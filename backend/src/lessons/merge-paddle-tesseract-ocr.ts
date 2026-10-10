@@ -60,7 +60,7 @@ function tokenLooksGarbage(token: string, alternateAtPosition?: string): boolean
   const letters = raw.match(/[A-Za-z]+/g) ?? [];
   if (!letters.length) {
     // Keep Greek / math punctuation fragments; only drop tiny unknown junk.
-    if (/[\u0370-\u03FF∪∩∈∅λμνπω°±×÷≈≠≤≥√∞=]/u.test(raw)) return false;
+    if (/[\u0370-\u03FF∪∩∈∅λμνπωθπ°±×÷≈≠≤≥√∞≅½=]/u.test(raw)) return false;
     return (raw.match(/[^\s]/g) ?? []).length <= 2;
   }
   const altLetters = alternateAtPosition?.match(/[A-Za-z]+/g)?.[0];
