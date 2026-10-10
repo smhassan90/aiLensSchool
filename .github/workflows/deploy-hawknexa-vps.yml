@@ -212,6 +212,17 @@ jobs:
           echo "Waiting for VPS deploy (commit ${short_sha})..."
           for i in $(seq 1 72); do
             status_body="$(curl -fsS -H "Authorization: Bearer ${DEPLOY_SECRET}" "${STATUS_URL}" 2>/dev/null || true)"
+            # Prefer live health over status-file races (webhook recreate can
+            # briefly report failed while the stack is already on the new SHA).
+            if [ "${BUILD_BACKEND}" = "true" ]; then
+              health_body="$(curl -fsS "${HEALTH_URL}" 2>/dev/null || true)"
+              if [ -n "${health_body}" ] && echo "${health_body}" | jq -e --arg sha "${short_sha}" \
+                '.data.commit == $sha' >/dev/null 2>&1; then
+                echo "OK: API health reports ${short_sha}"
+                exit 0
+              fi
+            fi
+
             if [ -n "${status_body}" ]; then
               echo "${status_body}"
               if echo "${status_body}" | jq -e --arg sha "${short_sha}" \
@@ -220,17 +231,12 @@ jobs:
                 exit 0
               fi
               if echo "${status_body}" | jq -e '.status == "failed"' >/dev/null 2>&1; then
-                echo "::error::VPS deploy failed. Check /tmp/hawknexa-deploy.log on the server."
-                exit 1
-              fi
-            fi
-
-            if [ "${BUILD_BACKEND}" = "true" ]; then
-              health_body="$(curl -fsS "${HEALTH_URL}" 2>/dev/null || true)"
-              if [ -n "${health_body}" ] && echo "${health_body}" | jq -e --arg sha "${short_sha}" \
-                '.data.commit == $sha' >/dev/null 2>&1; then
-                echo "OK: API health reports ${short_sha}"
-                exit 0
+                # Only fail if health also disagrees (or backend was not built).
+                if [ "${BUILD_BACKEND}" != "true" ] || ! echo "${health_body:-}" | jq -e --arg sha "${short_sha}" \
+                  '.data.commit == $sha' >/dev/null 2>&1; then
+                  echo "::error::VPS deploy failed. Check /tmp/hawknexa-deploy.log on the server."
+                  exit 1
+                fi
               fi
             fi
 

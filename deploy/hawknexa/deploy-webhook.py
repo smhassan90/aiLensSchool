@@ -171,8 +171,15 @@ class DeployHandler(BaseHTTPRequestHandler):
             running = deploy_running()
             if running and status.get("status") != "running":
                 status = {**status, "status": "running"}
+            # Do NOT invent "failed" when the deploy container briefly vanishes
+            # (compose recreate / recover-stack / concurrent deploy). deploy.sh
+            # owns writing success|failed to STATUS_FILE.
             if not running and status.get("status") == "running":
-                status = {**status, "status": "failed", "message": "Deploy container stopped unexpectedly"}
+                status = {
+                    **status,
+                    "message": status.get("message")
+                    or "Deploy process not visible (containers may be recreating)",
+                }
             self._send_json(
                 200,
                 {
