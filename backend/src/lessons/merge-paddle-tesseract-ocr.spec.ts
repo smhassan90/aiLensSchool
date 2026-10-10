@@ -103,6 +103,61 @@ wavelength of the waves are 8.0 m
     expect(merged).toMatch(/v = f/);
   });
 
+  it('keeps MCQ stem + Yes/No grid from either engine and formats a markdown table', () => {
+    const paddle = `
+General Wave propertie
+Water waves can be used to show reflection, refraction, and diffraction. For
+2.
+each of these,which row shows whether or not the speed of the water waves
+changes?
+Diffraction
+Refraction
+Reflection
+Yes
+yes
+Yes
+a)
+No
+yes
+Yes
+b)
+no
+yes
+No
+c)
+no
+No
+no
+d)
+3.The diagrams show water waves that move more slowly after passing into
+shallow water. Which diagram shows what happens to the waves?
+`.trim();
+    const tess = `
+Water waves can be used to show reflection,
+the speed of the water waves
+each of these, which row shows whether or not
+changes?
+Reflection        Refraction        Diffraction
+3. The dagrams show water waves that move more slowly after passing into
+shallow water. Which diagram shows what happens to the waves?
+5. Water waves pass from deep into the shallow region then refracted. The
+characteristics of wave which will remains constant is:
+a) Direction                  b)        Frequency
+c)     Speed                       d)        Wavelength.
+6. Which is not a characteristic of wave?
+a) An amplitude           b)      Period
+c) Mass                        d) Velocity
+`.trim();
+    const merged = mergePaddleAndTesseractPageOcr(paddle, tess);
+    expect(merged).toMatch(/each of these/i);
+    expect(merged).toMatch(/speed of the water waves/i);
+    expect(merged).toMatch(/changes\?/i);
+    expect(merged).toMatch(/\| Option \| Reflection \| Refraction \| Diffraction \|/);
+    expect(merged).toMatch(/\|\s*a\)\s*\|\s*Yes\s*\|\s*Yes\s*\|\s*Yes\s*\|/i);
+    expect(merged).toMatch(/remains constant/i);
+    expect(merged).toMatch(/\bMass\b/i);
+  });
+
   it('stitches Tess rope opener onto Paddle mid-sentence body instead of orphan truncation', () => {
     const paddle = `
 WaveMotion byusing a Rope

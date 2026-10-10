@@ -14,8 +14,9 @@ const LITERARY_KEEP_CUE =
   /\b(?:dignity of work|pre-reading|akhtar|rukhsana|uncle inayat|prophet|khandaq|central idea|note for teachers|cobweb|spider|scotland)\b/i;
 
 /** Short diagram / margin labels that OCR often injects into the reading column. */
+// Diagram chrome only — do NOT list real MCQ vocabulary (Frequency, Wavelength, Reflection…).
 const FIGURE_COLUMN_LABEL =
-  /^(?:Lamp|Vibrator|Water|Elastic\s*bands?|White\s*screen(?:\s+on\s+screen)?|Shallow(?:\s+water)?(?:\s+tray)?|Compressed|Stretched|region|Upand|down|motion|Cpes|Trongha|Amplitl|Dire|vibrallo|spreading|Shadow\s*region|Circular\s*waves|Incident(?:\s+wavefronts)?|wavefronts|Straight(?:\s+barrier)?|barrier|Reflected(?:\s+water\s+waves)?|Normal|Deep|Expansion|Raref(?:ue?|a)ction|Spherical(?:\s+dipper)?|dipper|Plane|wayefron|Energy|Transter|Vibration|Wavelength|particles|Compression|Other\s+end\.?|other\s+end\.?|[abc])$/i;
+  /^(?:Lamp|Vibrator|Elastic\s*bands?|White\s*screen(?:\s+on\s+screen)?|Shallow(?:\s+water)?(?:\s+tray)?|Upand|Cpes|Trongha|Amplitl|Dire|vibrallo|wayefron|Transter|Spherical(?:\s+dipper)?|dipper|Other\s+end\.?|other\s+end\.?)$/i;
 
 const DIAGRAM_DIRECTION_JUNK =
   /^Direction\s*of\s*i?vibration!?$|^Directionc?of\s*wave\s*propagation!?$|^Ditection[- ]?off?wave[- ]?propagation!?$|^Direction\s+of\s+particle\s+motion$|^Direction\s+of\s*waves?$/i;

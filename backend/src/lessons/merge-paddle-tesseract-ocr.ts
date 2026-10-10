@@ -84,6 +84,7 @@ function tokenLooksGarbage(token: string, alternateAtPosition?: string): boolean
 function lineIsMostlyGarbage(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return true;
+  if (lineLooksLikeMcqOrTableCell(trimmed)) return false;
   if (lineLooksLikeMathOrFormula(trimmed)) return false;
   const latin = countLatinLetters(trimmed);
   if (latin < 6 && (trimmed.match(/[|£€©®@#\\]/g) ?? []).length >= 1) return true;
@@ -207,6 +208,13 @@ export function scoreOcrMergeCoverage(text: string): number {
  * Prefer Tesseract as merge base when it has fuller reading-body coverage
  * (incomplete Paddle must not erase a longer story transcript).
  */
+function countMcqOrTableSignals(text: string): number {
+  const yesNo = (text.match(/^\s*(?:yes|no)\s*$/gim) ?? []).length;
+  const options = (text.match(/^\s*[a-d][).]\s*$/gim) ?? []).length;
+  const numbered = (text.match(/^\s*\d{1,2}[.)]\s+\S/gm) ?? []).length;
+  return yesNo + options + numbered;
+}
+
 export function pickOcrMergePrimary(
   paddle: string,
   tesseract: string,
@@ -219,6 +227,15 @@ export function pickOcrMergePrimary(
   const tScore = scoreOcrMergeCoverage(t);
   const pIncomplete = englishPageTranscriptLooksIncomplete(p);
   const tIncomplete = englishPageTranscriptLooksIncomplete(t);
+  const pTable = countMcqOrTableSignals(p);
+  const tTable = countMcqOrTableSignals(t);
+  // Prefer the engine that captured Yes/No grids / option letters for MCQ pages.
+  if (pTable >= tTable + 4 && countLatinLetters(p) >= countLatinLetters(t) * 0.55) {
+    return 'paddle';
+  }
+  if (tTable >= pTable + 4 && countLatinLetters(t) >= countLatinLetters(p) * 0.55) {
+    return 'tesseract';
+  }
   if (pIncomplete && !tIncomplete && countLatinLetters(t) >= countLatinLetters(p) * 0.85) {
     return 'tesseract';
   }
@@ -230,6 +247,145 @@ export function pickOcrMergePrimary(
     return 'tesseract';
   }
   return 'paddle';
+}
+
+/** Short MCQ / Yes-No table cells must never be dropped as "too short". */
+export function lineLooksLikeMcqOrTableCell(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  if (/^(?:yes|no)\.?$/i.test(trimmed)) return true;
+  if (/^[a-d][).:-]\s*$/i.test(trimmed)) return true;
+  if (/^[a-d][).]\s+\S+/i.test(trimmed)) return true;
+  if (/^\d{1,2}[.)]\s*$/.test(trimmed)) return true;
+  if (/^\d{1,2}[.)]\s+\S/.test(trimmed)) return true;
+  return false;
+}
+
+/**
+ * Rebuild Reflection / Refraction / Diffraction Yes-No grids as a markdown table
+ * when OCR left them as stacked labels.
+ */
+export function formatOcrMcqTables(text: string): string {
+  const value = (text ?? '').trim();
+  if (!value) return value;
+  if (!/\bReflection\b/i.test(value) || !/\bRefraction\b/i.test(value) || !/\bDiffraction\b/i.test(value)) {
+    return value;
+  }
+
+  // Already a markdown table with those headers.
+  if (/\|[^|\n]*Reflection[^|\n]*\|[^|\n]*Refraction[^|\n]*\|/i.test(value)) {
+    return value;
+  }
+
+  const lines = value.split(/\r?\n/);
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const headerInline =
+      /Reflection/i.test(line) && /Refraction/i.test(line) && /Diffraction/i.test(line);
+    const stackedHeaders =
+      /^Reflection$/i.test(line.trim()) ||
+      (/^Diffraction$/i.test(line.trim()) &&
+        i + 2 < lines.length &&
+        /^Refraction$/i.test(lines[i + 1].trim()) &&
+        /^Reflection$/i.test(lines[i + 2].trim()));
+
+    if (!headerInline && !stackedHeaders) {
+      out.push(line);
+      continue;
+    }
+
+    let headerEnd = i;
+    let columnOrder: Array<'Reflection' | 'Refraction' | 'Diffraction'> = [
+      'Reflection',
+      'Refraction',
+      'Diffraction',
+    ];
+    if (stackedHeaders && /^Diffraction$/i.test(line.trim())) {
+      headerEnd = i + 2;
+      // OCR often stacks Diffraction → Refraction → Reflection (right-to-left columns).
+      columnOrder = ['Diffraction', 'Refraction', 'Reflection'];
+    } else if (headerInline) {
+      const lower = line.toLowerCase();
+      const positions = [
+        { name: 'Reflection' as const, at: lower.indexOf('reflection') },
+        { name: 'Refraction' as const, at: lower.indexOf('refraction') },
+        { name: 'Diffraction' as const, at: lower.indexOf('diffraction') },
+      ]
+        .filter((p) => p.at >= 0)
+        .sort((a, b) => a.at - b.at);
+      if (positions.length === 3) {
+        columnOrder = positions.map((p) => p.name);
+      }
+    }
+
+    const cells: string[] = [];
+    let j = headerEnd + 1;
+    while (j < lines.length && cells.length < 20) {
+      const t = lines[j].trim();
+      if (!t) {
+        j += 1;
+        continue;
+      }
+      if (/^(?:yes|no)$/i.test(t) || /^[a-d][).]\s*$/i.test(t)) {
+        cells.push(/^[a-d]/i.test(t) ? `${t[0].toLowerCase()})` : t);
+        j += 1;
+        continue;
+      }
+      break;
+    }
+
+    if (cells.length < 6) {
+      out.push(line);
+      continue;
+    }
+
+    // Rows: three Yes/No then option letter, or option letter then three Yes/No.
+    const rows: string[][] = [];
+    let buf: string[] = [];
+    let label = '';
+    const flush = () => {
+      if (buf.length < 3) return;
+      const keyed: Record<string, string> = {
+        [columnOrder[0]]: buf[0],
+        [columnOrder[1]]: buf[1],
+        [columnOrder[2]]: buf[2],
+      };
+      rows.push([
+        label || `${String.fromCharCode(96 + rows.length + 1)})`,
+        keyed.Reflection,
+        keyed.Refraction,
+        keyed.Diffraction,
+      ]);
+      label = '';
+      buf = [];
+    };
+    for (const cell of cells) {
+      if (/^[a-d]\)$/i.test(cell)) {
+        if (buf.length >= 3) flush();
+        label = cell.toLowerCase();
+        continue;
+      }
+      if (/^(?:yes|no)$/i.test(cell)) {
+        buf.push(/yes/i.test(cell) ? 'Yes' : 'No');
+        if (buf.length === 3) flush();
+      }
+    }
+    if (buf.length >= 3) flush();
+
+    if (!rows.length) {
+      out.push(line);
+      continue;
+    }
+
+    out.push('| Option | Reflection | Refraction | Diffraction |');
+    out.push('| --- | --- | --- | --- |');
+    for (const row of rows) {
+      out.push(`| ${row[0]} | ${row[1]} | ${row[2]} | ${row[3]} |`);
+    }
+    i = j - 1;
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function mergePrimaryWithAlternate(primary: string, alternate: string): string {
@@ -289,12 +445,20 @@ function mergePrimaryWithAlternate(primary: string, alternate: string): string {
   for (let i = 0; i < altLines.length; i += 1) {
     if (usedAlt.has(i)) continue;
     const tl = altLines[i];
-    if (lineIsMostlyGarbage(tl)) continue;
+    const keepShortCell = lineLooksLikeMcqOrTableCell(tl);
+    if (!keepShortCell && lineIsMostlyGarbage(tl)) continue;
     const isMathLine = lineLooksLikeMathOrFormula(tl);
-    if (tl.length < 10 && countLatinLetters(tl) < 8 && !isMathLine) continue;
-    if (lineContentMostlyPresentInOutput(tl, out)) continue;
+    if (
+      !keepShortCell &&
+      tl.length < 10 &&
+      countLatinLetters(tl) < 8 &&
+      !isMathLine
+    ) {
+      continue;
+    }
+    if (!keepShortCell && lineContentMostlyPresentInOutput(tl, out)) continue;
     // Orphan opener: continuation was already consumed matching primary lines.
-    if (lineLooksLikeIncompleteClause(tl)) {
+    if (!keepShortCell && lineLooksLikeIncompleteClause(tl)) {
       let continuationAlreadyMerged = false;
       for (let j = i + 1; j < Math.min(i + 5, altLines.length); j += 1) {
         if (usedAlt.has(j) && lineContentMostlyPresentInOutput(altLines[j], out)) {
@@ -308,10 +472,12 @@ function mergePrimaryWithAlternate(primary: string, alternate: string): string {
     usedAlt.add(i);
   }
 
-  return out
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  return formatOcrMcqTables(
+    out
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim(),
+  );
 }
 
 /**
@@ -330,5 +496,7 @@ export function mergePaddleAndTesseractPageOcr(paddle: string, tesseract: string
     primary === 'tesseract' ? mergePrimaryWithAlternate(t, p) : mergePrimaryWithAlternate(p, t);
   // Drop interleaved Weblinks/YouTube sidebars after merge (no-op on literary pages).
   // Then collapse number duplicates / checkmark junk / science unit artifacts.
-  return cleanMergedPageOcrText(stripInterleavedWeblinkSidebar(merged));
+  return formatOcrMcqTables(
+    cleanMergedPageOcrText(stripInterleavedWeblinkSidebar(merged)),
+  );
 }
