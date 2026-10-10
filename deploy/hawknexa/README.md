@@ -62,8 +62,10 @@ Workflow: `.github/workflows/deploy-hawknexa-vps.yml`
 
 ### One-time: deploy webhook + GitHub secret
 
-Deploy normally uses an **HTTPS webhook** on port 443. If Hostinger firewall blocks 80/443,
-GitHub Actions falls back to **SSH deploy** on port 22 when `HAWKNEXA_VPS_SSH_KEY` is set.
+Deploy normally uses an **HTTPS webhook** on port 443. GitHub-hosted runners usually **cannot**
+reach Hostinger SSH (port 22 times out), so SSH fallback is **off by default**. If the webhook is
+down, recover it on the VPS then re-run Actions. To force SSH fallback anyway, set repository
+variable `HAWKNEXA_SSH_DEPLOY_ENABLED=true` and secret `HAWKNEXA_VPS_SSH_KEY`.
 
 On the VPS, the `deploy-webhook` Docker service handles deploy triggers. `DEPLOY_WEBHOOK_SECRET` must be set in `/opt/apps/hawknexa/deploy/.env`.
 

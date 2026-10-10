@@ -57,13 +57,15 @@ Scale intensity continuously with ${d}/10 — do not jump to max hardness unless
 }
 
 export function examChapterWeightInstructions(): string {
-  return `CHAPTER WEIGHTAGE (critical):
-Each lecture block may include Pages/photos, Content size, and a Weight hint (MAJOR / STANDARD / MINOR).
+  return `CHAPTER WEIGHTAGE & WITHIN-CHAPTER COVERAGE (critical):
+Each lecture block may include Pages/photos, Content size, Weight hint (MAJOR / STANDARD / MINOR), Key points, Section checklist, and Formulas & symbols.
 - Allocate MORE questions to MAJOR / longer chapters (many pages, rich content).
 - Allocate FEWER questions to MINOR / short chapters (1–2 pages, thin content).
 - Do NOT give equal counts per chapter when sizes differ.
-- Within each question type, INTERLEAVE chapters — never dump several questions from the same chapter in a row.
-- After choosing counts per chapter, SHUFFLE the final order of questions inside each section so the paper does not follow chapter sequence.`;
+- WITHIN one chapter/lesson: spread questions across the Section checklist and Key points. Forbidden: almost all questions from one subsection while another main part (definitions, formulas, worked examples, numericals, summary) has none.
+- If Formulas & symbols are listed (λ, π, √, v = f × λ, period/frequency relations, units, etc.), include questions that assess those — FIB/MCQ/SHORT_ANSWER with formula use or symbol meaning — not only prose definitions.
+- Within each question type, INTERLEAVE chapters and sections — never dump several questions from the same chapter/section in a row.
+- After choosing counts, SHUFFLE the final order inside each typed section so the paper does not follow chapter sequence.`;
 }
 
 export type QuizMixRequest = {
@@ -191,8 +193,9 @@ Every question MUST include correctAnswer.`;
     const shortSectionMarks = mix.shortAnswerCount * mix.shortAnswerMarks;
     const longSectionMarks = mix.longAnswerCount * mix.longAnswerMarks;
     return `This is a formal written exam paper for printout, not an app quiz.
-Cover the provided lectures with WEIGHTAGE by chapter size/importance (see chapter weight rules).
-Generate EXACTLY ${mix.questionCount} questions as typed sections (Section A, B, …). Inside each section, SHUFFLE so consecutive items are not from the same chapter:
+Write as a senior subject teacher: every question should check main learning and help the student understand the chapter.
+Cover the provided lectures with WEIGHTAGE by chapter size/importance AND even section coverage (see chapter weight rules). Use Formulas & symbols and Key points when present.
+Generate EXACTLY ${mix.questionCount} questions as typed sections (Section A, B, …). Inside each section, SHUFFLE so consecutive items are not from the same chapter or the same lesson subsection:
 - ${mix.mcqCount} MCQ questions (type MCQ). Section A. Each MUST have 4 options, exactly one isCorrect, and correctAnswer set. Each question is worth ${mix.mcqMarks} marks (section total ${mcqSectionMarks}).
 - ${mix.trueFalseCount} true/false questions (type TRUE_FALSE). Section B. correctAnswer must be TRUE or FALSE. Each question is worth ${mix.trueFalseMarks} marks (section total ${tfSectionMarks}).
 ${mix.fillBlankCount ? `- ${mix.fillBlankCount} fill-in-the-blank questions (type FILL_IN_THE_BLANK). Use 1–3 _____ blanks per difficulty rules; each blank is one word; multi-blank correctAnswer uses " | " between words. Each question is worth ${mix.fillBlankMarks} marks (section total ${fillSectionMarks}).` : ''}

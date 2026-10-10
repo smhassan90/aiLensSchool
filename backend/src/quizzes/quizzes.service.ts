@@ -39,6 +39,11 @@ import {
 import { examPaperLabel, EXAM_PAPER_KINDS, isExamPaperKind } from './exam-paper';
 import { paperKindFromExamName } from './exam-config-map';
 import { gradeQuizAnswer } from './quiz-grading';
+import {
+  buildExamCoverageBlock,
+  examExcerptBudget,
+  sampleLessonTextEvenly,
+} from './exam-lesson-coverage';
 import { normalizeGeneratedQuestion, sectionLabelForQuestionType } from '../ai/quiz-mix';
 import { deadlineBlockedMessage, isDeadlineOpen } from '../academics/exam-deadlines';
 import { HeadTeachersService } from '../head-teachers/head-teachers.service';
@@ -261,7 +266,10 @@ export class QuizzesService {
       }
       topicSummaries.push(
         ...lessons.map((l) =>
-          this.formatLectureBlock(l, { forExam: examPaperRequested }),
+          this.formatLectureBlock(l, {
+            forExam: examPaperRequested,
+            lessonCount: lessons.length,
+          }),
         ),
       );
       rangeFrom ??= lessons[0]?.date;
@@ -293,7 +301,10 @@ export class QuizzesService {
       });
       topicSummaries.push(
         ...lessons.map((l) =>
-          this.formatLectureBlock(l, { forExam: examPaperRequested }),
+          this.formatLectureBlock(l, {
+            forExam: examPaperRequested,
+            lessonCount: lessons.length,
+          }),
         ),
       );
     }
@@ -1200,7 +1211,9 @@ export class QuizzesService {
         message: 'No confirmed lessons found for this quiz. Add questions manually.',
       });
     }
-    return lessons.map((l) => this.formatLectureBlock(l, { forExam: true }));
+    return lessons.map((l) =>
+      this.formatLectureBlock(l, { forExam: true, lessonCount: lessons.length }),
+    );
   }
 
   private async recalculateQuizMarksInTx(tx: Prisma.TransactionClient, quizId: string) {
@@ -1494,10 +1507,10 @@ export class QuizzesService {
     return result;
   }
 
-  /** Prefer key points; otherwise keep a short slice of lesson text for the AI prompt. */
   /**
    * Build a lecture block the exam AI can weight: page count + content size +
-   * MAJOR/MINOR hint so longer chapters get more questions.
+   * MAJOR/MINOR hint. For exams, sample evenly across sections and surface formulas
+   * so mid/late-chapter learning (λ, π, √, v=fλ, …) is not dropped.
    */
   private formatLectureBlock(
     lesson: {
@@ -1508,7 +1521,7 @@ export class QuizzesService {
       concepts: Array<{ name: string }>;
       _count?: { sources: number };
     },
-    options?: { forExam?: boolean },
+    options?: { forExam?: boolean; lessonCount?: number },
   ): string {
     const pages = lesson._count?.sources ?? 0;
     const summary = (lesson.aiSummary ?? '').trim();
@@ -1520,14 +1533,20 @@ export class QuizzesService {
           ? 'MINOR (short / lower priority — generate FEWER questions from this)'
           : 'STANDARD';
     const concepts = lesson.concepts.map((c) => c.name).filter(Boolean);
-    const excerptMax = options?.forExam ? 1400 : 500;
-    const bodyParts = [
-      concepts.length ? `Key points: ${concepts.join('; ')}` : '',
-      this.slimTopicText(
-        summary || lesson.topicName || lesson.chapterName || 'Lesson',
-        excerptMax,
-      ),
-    ].filter(Boolean);
+    const sourceText = summary || lesson.topicName || lesson.chapterName || 'Lesson';
+    const bodyParts: string[] = [];
+    if (concepts.length) {
+      bodyParts.push(`Key points (main learning — cover these): ${concepts.join('; ')}`);
+    }
+    if (options?.forExam) {
+      const coverage = buildExamCoverageBlock(sourceText);
+      if (coverage) bodyParts.push(coverage);
+      bodyParts.push(
+        sampleLessonTextEvenly(sourceText, examExcerptBudget(options.lessonCount ?? 1)),
+      );
+    } else {
+      bodyParts.push(this.slimTopicText(sourceText, 500));
+    }
     return [
       `Date: ${lesson.date.toISOString().slice(0, 10)}`,
       `Chapter: ${lesson.chapterName ?? lesson.topicName ?? 'Lecture'}`,
@@ -1535,7 +1554,7 @@ export class QuizzesService {
       `Pages/photos: ${pages}`,
       `Content size: ${summaryLen} chars`,
       `Weight hint: ${weight}`,
-      ...bodyParts,
+      ...bodyParts.filter(Boolean),
     ].join('\n');
   }
 

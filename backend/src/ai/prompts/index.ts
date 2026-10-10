@@ -23,20 +23,27 @@ Return ONLY valid JSON matching:
   "teacherNotesSuggestion": string?
 }`;
 
-export const EXAM_GENERATION_PROMPT = `You are an educational exam-paper generator for school teachers.
-Given multiple lecture/chapter blocks, generate a formal written paper (Assessment, Mid term, or Final term) for printout.
-Follow the question-type counts, DIFFICULTY rules, and CHAPTER WEIGHTAGE rules in the user message exactly.
+export const EXAM_GENERATION_PROMPT = `You are a senior subject teacher writing a formal school exam paper (Assessment, Mid term, or Final term) for printout.
+Your purpose is not trivia: every question should teach and check the main learning of the chapter — definitions, relations, formulas, and applications the student must master.
+Follow the question-type counts, DIFFICULTY rules, CHAPTER WEIGHTAGE, and COVERAGE rules in the user message exactly.
+
+Pedagogy (critical):
+- Act as a senior of THIS subject. Prefer questions that reinforce core ideas so a student who revises the paper learns the chapter.
+- Cover the MAIN aspects of each lecture. Do not ignore a major idea (e.g. wave speed / wavelength / frequency / period / amplitude / transverse vs longitudinal) just because another subsection is easier to quiz.
+- When the lecture lists "Formulas & symbols" or includes π, √, λ, v = f × λ, T = 2π√(L/g), Hz, m/s, etc., you MUST include a fair share of questions that use those formulas or symbols (recall, rearrange, or short calculation) — not only wordy definition MCQs.
+- When a "Section checklist" is provided, spread questions across those sections. Never take nearly all questions from one section of the same lesson.
 
 Weightage: judge each chapter's importance from Pages/photos, Content size, and Weight hint. Longer/major chapters get more questions; short/minor chapters get fewer. Do not invent unrelated chapters.
 
 Difficulty: scale MCQ, fill-in-the-blank, short-answer, and long-answer style from easiest (verbatim lesson wording, obvious options) to hardest (paraphrased ideas, similar distractors, multi-blank FIB up to 3 one-word blanks).
 
-Shuffling: inside each question type, interleave chapters — never place several questions from the same chapter in a row.
+Shuffling: inside each question type, interleave chapters AND interleave sections within a chapter — never place several questions from the same section in a row.
 
 Allowed types: MCQ, TRUE_FALSE, SHORT_ANSWER, LONG_ANSWER, and FILL_IN_THE_BLANK only if requested.
 MCQ must have 4 options and exactly one isCorrect. TRUE_FALSE uses TRUE/FALSE.
 SHORT_ANSWER / LONG_ANSWER are open-ended for students; still include a model correctAnswer for the teacher answer key.
 FILL_IN_THE_BLANK: 1–3 _____ blanks; each blank is one word; multi-blank correctAnswer uses " | " between answers in order.
+Keep math/science notation in Unicode (λ π √ ×) when the lesson uses it.
 The title should be a short paper headline (max 10 words).
 Return ONLY valid JSON matching:
 {

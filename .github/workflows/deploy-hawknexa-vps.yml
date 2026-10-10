@@ -167,8 +167,13 @@ jobs:
           echo "triggered=false" >> "$GITHUB_OUTPUT"
           echo "Webhook POST did not succeed (last HTTP ${http_code})."
 
-      - name: Deploy on VPS over SSH (webhook blocked)
-        if: steps.webhook.outputs.healthy != 'true' && steps.webhook_deploy_retry.outputs.triggered != 'true'
+      # GitHub-hosted runners usually cannot reach Hostinger :22 (timeout). Prefer HTTPS webhook.
+      # Opt in only if your network allows inbound SSH from GitHub: vars.HAWKNEXA_SSH_DEPLOY_ENABLED=true
+      - name: Deploy on VPS over SSH (optional fallback)
+        if: >-
+          steps.webhook.outputs.healthy != 'true'
+          && steps.webhook_deploy_retry.outputs.triggered != 'true'
+          && vars.HAWKNEXA_SSH_DEPLOY_ENABLED == 'true'
         env:
           SSH_KEY: ${{ secrets.HAWKNEXA_VPS_SSH_KEY }}
           BUILD_BACKEND: ${{ steps.changes.outputs.backend }}
@@ -177,7 +182,9 @@ jobs:
           set -euo pipefail
           if [ -z "${SSH_KEY}" ]; then
             echo "::error::Webhook unreachable and HAWKNEXA_VPS_SSH_KEY is not set."
-            echo "Fix Hostinger firewall (allow TCP 80 and 443) OR add HAWKNEXA_VPS_SSH_KEY for SSH deploy fallback."
+            echo "Recover webhook on the VPS (Hostinger browser terminal):"
+            echo "  bash /opt/apps/hawknexa/deploy/recover-deploy-webhook.sh"
+            echo "Then re-run this workflow. Do not rely on SSH from GitHub (port 22 is usually blocked)."
             exit 1
           fi
           TARGETS=""
@@ -192,11 +199,27 @@ jobs:
           SSH_USER="${{ vars.HAWKNEXA_VPS_USER || 'root' }}"
           ssh-keyscan -H "${SSH_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
           echo "SSH deploy to ${SSH_USER}@${SSH_HOST} (targets=${TARGETS:-all})"
-          if ! ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=25 "${SSH_USER}@${SSH_HOST}" \
+          if ! ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 "${SSH_USER}@${SSH_HOST}" \
             "DEPLOY_TARGETS='${TARGETS}' bash /opt/apps/hawknexa/deploy/deploy.sh"; then
-            echo "::error::SSH deploy failed (port 22 often blocked from GitHub). Open HTTPS to the deploy webhook or allow SSH from GitHub IPs."
+            echo "::error::SSH deploy failed (port 22 blocked from GitHub). Recover HTTPS webhook, then re-run:"
+            echo "  bash /opt/apps/hawknexa/deploy/recover-deploy-webhook.sh"
             exit 1
           fi
+
+      - name: Fail when webhook unreachable (SSH fallback disabled)
+        if: >-
+          steps.webhook.outputs.healthy != 'true'
+          && steps.webhook_deploy_retry.outputs.triggered != 'true'
+          && vars.HAWKNEXA_SSH_DEPLOY_ENABLED != 'true'
+        run: |
+          set -euo pipefail
+          echo "::error::Deploy webhook unreachable from GitHub (HTTPS)."
+          echo "SSH fallback is disabled because GitHub runners usually cannot reach Hostinger port 22."
+          echo "On the VPS (Hostinger browser terminal) run:"
+          echo "  bash /opt/apps/hawknexa/deploy/recover-deploy-webhook.sh"
+          echo "Confirm: curl -fsS https://hawknexabackend.fynals.com/internal/deploy/health"
+          echo "Then re-run this workflow (Actions → Deploy HawkNexa VPS → Re-run)."
+          exit 1
 
       - name: Wait for VPS deploy to finish (webhook)
         if: steps.webhook.outputs.healthy == 'true' || steps.webhook_deploy_retry.outputs.triggered == 'true'
@@ -247,7 +270,10 @@ jobs:
           exit 1
 
       - name: Verify VPS deploy over SSH
-        if: steps.webhook.outputs.healthy != 'true' && steps.webhook_deploy_retry.outputs.triggered != 'true'
+        if: >-
+          steps.webhook.outputs.healthy != 'true'
+          && steps.webhook_deploy_retry.outputs.triggered != 'true'
+          && vars.HAWKNEXA_SSH_DEPLOY_ENABLED == 'true'
         env:
           SSH_KEY: ${{ secrets.HAWKNEXA_VPS_SSH_KEY }}
           EXPECTED_SHA: ${{ github.sha }}
