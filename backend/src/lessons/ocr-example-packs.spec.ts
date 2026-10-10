@@ -49,7 +49,7 @@ describe('ocr example packs (durable training fixtures)', () => {
 
   it('builds science few-shot block from physics packs only', () => {
     const block = buildScienceOcrFewShotBlock(packs, 2);
-    expect(block).toMatch(/Science\/(?:numericals|physics) OCR repair examples/i);
+    expect(block).toMatch(/Science\/(?:numericals|physics) textbook OCR/i);
     expect(block).toMatch(/physics-/);
     expect(block).not.toMatch(/english-dignity-page1/);
     expect(path.basename(packs[0].dir)).toBeTruthy();

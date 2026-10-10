@@ -3,17 +3,11 @@
   "subject": "physics",
   "scienceFewShot": true,
   "mustMatch": [
-    "sin θ",
-    "cos θ",
-    "π ≅ 22/7",
-    "π²",
-    "T = 2π√(L/g)",
+    "Simple Harmonic Motion",
     "f = 1/T",
-    "∞",
-    "a ∝ -x"
+    "mg sin",
+    "A = 1/2"
   ],
-  "mustNotMatch": [
-    "theeta",
-    "pie ="
-  ]
+  "mustNotMatch": [],
+  "notes": "Ideal λ/θ/π glyphs belong in expected.txt + ocr/training — not merge invent-replace."
 }

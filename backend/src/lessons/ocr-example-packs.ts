@@ -63,7 +63,7 @@ export function loadAllOcrExamplePacks(root = resolveOcrExamplesRoot()): OcrExam
 }
 
 /** Inlined when Docker/runtime has no test-fixtures on disk. */
-const EMBEDDED_SCIENCE_FEW_SHOTS = `Science/physics textbook OCR repair examples (imitate cleanup style; do not invent numbers):
+const EMBEDDED_SCIENCE_FEW_SHOTS = `Science/physics textbook OCR merge examples (prefer source glyphs; do not invent lesson sentences):
 --- Example physics-numericals-section-c (messy) ---
 Ya What is the wavelength ... frequency of 1300 1300 1300 57% SRR 5
 Where 1K the 103 ... 3x10" ms. (230.76m) (1.28ms™)
@@ -71,17 +71,15 @@ Where 1K the 103 ... 3x10" ms. (230.76m) (1.28ms™)
 What is the wavelength ... frequency of 1300 kHz?
 Where 1K = 10^3 ... 3 × 10^8 ms^-1. (230.76m) (1.28ms^-1)
 --- Example physics-shm-pendulum (messy) ---
-Weblinks myphysicslab/phet URLs interleaved. T = 2n V(L/g)
+Weblinks myphysicslab/phet URLs interleaved. Keep body; strip Weblinks/sim URLs.
 --- Example physics-shm-pendulum (cleaned) ---
-Keep SHM/pendulum body. T = 2π√(L/g). Strip Weblinks/sim URLs.
+Keep SHM/pendulum body from sources. Strip Weblinks/sim URLs. Keep λ/θ/π only if a source engine emitted them.
 --- Example physics-worked-example (messy) ---
 Encourage students / youtube between Step 1 and Step 2
 --- Example physics-worked-example (cleaned) ---
 Keep Worked Example Steps 1–3 and Result. No YouTube lines.
---- Example physics-math-symbols (messy) ---
-mg sin theeta, pie=22/7, T=2n V(L/g), pie2, infinity
---- Example physics-math-symbols (cleaned) ---
-mg sin θ, π ≅ 22/7, T = 2π√(L/g), π², ∞, f = 1/T`;
+--- Note ---
+Greek/math glyphs (λ, θ, π, √) come from the trained recognizer (backend/ocr/training), not from inventing wording.`;
 
 /**
  * Short before/after snippets for science AI merge prompts.
@@ -95,7 +93,7 @@ export function buildScienceOcrFewShotBlock(
   if (!science.length) return EMBEDDED_SCIENCE_FEW_SHOTS;
 
   const chunks: string[] = [
-    'Science/numericals OCR repair examples (imitate cleanup style; do not invent numbers):',
+    'Science/physics textbook OCR merge examples (prefer source glyphs; do not invent lesson sentences):',
   ];
   for (const pack of science.slice(0, maxPacks)) {
     const messy = (pack.paddle || pack.tesseract).slice(0, 420);

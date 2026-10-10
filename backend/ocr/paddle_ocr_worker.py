@@ -33,25 +33,61 @@ def paddle_lang(lang: str) -> str:
     return "en"
 
 
+def _science_rec_model_dir() -> Path | None:
+    """Fine-tuned rec model (λ/θ/π charset) from ocr/training — optional."""
+    import os
+
+    env = (os.environ.get("PADDLE_OCR_REC_MODEL_DIR") or "").strip()
+    candidates = []
+    if env:
+        candidates.append(Path(env))
+    here = Path(__file__).resolve().parent
+    candidates.append(here / "models" / "science-en-rec")
+    for path in candidates:
+        if not path.is_dir():
+            continue
+        charset = path / "science_charset.txt"
+        has_infer = any(
+            (path / name).exists()
+            for name in (
+                "inference.pdmodel",
+                "inference.json",
+                "inference.pdiparams",
+            )
+        )
+        if charset.is_file() and has_infer:
+            return path
+    return None
+
+
 def get_engine(lang: str):
     global _ENGINE, _ENGINE_KEY
     key = paddle_lang(lang)
-    if _ENGINE is not None and _ENGINE_KEY == key:
+    rec_dir = _science_rec_model_dir()
+    engine_key = f"{key}|rec={rec_dir}" if rec_dir else key
+    if _ENGINE is not None and _ENGINE_KEY == engine_key:
         return _ENGINE
     from paddleocr import PaddleOCR
 
-    # Lower det thresholds recover washed-out top lines on phone textbook photos.
-    engine = PaddleOCR(
+    kwargs: dict[str, Any] = dict(
         use_angle_cls=True,
         lang=key,
         show_log=False,
         use_gpu=False,
+        # Lower det thresholds recover washed-out top lines on phone textbook photos.
         det_db_thresh=0.2,
         det_db_box_thresh=0.45,
         det_db_unclip_ratio=1.8,
     )
+    # Trained science recognizer: same det, custom charset that includes λ θ π √ …
+    if rec_dir is not None and key == "en":
+        kwargs["rec_model_dir"] = str(rec_dir)
+        kwargs["rec_char_dict_path"] = str(rec_dir / "science_charset.txt")
+        print(f"[paddle_ocr_worker] using trained science rec model: {rec_dir}", file=sys.stderr)
+
+    engine = PaddleOCR(**kwargs)
     _ENGINE = engine
-    _ENGINE_KEY = key
+    _ENGINE_KEY = engine_key
     return engine
 
 

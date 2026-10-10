@@ -31,3 +31,11 @@ yarn-error.log*
 /.venv-paddle/
 .venv-paddle/
 .cursor-ocr-merge-agent/
+
+# OCR training artifacts (regenerate with ocr/training/*.py)
+/ocr/training/data/
+/ocr/training/output/
+/ocr/training/PaddleOCR/
+/ocr/models/science-en-rec/**
+!/ocr/models/science-en-rec/README.txt
+!/ocr/models/science-en-rec/science_charset.txt
