@@ -256,7 +256,7 @@ export class QuizzesService {
       if (!lessons.length) {
         throw new BadRequestException({
           code: 'NO_CONFIRMED_LECTURES',
-          message: 'Select confirmed lectures for this class and subject',
+          message: 'Select completed lectures for this class and subject',
         });
       }
       topicSummaries.push(

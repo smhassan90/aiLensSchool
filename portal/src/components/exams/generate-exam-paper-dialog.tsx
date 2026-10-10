@@ -301,12 +301,12 @@ export function GenerateExamPaperDialog({
                   ) : null}
                 </div>
                 {!selectedClass ? (
-                  <p className="text-sm text-muted-foreground">Select a class to see confirmed lectures.</p>
+                  <p className="text-sm text-muted-foreground">Select a class to see completed lectures.</p>
                 ) : lecturesLoading ? (
                   <PageLoader variant="panel" />
                 ) : !lectures.length ? (
                   <p className="rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
-                    No lectures for this class yet. Add chapter pages (or log a class session) for this subject, then try again.
+                    No completed lectures for this class yet. Confirm a chapter (or class session) for this subject, then try again.
                   </p>
                 ) : (
                   <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border bg-background p-2">

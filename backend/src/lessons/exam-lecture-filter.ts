@@ -1,30 +1,12 @@
-import { LessonRecordKind, LessonSourceType, LessonStatus, Prisma } from '@prisma/client';
+import { LessonRecordKind, LessonStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 
-/** Lessons a teacher can pick when building an exam paper. */
+/**
+ * Lessons a teacher can pick when building an exam paper.
+ * Only completed (CONFIRMED) lessons — drafts / in-review never appear.
+ */
 export function examLectureTeachableStatusWhere(): Prisma.DailyLessonWhereInput {
-  return {
-    OR: [
-      { status: LessonStatus.CONFIRMED },
-      {
-        recordKind: LessonRecordKind.CHAPTER_LIBRARY,
-        OR: [
-          { contentConfirmed: true },
-          {
-            AND: [{ aiSummary: { not: null } }, { NOT: { aiSummary: '' } }],
-          },
-          {
-            sources: {
-              some: {
-                type: LessonSourceType.TEXTBOOK_IMAGE,
-                AND: [{ ocrText: { not: null } }, { NOT: { ocrText: '' } }],
-              },
-            },
-          },
-        ],
-      },
-    ],
-  };
+  return { status: LessonStatus.CONFIRMED };
 }
 
 /** Chapter library ids that already have at least one logged class session in this class/subject. */

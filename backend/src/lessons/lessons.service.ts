@@ -2704,7 +2704,7 @@ export class LessonsService {
       const headsThisClass =
         query.sectionId && headSectionIds.includes(query.sectionId);
       if (headsThisClass && query.subjectId) {
-        // Head teacher may build exam papers from any confirmed lectures in the class/subject.
+        // Head teacher may build exam papers from any completed lectures in the class/subject.
         teacherFilter = {};
       } else {
         teacherFilter = { teacherId: teacher.id };
