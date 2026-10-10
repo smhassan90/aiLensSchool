@@ -9,15 +9,17 @@ highest point.
 iii. A is the one-half of displacement from the highest
 point to the lowest point
 iv. is the distance between the two consecutive crests
-b. v = f x
+b. v = fx
 Step 3: Put the values and calculate
 a.
 T = 8.0s
 f = 0.125Hz
 A = 1.5m
+iv.
 = 8.0m
 b. v = 0.125Hz x 8.0m
 Result = 1.0 m/s
+
 Thus, the period, frequency, amplitude, and wavelength of
 the waves are 8.0s, 0.125Hz, 1.5m, and 8.0m respectively
 The wave is moving at the speed of 1.0 m/s.

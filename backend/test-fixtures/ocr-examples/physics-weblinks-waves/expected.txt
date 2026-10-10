@@ -3,11 +3,13 @@ General Wave properties
 Step 2: Write down the formula and rearrange if necessary.
 T is the time taken to move from the highest point to the lowest point
 A is the one-half of displacement from the highest point to the lowest point
-is the distance between the two consecutive crests
+λ is the distance between the two consecutive crests
+v = f × λ
 Step 3: Put the values and calculate
 T = 8.0s
 f = 0.125Hz
 A = 1.5m
+λ = 8.0m
 Result = 1.0 m/s
 SELF-ASSESSMENT QUESTIONS
 Q1: How spherical wavefronts are produced in the ripple tank?

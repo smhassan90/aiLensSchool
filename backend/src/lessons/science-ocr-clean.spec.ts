@@ -2,6 +2,7 @@ import {
   cleanMergedPageOcrText,
   collapseRepeatedNumericTokens,
   normalizeScienceNotationArtifacts,
+  restoreWavelengthLambdaSymbols,
   stripConfidenceLikeJunk,
   stripLeadingMarkNoise,
 } from './science-ocr-clean';
@@ -62,6 +63,26 @@ Calculate the speed of these water waves. (1.28ms^-1)
       ),
     ).toBe(false);
     expect(lineLooksLikeMathOrFormula('f = 0.125 Hz')).toBe(true);
+  });
+
+  it('restores Greek λ when OCR drops wavelength symbols', () => {
+    const raw = `
+Step 2:Write down the formula and rearrange if necessary.
+iv. is the distance between the two consecutive crests
+b.v=fx
+Step 3:Put the values and calculate
+iv.
+=8.0m.
+b.v=0.125Hz8.0m
+Thus, the period, frequency, amplitude, and wavelength of the waves are 8.0s
+`.trim();
+    const cleaned = restoreWavelengthLambdaSymbols(raw);
+    expect(cleaned).toMatch(/λ is the distance between the two consecutive crests/);
+    expect(cleaned).toMatch(/v = f × λ/);
+    expect(cleaned).toMatch(/λ = 8\.0m/);
+    const merged = cleanMergedPageOcrText(raw);
+    expect(merged).toMatch(/λ/);
+    expect(merged).toMatch(/v = f × λ/);
   });
 
   it('keeps Dignity of Work literary text unchanged by science notation normalize', () => {

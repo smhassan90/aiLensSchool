@@ -5,7 +5,8 @@
   "mustMatch": [
     "Step 2",
     "0.125Hz",
-    "Q1"
+    "Q1",
+    "λ"
   ],
   "mustNotMatch": [
     "youtube.com",

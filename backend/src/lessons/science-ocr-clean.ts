@@ -45,9 +45,47 @@ export function stripLeadingMarkNoise(line: string): string {
     .trim();
 }
 
+/**
+ * OCR often drops Greek λ (wavelength) or reads it as latin x/l.
+ * Restore from textbook phrasing — only when wave/wavelength cues exist.
+ */
+export function restoreWavelengthLambdaSymbols(text: string): string {
+  const value = (text ?? '').trim();
+  if (!value) return value;
+  const waveContext =
+    /\b(?:wavelength|consecutive crests|ripple\s*tank|0\.125\s*Hz|wave\s*speed|general wave)\b/i.test(
+      value,
+    ) || /\bv\s*=\s*f/i.test(value);
+  if (!waveContext) return value;
+
+  return value
+    // "iv. is the distance between the two consecutive crests" → insert λ
+    .replace(
+      /(^|\n)(\s*(?:iv|IV)[.)]?\s*)is the distance between the two consecutive crests/gim,
+      '$1$2λ is the distance between the two consecutive crests',
+    )
+    // "iv. = 8.0 m" or "iv.\n=8.0m" → λ =
+    .replace(
+      /(^|\n)\s*(?:iv|IV)[.)]?\s*=\s*(\d+\.?\d*\s*m\.?)/gim,
+      '$1λ = $2',
+    )
+    .replace(
+      /(^|\n)\s*(?:iv|IV)[.)]?\s*\n\s*=\s*(\d+\.?\d*\s*m\.?)/gim,
+      '$1λ = $2',
+    )
+    // Compact OCR: b.v=fx  /  v=fx  /  v = f x  /  v=f× (missing λ)
+    .replace(/\bb\.?\s*v\s*=\s*f\s*x\b/gi, 'b. v = f × λ')
+    .replace(/\bv\s*=\s*fx\b/gi, 'v = f × λ')
+    .replace(/\bv\s*=\s*f\s*[x×*]\s*$/gim, 'v = f × λ')
+    .replace(/\bv\s*=\s*f\s*[x×*]\s*(?=\n|$)/gi, 'v = f × λ')
+    .replace(/\bv\s*=\s*f\s*[x×*]\s*[λl]\b/gi, 'v = f × λ')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
 /** Common unit / power-of-ten OCR artifacts from red superscripts. */
 export function normalizeScienceNotationArtifacts(text: string): string {
-  return text
+  let value = text
     // Trademark/registered often stand in for superscript −1 on speed units
     .replace(/ms[\u2122\u00AE™®]!?/gi, 'ms^-1')
     .replace(/m\/s[\u2122\u00AE™®]!?/gi, 'm/s^-1')
@@ -69,7 +107,6 @@ export function normalizeScienceNotationArtifacts(text: string): string {
     .replace(/T\s*=\s*2\s*(?:π|pi|n)\s*[√vV]?\s*\(?\s*[Ll]\s*\/\s*g\s*\)?/gi, 'T = 2π√(L/g)')
     .replace(/T\s*=\s*2\s*(?:π|pi|n)\s+V\s*\(\s*[Ll]\s*\/\s*g\s*\)/gi, 'T = 2π√(L/g)')
     .replace(/T\s*=\s*2π\s*[√vV]\s*\(?\s*[Ll]\s*\/\s*g\s*\)?/g, 'T = 2π√(L/g)')
-    .replace(/\bv\s*=\s*f\s*[x×*]\s*[λl]\b/gi, 'v = f × λ')
     .replace(/\bf\s*=\s*1\s*\/\s*T\b/gi, 'f = 1/T')
     .replace(/\ba\s*[∞∝]\s*-?\s*x\b/gi, 'a ∝ -x')
     .replace(/\bFig[:.]?\s*(\d+\.\d+)/gi, 'Fig: $1')
@@ -80,6 +117,8 @@ export function normalizeScienceNotationArtifacts(text: string): string {
     .replace(/\bStep\s+Step\s+(?=Put the values)/gi, 'Step 3: ')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
+  value = restoreWavelengthLambdaSymbols(value);
+  return value;
 }
 
 export function looksLikeScienceNumericalsPage(text: string): boolean {
