@@ -6,5 +6,7 @@ a ∝ -x
 The restoring force is a force which acts to bring a body to its equilibrium position.
 10.4 Simple pendulum
 Forces acting on a displaced pendulum
+mg sin θ
+mg cos θ
 T = 2π√(L/g)
 The period of a simple pendulum depends upon its length and acceleration due to gravity.

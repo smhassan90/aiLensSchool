@@ -5,9 +5,18 @@ When displaced by small angle 'theeta':
 i. Tension T
 ii. Weight W = mg
 mg sin theeta and mg cos theeta
+mg sine
+mg cos0 along the string and mg sin0
 T = 2n V(L/g)
+following formula for its period;
+T=2
+Vg
 pie = 22/7 ≅ 3.141
 pie2 ≅ 9.86
 f = 1/T
+f=1
+T
 Infinity damping would reduce amplitude to infinity
 A = 1/2(3.0m) = 1.5m
+A is the one-half of displacement
+whole square root of L/g

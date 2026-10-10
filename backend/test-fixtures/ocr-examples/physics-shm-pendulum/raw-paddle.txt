@@ -12,5 +12,10 @@ https://phet.colorado.edu/sims/html/pendulum-lab/latest/pendulum-lab_en.html
 10.4 Simple pendulum
 Forces acting on a displaced pendulum
 Tension T along the string and Weight W = mg
+mg sine
+mg cos0 along the string and mg sin0
 T = 2n V(L/g)
+following formula for its period;
+T=2
+Vg
 The period depends on length and g, independent of mass and amplitude.

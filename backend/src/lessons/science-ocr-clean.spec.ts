@@ -89,6 +89,44 @@ A = 1/2(3.0m)
     expect(cleaned).toMatch(/1\/2\s*\(?3\.0m/);
   });
 
+  it('restores live paddle SHM/period and wave frequency OCR garbage', () => {
+    const shm = `
+Force balance equations:
+mg sine
+mg cos
+mg cos0 along the string and mg sin0 perpendicular
+equals mg sine.
+For the simple pendulum executing SHM, we have the
+following formula for its period;
+T=2
+Vg
+`.trim();
+    const shmClean = cleanMergedPageOcrText(shm);
+    expect(shmClean).toMatch(/mg sin θ/);
+    expect(shmClean).toMatch(/mg cos θ/);
+    expect(shmClean).toMatch(/T = 2π√\(L\/g\)/);
+
+    const wave = `
+f=1
+T
+iii. A is the one-half of displacement from the highest
+iv.
+is the distance between the two consecutive crests
+b.v=f
+f=1
+ii.
+8s
+=0.125 Hz.
+A=1(3.0m)
+`.trim();
+    const waveClean = cleanMergedPageOcrText(wave);
+    expect(waveClean).toMatch(/f = 1\/T/);
+    expect(waveClean).toMatch(/f = 1\/8s/);
+    expect(waveClean).toMatch(/A = 1\/2/);
+    expect(waveClean).toMatch(/λ/);
+    expect(waveClean).toMatch(/v = f × λ/);
+  });
+
   it('restores Greek λ when OCR drops wavelength symbols', () => {
     const raw = `
 Step 2:Write down the formula and rearrange if necessary.

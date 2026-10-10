@@ -73,12 +73,14 @@ export function restoreWavelengthLambdaSymbols(text: string): string {
       /(^|\n)\s*(?:iv|IV)[.)]?\s*\n\s*=\s*(\d+\.?\d*\s*m\.?)/gim,
       '$1λ = $2',
     )
-    // Compact OCR: b.v=fx  /  v=fx  /  v = f x  /  v=f× (missing λ)
+    // Compact OCR: b.v=fx  /  v=fx  /  v = f x  /  v=f× / bare b.v=f (missing λ)
     .replace(/\bb\.?\s*v\s*=\s*f\s*x\b/gi, 'b. v = f × λ')
     .replace(/\bv\s*=\s*fx\b/gi, 'v = f × λ')
     .replace(/\bv\s*=\s*f\s*[x×*]\s*$/gim, 'v = f × λ')
     .replace(/\bv\s*=\s*f\s*[x×*]\s*(?=\n|$)/gi, 'v = f × λ')
     .replace(/\bv\s*=\s*f\s*[x×*]\s*[λl]\b/gi, 'v = f × λ')
+    .replace(/\bb\.?\s*v\s*=\s*f\s*$/gim, 'b. v = f × λ')
+    .replace(/\bb\.?\s*v\s*=\s*f\s*(?=\n)/gi, 'b. v = f × λ')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }
@@ -100,34 +102,52 @@ export function restorePhysicsMathSymbols(text: string): string {
     value
       // --- Angles: sin/cos/tan theta ---
       .replace(/\btheeta\b/gi, 'theta')
+      // Diagram OCR often reads θ as trailing e/d/0: mg sine, mg sind, mg sin0, mg cos0
+      .replace(/\bmg\s*sin\s*(?:θ|theta|0)\b/gi, 'mg sin θ')
+      .replace(/\bmg\s*cos\s*(?:θ|theta|0)\b/gi, 'mg cos θ')
+      .replace(/\bmg\s*sin(?:e|d)\b/gi, 'mg sin θ')
+      .replace(/\bmg\s*cos(?:e|d)\b/gi, 'mg cos θ')
+      .replace(/\bmg\s*sin0\b/gi, 'mg sin θ')
+      .replace(/\bmg\s*cos0\b/gi, 'mg cos θ')
+      .replace(/\bmg\s*sin\b(?=\s*[=,]|\s*$)/gim, 'mg sin θ')
+      .replace(/\bmg\s*cos\b(?=\s*[=,]|\s*$)/gim, 'mg cos θ')
       .replace(/\bsin\s*(?:θ|theta|0)\b/gi, 'sin θ')
       .replace(/\bcos\s*(?:θ|theta|0)\b/gi, 'cos θ')
       .replace(/\btan\s*(?:θ|theta|0)\b/gi, 'tan θ')
-      .replace(/\bmg\s*sin\s*(?:θ|theta|0)\b/gi, 'mg sin θ')
-      .replace(/\bmg\s*cos\s*(?:θ|theta|0)\b/gi, 'mg cos θ')
       .replace(/\bangular\s*displacement\s*(?:θ|theta|0)\b/gi, 'angular displacement θ')
       .replace(/\bsmall\s*angle\s*['']?(?:θ|theta|0)['']?/gi, "small angle 'θ'")
-      // --- Pi ---
+      // --- Pi (glyph often OCR'd as pie / n / missing entirely) ---
       .replace(/\bpie\s*(?:2|²|\^2)\b/gi, 'π²')
       .replace(/\bpie2\b/gi, 'π²')
       .replace(/\bpi\s*(?:2|²|\^2)\b/gi, 'π²')
       .replace(/\bpie\b/gi, 'π')
       .replace(/\bpi\b/gi, 'π')
-      .replace(/π\s*(?:=|≈|~|≅)\s*22\s*\/\s*7/gi, 'π ≅ 22/7')
+      .replace(/π\s*(?:=|≈|~|≅|≠)\s*22\s*\/\s*7/gi, 'π ≅ 22/7')
       .replace(/π\s*(?:=|≈|~|≅)\s*(3\.14\d*)/gi, 'π ≅ $1')
+      .replace(/\b(?:approx(?:imately)?|nearly)\s*(?:=\s*)?(22\s*\/\s*7|3\.14\d*)/gi, '≅ $1')
       .replace(/π\s*(?:2|²|\^2)\b/g, 'π²')
       .replace(/π2\b/g, 'π²')
       .replace(/4\s*π\s*(?:2|²|\^2)/g, '4π²')
       .replace(/4π2\b/g, '4π²')
       // Approx / not-equals
-      .replace(/\b(?:approx(?:imately)?|nearly)\s*(?:=\s*)?(22\s*\/\s*7|3\.14\d*)/gi, '≅ $1')
       .replace(/!=/g, '≠')
+      .replace(/\bnot\s*=\s*/gi, '≠ ')
+      .replace(/≠\s*22\s*\/\s*7/gi, '≅ 22/7')
       // --- Square root / period formula ---
+      // Live paddle often collapses T=2π√(L/g) to multiline "T=2\nVg"
+      .replace(
+        /T\s*=\s*2\s*(?:\n+\s*)?(?:π|n|pie|pi)?\s*(?:\n+\s*)?[√vV]\s*(?:\(?\s*[Ll]\s*\/\s*g\s*\)?|g\b)/gi,
+        'T = 2π√(L/g)',
+      )
+      .replace(/T\s*=\s*2\s*(?:π|n|pie|pi)\s*[√vV]\s*\(?\s*[Ll]\s*\/\s*g\s*\)?/gi, 'T = 2π√(L/g)')
+      .replace(/T\s*=\s*2\s*(?:π|n)\s+[√vV]\s*\(\s*[Ll]\s*\/\s*g\s*\)/gi, 'T = 2π√(L/g)')
+      .replace(
+        /(?:formula for its period[;:]?\s*)T\s*=\s*2(?:\s|\n)+V\s*g\b/gi,
+        'formula for its period;\nT = 2π√(L/g)',
+      )
+      .replace(/\bwhole\s*square\s*root\s*(?:of\s*)?/gi, '√')
       .replace(/\bsquare\s*root\s*(?:of\s*)?/gi, '√')
       .replace(/\bsqrt\s*\(/gi, '√(')
-      .replace(/T\s*=\s*2\s*π\s*[√vV]\s*\(?\s*[Ll]\s*\/\s*g\s*\)?/g, 'T = 2π√(L/g)')
-      .replace(/T\s*=\s*2\s*(?:π|n)\s*[√vV]?\s*\(?\s*[Ll]\s*\/\s*g\s*\)?/gi, 'T = 2π√(L/g)')
-      .replace(/T\s*=\s*2\s*(?:π|n)\s+V\s*\(\s*[Ll]\s*\/\s*g\s*\)/gi, 'T = 2π√(L/g)')
       .replace(/√\s*\(\s*[Ll]\s*\/\s*g\s*\)/g, '√(L/g)')
       .replace(/√\s*[Ll]\s*\/\s*g\b/g, '√(L/g)')
       // --- Infinity ---
@@ -135,8 +155,13 @@ export function restorePhysicsMathSymbols(text: string): string {
       .replace(/\b8\s*oo\b/gi, '∞')
       // --- Fractions / divide ---
       .replace(/\bA\s*=\s*1\s*\/\s*2\s*\(?\s*(\d)/gi, 'A = 1/2($1')
+      .replace(/\bA\s*=\s*1\s*\(\s*(\d)/gi, 'A = 1/2($1')
+      .replace(/\bA\s+is\s+the\s+one-half\b/gi, 'A = 1/2')
       .replace(/\b1\s*\/\s*2\b(?!\d)/g, '1/2')
+      // Frequency f = 1/T often split across lines: f=1\nT  or  f=1\n8s
+      .replace(/\bf\s*=\s*1\s*(?:\n+\s*)+T\b/gi, 'f = 1/T')
       .replace(/\bf\s*=\s*1\s*\/\s*T\b/gi, 'f = 1/T')
+      .replace(/\bf\s*=\s*1\s*(?:\n+\s*)+(?:ii\.?\s*(?:\n+\s*)*)?(\d+\.?\d*\s*s)\b/gi, 'f = 1/$1')
       .replace(/\bf\s*=\s*1\s*\/\s*(\d)/gi, 'f = 1/$1')
       // Frequency label often OCR'd without "f"
       .replace(
@@ -145,6 +170,7 @@ export function restorePhysicsMathSymbols(text: string): string {
       )
       .replace(/(^|\n)(\s*)f\s*\n\s*=\s*/gim, '$1$2f = ')
       .replace(/\bfrequency\s+f\b/gi, 'frequency f')
+      .replace(/\ba\.\.?\s*Period and frequency\b/gi, 'a. Period and frequency')
       .replace(/\bii\.?\s*f\s*=\s*\?/gi, 'ii. f = ?')
       .replace(/\bi\.?\s*T\s*=\s*\?/gi, 'i. T = ?')
       // Proportionality
