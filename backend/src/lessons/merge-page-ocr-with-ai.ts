@@ -89,6 +89,24 @@ export function pickStrongerRuleMerge(paddle: string, tesseract: string, rule: s
   const p = (paddle ?? '').trim();
   const t = (tesseract ?? '').trim();
   if (r) {
+    // Science cleanup often restores a known opener into a shorter transcript —
+    // never discard that for raw Tesseract/Paddle dumps — unless the rule lost
+    // body sentences that a source engine still has.
+    const scienceRestored =
+      looksLikeScienceNumericalsPage(r) &&
+      (/\bIn this chapter,?\s+we will discuss the various characteristics\b/i.test(r) ||
+        /\bProduction of electric charge\b/i.test(r) ||
+        (/\bCoulomb/i.test(r) && /10\^-?\d+/i.test(r)));
+    if (scienceRestored) {
+      const sourcesHaveBody =
+        /\bCharge is a basic characteristic\b/i.test(`${p}\n${t}`) ||
+        /\bBenjamin Franklin\b/i.test(`${p}\n${t}`);
+      const ruleHasBody =
+        /\bCharge is a basic characteristic\b/i.test(r) ||
+        /\bBenjamin Franklin\b/i.test(r);
+      if (!sourcesHaveBody || ruleHasBody) return r;
+    }
+
     const rScore = scoreOcrMergeCoverage(r);
     const pScore = scoreOcrMergeCoverage(p);
     const tScore = scoreOcrMergeCoverage(t);

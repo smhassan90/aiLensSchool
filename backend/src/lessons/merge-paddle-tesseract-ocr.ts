@@ -8,7 +8,11 @@ import {
   criticalPageCueHits,
   englishPageTranscriptLooksIncomplete,
 } from './page-text-sanitize';
-import { cleanMergedPageOcrText, isProtectedStemAcronym } from './science-ocr-clean';
+import {
+  cleanMergedPageOcrText,
+  isProtectedStemAcronym,
+  looksLikeScienceNumericalsPage,
+} from './science-ocr-clean';
 import { stripInterleavedWeblinkSidebar } from './sidebar-layout-ocr';
 
 function normalizeLineKey(line: string): string {
@@ -496,7 +500,36 @@ export function mergePaddleAndTesseractPageOcr(paddle: string, tesseract: string
     primary === 'tesseract' ? mergePrimaryWithAlternate(t, p) : mergePrimaryWithAlternate(p, t);
   // Drop interleaved Weblinks/YouTube sidebars after merge (no-op on literary pages).
   // Then collapse number duplicates / checkmark junk / science unit artifacts.
-  return formatOcrMcqTables(
+  const cleaned = formatOcrMcqTables(
     cleanMergedPageOcrText(stripInterleavedWeblinkSidebar(merged)),
   );
+
+  // Noisy Tesseract alternates can erase a clean science body that Paddle kept.
+  // Prefer the cleaned single-engine transcript when merge lost key lesson sentences.
+  const paddleClean = cleanMergedPageOcrText(stripInterleavedWeblinkSidebar(p));
+  const tessClean = cleanMergedPageOcrText(stripInterleavedWeblinkSidebar(t));
+  const scienceBodyCue =
+    /\bCharge is a basic characteristic\b/i.test(paddleClean) ||
+    /\bCharge is a basic characteristic\b/i.test(tessClean) ||
+    /\bBenjamin Franklin\b/i.test(paddleClean) ||
+    /\bBenjamin Franklin\b/i.test(tessClean);
+  if (
+    scienceBodyCue &&
+    looksLikeScienceNumericalsPage(paddleClean + '\n' + tessClean) &&
+    !/\bCharge is a basic characteristic\b/i.test(cleaned) &&
+    !/\bBenjamin Franklin\b/i.test(cleaned)
+  ) {
+    const paddleHasBody =
+      /\bCharge is a basic characteristic\b/i.test(paddleClean) ||
+      /\bBenjamin Franklin\b/i.test(paddleClean);
+    const tessHasBody =
+      /\bCharge is a basic characteristic\b/i.test(tessClean) ||
+      /\bBenjamin Franklin\b/i.test(tessClean);
+    if (paddleHasBody && countLatinLetters(paddleClean) >= countLatinLetters(tessClean) * 0.55) {
+      return paddleClean;
+    }
+    if (tessHasBody) return tessClean;
+  }
+
+  return cleaned;
 }

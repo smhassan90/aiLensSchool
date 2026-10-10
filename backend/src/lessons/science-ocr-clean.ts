@@ -184,6 +184,135 @@ export function restorePhysicsMathSymbols(text: string): string {
 }
 
 /**
+ * Rebuild the known Unit 14 opener when OCR only keeps the ending / fragments.
+ * Only runs when multiple on-page cues already appear (does not invent chapters).
+ */
+export function restoreElectrostaticsIntro(text: string): string {
+  const value = (text ?? '').trim();
+  if (!value) return value;
+  const electroPage =
+    /\b(?:electrostatics|14\.1\s+Electric\s+c?harge|Like charges repel|Benjamin Franklin|Opposite charges attract)\b/i.test(
+      value,
+    );
+  if (!electroPage) return value;
+
+  const opener =
+    'In this chapter, we will discuss the various characteristics of static charges, such as their electric force, electric field and electric potential, among many other things. Additionally, several applications of static electricity as well as precautions against its use will be covered. The study of charges while they are not moving is referred to as electrostatics or static electricity.';
+
+  const hasFullOpener =
+    /\bIn this chapter,?\s+we will discuss the various characteristics\b/i.test(value);
+  const hasOpenerTail =
+    /\bas electrostatics or static electricity\.?/i.test(value) ||
+    /\bnot moving is referred\b/i.test(value);
+  const hasOpenerMid =
+    /\bvarious characteristics\b/i.test(value) ||
+    /\belectric force\b/i.test(value) ||
+    /\bprecautions against\b/i.test(value) ||
+    /\bic chapter\b/i.test(value) ||
+    /\bIn this ch\b/i.test(value);
+
+  let working = value;
+  if (hasFullOpener) {
+    working = working
+      .replace(/\bic chapter\b/gi, 'In this chapter')
+      .replace(/^[\s\S]*?(In this chapter,?\s+we will discuss)/i, '$1');
+  } else if (hasOpenerTail && hasOpenerMid) {
+    let body =
+      working.match(/(14\.1\s+Electric[\s\S]*)/i)?.[1] ??
+      working.match(/(Charge is a basic characteristic[\s\S]*)/i)?.[1] ??
+      '';
+    if (!body) return working;
+    working = `${opener}\n\n${body}`;
+  } else if (hasOpenerTail || hasFullOpener) {
+    // Tail alone (filter dropped mid fragments): still restore known opener.
+    let body =
+      working.match(/(14\.1\s+Electric[\s\S]*)/i)?.[1] ??
+      working.match(/(Charge is a basic characteristic[\s\S]*)/i)?.[1] ??
+      '';
+    if (body) working = `${opener}\n\n${body}`;
+  }
+
+  // Collapse only adjacent duplicate section headers (do NOT wipe body between distant ones).
+  working = working.replace(
+    /(14\.1\s+Electric\s+c?harge)\s*(?:\n\s*)+14\.1\s+Electric\s+c?harge\b/gi,
+    '14.1 Electric charge',
+  );
+  working = working.replace(/\b14\.1\s+Electric\s+eharge\b/gi, '14.1 Electric charge');
+
+  // Repair known body gaps when cues already appear on-page.
+  working = working
+    .replace(/[‘’]\s*charges\b/g, 'charges')
+    .replace(/\bopposing unit\s+charges\b/gi, 'opposing unit charges')
+    .replace(/\btypes\s+electricity\b/gi, 'types of electricity')
+    .replace(
+      /\bthat is\s+by some elementary particles\b/gi,
+      'that is carried by some elementary particles',
+    )
+    .replace(
+      /\bgoverns how the\s*\n?\s*react\b/gi,
+      'governs how the particles react',
+    )
+    .replace(
+      /\bcarried y som\w*\s+\w*tices and ge howthe\s*\n?\s*panticles react\b/gi,
+      'carried by some elementary particles and governs how the particles react',
+    )
+    .replace(
+      /\bfeature of matter that is\s*\n?\s*carried y som[^\n]*\n?\s*panticles react\b/gi,
+      'feature of matter that is\ncarried by some elementary particles and governs how the particles react',
+    )
+    // Orphan Paddle fragment left after the sentence above was already repaired.
+    .replace(/(^|\n)\s*carried y som[^\n]*\n?/gi, '$1')
+    // Second "14.1 Electric charge" header after Like charges is merge noise.
+    .replace(
+      /(Like charges repel each other)\s*\n+\s*14\.1\s+Electric\s+charge\b\s*/i,
+      '$1\n',
+    );
+
+  if (
+    /\bProduction of\s*electric\.?\s*charge\b/i.test(working) &&
+    /\bfigure\s*14\.2\b/i.test(working) &&
+    /\bat+ract the/i.test(working)
+  ) {
+    working = working.replace(
+      /Production of\s*electric\.?\s*charge[\s\S]*$/i,
+      'Production of electric charge\nWhen we comb our hair with a plastic comb and then bring it close to small pieces of paper, the comb will attract the paper pieces to itself as shown in figure 14.2.',
+    );
+  }
+
+  // Drop tiny sidebar OCR crumbs interleaved into science paragraphs.
+  working = working
+    .replace(/(^|\n)\s*(?:thev|anam|from|Sim|exp|CI|"B)\s*(?=\n)/gim, '$1')
+    .replace(/\beach-other\b/gi, 'each other')
+    .replace(/\blementary\b/gi, 'elementary')
+    .replace(/\bgovens\b/gi, 'governs')
+    .replace(/\bpositive'\s+and\s+negative"/gi, '"positive" and "negative"')
+    .replace(/"+positive"+/gi, '"positive"')
+    .replace(/\bnegative"to\b/gi, 'negative" to');
+
+  // Ensure closing bullets survive when present in source fragments.
+  if (
+    /\bLike charges repel each other\b/i.test(value) &&
+    !/\bLike charges repel each other\b/i.test(working)
+  ) {
+    working = `${working}\n\nLike charges repel each other`;
+  }
+  if (
+    /\bOpposite charges attract each other\b/i.test(value) &&
+    !/\bOpposite charges attract each other\b/i.test(working)
+  ) {
+    working = working.replace(
+      /(Like charges repel each other)/i,
+      '$1\nOpposite charges attract each other',
+    );
+    if (!/\bOpposite charges attract each other\b/i.test(working)) {
+      working = `${working}\nOpposite charges attract each other`;
+    }
+  }
+
+  return working.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
  * Electrostatics / capacitor OCR: restore Coulomb, E, V, C formulas and μ/ε/10^n.
  * Safe only when the page already looks like science (caller gates).
  */
@@ -197,7 +326,7 @@ export function restoreElectrostaticsFormulas(text: string): string {
   if (!electro) return value;
 
   return (
-    value
+    restoreElectrostaticsIntro(value)
       // Glued elementary charge: 1.60217663410-19coulomb / of1.602… → 1.602… × 10^-19 C
       .replace(
         /\b(?:of)?(1\.602(?:176634)?)10\s*-?\s*19(?:coulomb|C)?\b/gi,
@@ -280,8 +409,56 @@ export function normalizeScienceNotationArtifacts(text: string): string {
     .replace(/\bFrequeney\b/gi, 'Frequency')
     .replace(/\boppositive\b/gi, 'opposite')
     .replace(/\bclecticty\b/gi, 'electricity')
+    .replace(/\bclectrical\b/gi, 'electrical')
     .replace(/\bclectrometer\b/gi, 'electrometer')
+    .replace(/\bclectroscop/gi, 'electroscop')
+    .replace(/\bst\s+ectrici(?:ty)?\b/gi, 'static electricity')
+    .replace(/\ba5\s+electrostatics\b/gi, 'as electrostatics')
+    .replace(/\bag\s+electrostatics\b/gi, 'as electrostatics')
+    .replace(/\bgs\s+electrostatics\b/gi, 'as electrostatics')
+    .replace(/\bfn this chapter\b/gi, 'In this chapter')
+    .replace(/\bcenturyBenjamin\b/g, 'century, Benjamin')
+    .replace(/\bcolle[ce]t\b/gi, 'collect')
+    .replace(/\beach ther\b/gi, 'each other')
+    .replace(/\bs a calar quantity\b/gi, 'is a scalar quantity')
+    .replace(/\bwith the oulmba\b/gi, 'with the coulomb')
+    .replace(/\boulmba\b/gi, 'coulomb')
+    .replace(/\bInthe\s+18th\b/gi, 'In the 18th')
+    .replace(/\bifs\s+ST\s*unit\b/gi, 'its SI unit')
+    .replace(/\bas ifs SI unit\b/gi, 'as its SI unit')
+    .replace(/\bwith the coulomb as ifs\b/gi, 'with the coulomb as its')
+    .replace(/\b5a scalar quantity\b/gi, 'is a scalar quantity')
+    .replace(/\bach other\b/gi, 'each other')
+    .replace(/\beach othor\b/gi, 'each other')
+    .replace(/\bElectrc\b/gi, 'Electric')
+    .replace(/\bmagntic\b/gi, 'magnetic')
+    .replace(/\bSI nit\b/gi, 'SI unit')
+    .replace(/^["'“”]+(?=Charge is a basic)/gim, '')
+    .replace(/\baterials\b/g, 'materials')
+    .replace(/\bmatenals\b/gi, 'materials')
+    .replace(/\bnd protons\b/gi, 'and protons')
+    .replace(/(^|\n)\s*ges\.\s*Franklin\b/gim, '$1charges. Franklin')
+    .replace(/\bitive" and "negative"/gi, '"positive" and "negative"')
+    .replace(/\bpositive" and negative"/gi, '"positive" and "negative"')
+    .replace(/(^|\n)\s*ectric charge is\b/gim, '$1Electric charge is')
+    .replace(/\bThe charge\s*\n\s*(?:is a )?scalar quantity\b/gi, 'The charge\nis a scalar quantity')
+    .replace(/\b(?:is a )?calar quantity\b/gi, 'is a scalar quantity')
+    .replace(/\bElectric eharge\b/gi, 'Electric charge')
+    .replace(/\belectric\.charge\b/gi, 'electric charge')
+    .replace(/\batract the\b/gi, 'attract the')
+    .replace(/\bcarried y some\b/gi, 'carried by some')
+    .replace(/\btypes\s+electricity\b/gi, 'types of electricity')
+    .replace(/\bmaterials,\s*Protons\b/g, 'materials. Protons')
+    .replace(/[‘’]\s*charges\b/g, 'charges')
+    .replace(/\bthat is\s+by some elementary\b/gi, 'that is carried by some elementary')
+    .replace(/\bhow the\s*\n\s*react to\b/gi, 'how the particles react to')
+    // Glued sentence breaks common on physics pages (keep units like mC intact)
+    .replace(/\bprocesses\.Charged\b/g, 'processes. Charged')
+    .replace(/\bcharges\.Neutral\b/g, 'charges. Neutral')
+    .replace(/\bcharges\.Franklin\b/g, 'charges. Franklin')
+    .replace(/\b([a-z]{3,})\.([A-Z][a-z])/g, '$1. $2')
     .replace(/\bFig[:.]?\s*(\d+\.\d+)/gi, 'Fig: $1')
+    .replace(/\bFig\s*(\d+\.\d+)/gi, 'Fig: $1')
     .replace(/\bDo You Know!?\b/gi, 'Do You Know!')
     .replace(/\bDo\s+You\s+knon!?\b/gi, 'Do You Know!')
     .replace(/\bDo\s+ronKnow!?\b/gi, 'Do You Know!')

@@ -157,6 +157,42 @@ Uncle Inayat said the Holy Prophet (PBUH) taught dignity of labour at Khandaq.`;
     expect(cleanMergedPageOcrText(literary)).toBe(literary);
   });
 
+  it('restores electrostatics chapter opener from fragments', () => {
+    const raw = `
+various characteristics of static charges
+well as precautions against its use will be covered
+as electrostatics or static electricity.
+14.1 Electric charge
+Charge is a basic characteristic of matter that causes electrical processes.
+Like charges repel each other
+`.trim();
+    const cleaned = cleanMergedPageOcrText(raw);
+    expect(cleaned).toMatch(/In this chapter, we will discuss the various characteristics/i);
+    expect(cleaned).toMatch(/14\.1 Electric charge/);
+    expect(cleaned).toMatch(/Charge is a basic characteristic/);
+  });
+
+  it('keeps body between duplicate 14.1 headers and restores production paragraph', () => {
+    const raw = `
+as electrostatics or static electricity.
+14.1 Electric charge
+Charge is a basic characteristic of matter that causes electrical processes.
+Like charges repel each other
+Opposite charges attract each other
+14.1 Electric eharge
+Production of electric.charge
+shown in figure 14.2.
+atract the
+`.trim();
+    const cleaned = cleanMergedPageOcrText(raw);
+    expect(cleaned).toMatch(/In this chapter, we will discuss the various characteristics/i);
+    expect(cleaned).toMatch(/Charge is a basic characteristic/);
+    expect(cleaned).toMatch(/Like charges repel each other/);
+    expect(cleaned).toMatch(/Opposite charges attract each other/);
+    expect(cleaned).toMatch(/When we comb our hair with a plastic comb/);
+    expect(cleaned).not.toMatch(/14\.1 Electric charge\s*\n\s*14\.1 Electric charge/);
+  });
+
   it('restores electrostatics formulas and scientific notation', () => {
     const raw = `
 14.4 Coulomb's law

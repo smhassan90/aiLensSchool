@@ -75,7 +75,8 @@ export async function runPaddleOcrOnBuffer(
     return { ok: false, text: '', error: 'PaddleOCR disabled' };
   }
 
-  const timeoutMs = options?.timeoutMs ?? Number(readEnv('PADDLE_OCR_TIMEOUT_MS') ?? 90000);
+  // Top-band second pass + model load can exceed 90s on cold start / CPU.
+  const timeoutMs = options?.timeoutMs ?? Number(readEnv('PADDLE_OCR_TIMEOUT_MS') ?? 180000);
   const dir = await mkdtemp(join(tmpdir(), 'ailens-paddle-'));
   const imagePath = join(dir, `page${mimeToExt(file.mimetype, file.originalname)}`);
   const script = readEnv('PADDLE_OCR_WORKER') || workerScriptPath();

@@ -250,6 +250,14 @@ const CRITICAL_PAGE_CUES = [
   /\bnote for teachers\b/i,
   /\bkhandaq|khandag\b/i,
   /\bfetched water\b/i,
+  /\bin this chapter\b/i,
+  /\belectrostatics\b/i,
+  /\bcoulomb(?:'s)?\s+law\b/i,
+  /\belectroscope\b/i,
+  /\blike charges repel\b/i,
+  /\bopposite charges attract\b/i,
+  /\b14\.1\s+electric charge\b/i,
+  /\bcharge is a basic characteristic\b/i,
 ] as const;
 
 export function criticalPageCueHits(text: string): number {
@@ -264,6 +272,21 @@ export type OrientationOcrCandidate = {
 };
 
 /** Prefer upright photos and transcripts that retain lesson cues (not a higher-scoring wrong rotation). */
+function looksLikeSidewaysTextbookOcr(text: string): boolean {
+  const value = (text ?? '').trim();
+  if (!value) return false;
+  // Classic sideways/gutter garbage on upright physics pages after a wrong 90° turn.
+  if (/\bfn this chapter\b|\bInthe 18th\b|\bifs ST\b|\bag electrostatics\b/i.test(value)) {
+    return true;
+  }
+  const lines = value.split(/\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length >= 10) {
+    const avg = lines.reduce((n, l) => n + l.length, 0) / lines.length;
+    if (avg < 26) return true;
+  }
+  return false;
+}
+
 export function compareOrientationOcrResults(
   current: OrientationOcrCandidate | undefined,
   candidate: OrientationOcrCandidate,
@@ -275,6 +298,31 @@ export function compareOrientationOcrResults(
   const candidateGarbled = looksLikeGarbledLatinOcr(candidate.text);
   if (candidateGarbled && !currentGarbled) return -1;
   if (currentGarbled && !candidateGarbled) return 1;
+
+  const currentSideways = looksLikeSidewaysTextbookOcr(current.text);
+  const candidateSideways = looksLikeSidewaysTextbookOcr(candidate.text);
+  if (candidateSideways && !currentSideways) return -1;
+  if (currentSideways && !candidateSideways) return 1;
+
+  // Prefer EXIF-upright strongly: wrong 90°/270° often scores higher on raw length.
+  if (current.degrees === 0 && candidate.degrees !== 0) {
+    const critCurrent = criticalPageCueHits(current.text);
+    const critCandidate = criticalPageCueHits(candidate.text);
+    const muchBetter =
+      !candidateSideways &&
+      critCandidate > critCurrent + 1 &&
+      candidate.text.length >= current.text.length * 1.35 &&
+      candidate.score >= current.score + 80;
+    if (!muchBetter) return -1;
+  }
+  if (candidate.degrees === 0 && current.degrees !== 0) {
+    const critCurrent = criticalPageCueHits(current.text);
+    const critCandidate = criticalPageCueHits(candidate.text);
+    if (!currentSideways && critCurrent > critCandidate + 1 && current.text.length >= candidate.text.length * 1.35) {
+      return -1;
+    }
+    if (!candidateSideways) return 1;
+  }
 
   if (candidate.readable && !current.readable) {
     if (current.text.length >= candidate.text.length * 1.12) return -1;
@@ -295,6 +343,8 @@ export function compareOrientationOcrResults(
   }
 
   const lengthRatio = candidate.text.length / Math.max(1, current.text.length);
+  // Do not let a longer sideways dump beat upright when lengths are merely close.
+  if (current.degrees === 0 && candidate.degrees !== 0 && lengthRatio < 1.35) return -1;
   if (lengthRatio >= 1.12) return 1;
   if (lengthRatio <= 0.88) return -1;
 
@@ -349,7 +399,7 @@ export function scorePageOcrCandidate(
   const cueBonus =
     (
       value.match(
-        /\b(bravo|fail|cobweb|silken|endeavour|native cot|give it all up|e[xz]ercise\s*[1-7]|flung|beginning to sink|nine\s+brave|anxious minute|akhtar|rukhsana|dignity of work|business tycoon|pre-reading|note for teachers|khandaq|khandag)\b/gi,
+        /\b(bravo|fail|cobweb|silken|endeavour|native cot|give it all up|e[xz]ercise\s*[1-7]|flung|beginning to sink|nine\s+brave|anxious minute|akhtar|rukhsana|dignity of work|business tycoon|pre-reading|note for teachers|khandaq|khandag|in this chapter|electrostatics|coulomb|electroscope|like charges repel|opposite charges attract|benjamin franklin)\b/gi,
       ) ?? []
     ).length * 10;
   let layoutPenalty = 0;

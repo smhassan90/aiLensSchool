@@ -67,30 +67,47 @@ async function toOcrJpeg(
   originalname: string,
 ): Promise<PreparedLessonPagePhoto> {
   const sharpFn = await getSharp();
-  let pipeline = sharpFn(working)
+  // Phone crops of textbook pages are often ~500–900px wide; engines miss the
+  // washed-out top lines. Upscale so detection sees "In this chapter…" etc.
+  const minEdge = Math.min(width, height) || 1;
+  const targetMin = 1400;
+  const scaleUp = minEdge < targetMin ? targetMin / minEdge : 1;
+  const outW = Math.max(1, Math.round(width * scaleUp));
+  const outH = Math.max(1, Math.round(height * scaleUp));
+
+  let pipeline = sharpFn(working);
+  if (scaleUp > 1.02) {
+    pipeline = pipeline.resize({
+      width: outW,
+      height: outH,
+      kernel: 'lanczos3',
+      fit: 'fill',
+    });
+  }
+  pipeline = pipeline
     .greyscale()
     .normalize()
-    .gamma(1.08)
-    .linear(1.22, -18)
-    .sharpen({ sigma: 1.0 });
+    .gamma(1.05)
+    .linear(1.15, -12)
+    .sharpen({ sigma: 0.9 });
 
   try {
     const trimmed = await pipeline.clone().trim({ threshold: 18 }).toBuffer({ resolveWithObject: true });
-    const areaBefore = Math.max(1, width * height);
+    const areaBefore = Math.max(1, outW * outH);
     const areaAfter = trimmed.info.width * trimmed.info.height;
     if (areaAfter >= areaBefore * 0.55) {
       pipeline = sharpFn(trimmed.data)
         .greyscale()
         .normalize()
-        .gamma(1.08)
-        .linear(1.22, -18)
-        .sharpen({ sigma: 1.0 });
+        .gamma(1.05)
+        .linear(1.15, -12)
+        .sharpen({ sigma: 0.9 });
     }
   } catch {
     // trim skipped
   }
 
-  const buffer = await pipeline.jpeg({ quality: 86, mozjpeg: true }).toBuffer();
+  const buffer = await pipeline.jpeg({ quality: 90, mozjpeg: true }).toBuffer();
   return {
     buffer,
     mimeType: 'image/jpeg',

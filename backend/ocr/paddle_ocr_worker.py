@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 _ENGINE = None
+_ENGINE_KEY = None
 
 WEBLINK_RE = re.compile(
     r"weblinks?|encourage students to(?:\s*visit)?|visit below link|youtube\.com|youtu\.be|"
@@ -33,21 +34,145 @@ def paddle_lang(lang: str) -> str:
 
 
 def get_engine(lang: str):
-    global _ENGINE
+    global _ENGINE, _ENGINE_KEY
     key = paddle_lang(lang)
-    if _ENGINE and _ENGINE[0] == key:
-        return _ENGINE[1]
+    if _ENGINE is not None and _ENGINE_KEY == key:
+        return _ENGINE
     from paddleocr import PaddleOCR
 
-    # paddleocr 2.x API (stable for CPU textbook photos).
+    # Lower det thresholds recover washed-out top lines on phone textbook photos.
     engine = PaddleOCR(
         use_angle_cls=True,
         lang=key,
         show_log=False,
         use_gpu=False,
+        det_db_thresh=0.2,
+        det_db_box_thresh=0.45,
+        det_db_unclip_ratio=1.8,
     )
-    _ENGINE = (key, engine)
+    _ENGINE = engine
+    _ENGINE_KEY = key
     return engine
+
+
+def preprocess_for_ocr(image_path: str) -> str:
+    """Upscale small pages + boost washed-out top band so openers are detectable."""
+    try:
+        from PIL import Image, ImageEnhance, ImageOps, ImageFilter
+    except Exception:
+        return image_path
+
+    path = Path(image_path)
+    try:
+        im = Image.open(path).convert("RGB")
+    except Exception:
+        return image_path
+
+    w, h = im.size
+    min_edge = min(w, h)
+    scale = max(1400 / max(min_edge, 1), 1.0)
+    if scale > 1.02:
+        im = im.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS)
+        w, h = im.size
+
+    im = ImageOps.autocontrast(im, cutoff=1)
+    im = ImageEnhance.Contrast(im).enhance(1.12)
+
+    # Top third of phone textbook shots is often brighter / lower-contrast.
+    top_h = max(40, int(h * 0.36))
+    top = im.crop((0, 0, w, top_h))
+    top = ImageOps.autocontrast(top, cutoff=2)
+    top = ImageEnhance.Contrast(top).enhance(1.35)
+    top = ImageEnhance.Sharpness(top).enhance(1.25)
+    top = top.filter(ImageFilter.UnsharpMask(radius=1.2, percent=140, threshold=2))
+    im.paste(top, (0, 0))
+
+    out = path.with_name(f"{path.stem}__paddle_prep{path.suffix}")
+    im.save(out, quality=93)
+    return str(out)
+
+
+def _line_text(row: dict[str, Any]) -> str:
+    return str(row.get("text") or "").strip()
+
+
+def opener_looks_complete(text: str) -> bool:
+    head = (text or "")[:400].lower()
+    return bool(
+        re.search(
+            r"\bin this chapter\b|\bunit\s+\d|\b14\.1\s+electric charge\b|\bcharge is a basic\b",
+            head,
+        )
+    )
+
+
+def ocr_top_band(image_path: str, lang: str, fraction: float = 0.38) -> list[dict[str, Any]]:
+    """Second-pass OCR on the top band when the first pass missed the chapter opener."""
+    try:
+        from PIL import Image, ImageEnhance, ImageOps
+    except Exception:
+        return []
+
+    path = Path(image_path)
+    try:
+        im = Image.open(path).convert("RGB")
+    except Exception:
+        return []
+
+    w, h = im.size
+    band_h = max(80, int(h * fraction))
+    top = im.crop((0, 0, w, band_h))
+    top = top.resize((max(1, top.width * 2), max(1, top.height * 2)), Image.Resampling.LANCZOS)
+    top = ImageOps.autocontrast(top, cutoff=1)
+    top = ImageEnhance.Contrast(top).enhance(1.25)
+    scale_y = band_h / max(1, top.height)
+    band_path = path.with_name(f"{path.stem}__top_band{path.suffix}")
+    top.save(band_path, quality=92)
+
+    engine = get_engine(lang)
+    try:
+        result = engine.ocr(str(band_path), cls=True)
+        lines = lines_from_result(result)
+    except Exception:
+        return []
+    finally:
+        try:
+            band_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    # Map y back into original page coordinates (top band only).
+    for row in lines:
+        row["y0"] = float(row["y0"]) * scale_y
+        row["y1"] = float(row["y1"]) * scale_y
+    return sorted(lines, key=lambda r: (r["y0"], r["x0"]))
+
+
+def merge_top_band_lines(
+    full: list[dict[str, Any]], top: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    if not top:
+        return full
+    existing = {re.sub(r"\s+", " ", _line_text(r)).lower() for r in full if _line_text(r)}
+    extras: list[dict[str, Any]] = []
+    for row in top:
+        text = _line_text(row)
+        if not text or len(text) < 8:
+            continue
+        key = re.sub(r"\s+", " ", text).lower()
+        if key in existing:
+            continue
+        # Prefer opener / early-paragraph lines from the top band.
+        if re.search(
+            r"in this chapter|static charges|electrostatics|electric force|electric field|"
+            r"electric potential|precautions|not moving|14\.1|charge is a basic",
+            key,
+        ) or float(row.get("y0") or 0) < 220:
+            extras.append(row)
+            existing.add(key)
+    if not extras:
+        return full
+    return sorted(full + extras, key=lambda r: (r["y0"], r["x0"]))
 
 
 def _box_bounds(box: Any) -> tuple[float, float, float, float] | None:
@@ -192,21 +317,21 @@ def text_from_lines(lines: list[dict[str, Any]]) -> str:
 
 
 def predict_structured(image_path: str, lang: str) -> list[dict[str, Any]]:
+    prepared = preprocess_for_ocr(image_path)
     engine = get_engine(lang)
+    lines: list[dict[str, Any]] = []
+
     # Prefer classic ocr() path — it returns boxes reliably on 2.x.
     if hasattr(engine, "ocr"):
         try:
-            result = engine.ocr(image_path, cls=True)
+            result = engine.ocr(prepared, cls=True)
             lines = lines_from_result(result)
-            if lines:
-                return pick_main_column(lines)
         except Exception:
-            pass
+            lines = []
 
-    if hasattr(engine, "predict"):
+    if not lines and hasattr(engine, "predict"):
         try:
-            result = engine.predict(image_path)
-            lines: list[dict[str, Any]] = []
+            result = engine.predict(prepared)
             for res in result or []:
                 data = getattr(res, "json", None) or getattr(res, "res", None) or res
                 if not isinstance(data, dict):
@@ -223,12 +348,25 @@ def predict_structured(image_path: str, lang: str) -> list[dict[str, Any]]:
                     else:
                         x0, y0, x1, y1 = 0.0, float(idx), 1.0, float(idx)
                     lines.append({"text": text, "x0": x0, "y0": y0, "x1": x1, "y1": y1})
-            if lines:
-                return pick_main_column(lines)
+        except Exception:
+            lines = []
+
+    if prepared != image_path:
+        try:
+            Path(prepared).unlink(missing_ok=True)
         except Exception:
             pass
 
-    return []
+    if not lines:
+        return []
+
+    chosen = pick_main_column(lines)
+    text = text_from_lines(chosen)
+    if not opener_looks_complete(text):
+        # Full-page pass often skips the bright top paragraph — recover from a zoomed top band.
+        top = ocr_top_band(image_path, lang)
+        chosen = merge_top_band_lines(chosen, top)
+    return chosen
 
 
 def predict_text(image_path: str, lang: str) -> str:
@@ -260,6 +398,7 @@ def main() -> int:
                     "chars": len((text or "").replace(" ", "")),
                     "lineCount": len(lines),
                     "columnFiltered": True,
+                    "openerOk": opener_looks_complete(text or ""),
                 },
                 ensure_ascii=False,
             ),

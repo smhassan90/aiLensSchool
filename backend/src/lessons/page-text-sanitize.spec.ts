@@ -33,6 +33,33 @@ Uncle Inayat looked at him and asked him what had happened.`.trim();
     );
     expect(cmp).toBeGreaterThan(0);
   });
+
+  it('keeps upright electrostatics page over a longer sideways dump', () => {
+    const upright = `
+In this chapter, we will discuss the various characteristics of static charges.
+14.1 Electric charge
+Charge is a basic characteristic of matter that causes electrical processes.
+Like charges repel each other
+Opposite charges attract each other
+Fig: 14.1 Electric charge`.trim();
+    const sideways = `
+fn this chapter, We ¥
+of static charges,
+oe © various characteristics
+Additionally, everal appl ns of static electr
+well as precautions against its use will be wiih
+study of charges while they are not moving is referred i
+ag electrostatics or static electricity
+14.1 Electric charge
+Charge is a basic characteristic of matter that causes
+electrical processes. Charged particles are found in most
+and some more filler text to make this longer than upright intentionally xxxxxxxx`.trim();
+    const cmp = compareOrientationOcrResults(
+      { text: upright, score: 200, readable: true, degrees: 0 },
+      { text: sideways, score: 260, readable: true, degrees: 90 },
+    );
+    expect(cmp).toBeLessThan(0);
+  });
 });
 
 describe('scorePageOcrQuality', () => {
