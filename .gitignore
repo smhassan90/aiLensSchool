@@ -201,3 +201,8 @@ scripts/agent_config.json
 scripts/sync_state.json
 scripts/hawknexa_agent_config.json
 scripts/hawknexa_sync_state.json
+
+# Local Python OCR venv (Paddle) — never commit site-packages
+**/.venv-paddle/
+**/.venv/
+**/venv/

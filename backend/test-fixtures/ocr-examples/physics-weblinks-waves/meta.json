@@ -1,0 +1,16 @@
+{
+  "id": "physics-weblinks-waves",
+  "subject": "physics",
+  "scienceFewShot": true,
+  "mustMatch": [
+    "Step 2",
+    "0.125Hz",
+    "Q1"
+  ],
+  "mustNotMatch": [
+    "youtube.com",
+    "Encourage students",
+    "Waves Ripple",
+    "Tank Interference"
+  ]
+}

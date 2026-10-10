@@ -1,0 +1,18 @@
+{
+  "id": "physics-numericals-section-c",
+  "subject": "physics",
+  "scienceFewShot": true,
+  "mustMatch": [
+    "Section (C) Numericals",
+    "wavelength",
+    "1300",
+    "230.76m"
+  ],
+  "mustNotMatch": [
+    "57%",
+    "SRR",
+    "1300 1300",
+    "ms™",
+    "Ya What"
+  ]
+}

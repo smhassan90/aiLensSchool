@@ -1,0 +1,7 @@
+Section (C) Numericals
+1. What is the wavelength of a radio wave broadcasted by a radio station with a
+frequency of 1300 kHz?
+Where 1K = 10^3, and the speed of the radio-wave is 3 × 10^8 ms^-1. (230.76m)
+
+3. The waves moving in the pond have a wavelength of 1.6 m, and a frequency
+of 0.80 Hz. Calculate the speed of these water waves. (1.28ms^-1)

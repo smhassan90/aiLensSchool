@@ -8,6 +8,7 @@ import {
   criticalPageCueHits,
   englishPageTranscriptLooksIncomplete,
 } from './page-text-sanitize';
+import { cleanMergedPageOcrText, isProtectedStemAcronym } from './science-ocr-clean';
 import { stripInterleavedWeblinkSidebar } from './sidebar-layout-ocr';
 
 function normalizeLineKey(line: string): string {
@@ -49,8 +50,10 @@ function tokenLooksGarbage(token: string, alternateAtPosition?: string): boolean
   if (!raw) return false;
   if (tokenLooksLikeMathSymbol(raw)) return false;
   if (/^[\dW]+[.)]?$/.test(raw)) return false;
-  if (/^[\d.,+\-×÷=/%]+$/u.test(raw)) return false;
-  if ((raw.match(/[|£€©®@#\\<>{}]/g) ?? []).length >= 1) return true;
+  // Standalone "57%" is usually OCR junk next to units — keep real "50%" only with letters around.
+  if (/^\d{1,3}%$/.test(raw)) return true;
+  if (/^[\d.,+\-×÷=/]+$/u.test(raw)) return false;
+  if ((raw.match(/[|£€©®™@#\\<>{}]/g) ?? []).length >= 1) return true;
   const letters = raw.match(/[A-Za-z]+/g) ?? [];
   if (!letters.length) {
     // Keep Greek / math punctuation fragments; only drop tiny unknown junk.
@@ -59,7 +62,7 @@ function tokenLooksGarbage(token: string, alternateAtPosition?: string): boolean
   }
   const altLetters = alternateAtPosition?.match(/[A-Za-z]+/g)?.[0];
   for (const part of letters) {
-    if (/^[A-Z]{3,6}$/.test(part) && part !== 'THE' && part !== 'AND') return true;
+    if (/^[A-Z]{3,6}$/.test(part) && !isProtectedStemAcronym(part)) return true;
     if (part.length >= 3 && !latinOcrWordLooksPlausible(part)) return true;
     if (
       altLetters &&
@@ -232,12 +235,13 @@ export function mergePaddleAndTesseractPageOcr(paddle: string, tesseract: string
   const p = (paddle ?? '').trim();
   const t = (tesseract ?? '').trim();
   if (!p && !t) return '';
-  if (!p) return stripInterleavedWeblinkSidebar(t);
-  if (!t) return stripInterleavedWeblinkSidebar(p);
+  if (!p) return cleanMergedPageOcrText(stripInterleavedWeblinkSidebar(t));
+  if (!t) return cleanMergedPageOcrText(stripInterleavedWeblinkSidebar(p));
 
   const primary = pickOcrMergePrimary(p, t);
   const merged =
     primary === 'tesseract' ? mergePrimaryWithAlternate(t, p) : mergePrimaryWithAlternate(p, t);
   // Drop interleaved Weblinks/YouTube sidebars after merge (no-op on literary pages).
-  return stripInterleavedWeblinkSidebar(merged);
+  // Then collapse number duplicates / checkmark junk / science unit artifacts.
+  return cleanMergedPageOcrText(stripInterleavedWeblinkSidebar(merged));
 }

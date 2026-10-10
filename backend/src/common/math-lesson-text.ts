@@ -24,10 +24,29 @@ export function lineLooksLikeMathOrFormula(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return false;
   if (MATH_SYMBOL_RE.test(trimmed) || GREEK_LETTER_RE.test(trimmed)) return true;
-  if (/\b(?:Hz|m\/s|wavelength|frequency|amplitude|period)\b/i.test(trimmed)) return true;
   if (/\b[A-Za-zλμν]\s*=\s*[-\d.]/u.test(trimmed)) return true;
-  if (/\d+\s*(?:Hz|m\/s|m\b|s\b)/i.test(trimmed)) return true;
   if (/v\s*=\s*f\s*[×x*]\s*/i.test(trimmed)) return true;
+  // Require formula shape — do not shield English question stems that mention units.
+  const looksLikeQuestionProse =
+    /\?/.test(trimmed) ||
+    /^(?:\d+[.)]\s*)?(?:what|how|explain|calculate|if|when|why|suppose|describe)\b/i.test(
+      trimmed,
+    );
+  if (
+    !looksLikeQuestionProse &&
+    /\d+\s*(?:Hz|m\/s|ms\^-?1|cm\/s|kHz)\b/i.test(trimmed) &&
+    trimmed.length <= 90
+  ) {
+    return true;
+  }
+  if (
+    !looksLikeQuestionProse &&
+    /\b(?:wavelength|frequency|amplitude|period)\b/i.test(trimmed) &&
+    /[=×*]|\d+\s*(?:Hz|m\/s|ms|cm|s)\b/i.test(trimmed) &&
+    trimmed.length <= 72
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -47,8 +66,13 @@ export function looksLikeMathScienceLessonText(text: string | undefined | null):
   const setWords = (value.match(/\b(?:union|intersection|subset|disjoint|exhaustive)\b/gi) ?? []).length;
   if (braces >= 2 && setWords >= 2) return true;
   if (
-    /\b(?:wavelength|frequency|amplitude|ripple\s*tank|wave\s*speed|self[- ]?assessment)\b/i.test(value) &&
-    (/\d+\s*(?:Hz|m\/s|m\b|s\b)/i.test(value) || /v\s*=\s*f/i.test(value) || /step\s*\d/i.test(value))
+    /\b(?:wavelength|frequency|amplitude|ripple\s*tank|wave\s*speed|self[- ]?assessment|numericals?|slinky|pendulum)\b/i.test(
+      value,
+    ) &&
+    (/\d+\s*(?:Hz|m\/s|ms|m\b|s\b|cm)\b/i.test(value) ||
+      /v\s*=\s*f/i.test(value) ||
+      /step\s*\d/i.test(value) ||
+      /\(\d+\.?\d*\s*(?:m|s|Hz)/i.test(value))
   ) {
     return true;
   }

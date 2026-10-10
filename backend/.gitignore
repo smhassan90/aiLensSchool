@@ -28,3 +28,6 @@ yarn-error.log*
 /uploads
 /tmp
 /.tesseract-cache
+/.venv-paddle/
+.venv-paddle/
+.cursor-ocr-merge-agent/

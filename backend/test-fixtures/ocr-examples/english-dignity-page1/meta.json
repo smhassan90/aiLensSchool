@@ -1,0 +1,11 @@
+{
+  "id": "english-dignity-page1",
+  "subject": "english",
+  "scienceFewShot": false,
+  "mustMatch": [
+    "Akhtar came home",
+    "feeling cross",
+    "social service"
+  ],
+  "mustNotMatch": []
+}

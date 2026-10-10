@@ -70,10 +70,15 @@ def lines_from_result(result) -> list[dict[str, Any]]:
                 continue
             box = item[0]
             payload = item[1]
+            # Paddle 2.x: payload is (text, confidence). Never stringify the tuple.
             if isinstance(payload, (list, tuple)) and payload:
                 text = str(payload[0]).strip()
+            elif isinstance(payload, dict):
+                text = str(payload.get("text") or payload.get("transcription") or "").strip()
+            elif isinstance(payload, str):
+                text = payload.strip()
             else:
-                text = str(payload).strip()
+                continue
             if not text:
                 continue
             bounds = _box_bounds(box)
@@ -81,6 +86,20 @@ def lines_from_result(result) -> list[dict[str, Any]]:
                 lines.append({"text": text, "x0": 0.0, "y0": float(len(lines)), "x1": 1.0, "y1": float(len(lines))})
                 continue
             x0, y0, x1, y1 = bounds
+            # Drop near-duplicate boxes (same text, heavily overlapping) from multi-pass noise.
+            mid_y = (y0 + y1) / 2.0
+            mid_x = (x0 + x1) / 2.0
+            dup = False
+            for prev in lines[-8:]:
+                if (prev.get("text") or "").strip() != text:
+                    continue
+                py = (prev["y0"] + prev["y1"]) / 2.0
+                px = (prev["x0"] + prev["x1"]) / 2.0
+                if abs(py - mid_y) <= 12 and abs(px - mid_x) <= 40:
+                    dup = True
+                    break
+            if dup:
+                continue
             lines.append({"text": text, "x0": x0, "y0": y0, "x1": x1, "y1": y1})
         except Exception:
             continue

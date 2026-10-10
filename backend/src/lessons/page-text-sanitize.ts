@@ -6,7 +6,12 @@ import {
   looksLikeRealLessonText,
 } from '../common/extract-quality';
 import { looksLikeGarbledLatinOcr } from '../common/garbled-latin-ocr';
-import { lineLooksLikeMathOrFormula } from '../common/math-lesson-text';
+import { lineLooksLikeMathOrFormula, looksLikeMathScienceLessonText } from '../common/math-lesson-text';
+import {
+  cleanMergedPageOcrText,
+  looksLikeScienceNumericalsPage,
+  normalizeScienceNotationArtifacts,
+} from './science-ocr-clean';
 import { lineLooksLikeWeblinkSidebar } from './sidebar-layout-ocr';
 
 const SIDEBAR_ACTIVITY =
@@ -409,6 +414,17 @@ export function filterPageTextForLessonAssembly(
     return lightCleanPoemOrReadingPage(value);
   }
 
+  const finish = (out: string) => {
+    const cleaned = cleanMergedPageOcrText(out);
+    if (
+      looksLikeMathScienceLessonText(cleaned) ||
+      looksLikeScienceNumericalsPage(cleaned)
+    ) {
+      return normalizeScienceNotationArtifacts(cleaned);
+    }
+    return cleaned;
+  };
+
   const blocks = value.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
   const keptBlocks = blocks.filter((b) => !isSuspectParagraph(b));
   if (keptBlocks.length >= 1) {
@@ -422,23 +438,23 @@ export function filterPageTextForLessonAssembly(
         (looksLikePoemOrReadingPage(value) &&
           countLatinLetters(value) > countLatinLetters(joined) + 60))
     ) {
-      return value;
+      return finish(value);
     }
-    return joined;
+    return finish(joined);
   }
 
   const lines = value.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const keptLines = lines.filter((l) => !lineLooksLikeGibberish(l));
   if (keptLines.length >= 2) {
-    return keptLines.join('\n').trim();
+    return finish(keptLines.join('\n').trim());
   }
 
   const english = englishOnlyFromMixedOcr(value, { keepArabicScript: keepArabic });
   if (english.trim().length >= 80) {
-    return english.trim();
+    return finish(english.trim());
   }
 
-  return value;
+  return finish(value);
 }
 
 export function pageTextNeedsVisionRetry(text: string): boolean {

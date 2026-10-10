@@ -6,9 +6,14 @@ import {
   scoreOcrMergeCoverage,
 } from './merge-paddle-tesseract-ocr';
 import {
+  buildScienceOcrFewShotBlock,
+  textLooksLikeScienceForFewShot,
+} from './ocr-example-packs';
+import {
   criticalPageCueHits,
   isPagePhotoTextReadable,
 } from './page-text-sanitize';
+import { looksLikeScienceNumericalsPage } from './science-ocr-clean';
 
 const PAGE_OCR_MERGE_SYSTEM = `You merge OCR transcripts of the SAME English textbook page into one clean reading.
 Return JSON only: { "lessonText": "..." }
@@ -367,6 +372,13 @@ export async function intelligentMergePageOcrTranscripts(
     return finalize(ruleFallback, false);
   }
 
+  const sourceBlob = [ruleFallback, paddle, tesseract, input.visionText ?? ''].join('\n');
+  const useScienceFewShot =
+    looksLikeScienceNumericalsPage(sourceBlob) ||
+    textLooksLikeScienceForFewShot(sourceBlob) ||
+    /\b(?:physics|chemistry|math|maths|science)\b/i.test(input.subjectName ?? '');
+  const scienceFewShot = useScienceFewShot ? buildScienceOcrFewShotBlock() : '';
+
   const userPrompt = [
     `Subject: ${input.subjectName ?? 'English'}`,
     '',
@@ -384,8 +396,11 @@ export async function intelligentMergePageOcrTranscripts(
     input.visionText?.trim()
       ? `\n--- Vision transcript ---\n${input.visionText.trim()}`
       : '',
+    scienceFewShot ? `\n${scienceFewShot}` : '',
     '',
-    'CRITICAL: If any transcript contains "Akhtar came home", lessonText MUST include "Akhtar came home late from school" (cleaned) before the uncle visit. Do not invent a different opening.',
+    useScienceFewShot
+      ? 'CRITICAL (science): Remove weblink/YouTube sidebars, collapse duplicate numbers, fix unit OCR (ms™→ms^-1, 1K the 103→1K=10^3). Keep every numerical question and parenthetical answer. Do not invent values.'
+      : 'CRITICAL: If any transcript contains "Akhtar came home", lessonText MUST include "Akhtar came home late from school" (cleaned) before the uncle visit. Do not invent a different opening.',
   ].join('\n');
 
   try {

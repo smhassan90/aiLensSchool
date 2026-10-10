@@ -16,6 +16,11 @@ describe('math-lesson-text', () => {
     expect(lineLooksLikeMathOrFormula('v = f × λ')).toBe(true);
     expect(lineLooksLikeMathOrFormula('f = 0.125 Hz')).toBe(true);
     expect(lineLooksLikeMathOrFormula('Akhtar smiled at Rukhsana.')).toBe(false);
+    expect(
+      lineLooksLikeMathOrFormula(
+        'What is the wavelength of a radio wave with a frequency of 1300 kHz?',
+      ),
+    ).toBe(false);
   });
 
   it('detects physics lesson pages without set notation', () => {
