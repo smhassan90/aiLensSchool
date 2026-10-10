@@ -97,7 +97,13 @@ fi
 
 echo "=== Pull latest ${BRANCH} ==="
 cd "${REPO_DIR}"
-git fetch origin "${BRANCH}"
+# Recover stale/locked remote refs (concurrent webhook + SSH deploys).
+git remote prune origin >/dev/null 2>&1 || true
+if ! git fetch --prune origin "${BRANCH}"; then
+  echo "WARN: git fetch failed; forcing remote-tracking ref refresh..." >&2
+  rm -f "${REPO_DIR}/.git/refs/remotes/origin/${BRANCH}.lock" 2>/dev/null || true
+  git fetch --prune origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+fi
 git reset --hard "origin/${BRANCH}"
 
 echo "=== Sync deploy configs (keep server .env) ==="
@@ -181,13 +187,27 @@ compose_up() {
   fi
 }
 
+clear_stuck_hawknexa_containers() {
+  echo "Clearing stuck hawknexa containers..."
+  docker compose -f "${COMPOSE_FILE}" rm -sf backend portal mysql redis 2>/dev/null || true
+  # Wait for "removal already in progress" to finish, then force-remove leftovers.
+  for _ in 1 2 3 4 5 6; do
+    local ids
+    ids="$(docker ps -aq --filter name=hawknexa- 2>/dev/null || true)"
+    if [[ -z "${ids}" ]]; then
+      break
+    fi
+    # shellcheck disable=SC2086
+    docker rm -f ${ids} >/dev/null 2>&1 || true
+    sleep 2
+  done
+  docker container prune -f >/dev/null 2>&1 || true
+  sleep 2
+}
+
 if ! compose_up 1; then
   echo "WARN: compose up failed, pruning stale containers and retrying once..." >&2
-  # Name conflicts leave containers like 2403a3fa…_hawknexa-backend-1 that block reuse.
-  docker compose -f "${COMPOSE_FILE}" rm -sf backend portal mysql redis 2>/dev/null || true
-  docker ps -a --format '{{.ID}} {{.Names}}' | awk '/hawknexa-(backend|portal|mysql|redis)/ {print $1}' | xargs -r docker rm -f
-  docker container prune -f >/dev/null 2>&1 || true
-  sleep 3
+  clear_stuck_hawknexa_containers
   compose_up 2
 fi
 
