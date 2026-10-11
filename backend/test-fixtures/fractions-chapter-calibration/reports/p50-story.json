@@ -1,0 +1,389 @@
+{
+  "pageId": "p50-story",
+  "bookPage": 50,
+  "layout": "exercise_grid",
+  "image": "p50-story.jpg",
+  "models": {
+    "paddleRec": "stock_en",
+    "paddleMs": 12105,
+    "tesseractMs": 12852
+  },
+  "paddleText": "Now let us try this: We ask ourselves how many thirds are needed to make two wholes?\n2+4\nAgain the answer is easy:6 thirds make 2 wholes.\n2x3-23-6=6\nWe ask ourselves: how many thirds are needed to make two wholes?\nAgain, the answer is easy:6 thirds make 2 wholes.\n2=6\n3\nSimilarly2x3-33-6=6\nx\nWhat happens when we divide a fraction by I?\nExample:\n5/6\nREMEMBER\nWe follow our rule:5 = 5x When we divide any\n6 number by I, the\n5=5 answer is the number\n6x 6 itself.\nWe get the same fraction we started with.\nWhat happens when we divide a\nfraction by itself? REMEMBER\nExample: When we divide a\nnumber by the same\n4+=x number, the answer\n4\nwill be I.\n=4x==\nOur answer is I\nWhat happens when the dividend is zero? REMEMBER\nThe result of O divided\nExample:\nby any number is\n03=0x4=0=0 always 0.\n-3\nFractions\nOXFORD",
+  "tesseractText": "ge 2 ourselves: how many thirds are needed to make two wholes?\nAgain, the answer is easy: 6 thirds make 2 wholes\n2+ 1 =6                                           .\n\nsimilarly, 2\n\nWhat happens when we divide a fraction by 17\n\nExample:\n54\n5                                                  REMEMBER\nWe follow our rule: 2 Leo Li dE            When we divide any\n[     6 1           number by I, the\nEos GB       answer is the number\n\nWhat happens when we divide a\nfraction by itself?\n\nExample:\nample                                                        When we divide a\nA, Bo box LL                          number by the same\nTATE                        number, the answer\nTe              will be 1.\nTix MT\n\nOur answer is |.\n\nWhat happens when the dividend is zero?        REMEMBER\n\nThe result of 0 divided\nby any number is\nalways 0.",
+  "mergedText": "Now let us try this: We ask ourselves how many thirds are needed to make two wholes?\n2+4\nAgain the answer is easy:6 thirds make 2 wholes.\n2x3-23-6=6\nWe ask ourselves: how many thirds are needed to make two wholes?\nAgain, the answer is easy:6 thirds make 2 wholes.\n2=6\n3\nSimilarly2x3-33-6=6\nx\nWhat happens when we divide a fraction by I?\nExample:\n5/6\nREMEMBER\nWe follow our rule:5 = 5x When we divide any\n6 number by I, the\n5=5 answer is the number\n6x 6 itself.\nWe get the same fraction we started with.\nWhat happens when we divide a\nfraction by itself? REMEMBER\nExample: When we divide a\nnumber by the same\n4+=x number, the answer\n4\nwill be I.\n=4x==\nOur answer is I\nWhat happens when the dividend is zero? REMEMBER\nThe result of O divided\nExample:\nby any number is\n03=0x4=0=0 always 0.\n-3\nFractions\nOXFORD",
+  "paddleLines": [
+    {
+      "text": "Now let us try this:",
+      "x0": 95,
+      "y0": 120,
+      "x1": 406,
+      "y1": 171
+    },
+    {
+      "text": "We ask ourselves how many thirds are needed to make two wholes?",
+      "x0": 107,
+      "y0": 127,
+      "x1": 1295,
+      "y1": 157.5
+    },
+    {
+      "text": "2+4",
+      "x0": 80,
+      "y0": 152,
+      "x1": 213,
+      "y1": 257
+    },
+    {
+      "text": "Again the answer is easy:6 thirds make 2 wholes.",
+      "x0": 107,
+      "y0": 158,
+      "x1": 979,
+      "y1": 187
+    },
+    {
+      "text": "2x3-23-6=6",
+      "x0": 276,
+      "y0": 217,
+      "x1": 722,
+      "y1": 256.5
+    },
+    {
+      "text": "We ask ourselves: how many thirds are needed to make two wholes?",
+      "x0": 95,
+      "y0": 231,
+      "x1": 1181,
+      "y1": 288
+    },
+    {
+      "text": "Again, the answer is easy:6 thirds make 2 wholes.",
+      "x0": 97,
+      "y0": 288,
+      "x1": 895,
+      "y1": 342
+    },
+    {
+      "text": "2=6",
+      "x0": 92,
+      "y0": 327,
+      "x1": 274,
+      "y1": 396
+    },
+    {
+      "text": "3",
+      "x0": 141,
+      "y0": 369,
+      "x1": 195,
+      "y1": 404
+    },
+    {
+      "text": "Similarly2x3-33-6=6",
+      "x0": 89,
+      "y0": 392,
+      "x1": 663,
+      "y1": 477
+    },
+    {
+      "text": "x",
+      "x0": 322,
+      "y0": 445,
+      "x1": 583,
+      "y1": 482
+    },
+    {
+      "text": "What happens when we divide a fraction by I?",
+      "x0": 99,
+      "y0": 527,
+      "x1": 861,
+      "y1": 577
+    },
+    {
+      "text": "Example:",
+      "x0": 103,
+      "y0": 603,
+      "x1": 237,
+      "y1": 641
+    },
+    {
+      "text": "5",
+      "x0": 97,
+      "y0": 651,
+      "x1": 201,
+      "y1": 714
+    },
+    {
+      "text": "REMEMBER",
+      "x0": 881,
+      "y0": 653,
+      "x1": 1110,
+      "y1": 702
+    },
+    {
+      "text": "6",
+      "x0": 109,
+      "y0": 698,
+      "x1": 141,
+      "y1": 733
+    },
+    {
+      "text": "We follow our rule:5",
+      "x0": 98,
+      "y0": 716,
+      "x1": 556,
+      "y1": 792
+    },
+    {
+      "text": "When we divide any",
+      "x0": 883,
+      "y0": 721,
+      "x1": 1158,
+      "y1": 764
+    },
+    {
+      "text": "5x",
+      "x0": 605,
+      "y0": 723,
+      "x1": 716,
+      "y1": 770
+    },
+    {
+      "text": "=",
+      "x0": 566,
+      "y0": 728,
+      "x1": 626,
+      "y1": 769
+    },
+    {
+      "text": "6",
+      "x0": 432,
+      "y0": 754,
+      "x1": 483,
+      "y1": 801
+    },
+    {
+      "text": "number by I,the",
+      "x0": 882,
+      "y0": 756,
+      "x1": 1120,
+      "y1": 801
+    },
+    {
+      "text": "answer is the number",
+      "x0": 885,
+      "y0": 791,
+      "x1": 1172,
+      "y1": 832
+    },
+    {
+      "text": "5=5",
+      "x0": 606,
+      "y0": 798,
+      "x1": 778,
+      "y1": 848
+    },
+    {
+      "text": "itself.",
+      "x0": 885,
+      "y0": 834,
+      "x1": 966,
+      "y1": 867
+    },
+    {
+      "text": "6x",
+      "x0": 612,
+      "y0": 840,
+      "x1": 742,
+      "y1": 877
+    },
+    {
+      "text": "6",
+      "x0": 748,
+      "y0": 842,
+      "x1": 772,
+      "y1": 867
+    },
+    {
+      "text": "We get the same fraction we started with.",
+      "x0": 107,
+      "y0": 878,
+      "x1": 780,
+      "y1": 933
+    },
+    {
+      "text": "What happens when we divide a",
+      "x0": 107,
+      "y0": 971,
+      "x1": 647,
+      "y1": 1031
+    },
+    {
+      "text": "fraction by itself?",
+      "x0": 107,
+      "y0": 1020,
+      "x1": 404,
+      "y1": 1073
+    },
+    {
+      "text": "REMEMBER",
+      "x0": 892,
+      "y0": 1024,
+      "x1": 1126,
+      "y1": 1073
+    },
+    {
+      "text": "Example:",
+      "x0": 107,
+      "y0": 1094,
+      "x1": 251,
+      "y1": 1143
+    },
+    {
+      "text": "When we divide a",
+      "x0": 897,
+      "y0": 1096,
+      "x1": 1138,
+      "y1": 1135
+    },
+    {
+      "text": "number by the same",
+      "x0": 894,
+      "y0": 1129,
+      "x1": 1176,
+      "y1": 1174
+    },
+    {
+      "text": "4+=x",
+      "x0": 109,
+      "y0": 1138,
+      "x1": 438,
+      "y1": 1212
+    },
+    {
+      "text": "number,the answer",
+      "x0": 895,
+      "y0": 1166,
+      "x1": 1170,
+      "y1": 1209
+    },
+    {
+      "text": "4",
+      "x0": 388,
+      "y0": 1188,
+      "x1": 424,
+      "y1": 1221
+    },
+    {
+      "text": "will be I.",
+      "x0": 899,
+      "y0": 1207,
+      "x1": 1032,
+      "y1": 1244
+    },
+    {
+      "text": "=4x==",
+      "x0": 113,
+      "y0": 1226,
+      "x1": 444,
+      "y1": 1291
+    },
+    {
+      "text": "Our answer is I",
+      "x0": 115,
+      "y0": 1321,
+      "x1": 378,
+      "y1": 1371
+    },
+    {
+      "text": "What happens when the dividend is zero?",
+      "x0": 112,
+      "y0": 1385,
+      "x1": 806,
+      "y1": 1472
+    },
+    {
+      "text": "REMEMBER",
+      "x0": 906,
+      "y0": 1401,
+      "x1": 1136,
+      "y1": 1455
+    },
+    {
+      "text": "The result of O divided",
+      "x0": 908,
+      "y0": 1473,
+      "x1": 1212,
+      "y1": 1521
+    },
+    {
+      "text": "Example:",
+      "x0": 117,
+      "y0": 1489,
+      "x1": 259,
+      "y1": 1534
+    },
+    {
+      "text": "by any number is",
+      "x0": 908,
+      "y0": 1512,
+      "x1": 1148,
+      "y1": 1559
+    },
+    {
+      "text": "03=0x4=0=0",
+      "x0": 111,
+      "y0": 1529,
+      "x1": 514,
+      "y1": 1602
+    },
+    {
+      "text": "always 0.",
+      "x0": 910,
+      "y0": 1550,
+      "x1": 1047,
+      "y1": 1596
+    },
+    {
+      "text": "-3",
+      "x0": 354,
+      "y0": 1574,
+      "x1": 447,
+      "y1": 1613
+    },
+    {
+      "text": "Fractions",
+      "x0": 1188,
+      "y0": 1729,
+      "x1": 1325,
+      "y1": 1781
+    },
+    {
+      "text": "OXFORD",
+      "x0": 58,
+      "y0": 1783,
+      "x1": 180,
+      "y1": 1838
+    }
+  ],
+  "verifiedSnippets": [
+    {
+      "id": "story-header",
+      "text": "Real-Life Story Sums",
+      "regionType": "heading",
+      "reviewStatus": "reference"
+    }
+  ],
+  "exerciseItems": [],
+  "exerciseResults": [],
+  "failures": [
+    {
+      "kind": "snippet",
+      "detail": "story-header: \"Real-Life Story Sums\"",
+      "category": "missing_snippet"
+    }
+  ],
+  "needsHumanVerification": true,
+  "metrics": {
+    "snippetHitRate": 0,
+    "exerciseExactRate": null,
+    "mergedVsReferenceCER": 39.25
+  }
+}

@@ -5,8 +5,8 @@
   "image": "p57-divide-grid.jpg",
   "models": {
     "paddleRec": "stock_en",
-    "paddleMs": 24315,
-    "tesseractMs": 18290
+    "paddleMs": 13884,
+    "tesseractMs": 15653
   },
   "paddleText": "7.Divide the following fractions\nc. 325 -15 -/0\nd. 84 � 35\nj. 4 5-13 -/0 35 j. 5 100/34 k.16 -4 58\nn. 5 100/34 k.16 n. -4 58\nReal-life Story Sums\nIf 4 children ate  of a bowl of ice cream then how much\nice cream of the bowl did each child have?\nA pile of Math textbooks on a table is exactly I4  cm high.\n2.\nIf each book is I cm thick, how many books make up the pile?\n3.Maham has 36 chocolates. She gives  of them to her best friend\nLaila, then shares the rest between herself and 4 other friends.\nHow many chocolates does Maham get?\nA piece of ribbon is 5 m long.If it is cut into 14 equal pieces,\n4.\nhow long will each piece be?\nA cupcake takes just  of an hour to bake. How many cup cakes\n5.\ncan be baked in I hours?\nFractions\nOXFORD",
   "tesseractText": "If 4 children ate § of a bowl of ice cream, then how much\n\nice cream of the bowl did each child have?\n\n2. A pile of Math textbooks on a table is exactly 14 2 cm high.\nIf each book is 1-5 cm thick, how many books make up the pile?\n\n3. Maham has 36 chocolates. She gives § of them to her best friend,\nLaila, then shares the rest between herself and 4 other friends.\nHow many chocolates does Maham get?\n\n4. A piece of ribbon is 5 2 m long. If it is cut into 14 equal pieces,\nhow long will each piece be?\n\n5. A cupcake takes just J of an hour to bake. How many cup cakes\ncan be baked in 15 hours?",

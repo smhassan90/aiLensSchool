@@ -1,0 +1,663 @@
+{
+  "pageId": "p48-grid",
+  "bookPage": 48,
+  "layout": "exercise_grid",
+  "image": "p48-grid.jpg",
+  "models": {
+    "paddleRec": "stock_en",
+    "paddleMs": 13142,
+    "tesseractMs": 14085
+  },
+  "paddleText": "Exercise 3b\nI.Fill in the blanks.\n> Exercise 3b\nFill in the blanks.\na. of12=\n3/7, 9\nb. x15\n35\n5 d. 33\n442/8\ne. 3x+3x=\n2. State whether the following statements are true or false.\na.ofis!.\n2 4\"6 6\n144 x81x 4\n81144 q 4/19 d.Half of a third is\n5\ne.Five thirds make 5/3\n3.Select the correct answer from the given options.\na.Three times one-ninth is\nb.Product of 59 and 3 1/515 is\n27 -3 3\n315 65/56 � 70 27/12\n13\n5\nA ? D\n45\n34 15/210\nin the lowest term.\nc.Express the product of 35\n-5 30/150\n12/20\nd. x3 315 7/12 � 60/21\nD 63\n6/72, 7/5 x10 is equal to\n70 7156\n14\nFractions\nOR",
+  "tesseractText": "1      » Exercise 3b [RE                              i\nER\n~ |. Fillin the blanks.           a\na. Lofl2=                   hl           N\n|       a3        ==              b 3xis.\na\nEe ss —       d.'Zx(2 S35\n4 ip              Cea\nEcht) (2 xiAy =                    p\n+ (GRR                         E\n2 Re ster the following statements are true or false.          :\nlial (=    )     b.-1    )\n144 81     =                         od\n© Tas Ya =) dHalfiof a third isl: (EE)\ne. Five thirds make 3  (        )\n3. Select the correct answer from the given options.\na. Three times one-ninth is\n!           lg          3\n0 27       (&) o       [c] 5       [0]\nb. Product of 2 2 and E3 is      .\niB          ou       0 ls          Bb\n[) =       Oi      © =        45\n112,\n¢. Express the product of 2 xox sgin the lowest term.           i\n|          ® 30\n2            12       (                  :\n0 2        (]  50         5           150     ]    ie\nd. #x3d xl                     5    al\ni       © 65       y\n20      (OT)         3 Ja\n{        06        0 5          3           ied            y\nbe 1        al to                 J          FE\ne. fox 10 is equ                 ao         0/1                 :\n0?         Q 14        RE a            dad",
+  "mergedText": "1 Exercise 3b [RE i\nI.Fill in the blanks.\n> Exercise 3b\nFill in the blanks.\na. of12=\n3/7, 9\nb. x15\n35\n5 d. 33\n442/8\ne. 3x+3x=\n2. State whether the following statements are true or false.\na.ofis!.\n2 4\"6\n14/8, 4/11, 8/4, 1/4, 4/5\ne.Five thirds make 5/3\n3.Select the correct answer from the given options.\na.Three times one-ninth is\nb.Product of 59 and 3 1/515 is\nb. Product of 2 and E3 is .\n27 -3\n315 65/56 � 70 27/12\n13\n5\nA ? D\n45\n34 15/210\n¢. Express the product of 2 xox sgin the lowest term. i\nc.Express the product of 35\n0 2 50 5 150 ie\n12/20\nd. x3 315 7/12 � 60/21\nD 63\n6/72, 7/5 x10 is equal to\n70 7156\n14\nFractions\nOR\na. Lofl2= hl N\nd. d. xl 5 al\ne. fox 10 is equ ao 0/1 :",
+  "paddleLines": [
+    {
+      "text": "Exercise 3b",
+      "x0": 208,
+      "y0": 47.5,
+      "x1": 448,
+      "y1": 76.5
+    },
+    {
+      "text": "I.Fill in the blanks.",
+      "x0": 166,
+      "y0": 82,
+      "x1": 542,
+      "y1": 110
+    },
+    {
+      "text": "> Exercise 3b",
+      "x0": 155,
+      "y0": 85,
+      "x1": 410,
+      "y1": 142
+    },
+    {
+      "text": "Fill in the blanks.",
+      "x0": 151,
+      "y0": 146,
+      "x1": 495,
+      "y1": 200
+    },
+    {
+      "text": "of12=",
+      "x0": 234,
+      "y0": 199,
+      "x1": 417,
+      "y1": 256
+    },
+    {
+      "text": "a.",
+      "x0": 195,
+      "y0": 218,
+      "x1": 237,
+      "y1": 259
+    },
+    {
+      "text": "3",
+      "x0": 243,
+      "y0": 235,
+      "x1": 272,
+      "y1": 276
+    },
+    {
+      "text": "x15",
+      "x0": 873,
+      "y0": 235,
+      "x1": 976,
+      "y1": 290
+    },
+    {
+      "text": "35",
+      "x0": 843,
+      "y0": 237,
+      "x1": 875,
+      "y1": 327
+    },
+    {
+      "text": "b.",
+      "x0": 797,
+      "y0": 243,
+      "x1": 829,
+      "y1": 282
+    },
+    {
+      "text": "9",
+      "x0": 913,
+      "y0": 268,
+      "x1": 957,
+      "y1": 328
+    },
+    {
+      "text": "33",
+      "x0": 813,
+      "y0": 281,
+      "x1": 1114,
+      "y1": 419
+    },
+    {
+      "text": "442",
+      "x0": 239,
+      "y0": 286,
+      "x1": 438,
+      "y1": 336
+    },
+    {
+      "text": "C.",
+      "x0": 199,
+      "y0": 305,
+      "x1": 229,
+      "y1": 344
+    },
+    {
+      "text": "8",
+      "x0": 307,
+      "y0": 319,
+      "x1": 364,
+      "y1": 373
+    },
+    {
+      "text": "d.",
+      "x0": 799,
+      "y0": 325,
+      "x1": 829,
+      "y1": 365
+    },
+    {
+      "text": "7",
+      "x0": 247,
+      "y0": 327,
+      "x1": 278,
+      "y1": 363
+    },
+    {
+      "text": "5",
+      "x0": 400,
+      "y0": 327,
+      "x1": 430,
+      "y1": 365
+    },
+    {
+      "text": "3x+3x=",
+      "x0": 220,
+      "y0": 357,
+      "x1": 582,
+      "y1": 475
+    },
+    {
+      "text": "e.",
+      "x0": 203,
+      "y0": 395,
+      "x1": 237,
+      "y1": 426
+    },
+    {
+      "text": "2. State whether the following statements are true or false.",
+      "x0": 147,
+      "y0": 458,
+      "x1": 1138,
+      "y1": 547
+    },
+    {
+      "text": "a.ofis!.",
+      "x0": 190,
+      "y0": 513,
+      "x1": 450,
+      "y1": 574
+    },
+    {
+      "text": "6",
+      "x0": 786,
+      "y0": 542,
+      "x1": 836,
+      "y1": 591
+    },
+    {
+      "text": "4\"6",
+      "x0": 317,
+      "y0": 547,
+      "x1": 438,
+      "y1": 600
+    },
+    {
+      "text": "2",
+      "x0": 245,
+      "y0": 560,
+      "x1": 276,
+      "y1": 591
+    },
+    {
+      "text": "144 x81x 4",
+      "x0": 238,
+      "y0": 594,
+      "x1": 510,
+      "y1": 656
+    },
+    {
+      "text": "4",
+      "x0": 541,
+      "y0": 616,
+      "x1": 571,
+      "y1": 649
+    },
+    {
+      "text": "d.Half of a third is",
+      "x0": 779,
+      "y0": 624,
+      "x1": 1152,
+      "y1": 679
+    },
+    {
+      "text": "81144",
+      "x0": 253,
+      "y0": 638,
+      "x1": 432,
+      "y1": 682
+    },
+    {
+      "text": "19",
+      "x0": 543,
+      "y0": 638,
+      "x1": 573,
+      "y1": 686
+    },
+    {
+      "text": "q",
+      "x0": 465,
+      "y0": 641,
+      "x1": 495,
+      "y1": 678
+    },
+    {
+      "text": "5",
+      "x0": 1116,
+      "y0": 655,
+      "x1": 1141,
+      "y1": 682
+    },
+    {
+      "text": "5",
+      "x0": 539,
+      "y0": 694,
+      "x1": 561,
+      "y1": 731
+    },
+    {
+      "text": "e.Five thirds make",
+      "x0": 197,
+      "y0": 696,
+      "x1": 529,
+      "y1": 741
+    },
+    {
+      "text": "3",
+      "x0": 537,
+      "y0": 723,
+      "x1": 567,
+      "y1": 764
+    },
+    {
+      "text": "3.Select the correct answer from the given options.",
+      "x0": 155,
+      "y0": 768,
+      "x1": 997,
+      "y1": 820
+    },
+    {
+      "text": "a.Three times one-ninth is",
+      "x0": 197,
+      "y0": 816,
+      "x1": 656,
+      "y1": 857
+    },
+    {
+      "text": "1",
+      "x0": 788,
+      "y0": 859,
+      "x1": 839,
+      "y1": 910
+    },
+    {
+      "text": "27",
+      "x0": 240,
+      "y0": 864,
+      "x1": 349,
+      "y1": 916
+    },
+    {
+      "text": "3",
+      "x0": 972,
+      "y0": 868,
+      "x1": 1055,
+      "y1": 914
+    },
+    {
+      "text": "-3",
+      "x0": 555,
+      "y0": 871,
+      "x1": 583,
+      "y1": 937
+    },
+    {
+      "text": "27",
+      "x0": 784,
+      "y0": 887,
+      "x1": 841,
+      "y1": 943
+    },
+    {
+      "text": "13",
+      "x0": 415,
+      "y0": 940,
+      "x1": 488,
+      "y1": 989
+    },
+    {
+      "text": "59",
+      "x0": 503,
+      "y0": 945,
+      "x1": 543,
+      "y1": 1026
+    },
+    {
+      "text": "b.Product of",
+      "x0": 194,
+      "y0": 946,
+      "x1": 442,
+      "y1": 1003
+    },
+    {
+      "text": "3",
+      "x0": 634,
+      "y0": 947,
+      "x1": 676,
+      "y1": 985
+    },
+    {
+      "text": "and",
+      "x0": 555,
+      "y0": 949,
+      "x1": 628,
+      "y1": 997
+    },
+    {
+      "text": "is",
+      "x0": 678,
+      "y0": 954,
+      "x1": 708,
+      "y1": 989
+    },
+    {
+      "text": "5",
+      "x0": 431,
+      "y0": 966,
+      "x1": 493,
+      "y1": 1028
+    },
+    {
+      "text": "65",
+      "x0": 630,
+      "y0": 968,
+      "x1": 676,
+      "y1": 1019
+    },
+    {
+      "text": "315",
+      "x0": 551,
+      "y0": 995,
+      "x1": 607,
+      "y1": 1100
+    },
+    {
+      "text": "515",
+      "x0": 789,
+      "y0": 1009,
+      "x1": 839,
+      "y1": 1100
+    },
+    {
+      "text": "?",
+      "x0": 505,
+      "y0": 1022,
+      "x1": 541,
+      "y1": 1071
+    },
+    {
+      "text": "A",
+      "x0": 247,
+      "y0": 1028,
+      "x1": 308,
+      "y1": 1073
+    },
+    {
+      "text": "D",
+      "x0": 980,
+      "y0": 1028,
+      "x1": 1006,
+      "y1": 1055
+    },
+    {
+      "text": "45",
+      "x0": 1024,
+      "y0": 1046,
+      "x1": 1066,
+      "y1": 1087
+    },
+    {
+      "text": "15",
+      "x0": 298,
+      "y0": 1057,
+      "x1": 350,
+      "y1": 1104
+    },
+    {
+      "text": "12",
+      "x0": 780,
+      "y0": 1092,
+      "x1": 819,
+      "y1": 1133
+    },
+    {
+      "text": "70",
+      "x0": 698,
+      "y0": 1094,
+      "x1": 744,
+      "y1": 1170
+    },
+    {
+      "text": "in the lowest term.",
+      "x0": 821,
+      "y0": 1098,
+      "x1": 1120,
+      "y1": 1141
+    },
+    {
+      "text": "c.Express the product of",
+      "x0": 198,
+      "y0": 1099,
+      "x1": 633,
+      "y1": 1169
+    },
+    {
+      "text": "56",
+      "x0": 632,
+      "y0": 1104,
+      "x1": 660,
+      "y1": 1164
+    },
+    {
+      "text": "x",
+      "x0": 662,
+      "y0": 1104,
+      "x1": 690,
+      "y1": 1143
+    },
+    {
+      "text": "35",
+      "x0": 774,
+      "y0": 1116,
+      "x1": 819,
+      "y1": 1172
+    },
+    {
+      "text": "-5",
+      "x0": 769,
+      "y0": 1148,
+      "x1": 830,
+      "y1": 1244
+    },
+    {
+      "text": "30",
+      "x0": 1026,
+      "y0": 1160,
+      "x1": 1076,
+      "y1": 1197
+    },
+    {
+      "text": "12",
+      "x0": 565,
+      "y0": 1170,
+      "x1": 616,
+      "y1": 1219
+    },
+    {
+      "text": "210",
+      "x0": 298,
+      "y0": 1176,
+      "x1": 348,
+      "y1": 1267
+    },
+    {
+      "text": "150",
+      "x0": 1022,
+      "y0": 1193,
+      "x1": 1084,
+      "y1": 1236
+    },
+    {
+      "text": "60",
+      "x0": 565,
+      "y0": 1201,
+      "x1": 612,
+      "y1": 1250
+    },
+    {
+      "text": "315",
+      "x0": 335,
+      "y0": 1251,
+      "x1": 426,
+      "y1": 1359
+    },
+    {
+      "text": "7",
+      "x0": 457,
+      "y0": 1261,
+      "x1": 489,
+      "y1": 1302
+    },
+    {
+      "text": "34",
+      "x0": 247,
+      "y0": 1265,
+      "x1": 306,
+      "y1": 1351
+    },
+    {
+      "text": "x3",
+      "x0": 300,
+      "y0": 1267,
+      "x1": 372,
+      "y1": 1328
+    },
+    {
+      "text": "d.",
+      "x0": 201,
+      "y0": 1272,
+      "x1": 258,
+      "y1": 1322
+    },
+    {
+      "text": "12",
+      "x0": 447,
+      "y0": 1293,
+      "x1": 499,
+      "y1": 1339
+    },
+    {
+      "text": "63",
+      "x0": 1012,
+      "y0": 1314,
+      "x1": 1070,
+      "y1": 1396
+    },
+    {
+      "text": "D",
+      "x0": 976,
+      "y0": 1331,
+      "x1": 1008,
+      "y1": 1368
+    },
+    {
+      "text": "20",
+      "x0": 545,
+      "y0": 1336,
+      "x1": 604,
+      "y1": 1392
+    },
+    {
+      "text": "6",
+      "x0": 249,
+      "y0": 1351,
+      "x1": 334,
+      "y1": 1407
+    },
+    {
+      "text": "21",
+      "x0": 549,
+      "y0": 1370,
+      "x1": 599,
+      "y1": 1419
+    },
+    {
+      "text": "x10 is equal to",
+      "x0": 280,
+      "y0": 1430,
+      "x1": 555,
+      "y1": 1485
+    },
+    {
+      "text": "7",
+      "x0": 257,
+      "y0": 1433,
+      "x1": 286,
+      "y1": 1471
+    },
+    {
+      "text": "e,",
+      "x0": 208,
+      "y0": 1437,
+      "x1": 238,
+      "y1": 1475
+    },
+    {
+      "text": "7156",
+      "x0": 1012,
+      "y0": 1460,
+      "x1": 1064,
+      "y1": 1539
+    },
+    {
+      "text": "5",
+      "x0": 257,
+      "y0": 1462,
+      "x1": 284,
+      "y1": 1514
+    },
+    {
+      "text": "70",
+      "x0": 740,
+      "y0": 1485,
+      "x1": 833,
+      "y1": 1526
+    },
+    {
+      "text": "72",
+      "x0": 294,
+      "y0": 1492,
+      "x1": 339,
+      "y1": 1579
+    },
+    {
+      "text": "14",
+      "x0": 496,
+      "y0": 1500,
+      "x1": 601,
+      "y1": 1552
+    },
+    {
+      "text": "Fractions",
+      "x0": 1191,
+      "y0": 1755,
+      "x1": 1323,
+      "y1": 1798
+    },
+    {
+      "text": "OR",
+      "x0": 1,
+      "y0": 1805,
+      "x1": 55,
+      "y1": 1853
+    }
+  ],
+  "verifiedSnippets": [],
+  "exerciseItems": [],
+  "exerciseResults": [],
+  "failures": [],
+  "needsHumanVerification": false,
+  "metrics": {
+    "snippetHitRate": null,
+    "exerciseExactRate": null,
+    "mergedVsReferenceCER": null
+  }
+}

@@ -1,0 +1,438 @@
+{
+  "pageId": "p45-mixed",
+  "bookPage": 45,
+  "layout": "lesson_body",
+  "image": "p45-mixed.jpg",
+  "models": {
+    "paddleRec": "stock_en",
+    "paddleMs": 20097,
+    "tesseractMs": 15110
+  },
+  "paddleText": "25/5, 3/5 of\n2. 35\n2/5 � 5 2/5, 3/5 � 6/25\n3. 6 3/4\n3/4, 5/6 t-53-15\nDo you notice a pattern?\nYes, once again we can multiply to find the product..\nFor example, 7x4=7x4=28\n8585 40\nIt is easy to solve multiplication sums containing mixed numbers,\nonce we remember that we must change each mixed number into an\nimproper fraction first.\nWe have a useful short cut which we can use for multiplying fractions.\nWe will first change mixed numbers into improper fractions:\n4x33\n2215=2215 45*34/54\n5x4\nIt's bothersome to multiply 22 by 15.\nSo, we look for a short cut. We notice that\nnumerator of the I and the denominator of the 2nd\n2215\n5x02/2 fraction have common factors\nfraction have common factors\nnumerator of the 2nd and the denominator of the I\n1x45/1x2\n+x2\n=13=33=16\n2\nFractions\nOXFORD",
+  "tesseractText": "Do you notice a pattern?\nYes, once again we can multiply to find the product.\n\nFor example, 7 x 4 = 7x4 _ 28\n8 5 8x5 40\n\nIt is easy to solve multiplication sums containing mixed numbers,\nonce we remember that we must change each mixed number into an\nimproper fraction first.\n\nWe have a useful short cut which we can use for multiplying fractions.\n\nFor example, we want to find the product of = x32.\nWe will first change mixed numbers into improper fractions:\n\n42 x 32.\n2,15 _ 22x15\n\n5° 4       5x4\n\nIt's bothersome to multiply 22 by 15.\n\nSo, we Look for a short cut. We notice that:\n\n1 and the denominator of the 2¢\n\nx15 numerator of the\n5x) fraction have common factors\n\nI                    i       of the 1\n11xG5° numerator of the 2° and the denominator\nfraction have common factors",
+  "mergedText": "2. 35\n3. 6 3/4\nDo you notice a pattern?\nYes, once again we can multiply to find the product..\nIt is easy to solve multiplication sums containing mixed numbers,\nonce we remember that we must change each mixed number into an\nimproper fraction first.\nWe have a useful short cut which we can use for multiplying fractions.\nWe will first change mixed numbers into improper fractions:\nfraction have common factors\nFractions",
+  "paddleLines": [
+    {
+      "text": "25",
+      "x0": 201,
+      "y0": 128,
+      "x1": 241,
+      "y1": 204
+    },
+    {
+      "text": "35",
+      "x0": 278,
+      "y0": 128,
+      "x1": 312,
+      "y1": 208
+    },
+    {
+      "text": "X",
+      "x0": 247,
+      "y0": 140,
+      "x1": 274,
+      "y1": 185
+    },
+    {
+      "text": "2.",
+      "x0": 145,
+      "y0": 144,
+      "x1": 175,
+      "y1": 179
+    },
+    {
+      "text": "3",
+      "x0": 428,
+      "y0": 224,
+      "x1": 465,
+      "y1": 266
+    },
+    {
+      "text": "of",
+      "x0": 579,
+      "y0": 229,
+      "x1": 682,
+      "y1": 297
+    },
+    {
+      "text": "2",
+      "x0": 553,
+      "y0": 233,
+      "x1": 583,
+      "y1": 276
+    },
+    {
+      "text": "2",
+      "x0": 716,
+      "y0": 247,
+      "x1": 748,
+      "y1": 284
+    },
+    {
+      "text": "3",
+      "x0": 788,
+      "y0": 249,
+      "x1": 817,
+      "y1": 286
+    },
+    {
+      "text": "6",
+      "x0": 867,
+      "y0": 249,
+      "x1": 901,
+      "y1": 286
+    },
+    {
+      "text": "5",
+      "x0": 432,
+      "y0": 262,
+      "x1": 463,
+      "y1": 301
+    },
+    {
+      "text": "5",
+      "x0": 553,
+      "y0": 268,
+      "x1": 581,
+      "y1": 307
+    },
+    {
+      "text": "5",
+      "x0": 636,
+      "y0": 272,
+      "x1": 666,
+      "y1": 311
+    },
+    {
+      "text": "5",
+      "x0": 714,
+      "y0": 280,
+      "x1": 746,
+      "y1": 317
+    },
+    {
+      "text": "5",
+      "x0": 788,
+      "y0": 280,
+      "x1": 817,
+      "y1": 319
+    },
+    {
+      "text": "25",
+      "x0": 861,
+      "y0": 282,
+      "x1": 905,
+      "y1": 325
+    },
+    {
+      "text": "5",
+      "x0": 207,
+      "y0": 342,
+      "x1": 245,
+      "y1": 387
+    },
+    {
+      "text": "3",
+      "x0": 280,
+      "y0": 344,
+      "x1": 312,
+      "y1": 381
+    },
+    {
+      "text": "3.",
+      "x0": 139,
+      "y0": 358,
+      "x1": 181,
+      "y1": 400
+    },
+    {
+      "text": "6",
+      "x0": 199,
+      "y0": 365,
+      "x1": 249,
+      "y1": 426
+    },
+    {
+      "text": "4",
+      "x0": 276,
+      "y0": 377,
+      "x1": 314,
+      "y1": 422
+    },
+    {
+      "text": "t-53-15",
+      "x0": 570,
+      "y0": 435,
+      "x1": 917,
+      "y1": 508
+    },
+    {
+      "text": "3",
+      "x0": 430,
+      "y0": 437,
+      "x1": 463,
+      "y1": 474
+    },
+    {
+      "text": "5",
+      "x0": 553,
+      "y0": 445,
+      "x1": 583,
+      "y1": 480
+    },
+    {
+      "text": "4",
+      "x0": 432,
+      "y0": 476,
+      "x1": 469,
+      "y1": 513
+    },
+    {
+      "text": "6",
+      "x0": 547,
+      "y0": 486,
+      "x1": 589,
+      "y1": 517
+    },
+    {
+      "text": "Do you notice a pattern?",
+      "x0": 143,
+      "y0": 542,
+      "x1": 565,
+      "y1": 591
+    },
+    {
+      "text": "Yes, once again we can multiply to find the product..",
+      "x0": 141,
+      "y0": 585,
+      "x1": 987,
+      "y1": 648
+    },
+    {
+      "text": "For example,7x4=7x4=28",
+      "x0": 135,
+      "y0": 643,
+      "x1": 688,
+      "y1": 702
+    },
+    {
+      "text": "8585",
+      "x0": 355,
+      "y0": 680,
+      "x1": 605,
+      "y1": 727
+    },
+    {
+      "text": "40",
+      "x0": 585,
+      "y0": 690,
+      "x1": 684,
+      "y1": 729
+    },
+    {
+      "text": "It is easy to solve multiplication sums containing mixed numbers,",
+      "x0": 137,
+      "y0": 738,
+      "x1": 1168,
+      "y1": 791
+    },
+    {
+      "text": "once we remember that we must change each mixed number into an",
+      "x0": 139,
+      "y0": 781,
+      "x1": 1229,
+      "y1": 834
+    },
+    {
+      "text": "improper fraction first.",
+      "x0": 143,
+      "y0": 830,
+      "x1": 515,
+      "y1": 867
+    },
+    {
+      "text": "We have a useful short cut which we can use for multiplying fractions.",
+      "x0": 141,
+      "y0": 882,
+      "x1": 1247,
+      "y1": 929
+    },
+    {
+      "text": "We will first change mixed numbers into improper fractions:",
+      "x0": 139,
+      "y0": 1009,
+      "x1": 1094,
+      "y1": 1059
+    },
+    {
+      "text": "4x33",
+      "x0": 135,
+      "y0": 1052,
+      "x1": 288,
+      "y1": 1125
+    },
+    {
+      "text": "45*34",
+      "x0": 143,
+      "y0": 1092,
+      "x1": 287,
+      "y1": 1141
+    },
+    {
+      "text": "2215=2215",
+      "x0": 141,
+      "y0": 1139,
+      "x1": 444,
+      "y1": 1200
+    },
+    {
+      "text": "5x4",
+      "x0": 308,
+      "y0": 1185,
+      "x1": 422,
+      "y1": 1223
+    },
+    {
+      "text": "54",
+      "x0": 151,
+      "y0": 1186,
+      "x1": 304,
+      "y1": 1223
+    },
+    {
+      "text": "It's bothersome to multiply 22 by 15.",
+      "x0": 141,
+      "y0": 1216,
+      "x1": 744,
+      "y1": 1279
+    },
+    {
+      "text": "So, we look for a short cut. We notice that",
+      "x0": 143,
+      "y0": 1271,
+      "x1": 838,
+      "y1": 1336
+    },
+    {
+      "text": "numerator of the I and the denominator of the 2nd",
+      "x0": 337,
+      "y0": 1325,
+      "x1": 1156,
+      "y1": 1404
+    },
+    {
+      "text": "2215",
+      "x0": 161,
+      "y0": 1361,
+      "x1": 290,
+      "y1": 1409
+    },
+    {
+      "text": "5x02",
+      "x0": 168,
+      "y0": 1382,
+      "x1": 312,
+      "y1": 1469
+    },
+    {
+      "text": "fraction have common factors",
+      "x0": 341,
+      "y0": 1383,
+      "x1": 820,
+      "y1": 1443
+    },
+    {
+      "text": "numerator of the 2nd and the denominator of the I",
+      "x0": 339,
+      "y0": 1459,
+      "x1": 1156,
+      "y1": 1544
+    },
+    {
+      "text": "1x45",
+      "x0": 150,
+      "y0": 1477,
+      "x1": 312,
+      "y1": 1557
+    },
+    {
+      "text": "fraction have common factors",
+      "x0": 343,
+      "y0": 1517,
+      "x1": 818,
+      "y1": 1583
+    },
+    {
+      "text": "+x2",
+      "x0": 137,
+      "y0": 1524,
+      "x1": 275,
+      "y1": 1600
+    },
+    {
+      "text": "=13=33=16",
+      "x0": 147,
+      "y0": 1611,
+      "x1": 489,
+      "y1": 1666
+    },
+    {
+      "text": "2",
+      "x0": 443,
+      "y0": 1642,
+      "x1": 495,
+      "y1": 1692
+    },
+    {
+      "text": "2",
+      "x0": 329,
+      "y0": 1649,
+      "x1": 380,
+      "y1": 1697
+    },
+    {
+      "text": "1x2",
+      "x0": 189,
+      "y0": 1660,
+      "x1": 284,
+      "y1": 1699
+    },
+    {
+      "text": "Fractions",
+      "x0": 1183,
+      "y0": 1742,
+      "x1": 1305,
+      "y1": 1779
+    },
+    {
+      "text": "OXFORD",
+      "x0": 84,
+      "y0": 1781,
+      "x1": 204,
+      "y1": 1830
+    }
+  ],
+  "verifiedSnippets": [
+    {
+      "id": "mixed-prod",
+      "text": "4 2/5 × 3 3/4",
+      "regionType": "math",
+      "reviewStatus": "reference"
+    }
+  ],
+  "exerciseItems": [],
+  "exerciseResults": [],
+  "failures": [
+    {
+      "kind": "snippet",
+      "detail": "mixed-prod: \"4 2/5 × 3 3/4\"",
+      "category": "mixed_number_split"
+    }
+  ],
+  "needsHumanVerification": true,
+  "metrics": {
+    "snippetHitRate": 0,
+    "exerciseExactRate": null,
+    "mergedVsReferenceCER": 31.53846153846154
+  }
+}

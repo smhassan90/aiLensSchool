@@ -1,0 +1,320 @@
+{
+  "pageId": "p52-rules",
+  "bookPage": 52,
+  "layout": "lesson_body",
+  "image": "p52-rules.jpg",
+  "models": {
+    "paddleRec": "stock_en",
+    "paddleMs": 11889,
+    "tesseractMs": 12058
+  },
+  "paddleText": "I.Fill in the blanks.\n>Exercise 3a\n.Fill in the blanks. e.3-5-10-\na.\nb.-22=\n6+ =\nd.3++=\n.-15-16-\n2.State whether the following statements are true or false.\na.3f+4-5\n) b.-39-30\nc.13-3-9\nd.2+3+4-1\ne.3-34-2-2\n2p3012-9li858\n3.Select the correct answer from the given options.\na.\n-49 013/0\n30\nis equal to 033/39\n85/05\n+30\nC\nd.2 2-5-is equal to\n. 2-10-expressed in simplest form is 30 0/010\n015\nFractions\nOXFORD",
+  "tesseractText": "PP                                           be.\nEb » Exercise 3a                                                 So\n1. Fill in the blanks,                           -\n4   pe                                          B\ngo Thy = ht\n: i    2]          fin\n|     Es —— =f         dd+3s+ls              |\n6 _ 1 _\n|        of if F—                                                 |\n|\n2 pe whether the following statements are true or false.\nLgl =H5\nfc 4s = Ca    bf-%H=8C        |\nig 3. 9                                                       |\n17 ET 7     df+lel-B¢\nBRN: 21 Sis)\nBY 15 ~37 S37 Cy\n3. Select the correct answer from the given options.\na. +a is equal to                   -\n12          12         30         30\n0 15       0 {5      3      ® 3                  |\n26 _ 4\nb 26-4                                            |\n57°14\n22        14      ° 2\n04       0%       °5        57                 |\n7A ed 1\ncg +5+3g is TE       as       on\n[) 1       0 3         5         15\n[at     L to                                    |\nd. 23 - 1% - &% is equal\nB's 15\n5       ° 5      ©0\n6          [1          45\n|        05       03              y\nin si     form is\nkel      ssed in simplest                                       |\n|      e. 23- Iyp  gh      ye      03                |\n2      [:)           2                           4\n|       014       15                              ¥\nea                                                 Jad\n45 5:                                     Lo",
+  "mergedText": "1. Fill in the blanks, -\nEb » Exercise 3a So\n.Fill in the blanks. e.3-5-10-\na.\nb.-22=\n6+ =\nd.3++=\n.-15-16-\n2.State whether the following statements are true or false.\na.3f+4-5\n) b.-39-30\n1/2, 3/3, 3/4, 9/1\ne.3-34-2-2\n2p3012-9li858\n3.Select the correct answer from the given options.\na.\n-49 013/0\n30\nis equal to 033/39\n05/15\n+30\nC\nd.2-5-is equal to\n. 2-10-expressed in simplest form is 30 0/010\nFractions\nOXFORD\nfc 4s = Ca bf-%H=8C |\n5/22, 7/14, 14/2\n04/5, 05/5",
+  "paddleLines": [
+    {
+      "text": "I.Fill in the blanks.",
+      "x0": 143,
+      "y0": 107.5,
+      "x1": 492,
+      "y1": 139
+    },
+    {
+      "text": ">Exercise 3a",
+      "x0": 135,
+      "y0": 145,
+      "x1": 384,
+      "y1": 197
+    },
+    {
+      "text": ".Fill in the blanks.",
+      "x0": 121,
+      "y0": 190,
+      "x1": 454,
+      "y1": 257
+    },
+    {
+      "text": "e.3-5-10-",
+      "x0": 173,
+      "y0": 211.5,
+      "x1": 467,
+      "y1": 260
+    },
+    {
+      "text": "a.",
+      "x0": 171,
+      "y0": 255,
+      "x1": 209,
+      "y1": 297
+    },
+    {
+      "text": "b.-22=",
+      "x0": 712,
+      "y0": 278,
+      "x1": 919,
+      "y1": 363
+    },
+    {
+      "text": "6+",
+      "x0": 203,
+      "y0": 315,
+      "x1": 276,
+      "y1": 389
+    },
+    {
+      "text": "=",
+      "x0": 352,
+      "y0": 325,
+      "x1": 471,
+      "y1": 402
+    },
+    {
+      "text": "d.3++=",
+      "x0": 719,
+      "y0": 353,
+      "x1": 1031,
+      "y1": 435
+    },
+    {
+      "text": ".-15-16-",
+      "x0": 152,
+      "y0": 382,
+      "x1": 429,
+      "y1": 480
+    },
+    {
+      "text": "2.State whether the following statements are true or false.",
+      "x0": 120,
+      "y0": 473,
+      "x1": 1041,
+      "y1": 574
+    },
+    {
+      "text": "a.3f+4-5",
+      "x0": 156,
+      "y0": 524,
+      "x1": 464,
+      "y1": 605
+    },
+    {
+      "text": "b.-39-30",
+      "x0": 705,
+      "y0": 549,
+      "x1": 991,
+      "y1": 638
+    },
+    {
+      "text": ")",
+      "x0": 579,
+      "y0": 570,
+      "x1": 595,
+      "y1": 591
+    },
+    {
+      "text": "c.13-3-9",
+      "x0": 150,
+      "y0": 602,
+      "x1": 454,
+      "y1": 681
+    },
+    {
+      "text": "d.2+3+4-1",
+      "x0": 714,
+      "y0": 634,
+      "x1": 1020,
+      "y1": 709
+    },
+    {
+      "text": "e.3-34-2-2",
+      "x0": 152,
+      "y0": 678,
+      "x1": 498,
+      "y1": 761
+    },
+    {
+      "text": "2p3012-9li858",
+      "x0": 863,
+      "y0": 756,
+      "x1": 1138,
+      "y1": 787
+    },
+    {
+      "text": "3.Select the correct answer from the given options.",
+      "x0": 113,
+      "y0": 761,
+      "x1": 911,
+      "y1": 834
+    },
+    {
+      "text": "a.",
+      "x0": 151,
+      "y0": 821,
+      "x1": 195,
+      "y1": 869
+    },
+    {
+      "text": "013",
+      "x0": 430,
+      "y0": 875,
+      "x1": 547,
+      "y1": 962
+    },
+    {
+      "text": "30",
+      "x0": 658,
+      "y0": 877,
+      "x1": 772,
+      "y1": 966
+    },
+    {
+      "text": "-49",
+      "x0": 233,
+      "y0": 952,
+      "x1": 326,
+      "y1": 1028
+    },
+    {
+      "text": "0",
+      "x0": 428,
+      "y0": 1013,
+      "x1": 543,
+      "y1": 1102
+    },
+    {
+      "text": "033",
+      "x0": 877,
+      "y0": 1015,
+      "x1": 986,
+      "y1": 1104
+    },
+    {
+      "text": "85",
+      "x0": 185,
+      "y0": 1098,
+      "x1": 229,
+      "y1": 1168
+    },
+    {
+      "text": "is equal to",
+      "x0": 357,
+      "y0": 1113,
+      "x1": 539,
+      "y1": 1157
+    },
+    {
+      "text": "+30",
+      "x0": 286,
+      "y0": 1121,
+      "x1": 361,
+      "y1": 1172
+    },
+    {
+      "text": "39",
+      "x0": 927,
+      "y0": 1160,
+      "x1": 976,
+      "y1": 1232
+    },
+    {
+      "text": "D",
+      "x0": 891,
+      "y0": 1174,
+      "x1": 923,
+      "y1": 1211
+    },
+    {
+      "text": "C",
+      "x0": 672,
+      "y0": 1180,
+      "x1": 698,
+      "y1": 1205
+    },
+    {
+      "text": "2-5-is equal to",
+      "x0": 177,
+      "y0": 1244,
+      "x1": 579,
+      "y1": 1316
+    },
+    {
+      "text": "d.2",
+      "x0": 155,
+      "y0": 1260,
+      "x1": 207,
+      "y1": 1296
+    },
+    {
+      "text": "05",
+      "x0": 181,
+      "y0": 1304,
+      "x1": 294,
+      "y1": 1396
+    },
+    {
+      "text": "0",
+      "x0": 884,
+      "y0": 1307,
+      "x1": 958,
+      "y1": 1354
+    },
+    {
+      "text": "2-10-expressed in simplest form is",
+      "x0": 174,
+      "y0": 1376,
+      "x1": 852,
+      "y1": 1464
+    },
+    {
+      "text": ".",
+      "x0": 159,
+      "y0": 1409,
+      "x1": 205,
+      "y1": 1438
+    },
+    {
+      "text": "010",
+      "x0": 869,
+      "y0": 1421,
+      "x1": 972,
+      "y1": 1518
+    },
+    {
+      "text": "30",
+      "x0": 650,
+      "y0": 1434,
+      "x1": 758,
+      "y1": 1514
+    },
+    {
+      "text": "015",
+      "x0": 415,
+      "y0": 1444,
+      "x1": 534,
+      "y1": 1532
+    },
+    {
+      "text": "Fractions",
+      "x0": 1102,
+      "y0": 1744,
+      "x1": 1227,
+      "y1": 1780
+    },
+    {
+      "text": "OXFORD",
+      "x0": 23,
+      "y0": 1756,
+      "x1": 136,
+      "y1": 1824
+    }
+  ],
+  "verifiedSnippets": [],
+  "exerciseItems": [],
+  "exerciseResults": [],
+  "failures": [],
+  "needsHumanVerification": false,
+  "metrics": {
+    "snippetHitRate": null,
+    "exerciseExactRate": null,
+    "mergedVsReferenceCER": null
+  }
+}

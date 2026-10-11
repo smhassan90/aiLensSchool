@@ -1,0 +1,481 @@
+{
+  "pageId": "p46-brackets",
+  "bookPage": 46,
+  "layout": "lesson_body",
+  "image": "p46-brackets.jpg",
+  "models": {
+    "paddleRec": "stock_en",
+    "paddleMs": 16969,
+    "tesseractMs": 15958
+  },
+  "paddleText": "Examples:\n5 � 566 11x1/56\n2. 2\nI. *2\n52\nX\n+2\n= 32, 30\nMultiplication of two or more fractions involving brackets\nLook at the multiplication of 3 whole numbers.\n2x3x5\n=23x5=6x5=30\n=2x3x5=2x15=30\n=2x5x3=10x3=30\ni svioz of pzo\nThe same rule can be applied to fractions.\nxx\n2, 5\n2 X -Tm -5 - -5 =\nHbidw o norle Juigau.ogyod\n30\nI arbni.ortnow aw..elqmcx\n-2 -T5 -2 +\nX -T5 X 1 15/3 � 30/30\nUmaun bexi epaprb tanit\n-13\nSome more examples\nx5) a.amoa9dn\n14\n3\nNAY\n5 =23\nI b- 412\n-2\npd.noint\nFractions.",
+  "tesseractText": "re ade   a     1   Biss.\nes:            p—\"     :\nES          5). ably      3\n=          BN 11 rea]\n3  =1 x2           Bcd oy   :   -\nJ   ia Zl      SRIZIBE 112    L\neo 2         Gi HED      :\nMultiplication of two or more fractions involving brackets\nLook at the multiplication of 3 whole numbers.\n2x3x5\n=(@x3)x5 =6x5 =30\n=2x(3x5 =2x15=30\n=@x5)x3 =10x3=30\nThe same rule can be applied to fractions.\ni x |\nTNE                i\nBm\nbe xT  Shee sn\n= i CO RO |  |  |\nBho Lo\n    . 3 5) a 0\n=oxhxl=, |_|\noe E\nSome more examples:\nd= 3 4\nI, Csx63)x2\n:     3 ig       2 §xExsl)       3\nb    Ex) a              3 2 5       4\n\"  3 “7 *3m        sly. or\nia           ax Gx2)\n2    3     =\nRE    J              I        a8   a\nwe es Bi    dots      \"           E >                    I\nea aL     is\nTe 5 [20x svnrt 1 al\n-—  BEE Ten of",
+  "mergedText": "Examples:\n2. 2\nMultiplication of two or more fractions involving brackets\nLook at the multiplication of 3 whole numbers.\nThe same rule can be applied to fractions.\nHbidw o norle Juigau.ogyod\nI arbni.ortnow aw..elqmcx\nUmaun bexi epaprb tanit\nSome more examples\nFractions.\nd= 3 4",
+  "paddleLines": [
+    {
+      "text": "566",
+      "x0": 857,
+      "y0": 105,
+      "x1": 947,
+      "y1": 324
+    },
+    {
+      "text": "Examples:",
+      "x0": 62,
+      "y0": 113,
+      "x1": 221,
+      "y1": 152
+    },
+    {
+      "text": "5",
+      "x0": 750,
+      "y0": 129,
+      "x1": 817,
+      "y1": 233
+    },
+    {
+      "text": "2.",
+      "x0": 676,
+      "y0": 150,
+      "x1": 718,
+      "y1": 192
+    },
+    {
+      "text": "2",
+      "x0": 750,
+      "y0": 152,
+      "x1": 772,
+      "y1": 181
+    },
+    {
+      "text": "*2",
+      "x0": 197,
+      "y0": 167,
+      "x1": 262,
+      "y1": 212
+    },
+    {
+      "text": "I.",
+      "x0": 66,
+      "y0": 171,
+      "x1": 107,
+      "y1": 212
+    },
+    {
+      "text": "52",
+      "x0": 772,
+      "y0": 191,
+      "x1": 865,
+      "y1": 404
+    },
+    {
+      "text": "11x1",
+      "x0": 972,
+      "y0": 198,
+      "x1": 1118,
+      "y1": 247
+    },
+    {
+      "text": "X",
+      "x0": 844,
+      "y0": 215,
+      "x1": 876,
+      "y1": 279
+    },
+    {
+      "text": "56",
+      "x0": 996,
+      "y0": 242,
+      "x1": 1104,
+      "y1": 292
+    },
+    {
+      "text": "+2",
+      "x0": 219,
+      "y0": 246,
+      "x1": 286,
+      "y1": 297
+    },
+    {
+      "text": "32",
+      "x0": 339,
+      "y0": 318,
+      "x1": 424,
+      "y1": 417
+    },
+    {
+      "text": "=",
+      "x0": 239,
+      "y0": 334,
+      "x1": 268,
+      "y1": 373
+    },
+    {
+      "text": "30",
+      "x0": 923,
+      "y0": 336,
+      "x1": 976,
+      "y1": 385
+    },
+    {
+      "text": "Multiplication of two or more fractions involving brackets",
+      "x0": 79,
+      "y0": 468,
+      "x1": 1200,
+      "y1": 555
+    },
+    {
+      "text": "Look at the multiplication of 3 whole numbers.",
+      "x0": 85,
+      "y0": 548,
+      "x1": 871,
+      "y1": 611
+    },
+    {
+      "text": "2x3x5",
+      "x0": 147,
+      "y0": 604,
+      "x1": 305,
+      "y1": 654
+    },
+    {
+      "text": "=23x5=6x5=30",
+      "x0": 155,
+      "y0": 649,
+      "x1": 613,
+      "y1": 696
+    },
+    {
+      "text": "=2x3x5=2x15=30",
+      "x0": 163,
+      "y0": 700,
+      "x1": 607,
+      "y1": 737
+    },
+    {
+      "text": "=2x5x3=10x3=30",
+      "x0": 161,
+      "y0": 744,
+      "x1": 607,
+      "y1": 781
+    },
+    {
+      "text": "i svioz of pzo",
+      "x0": 891,
+      "y0": 769,
+      "x1": 1221,
+      "y1": 813
+    },
+    {
+      "text": "The same rule can be applied to fractions.",
+      "x0": 99,
+      "y0": 801,
+      "x1": 782,
+      "y1": 850
+    },
+    {
+      "text": "xx",
+      "x0": 165,
+      "y0": 849,
+      "x1": 348,
+      "y1": 894
+    },
+    {
+      "text": "2",
+      "x0": 173,
+      "y0": 886,
+      "x1": 205,
+      "y1": 923
+    },
+    {
+      "text": "5",
+      "x0": 320,
+      "y0": 888,
+      "x1": 344,
+      "y1": 921
+    },
+    {
+      "text": "-Tm",
+      "x0": 265,
+      "y0": 926,
+      "x1": 316,
+      "y1": 1012
+    },
+    {
+      "text": "Hbidw o norle Juigau.ogyod",
+      "x0": 712,
+      "y0": 929,
+      "x1": 1241,
+      "y1": 972
+    },
+    {
+      "text": "-5",
+      "x0": 344,
+      "y0": 933,
+      "x1": 384,
+      "y1": 1013
+    },
+    {
+      "text": "2",
+      "x0": 205,
+      "y0": 937,
+      "x1": 239,
+      "y1": 1003
+    },
+    {
+      "text": "-",
+      "x0": 432,
+      "y0": 939,
+      "x1": 465,
+      "y1": 1011
+    },
+    {
+      "text": "-5",
+      "x0": 509,
+      "y0": 939,
+      "x1": 543,
+      "y1": 1013
+    },
+    {
+      "text": "X",
+      "x0": 251,
+      "y0": 952,
+      "x1": 264,
+      "y1": 976
+    },
+    {
+      "text": "=",
+      "x0": 557,
+      "y0": 957,
+      "x1": 580,
+      "y1": 983
+    },
+    {
+      "text": "30",
+      "x0": 593,
+      "y0": 970,
+      "x1": 636,
+      "y1": 1011
+    },
+    {
+      "text": "arbni.ortnow aw..elqmcx",
+      "x0": 698,
+      "y0": 1006,
+      "x1": 1221,
+      "y1": 1062
+    },
+    {
+      "text": "-2",
+      "x0": 199,
+      "y0": 1017,
+      "x1": 251,
+      "y1": 1096
+    },
+    {
+      "text": "-2",
+      "x0": 424,
+      "y0": 1017,
+      "x1": 463,
+      "y1": 1098
+    },
+    {
+      "text": "-T5",
+      "x0": 334,
+      "y0": 1020,
+      "x1": 382,
+      "y1": 1100
+    },
+    {
+      "text": "I",
+      "x0": 511,
+      "y0": 1026,
+      "x1": 541,
+      "y1": 1061
+    },
+    {
+      "text": "+",
+      "x0": 463,
+      "y0": 1037,
+      "x1": 500,
+      "y1": 1073
+    },
+    {
+      "text": "15",
+      "x0": 505,
+      "y0": 1063,
+      "x1": 549,
+      "y1": 1100
+    },
+    {
+      "text": "30",
+      "x0": 589,
+      "y0": 1067,
+      "x1": 638,
+      "y1": 1104
+    },
+    {
+      "text": "Umaun bexi epaprb tanit",
+      "x0": 723,
+      "y0": 1071,
+      "x1": 1178,
+      "y1": 1126
+    },
+    {
+      "text": "-T5",
+      "x0": 268,
+      "y0": 1097,
+      "x1": 315,
+      "y1": 1177
+    },
+    {
+      "text": "-13",
+      "x0": 341,
+      "y0": 1103,
+      "x1": 393,
+      "y1": 1183
+    },
+    {
+      "text": "1",
+      "x0": 424,
+      "y0": 1104,
+      "x1": 481,
+      "y1": 1188
+    },
+    {
+      "text": "X",
+      "x0": 312,
+      "y0": 1118,
+      "x1": 340,
+      "y1": 1164
+    },
+    {
+      "text": "X",
+      "x0": 251,
+      "y0": 1125,
+      "x1": 264,
+      "y1": 1147
+    },
+    {
+      "text": "3",
+      "x0": 517,
+      "y0": 1149,
+      "x1": 547,
+      "y1": 1186
+    },
+    {
+      "text": "30",
+      "x0": 597,
+      "y0": 1153,
+      "x1": 642,
+      "y1": 1192
+    },
+    {
+      "text": "Some more examples",
+      "x0": 108,
+      "y0": 1198,
+      "x1": 446,
+      "y1": 1264
+    },
+    {
+      "text": "x5)",
+      "x0": 848,
+      "y0": 1299,
+      "x1": 950,
+      "y1": 1360
+    },
+    {
+      "text": "a.amoa9dn",
+      "x0": 984,
+      "y0": 1322,
+      "x1": 1201,
+      "y1": 1353
+    },
+    {
+      "text": "14",
+      "x0": 907,
+      "y0": 1335,
+      "x1": 943,
+      "y1": 1392
+    },
+    {
+      "text": "3",
+      "x0": 948,
+      "y0": 1382,
+      "x1": 997,
+      "y1": 1432
+    },
+    {
+      "text": "NAY",
+      "x0": 928,
+      "y0": 1408,
+      "x1": 1022,
+      "y1": 1544
+    },
+    {
+      "text": "5",
+      "x0": 259,
+      "y0": 1469,
+      "x1": 312,
+      "y1": 1594
+    },
+    {
+      "text": "=23",
+      "x0": 387,
+      "y0": 1480,
+      "x1": 501,
+      "y1": 1578
+    },
+    {
+      "text": "b-",
+      "x0": 773,
+      "y0": 1515,
+      "x1": 826,
+      "y1": 1603
+    },
+    {
+      "text": "412",
+      "x0": 863,
+      "y0": 1526,
+      "x1": 905,
+      "y1": 1609
+    },
+    {
+      "text": "I",
+      "x0": 748,
+      "y0": 1532,
+      "x1": 768,
+      "y1": 1563
+    },
+    {
+      "text": "-2",
+      "x0": 776,
+      "y0": 1584,
+      "x1": 807,
+      "y1": 1670
+    },
+    {
+      "text": "pd.noint",
+      "x0": 878,
+      "y0": 1643,
+      "x1": 1081,
+      "y1": 1698
+    },
+    {
+      "text": "Fractions.",
+      "x0": 56,
+      "y0": 1816,
+      "x1": 189,
+      "y1": 1865
+    }
+  ],
+  "verifiedSnippets": [],
+  "exerciseItems": [],
+  "exerciseResults": [],
+  "failures": [],
+  "needsHumanVerification": false,
+  "metrics": {
+    "snippetHitRate": null,
+    "exerciseExactRate": null,
+    "mergedVsReferenceCER": null
+  }
+}

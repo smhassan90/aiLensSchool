@@ -1,0 +1,368 @@
+{
+  "pageId": "p55-exercise-3c",
+  "bookPage": 55,
+  "layout": "exercise_panel",
+  "image": "p55-exercise-3c.jpg",
+  "models": {
+    "paddleRec": "stock_en",
+    "paddleMs": 13123,
+    "tesseractMs": 12962
+  },
+  "paddleText": "REMEMDER\nStep 2 Take the reciprocal f the second fraction and change the division (\nsign to the multiplication (x) sign.\nremember\nRules for Division of Fractions\nStep 2Tke the reciprocaf the second fraction and change the division ( Step I: First fraction is kept as it is.\nsign to the multiplication (x sign.\nStep 3:Multiply the numerators.\nStep4: Multiply the denominators.\nStep 5: Simplify by cancellation if needed.\nDivision of a fraction by a whole number.\nStep I Take the reciprocal of the whole number.\nStep 2 Multiply the numerators of the fractions.\nStep 3 Multiply the denominators of the fractions.\nStep 4 Simplify the fraction to the lowest term if necessary.\nExample:\nIMPORTANT\n2\nDivision by a fraction\nL + 1x\n1/8 is the same as\n4, 2 4x2 1\n1/8 multiplication by its\nt reciprocal.\nDivision of a whole number by a fraction\nUsing words to help us, we can easily solve this division.\n4\nWe ask ourselves: how many quarters make one whole?\nThe answer is easy:4 quarters make I whole.\n=+1\n4\nisthe same asx4=14=4=4 DOOO-\nx\n4 quarters make I whole\n3Fractions",
+  "tesseractText": "ie                     co         E\ni       md                              +         =\n3           REMEMBER                                           Ee        oe\n2            I mutes for Division of Fractions                                     b\nEh   ion is kept as it is:     .          i   =\nEo arte of the second fraction and change the division (3)\nsign to the ‘multiplication () sign                                     v\nstep 3 Multiply the numeretors.                                                1\nStep 4: Multiply the denomindtofs\nctep 5: Simplify by cancellation if needed.                                         |\nDivision of a fraction by a whole number\nStep | Take the reciprocal of the whole number.\nStep2 Multiply the numerators of the fractions.\nply\nstep3 Multiply the denominators of the fractions.                     :\nstep 4 Simplify the fraction to the lowest term if necessary.\nExample:                                                           |   g\nI,\n2                                IMPORTANT\nSo le]  A |   d     Division br    y\ndxlo       lls                                      y a fraction\n4 2 4x2\" 8   i      g      is the same as\nIn         iy            multiplication by its\nreciprocal.\nDivision of a whole\nUsing words to help pi by a fraction\n+L we can easily solve this division.\nWe ask ourselves:\n: how many\nquarters\nThe answer is easy: 4 quarte             is soe whole?\n1+ + =                  rs make | whole,\nis the same as | x 4 = | x            ~            a\naxbolxa_ 4                 ND\n1        fost a            AAA\nERT =n       COCO —\nEl                                         4 quarters make | whole     a\n|                                                                                4\n                             :                              4",
+  "mergedText": "REMEMDER\nStep 2 Take the reciprocal f the second fraction and change the division (\nsign to the multiplication (x) sign.\nremember\nRules for Division of Fractions\nStep 2Tke the reciprocaf the second fraction and change the division ( Step I: First fraction is kept as it is.\nsign to the multiplication (x sign.\nStep 3:Multiply the numerators.\nStep4: Multiply the denominators.\nStep 5: Simplify by cancellation if needed.\nDivision of a fraction by a whole number.\nStep I Take the reciprocal of the whole number.\nStep 2 Multiply the numerators of the fractions.\nStep 3 Multiply the denominators of the fractions.\nStep 4 Simplify the fraction to the lowest term if necessary.\nExample:\nIMPORTANT\n2\nDivision by a fraction\nL + 1x\n1/8 is the same as\n4, 2 4x2 1\n1/8 multiplication by its\nt reciprocal.\nDivision of a whole number by a fraction\nUsing words to help us, we can easily solve this division.\n4\nWe ask ourselves: how many quarters make one whole?\nThe answer is easy:4 quarters make I whole.\n=+1\n4\nisthe same asx4=14=4=4 DOOO-\nx\n4 quarters make I whole\n3Fractions",
+  "paddleLines": [
+    {
+      "text": "REMEMDER",
+      "x0": 234,
+      "y0": 123.5,
+      "x1": 462,
+      "y1": 156.5
+    },
+    {
+      "text": "Step 2 Take the reciprocal f the second fraction and change the division (",
+      "x0": 227,
+      "y0": 153,
+      "x1": 1320,
+      "y1": 227
+    },
+    {
+      "text": "sign to the multiplication (x) sign.",
+      "x0": 330,
+      "y0": 197,
+      "x1": 795,
+      "y1": 237
+    },
+    {
+      "text": "remember",
+      "x0": 211,
+      "y0": 224,
+      "x1": 423,
+      "y1": 285
+    },
+    {
+      "text": "Rules for Division of Fractions",
+      "x0": 212,
+      "y0": 265,
+      "x1": 626,
+      "y1": 340
+    },
+    {
+      "text": "Step 2Tke the reciprocaf the second fraction and change the division (",
+      "x0": 207,
+      "y0": 276,
+      "x1": 1205,
+      "y1": 414
+    },
+    {
+      "text": "Step I: First fraction is kept as it is.",
+      "x0": 216,
+      "y0": 298,
+      "x1": 640,
+      "y1": 372
+    },
+    {
+      "text": "sign to the multiplication (x sign.",
+      "x0": 293,
+      "y0": 358,
+      "x1": 723,
+      "y1": 433
+    },
+    {
+      "text": "Step 3:Multiply the numerators.",
+      "x0": 216,
+      "y0": 401,
+      "x1": 618,
+      "y1": 472
+    },
+    {
+      "text": "Step4: Multiply the denominators.",
+      "x0": 218,
+      "y0": 432,
+      "x1": 647,
+      "y1": 504
+    },
+    {
+      "text": "Step 5: Simplify by cancellation if needed.",
+      "x0": 220,
+      "y0": 462,
+      "x1": 741,
+      "y1": 537
+    },
+    {
+      "text": "Division of a fraction by a whole number.",
+      "x0": 194,
+      "y0": 575,
+      "x1": 866,
+      "y1": 656
+    },
+    {
+      "text": "Step I Take the reciprocal of the whole number.",
+      "x0": 194,
+      "y0": 613,
+      "x1": 937,
+      "y1": 695
+    },
+    {
+      "text": "Step 2 Multiply the numerators of the fractions.",
+      "x0": 194,
+      "y0": 658,
+      "x1": 929,
+      "y1": 731
+    },
+    {
+      "text": "Step 3 Multiply the denominators of the fractions.",
+      "x0": 194,
+      "y0": 697,
+      "x1": 969,
+      "y1": 772
+    },
+    {
+      "text": "Step 4 Simplify the fraction to the lowest term if necessary.",
+      "x0": 194,
+      "y0": 732,
+      "x1": 1116,
+      "y1": 811
+    },
+    {
+      "text": "Example:",
+      "x0": 203,
+      "y0": 863,
+      "x1": 328,
+      "y1": 900
+    },
+    {
+      "text": "IMPORTANT",
+      "x0": 898,
+      "y0": 878,
+      "x1": 1182,
+      "y1": 928
+    },
+    {
+      "text": "2",
+      "x0": 197,
+      "y0": 895,
+      "x1": 296,
+      "y1": 951
+    },
+    {
+      "text": "Division by a fraction",
+      "x0": 924,
+      "y0": 946,
+      "x1": 1223,
+      "y1": 988
+    },
+    {
+      "text": "1x",
+      "x0": 380,
+      "y0": 970,
+      "x1": 459,
+      "y1": 1003
+    },
+    {
+      "text": "1",
+      "x0": 499,
+      "y0": 974,
+      "x1": 515,
+      "y1": 995
+    },
+    {
+      "text": "+",
+      "x0": 266,
+      "y0": 975,
+      "x1": 316,
+      "y1": 1023
+    },
+    {
+      "text": "L",
+      "x0": 243,
+      "y0": 976,
+      "x1": 290,
+      "y1": 1012
+    },
+    {
+      "text": "is the same as",
+      "x0": 929,
+      "y0": 989,
+      "x1": 1130,
+      "y1": 1020
+    },
+    {
+      "text": "4x2",
+      "x0": 375,
+      "y0": 1000,
+      "x1": 460,
+      "y1": 1039
+    },
+    {
+      "text": "8",
+      "x0": 497,
+      "y0": 1001,
+      "x1": 521,
+      "y1": 1030
+    },
+    {
+      "text": "2",
+      "x0": 310,
+      "y0": 1003,
+      "x1": 340,
+      "y1": 1038
+    },
+    {
+      "text": "4",
+      "x0": 249,
+      "y0": 1011,
+      "x1": 274,
+      "y1": 1038
+    },
+    {
+      "text": "multiplication by its",
+      "x0": 926,
+      "y0": 1018,
+      "x1": 1211,
+      "y1": 1060
+    },
+    {
+      "text": "1",
+      "x0": 595,
+      "y0": 1022,
+      "x1": 609,
+      "y1": 1042
+    },
+    {
+      "text": "1",
+      "x0": 752,
+      "y0": 1022,
+      "x1": 766,
+      "y1": 1042
+    },
+    {
+      "text": "8",
+      "x0": 744,
+      "y0": 1050,
+      "x1": 774,
+      "y1": 1083
+    },
+    {
+      "text": "t",
+      "x0": 591,
+      "y0": 1052,
+      "x1": 616,
+      "y1": 1077
+    },
+    {
+      "text": "reciprocal.",
+      "x0": 929,
+      "y0": 1059,
+      "x1": 1080,
+      "y1": 1096
+    },
+    {
+      "text": "Division of a whole number by a fraction",
+      "x0": 217,
+      "y0": 1168,
+      "x1": 877,
+      "y1": 1215
+    },
+    {
+      "text": "Using words to help us, we can easily solve this division.",
+      "x0": 214,
+      "y0": 1205,
+      "x1": 1040,
+      "y1": 1266
+    },
+    {
+      "text": "4",
+      "x0": 264,
+      "y0": 1287,
+      "x1": 298,
+      "y1": 1310
+    },
+    {
+      "text": "We ask ourselves: how many quarters make one whole?",
+      "x0": 214,
+      "y0": 1310,
+      "x1": 1051,
+      "y1": 1381
+    },
+    {
+      "text": "The answer is easy:4 quarters make I whole.",
+      "x0": 214,
+      "y0": 1360,
+      "x1": 874,
+      "y1": 1429
+    },
+    {
+      "text": "=+1",
+      "x0": 212,
+      "y0": 1399,
+      "x1": 371,
+      "y1": 1457
+    },
+    {
+      "text": "4",
+      "x0": 272,
+      "y0": 1438,
+      "x1": 312,
+      "y1": 1468
+    },
+    {
+      "text": "isthe same asx4=14=4=4",
+      "x0": 204,
+      "y0": 1465,
+      "x1": 786,
+      "y1": 1554
+    },
+    {
+      "text": "DOOO-",
+      "x0": 886,
+      "y0": 1470,
+      "x1": 1196,
+      "y1": 1552
+    },
+    {
+      "text": "x",
+      "x0": 559,
+      "y0": 1528,
+      "x1": 638,
+      "y1": 1553
+    },
+    {
+      "text": "4 quarters make I whole",
+      "x0": 893,
+      "y0": 1551,
+      "x1": 1239,
+      "y1": 1602
+    },
+    {
+      "text": "3Fractions",
+      "x0": 113,
+      "y0": 1701,
+      "x1": 291,
+      "y1": 1746
+    }
+  ],
+  "verifiedSnippets": [
+    {
+      "id": "panel",
+      "text": "Exercise 3c",
+      "regionType": "heading",
+      "reviewStatus": "reference"
+    }
+  ],
+  "exerciseItems": [],
+  "exerciseResults": [],
+  "failures": [
+    {
+      "kind": "snippet",
+      "detail": "panel: \"Exercise 3c\"",
+      "category": "missing_snippet"
+    }
+  ],
+  "needsHumanVerification": true,
+  "metrics": {
+    "snippetHitRate": 0,
+    "exerciseExactRate": null,
+    "mergedVsReferenceCER": 95.54545454545455
+  }
+}

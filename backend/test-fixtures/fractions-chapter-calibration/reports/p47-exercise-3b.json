@@ -1,0 +1,466 @@
+{
+  "pageId": "p47-exercise-3b",
+  "bookPage": 47,
+  "layout": "exercise_panel",
+  "image": "p47-exercise-3b.jpg",
+  "models": {
+    "paddleRec": "stock_en",
+    "paddleMs": 11463,
+    "tesseractMs": 13479
+  },
+  "paddleText": "Division of fractions\ndivision we shall find division with ractions smple nd fu toc\nDivision sum\nWords we say\n729 Quotient\nHow many nines make 72?\n8\n250050\nHow many fifties make 2500?\n3244\nHow many fours make 324?\n391:17\nHow many seventeens make 391?\nReciprocal\nWhen the product of two fractions is equal to I, then each fraction\nis the reciprocal of the other.To find the reciprocal of a fraction, we\nsimply interchange the numerator and the denominator.\nExamples:\nFind the reciprocal of the given fractions.\na. 5/9 b.\nI\n12/12, 2\n5x9/9\n5 I\n=| =\nreciprocal ofis 12.\nreciprocal of 5is 12\n9, 5\n15/813, 8/138\n23/3\nsalortwsao.elom\n83\n8\n=1\n=1\nreciprocal of13is8\n8, 13\nreciprocal of 3 3/8\nFractions\nOXFORD",
+  "tesseractText": "* 3, we ask\nof 21\" or     ourselves,\n\nal\n\n+ More simply, *how mar\n\nY for you, If we remember the basic rule of\nractions simple and fun to do,\n\n2:0 | How Many nines make 727               8\n\n| [2590750 | How many fifties make 25067\nET        How many fours make 3247 i Lo\n[301517 | How many severteens maser |\nReciprocal\n\nWhen the product of two fractions is equal to I, then each fraction\nis the reciprocal of the other. To find the reciprocal of a fraction, we\nsimply interchange the numerator and the denominator.\n\nExamples:\nFind the reciprocal of the given fractions.\n\n|\na 3               bb\nili\na3                    2]\n=\n=\n- red     Lis 12.\n*. reciprocal of 2 is 2          +. reciprocal o 1515\naa\n[    EZ                   d.  =\n:                        13,8\nSAE                    13\n3%8                    2\npi!            3         - reciprocal of 12        -\n\n+. reciprocal of 2 is 3",
+  "mergedText": "Division of fractions\ndivision we shall find division with ractions smple nd fu toc\nDivision sum\nWords we say\n729 Quotient\nHow many nines make 72?\n8\n25/3, 30/9, 24/11, 04/7\nHow many fifties make 2500?\nHow many fours make 324?\nHow many seventeens make 391?\nReciprocal\nWhen the product of two fractions is equal to I, then each fraction\nis the reciprocal of the other.To find the reciprocal of a fraction, we\nsimply interchange the numerator and the denominator.\nExamples:\nFind the reciprocal of the given fractions.\na. 5/9 b.\nI\n12/5, 12/9, 2/9\n5 I\n=| =\nreciprocal ofis 12.\nreciprocal of 5is 12\n9, 5\n15/813, 8/138\n23/3\nsalortwsao.elom\n83\n8\n=1\n=1\nreciprocal of13is8\n8, 13\nreciprocal of 3/8\nFractions\nOXFORD",
+  "paddleLines": [
+    {
+      "text": "Division of fractions",
+      "x0": 141,
+      "y0": 128,
+      "x1": 557,
+      "y1": 199
+    },
+    {
+      "text": "division we shall find division with ractions smple nd fu toc",
+      "x0": 130,
+      "y0": 290,
+      "x1": 1139,
+      "y1": 415
+    },
+    {
+      "text": "Division sum",
+      "x0": 169,
+      "y0": 371,
+      "x1": 366,
+      "y1": 408
+    },
+    {
+      "text": "Words we say",
+      "x0": 573,
+      "y0": 382,
+      "x1": 799,
+      "y1": 441
+    },
+    {
+      "text": "Quotient",
+      "x0": 1004,
+      "y0": 412,
+      "x1": 1142,
+      "y1": 453
+    },
+    {
+      "text": "729",
+      "x0": 180,
+      "y0": 417,
+      "x1": 280,
+      "y1": 472
+    },
+    {
+      "text": "How many nines make 72?",
+      "x0": 420,
+      "y0": 426,
+      "x1": 842,
+      "y1": 502
+    },
+    {
+      "text": "8",
+      "x0": 1060,
+      "y0": 474,
+      "x1": 1086,
+      "y1": 501
+    },
+    {
+      "text": "250050",
+      "x0": 182,
+      "y0": 478,
+      "x1": 327,
+      "y1": 529
+    },
+    {
+      "text": "How many fifties make 2500?",
+      "x0": 421,
+      "y0": 487,
+      "x1": 884,
+      "y1": 559
+    },
+    {
+      "text": "3244",
+      "x0": 181,
+      "y0": 544,
+      "x1": 294,
+      "y1": 589
+    },
+    {
+      "text": "How many fours make 324?",
+      "x0": 421,
+      "y0": 547,
+      "x1": 858,
+      "y1": 617
+    },
+    {
+      "text": "391:17",
+      "x0": 181,
+      "y0": 606,
+      "x1": 306,
+      "y1": 645
+    },
+    {
+      "text": "How many seventeens make 391?",
+      "x0": 419,
+      "y0": 608,
+      "x1": 941,
+      "y1": 677
+    },
+    {
+      "text": "Reciprocal",
+      "x0": 137,
+      "y0": 711,
+      "x1": 340,
+      "y1": 754
+    },
+    {
+      "text": "When the product of two fractions is equal to I, then each fraction",
+      "x0": 133,
+      "y0": 754,
+      "x1": 1160,
+      "y1": 823
+    },
+    {
+      "text": "is the reciprocal of the other.To find the reciprocal of a fraction, we",
+      "x0": 133,
+      "y0": 799,
+      "x1": 1176,
+      "y1": 857
+    },
+    {
+      "text": "simply interchange the numerator and the denominator.",
+      "x0": 135,
+      "y0": 843,
+      "x1": 999,
+      "y1": 894
+    },
+    {
+      "text": "Examples:",
+      "x0": 133,
+      "y0": 939,
+      "x1": 274,
+      "y1": 976
+    },
+    {
+      "text": "Find the reciprocal of the given fractions.",
+      "x0": 131,
+      "y0": 978,
+      "x1": 768,
+      "y1": 1022
+    },
+    {
+      "text": "5",
+      "x0": 197,
+      "y0": 1050,
+      "x1": 227,
+      "y1": 1087
+    },
+    {
+      "text": "I",
+      "x0": 762,
+      "y0": 1052,
+      "x1": 789,
+      "y1": 1077
+    },
+    {
+      "text": "b.",
+      "x0": 698,
+      "y0": 1059,
+      "x1": 730,
+      "y1": 1092
+    },
+    {
+      "text": "a.",
+      "x0": 143,
+      "y0": 1063,
+      "x1": 173,
+      "y1": 1096
+    },
+    {
+      "text": "12",
+      "x0": 756,
+      "y0": 1077,
+      "x1": 799,
+      "y1": 1114
+    },
+    {
+      "text": "9",
+      "x0": 197,
+      "y0": 1081,
+      "x1": 227,
+      "y1": 1123
+    },
+    {
+      "text": "5x9",
+      "x0": 187,
+      "y0": 1112,
+      "x1": 302,
+      "y1": 1182
+    },
+    {
+      "text": "2",
+      "x0": 758,
+      "y0": 1116,
+      "x1": 873,
+      "y1": 1162
+    },
+    {
+      "text": "12",
+      "x0": 758,
+      "y0": 1155,
+      "x1": 805,
+      "y1": 1192
+    },
+    {
+      "text": "I",
+      "x0": 835,
+      "y0": 1158,
+      "x1": 859,
+      "y1": 1186
+    },
+    {
+      "text": "9",
+      "x0": 199,
+      "y0": 1164,
+      "x1": 233,
+      "y1": 1199
+    },
+    {
+      "text": "5",
+      "x0": 261,
+      "y0": 1166,
+      "x1": 290,
+      "y1": 1203
+    },
+    {
+      "text": "=",
+      "x0": 756,
+      "y0": 1197,
+      "x1": 813,
+      "y1": 1232
+    },
+    {
+      "text": "=|",
+      "x0": 195,
+      "y0": 1203,
+      "x1": 255,
+      "y1": 1246
+    },
+    {
+      "text": "reciprocal ofis 12.",
+      "x0": 749,
+      "y0": 1226,
+      "x1": 1112,
+      "y1": 1293
+    },
+    {
+      "text": "reciprocal of 5is",
+      "x0": 186,
+      "y0": 1234,
+      "x1": 567,
+      "y1": 1315
+    },
+    {
+      "text": "12",
+      "x0": 984,
+      "y0": 1263,
+      "x1": 1031,
+      "y1": 1304
+    },
+    {
+      "text": "5",
+      "x0": 509,
+      "y0": 1277,
+      "x1": 547,
+      "y1": 1320
+    },
+    {
+      "text": "9",
+      "x0": 440,
+      "y0": 1278,
+      "x1": 532,
+      "y1": 1328
+    },
+    {
+      "text": "15",
+      "x0": 748,
+      "y0": 1326,
+      "x1": 811,
+      "y1": 1384
+    },
+    {
+      "text": "23",
+      "x0": 180,
+      "y0": 1340,
+      "x1": 252,
+      "y1": 1436
+    },
+    {
+      "text": "d.",
+      "x0": 698,
+      "y0": 1349,
+      "x1": 736,
+      "y1": 1382
+    },
+    {
+      "text": "8",
+      "x0": 757,
+      "y0": 1355,
+      "x1": 813,
+      "y1": 1410
+    },
+    {
+      "text": "salortwsao.elom",
+      "x0": 363,
+      "y0": 1358,
+      "x1": 663,
+      "y1": 1414
+    },
+    {
+      "text": "C.",
+      "x0": 143,
+      "y0": 1363,
+      "x1": 169,
+      "y1": 1390
+    },
+    {
+      "text": "138",
+      "x0": 749,
+      "y0": 1397,
+      "x1": 868,
+      "y1": 1455
+    },
+    {
+      "text": "83",
+      "x0": 184,
+      "y0": 1412,
+      "x1": 302,
+      "y1": 1481
+    },
+    {
+      "text": "813",
+      "x0": 753,
+      "y0": 1434,
+      "x1": 870,
+      "y1": 1480
+    },
+    {
+      "text": "3",
+      "x0": 197,
+      "y0": 1460,
+      "x1": 225,
+      "y1": 1499
+    },
+    {
+      "text": "8",
+      "x0": 261,
+      "y0": 1464,
+      "x1": 290,
+      "y1": 1501
+    },
+    {
+      "text": "=1",
+      "x0": 754,
+      "y0": 1483,
+      "x1": 813,
+      "y1": 1518
+    },
+    {
+      "text": "=1",
+      "x0": 193,
+      "y0": 1499,
+      "x1": 253,
+      "y1": 1545
+    },
+    {
+      "text": "reciprocal of13is8",
+      "x0": 746,
+      "y0": 1501,
+      "x1": 1101,
+      "y1": 1580
+    },
+    {
+      "text": "13",
+      "x0": 1048,
+      "y0": 1541,
+      "x1": 1100,
+      "y1": 1578
+    },
+    {
+      "text": "3",
+      "x0": 519,
+      "y0": 1543,
+      "x1": 541,
+      "y1": 1576
+    },
+    {
+      "text": "8",
+      "x0": 988,
+      "y0": 1545,
+      "x1": 1022,
+      "y1": 1578
+    },
+    {
+      "text": "reciprocal of",
+      "x0": 190,
+      "y0": 1549,
+      "x1": 446,
+      "y1": 1606
+    },
+    {
+      "text": "8",
+      "x0": 515,
+      "y0": 1569,
+      "x1": 545,
+      "y1": 1611
+    },
+    {
+      "text": "3",
+      "x0": 438,
+      "y0": 1571,
+      "x1": 477,
+      "y1": 1618
+    },
+    {
+      "text": "Fractions",
+      "x0": 1138,
+      "y0": 1732,
+      "x1": 1261,
+      "y1": 1771
+    },
+    {
+      "text": "OXFORD",
+      "x0": 69,
+      "y0": 1752,
+      "x1": 181,
+      "y1": 1825
+    }
+  ],
+  "verifiedSnippets": [
+    {
+      "id": "panel",
+      "text": "Exercise 3b",
+      "regionType": "heading",
+      "reviewStatus": "reference"
+    }
+  ],
+  "exerciseItems": [],
+  "exerciseResults": [],
+  "failures": [
+    {
+      "kind": "snippet",
+      "detail": "panel: \"Exercise 3b\"",
+      "category": "missing_snippet"
+    }
+  ],
+  "needsHumanVerification": true,
+  "metrics": {
+    "snippetHitRate": 0,
+    "exerciseExactRate": null,
+    "mergedVsReferenceCER": 63
+  }
+}

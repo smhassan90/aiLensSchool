@@ -1,0 +1,600 @@
+{
+  "pageId": "p53-divide-1",
+  "bookPage": 53,
+  "layout": "lesson_body",
+  "image": "p53-divide-1.jpg",
+  "models": {
+    "paddleRec": "stock_en",
+    "paddleMs": 12901,
+    "tesseractMs": 14292
+  },
+  "paddleText": "Division of a fraction by a fraction\nExamples: Divide by 6\n2. 3/13\n42\n9, 9 Solution:\nSolution: 36\nConvert the mixed fraction into\nimproper fractions: 3x\n13 3x1/13 x 6\n26\n3822\n19/1\n38x 61, 8\n9 ztxb\n48, 18\n3. 4914 4.\n3915\n6525\nSolution: Solution:\n65*14 9 35/26 � 9 48/39 =26 18 8/13 =39=139\n7, 5\n49254925 15 8x540\n8138\n13, 3\n5.Adil has read of a book in 6 days. How much of the book did he\nread in one day?\nSolution:\nIn 6 days he reads of the book\n8\n86=48 of the book.\nhow many dresses can be made from 20 m of fabric?\nSolution:\n1 m is used to make I dress. 3\n20 m will be sed to make 20 dresses\n3/4\n201=205 = 20\n+ 203\n3\n=12 dresses.\n3 1x5/54\nFractions",
+  "tesseractText": "y ion of a fraction by a frac eo\n\nExamples:                        |   2. Divide = i\n2                                ion:\nq     q                           Solution:\nSolution:                           rc\nConvert th\n\ne mixed fraction into     |   =\n\nimproper fractions:                   3%\n[=z \"c= 3x&\nfies is\n\n@diza.\" 15\nSolution:                        Solution:\n\n8 2)\n4,25 _umxds 359 | us 15 _ ABx45 _40_\n= 4 esx i 26° '26 30718 ~ 39x 48\n\n:\n\n5. Adil has read of a book in 6 days. How much of the book didh\nread in one day?\n\nSolution:\nIn 6 days, he reads of the book.\n\nIn one day h  Tr6=Lyl\nlay e reads *6=g xg = 73 of the book.\n\n6. A tailor requires | 2.           i\nequires | 3 M of fabric to make qo dress,\nhow many dresses can be made from 20\nSolution:\n\nm of fabric?\n\nPr\nle Mis used to make | dress,\n\n20 m will be used t\n0 make 20 + 12 dresses,\n\n2041220, 52    26x",
+  "mergedText": "Division of a fraction by a fraction\nExamples: | 2. Divide = i\n2. 3/13\n42\nq q Solution:\nSolution: rc\nConvert the mixed fraction into\nimproper fractions: 3%\n13 3x1/13 x 6\n26\n38/19, 22/1\n38x 61, 8\n9 ztxb\n48, 18\n3. 4914 4.\n3/6, 9/5, 15/25\nSolution: Solution:\n65*14 9 35/26 � 9 48/39 =26 18 8/13 =39=139\n7, 5\n49254925 15 8x540\n8/1, 13/3, 8/3\n5.Adil has read of a book in 6 days. How much of the book did he\nread in one day?\nSolution:\nIn 6 days he reads of the book\n8\nlay e reads *6=g xg = 73 of the book.\nhow many dresses can be made from 20 m of fabric?\nSolution:\n1 m is used to make I dress. 3\n20 m will be sed to make 20 dresses\n3/4\n201=205 = 20\n+ 203\n3\n=12 dresses.\n3 1x5/54\nFractions\n[=z \"c= 3x&\n= 4 esx i 26° '26 30718 ~ 39x 48\n6. A tailor requires | 2. i",
+  "paddleLines": [
+    {
+      "text": "Division of a fraction by a fraction",
+      "x0": 140,
+      "y0": 88,
+      "x1": 761,
+      "y1": 188
+    },
+    {
+      "text": "by 6",
+      "x0": 973,
+      "y0": 191,
+      "x1": 1069,
+      "y1": 252
+    },
+    {
+      "text": "Divide",
+      "x0": 801,
+      "y0": 196,
+      "x1": 949,
+      "y1": 266
+    },
+    {
+      "text": "3",
+      "x0": 923,
+      "y0": 198,
+      "x1": 988,
+      "y1": 239
+    },
+    {
+      "text": "Examples:",
+      "x0": 144,
+      "y0": 201,
+      "x1": 301,
+      "y1": 253
+    },
+    {
+      "text": "2.",
+      "x0": 742,
+      "y0": 218,
+      "x1": 831,
+      "y1": 264
+    },
+    {
+      "text": "13",
+      "x0": 931,
+      "y0": 235,
+      "x1": 976,
+      "y1": 274
+    },
+    {
+      "text": "42",
+      "x0": 209,
+      "y0": 241,
+      "x1": 388,
+      "y1": 321
+    },
+    {
+      "text": "9",
+      "x0": 326,
+      "y0": 282,
+      "x1": 380,
+      "y1": 328
+    },
+    {
+      "text": "Solution:",
+      "x0": 745,
+      "y0": 291,
+      "x1": 894,
+      "y1": 339
+    },
+    {
+      "text": "9",
+      "x0": 237,
+      "y0": 297,
+      "x1": 288,
+      "y1": 332
+    },
+    {
+      "text": "36",
+      "x0": 748,
+      "y0": 335,
+      "x1": 867,
+      "y1": 393
+    },
+    {
+      "text": "Solution:",
+      "x0": 167,
+      "y0": 340,
+      "x1": 299,
+      "y1": 383
+    },
+    {
+      "text": "Convert the mixed fraction into",
+      "x0": 168,
+      "y0": 355,
+      "x1": 653,
+      "y1": 431
+    },
+    {
+      "text": "13",
+      "x0": 748,
+      "y0": 376,
+      "x1": 801,
+      "y1": 419
+    },
+    {
+      "text": "improper fractions:",
+      "x0": 166,
+      "y0": 415,
+      "x1": 464,
+      "y1": 473
+    },
+    {
+      "text": "3x1",
+      "x0": 968,
+      "y0": 419,
+      "x1": 1069,
+      "y1": 463
+    },
+    {
+      "text": "3x",
+      "x0": 795,
+      "y0": 433,
+      "x1": 877,
+      "y1": 474
+    },
+    {
+      "text": "26",
+      "x0": 1122,
+      "y0": 459,
+      "x1": 1173,
+      "y1": 496
+    },
+    {
+      "text": "13 x 6",
+      "x0": 964,
+      "y0": 461,
+      "x1": 1086,
+      "y1": 505
+    },
+    {
+      "text": "3822",
+      "x0": 170,
+      "y0": 474,
+      "x1": 301,
+      "y1": 531
+    },
+    {
+      "text": "19",
+      "x0": 390,
+      "y0": 544,
+      "x1": 426,
+      "y1": 575
+    },
+    {
+      "text": "8",
+      "x0": 646,
+      "y0": 564,
+      "x1": 670,
+      "y1": 595
+    },
+    {
+      "text": "38x",
+      "x0": 375,
+      "y0": 565,
+      "x1": 498,
+      "y1": 611
+    },
+    {
+      "text": "61",
+      "x0": 539,
+      "y0": 566,
+      "x1": 585,
+      "y1": 603
+    },
+    {
+      "text": "ztxb",
+      "x0": 375,
+      "y0": 600,
+      "x1": 496,
+      "y1": 650
+    },
+    {
+      "text": "9",
+      "x0": 227,
+      "y0": 612,
+      "x1": 264,
+      "y1": 641
+    },
+    {
+      "text": "1",
+      "x0": 380,
+      "y0": 643,
+      "x1": 402,
+      "y1": 669
+    },
+    {
+      "text": "18",
+      "x0": 905,
+      "y0": 674,
+      "x1": 951,
+      "y1": 711
+    },
+    {
+      "text": "48",
+      "x0": 815,
+      "y0": 676,
+      "x1": 901,
+      "y1": 715
+    },
+    {
+      "text": "4914",
+      "x0": 244,
+      "y0": 693,
+      "x1": 364,
+      "y1": 737
+    },
+    {
+      "text": "4.",
+      "x0": 756,
+      "y0": 706,
+      "x1": 788,
+      "y1": 737
+    },
+    {
+      "text": "3915",
+      "x0": 809,
+      "y0": 706,
+      "x1": 955,
+      "y1": 756
+    },
+    {
+      "text": "3.",
+      "x0": 189,
+      "y0": 709,
+      "x1": 239,
+      "y1": 746
+    },
+    {
+      "text": "6525",
+      "x0": 247,
+      "y0": 727,
+      "x1": 366,
+      "y1": 772
+    },
+    {
+      "text": "Solution:",
+      "x0": 752,
+      "y0": 770,
+      "x1": 891,
+      "y1": 809
+    },
+    {
+      "text": "Solution:",
+      "x0": 193,
+      "y0": 776,
+      "x1": 318,
+      "y1": 812
+    },
+    {
+      "text": "8",
+      "x0": 943,
+      "y0": 805,
+      "x1": 980,
+      "y1": 836
+    },
+    {
+      "text": "5",
+      "x0": 1018,
+      "y0": 805,
+      "x1": 1044,
+      "y1": 830
+    },
+    {
+      "text": "7",
+      "x0": 400,
+      "y0": 816,
+      "x1": 424,
+      "y1": 832
+    },
+    {
+      "text": "=26",
+      "x0": 568,
+      "y0": 825,
+      "x1": 695,
+      "y1": 913
+    },
+    {
+      "text": "8x540",
+      "x0": 928,
+      "y0": 826,
+      "x1": 1192,
+      "y1": 869
+    },
+    {
+      "text": "49254925",
+      "x0": 229,
+      "y0": 828,
+      "x1": 501,
+      "y1": 871
+    },
+    {
+      "text": "15",
+      "x0": 833,
+      "y0": 830,
+      "x1": 883,
+      "y1": 867
+    },
+    {
+      "text": "35",
+      "x0": 541,
+      "y0": 832,
+      "x1": 581,
+      "y1": 863
+    },
+    {
+      "text": "9",
+      "x0": 648,
+      "y0": 832,
+      "x1": 672,
+      "y1": 857
+    },
+    {
+      "text": "48",
+      "x0": 756,
+      "y0": 832,
+      "x1": 801,
+      "y1": 869
+    },
+    {
+      "text": "=39=139",
+      "x0": 1061,
+      "y0": 840,
+      "x1": 1266,
+      "y1": 913
+    },
+    {
+      "text": "65*14",
+      "x0": 231,
+      "y0": 863,
+      "x1": 376,
+      "y1": 902
+    },
+    {
+      "text": "X",
+      "x0": 807,
+      "y0": 863,
+      "x1": 827,
+      "y1": 881
+    },
+    {
+      "text": "9",
+      "x0": 382,
+      "y0": 867,
+      "x1": 501,
+      "y1": 906
+    },
+    {
+      "text": "26",
+      "x0": 541,
+      "y0": 867,
+      "x1": 581,
+      "y1": 898
+    },
+    {
+      "text": "39",
+      "x0": 756,
+      "y0": 867,
+      "x1": 801,
+      "y1": 906
+    },
+    {
+      "text": "18",
+      "x0": 833,
+      "y0": 867,
+      "x1": 883,
+      "y1": 904
+    },
+    {
+      "text": "8138",
+      "x0": 933,
+      "y0": 869,
+      "x1": 1070,
+      "y1": 908
+    },
+    {
+      "text": "13",
+      "x0": 388,
+      "y0": 896,
+      "x1": 424,
+      "y1": 925
+    },
+    {
+      "text": "3",
+      "x0": 1018,
+      "y0": 904,
+      "x1": 1060,
+      "y1": 935
+    },
+    {
+      "text": "13",
+      "x0": 937,
+      "y0": 906,
+      "x1": 978,
+      "y1": 935
+    },
+    {
+      "text": "5.Adil has read  of a book in 6 days. How much of the book did he",
+      "x0": 187,
+      "y0": 962,
+      "x1": 1283,
+      "y1": 1024
+    },
+    {
+      "text": "read in one day?",
+      "x0": 246,
+      "y0": 1007,
+      "x1": 498,
+      "y1": 1052
+    },
+    {
+      "text": "Solution:",
+      "x0": 192,
+      "y0": 1066,
+      "x1": 315,
+      "y1": 1115
+    },
+    {
+      "text": "In 6 days he reads of the book",
+      "x0": 182,
+      "y0": 1103,
+      "x1": 709,
+      "y1": 1186
+    },
+    {
+      "text": "8",
+      "x0": 465,
+      "y0": 1153,
+      "x1": 525,
+      "y1": 1186
+    },
+    {
+      "text": "86=48 of the book.",
+      "x0": 594,
+      "y0": 1217,
+      "x1": 1042,
+      "y1": 1281
+    },
+    {
+      "text": "how many dresses can be made from 20 m of fabric?",
+      "x0": 246,
+      "y0": 1313,
+      "x1": 1065,
+      "y1": 1408
+    },
+    {
+      "text": "Solution:",
+      "x0": 188,
+      "y0": 1375,
+      "x1": 317,
+      "y1": 1424
+    },
+    {
+      "text": "1 m is used to make I dress.",
+      "x0": 183,
+      "y0": 1411,
+      "x1": 641,
+      "y1": 1518
+    },
+    {
+      "text": "3",
+      "x0": 219,
+      "y0": 1464,
+      "x1": 243,
+      "y1": 1487
+    },
+    {
+      "text": "20 m will be sed to make 20 dresses",
+      "x0": 175,
+      "y0": 1470,
+      "x1": 857,
+      "y1": 1596
+    },
+    {
+      "text": "3",
+      "x0": 690,
+      "y0": 1557,
+      "x1": 712,
+      "y1": 1588
+    },
+    {
+      "text": "201=205",
+      "x0": 181,
+      "y0": 1582,
+      "x1": 470,
+      "y1": 1637
+    },
+    {
+      "text": "4",
+      "x0": 674,
+      "y0": 1594,
+      "x1": 692,
+      "y1": 1611
+    },
+    {
+      "text": "20",
+      "x0": 501,
+      "y0": 1600,
+      "x1": 555,
+      "y1": 1635
+    },
+    {
+      "text": "=",
+      "x0": 465,
+      "y0": 1602,
+      "x1": 517,
+      "y1": 1637
+    },
+    {
+      "text": "3",
+      "x0": 579,
+      "y0": 1606,
+      "x1": 611,
+      "y1": 1639
+    },
+    {
+      "text": "203",
+      "x0": 651,
+      "y0": 1606,
+      "x1": 767,
+      "y1": 1655
+    },
+    {
+      "text": "+",
+      "x0": 541,
+      "y0": 1618,
+      "x1": 585,
+      "y1": 1665
+    },
+    {
+      "text": "3",
+      "x0": 432,
+      "y0": 1629,
+      "x1": 463,
+      "y1": 1662
+    },
+    {
+      "text": "=12 dresses.",
+      "x0": 768,
+      "y0": 1635,
+      "x1": 980,
+      "y1": 1698
+    },
+    {
+      "text": "1x5",
+      "x0": 663,
+      "y0": 1645,
+      "x1": 763,
+      "y1": 1688
+    },
+    {
+      "text": "Fractions",
+      "x0": 102,
+      "y0": 1721,
+      "x1": 264,
+      "y1": 1778
+    },
+    {
+      "text": "54",
+      "x0": 704,
+      "y0": 1777,
+      "x1": 734,
+      "y1": 1800
+    }
+  ],
+  "verifiedSnippets": [],
+  "exerciseItems": [],
+  "exerciseResults": [],
+  "failures": [],
+  "needsHumanVerification": false,
+  "metrics": {
+    "snippetHitRate": null,
+    "exerciseExactRate": null,
+    "mergedVsReferenceCER": null
+  }
+}

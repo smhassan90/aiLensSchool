@@ -1,0 +1,535 @@
+{
+  "pageId": "p43-mult-whole",
+  "bookPage": 43,
+  "layout": "lesson_body",
+  "image": "p43-mult-whole.jpg",
+  "models": {
+    "paddleRec": "stock_en",
+    "paddleMs": 16081,
+    "tesseractMs": 16041
+  },
+  "paddleText": "Multiplication of fractions With the help of diagrams it becomes easy to understand\nmultiplication of a fraction by a whole number. asviorsoand7\nMultiplication of a fraction by a whole number Let us take three s or 3x\nxEzsvoroad\nLet us take three s or 3 x\n4\nWe can solve this by repeated addition, thus: 3 or three quarters\n4\nt7 4, 3/4\n4\nWe write3x=3x=3\n4, 47 f7 otp.ddaoitntl.nronoixoaugoun\nExampleWork out 2using repeated addition and with a diagram.\n3\nSolution:2xexpressed in a diagram\n3\n2/3\n3/5\n3\nLet us take three 2s or 32.\n5\n2/5, 2/5 � 2/5, 6/5 nii.sodanoosw\n5\nDid you spot the short cut? Instead of adding, we can solve our sum\nvery quickly by multiplying the numerator by the whole number\nNow take two s.\nLet us take three 2s. 7\n5 3+3-6\n2+2+2-6 777 ens jodoirawy\n5\n0r3x2-32= 5 5/5, 7\nOr23=236\n6/5 =15 7, 7\n5\nFractions\nOXFORD",
+  "tesseractText": "ER ellemion < of a fraction by a whole number\nwith the help of diagrams it becomes easy to understand\nmultiplication of a fraction = a whole number.\n\nLet us take three (Ls or 3 x +\n\nWe can solve this by repeated addition, thus: 3 x | or three quarters\n\ni    1\nite 3 x\n|   We write  =\n\nExample: Work out 2 x = , using repeated addition and with a diagram.\n\nSolution: 2 X 1 expressed in a diagram:\n\nLet us take three 2 sor3x =\n\n                         ®  wv\n\n2,2\nGE\nDid you spot the short cut? Instead of adding, we can solve our sum\nvery quickly by multiplying the numerator by the whole number:\n\nNow take two 3s.\n\nLet us take three Zs.",
+  "mergedText": "Multiplication of fractions With the help of diagrams it becomes easy to understand\nMultiplication of a fraction by a whole number Let us take three s or 3x\nxEzsvoroad\nWe can solve this by repeated addition, thus: 3 or three quarters\nExampleWork out 2using repeated addition and with a diagram.\n2/5, 2/5 � 2/5, 6/5 nii.sodanoosw\nDid you spot the short cut? Instead of adding, we can solve our sum\nvery quickly by multiplying the numerator by the whole number\n2+2+2-6 777 ens jodoirawy\n6/5 =15 7, 7\nFractions",
+  "paddleLines": [
+    {
+      "text": "Multiplication of fractions",
+      "x0": 109,
+      "y0": 95,
+      "x1": 653,
+      "y1": 162
+    },
+    {
+      "text": "With the help of diagrams it becomes easy to understand",
+      "x0": 121,
+      "y0": 115.5,
+      "x1": 1119,
+      "y1": 151.5
+    },
+    {
+      "text": "multiplication of a fraction by a whole number.",
+      "x0": 121,
+      "y0": 140,
+      "x1": 959,
+      "y1": 172
+    },
+    {
+      "text": "asviorsoand7",
+      "x0": 1077,
+      "y0": 151.5,
+      "x1": 1293,
+      "y1": 170.5
+    },
+    {
+      "text": "Multiplication of a fraction by a whole number",
+      "x0": 107,
+      "y0": 165,
+      "x1": 951,
+      "y1": 234
+    },
+    {
+      "text": "Let us take three s or 3x",
+      "x0": 120,
+      "y0": 173.5,
+      "x1": 655,
+      "y1": 206
+    },
+    {
+      "text": "xEzsvoroad",
+      "x0": 924,
+      "y0": 272,
+      "x1": 1194,
+      "y1": 317
+    },
+    {
+      "text": "Let us take three s or 3 x",
+      "x0": 109,
+      "y0": 319,
+      "x1": 597,
+      "y1": 375
+    },
+    {
+      "text": "4",
+      "x0": 560,
+      "y0": 350,
+      "x1": 607,
+      "y1": 396
+    },
+    {
+      "text": "We can solve this by repeated addition, thus: 3",
+      "x0": 109,
+      "y0": 383,
+      "x1": 921,
+      "y1": 443
+    },
+    {
+      "text": "or three quarters",
+      "x0": 900,
+      "y0": 388,
+      "x1": 1210,
+      "y1": 444
+    },
+    {
+      "text": "4",
+      "x0": 909,
+      "y0": 426,
+      "x1": 931,
+      "y1": 451
+    },
+    {
+      "text": "3",
+      "x0": 760,
+      "y0": 556,
+      "x1": 789,
+      "y1": 591
+    },
+    {
+      "text": "t7",
+      "x0": 503,
+      "y0": 593,
+      "x1": 529,
+      "y1": 618
+    },
+    {
+      "text": "4",
+      "x0": 569,
+      "y0": 593,
+      "x1": 595,
+      "y1": 618
+    },
+    {
+      "text": "4",
+      "x0": 634,
+      "y0": 593,
+      "x1": 664,
+      "y1": 626
+    },
+    {
+      "text": "4",
+      "x0": 760,
+      "y0": 593,
+      "x1": 789,
+      "y1": 628
+    },
+    {
+      "text": "We write3x=3x=3",
+      "x0": 111,
+      "y0": 627,
+      "x1": 581,
+      "y1": 691
+    },
+    {
+      "text": "otp.ddaoitntl.nronoixoaugoun",
+      "x0": 624,
+      "y0": 671,
+      "x1": 1239,
+      "y1": 706
+    },
+    {
+      "text": "4",
+      "x0": 326,
+      "y0": 676,
+      "x1": 360,
+      "y1": 706
+    },
+    {
+      "text": "47",
+      "x0": 473,
+      "y0": 680,
+      "x1": 505,
+      "y1": 704
+    },
+    {
+      "text": "f7",
+      "x0": 551,
+      "y0": 682,
+      "x1": 577,
+      "y1": 704
+    },
+    {
+      "text": "ExampleWork out 2using repeated addition and with a diagram.",
+      "x0": 107,
+      "y0": 733,
+      "x1": 1241,
+      "y1": 805
+    },
+    {
+      "text": "3",
+      "x0": 483,
+      "y0": 785,
+      "x1": 507,
+      "y1": 811
+    },
+    {
+      "text": "Solution:2xexpressed in a diagram",
+      "x0": 109,
+      "y0": 807,
+      "x1": 738,
+      "y1": 869
+    },
+    {
+      "text": "3",
+      "x0": 316,
+      "y0": 849,
+      "x1": 348,
+      "y1": 881
+    },
+    {
+      "text": "2",
+      "x0": 770,
+      "y0": 974,
+      "x1": 791,
+      "y1": 1003
+    },
+    {
+      "text": "3",
+      "x0": 770,
+      "y0": 1005,
+      "x1": 791,
+      "y1": 1038
+    },
+    {
+      "text": "3",
+      "x0": 563,
+      "y0": 1007,
+      "x1": 585,
+      "y1": 1038
+    },
+    {
+      "text": "3",
+      "x0": 630,
+      "y0": 1011,
+      "x1": 646,
+      "y1": 1036
+    },
+    {
+      "text": "Let us take three 2s or 32.",
+      "x0": 108,
+      "y0": 1053,
+      "x1": 602,
+      "y1": 1138
+    },
+    {
+      "text": "5",
+      "x0": 567,
+      "y0": 1102,
+      "x1": 589,
+      "y1": 1133
+    },
+    {
+      "text": "5",
+      "x0": 396,
+      "y0": 1108,
+      "x1": 426,
+      "y1": 1141
+    },
+    {
+      "text": "6",
+      "x0": 778,
+      "y0": 1248,
+      "x1": 799,
+      "y1": 1277
+    },
+    {
+      "text": "2",
+      "x0": 605,
+      "y0": 1252,
+      "x1": 626,
+      "y1": 1289
+    },
+    {
+      "text": "2",
+      "x0": 535,
+      "y0": 1254,
+      "x1": 559,
+      "y1": 1287
+    },
+    {
+      "text": "nii.sodanoosw",
+      "x0": 911,
+      "y0": 1254,
+      "x1": 1185,
+      "y1": 1293
+    },
+    {
+      "text": "2",
+      "x0": 471,
+      "y0": 1260,
+      "x1": 495,
+      "y1": 1287
+    },
+    {
+      "text": "+",
+      "x0": 577,
+      "y0": 1271,
+      "x1": 591,
+      "y1": 1291
+    },
+    {
+      "text": "5",
+      "x0": 858,
+      "y0": 1281,
+      "x1": 894,
+      "y1": 1316
+    },
+    {
+      "text": "5",
+      "x0": 776,
+      "y0": 1283,
+      "x1": 799,
+      "y1": 1314
+    },
+    {
+      "text": "5",
+      "x0": 603,
+      "y0": 1285,
+      "x1": 626,
+      "y1": 1318
+    },
+    {
+      "text": "5",
+      "x0": 529,
+      "y0": 1291,
+      "x1": 563,
+      "y1": 1324
+    },
+    {
+      "text": "5",
+      "x0": 469,
+      "y0": 1295,
+      "x1": 501,
+      "y1": 1326
+    },
+    {
+      "text": "Did you spot the short cut? Instead of adding, we can solve our sum",
+      "x0": 117,
+      "y0": 1314,
+      "x1": 1198,
+      "y1": 1388
+    },
+    {
+      "text": "very quickly by multiplying the numerator by the whole number",
+      "x0": 115,
+      "y0": 1356,
+      "x1": 1164,
+      "y1": 1433
+    },
+    {
+      "text": "Now take two s.",
+      "x0": 738,
+      "y0": 1412,
+      "x1": 1043,
+      "y1": 1494
+    },
+    {
+      "text": "2s.",
+      "x0": 386,
+      "y0": 1435,
+      "x1": 463,
+      "y1": 1501
+    },
+    {
+      "text": "Let us take three",
+      "x0": 121,
+      "y0": 1454,
+      "x1": 396,
+      "y1": 1501
+    },
+    {
+      "text": "7",
+      "x0": 984,
+      "y0": 1468,
+      "x1": 1010,
+      "y1": 1495
+    },
+    {
+      "text": "5",
+      "x0": 398,
+      "y0": 1481,
+      "x1": 428,
+      "y1": 1518
+    },
+    {
+      "text": "3+3-6",
+      "x0": 749,
+      "y0": 1486,
+      "x1": 928,
+      "y1": 1540
+    },
+    {
+      "text": "2+2+2-6",
+      "x0": 113,
+      "y0": 1502,
+      "x1": 372,
+      "y1": 1569
+    },
+    {
+      "text": "ens jodoirawy",
+      "x0": 940,
+      "y0": 1516,
+      "x1": 1190,
+      "y1": 1561
+    },
+    {
+      "text": "777",
+      "x0": 749,
+      "y0": 1524,
+      "x1": 929,
+      "y1": 1567
+    },
+    {
+      "text": "5",
+      "x0": 112,
+      "y0": 1541,
+      "x1": 164,
+      "y1": 1592
+    },
+    {
+      "text": "5",
+      "x0": 336,
+      "y0": 1553,
+      "x1": 360,
+      "y1": 1586
+    },
+    {
+      "text": "5",
+      "x0": 257,
+      "y0": 1555,
+      "x1": 286,
+      "y1": 1590
+    },
+    {
+      "text": "Or23=236",
+      "x0": 744,
+      "y0": 1558,
+      "x1": 1095,
+      "y1": 1640
+    },
+    {
+      "text": "0r3x2-32=",
+      "x0": 109,
+      "y0": 1582,
+      "x1": 436,
+      "y1": 1677
+    },
+    {
+      "text": "=15",
+      "x0": 473,
+      "y0": 1600,
+      "x1": 573,
+      "y1": 1668
+    },
+    {
+      "text": "6",
+      "x0": 441,
+      "y0": 1604,
+      "x1": 493,
+      "y1": 1641
+    },
+    {
+      "text": "7",
+      "x0": 952,
+      "y0": 1606,
+      "x1": 1001,
+      "y1": 1654
+    },
+    {
+      "text": "7",
+      "x0": 1040,
+      "y0": 1613,
+      "x1": 1088,
+      "y1": 1650
+    },
+    {
+      "text": "7",
+      "x0": 861,
+      "y0": 1619,
+      "x1": 893,
+      "y1": 1650
+    },
+    {
+      "text": "5",
+      "x0": 445,
+      "y0": 1637,
+      "x1": 475,
+      "y1": 1676
+    },
+    {
+      "text": "5",
+      "x0": 338,
+      "y0": 1646,
+      "x1": 362,
+      "y1": 1679
+    },
+    {
+      "text": "5",
+      "x0": 231,
+      "y0": 1648,
+      "x1": 261,
+      "y1": 1683
+    },
+    {
+      "text": "Fractions",
+      "x0": 1173,
+      "y0": 1722,
+      "x1": 1301,
+      "y1": 1759
+    },
+    {
+      "text": "OXFORD",
+      "x0": 64,
+      "y0": 1738,
+      "x1": 177,
+      "y1": 1792
+    }
+  ],
+  "verifiedSnippets": [
+    {
+      "id": "title",
+      "text": "Multiplication of fractions",
+      "regionType": "heading",
+      "reviewStatus": "reference"
+    },
+    {
+      "id": "ex-3x-quarter",
+      "text": "3 × 1/4 = 3/4",
+      "regionType": "math",
+      "reviewStatus": "reference"
+    }
+  ],
+  "exerciseItems": [],
+  "exerciseResults": [],
+  "failures": [
+    {
+      "kind": "snippet",
+      "detail": "ex-3x-quarter: \"3 × 1/4 = 3/4\"",
+      "category": "digit_soup_fraction"
+    }
+  ],
+  "needsHumanVerification": true,
+  "metrics": {
+    "snippetHitRate": 0.5,
+    "exerciseExactRate": null,
+    "mergedVsReferenceCER": 11.487804878048781
+  }
+}
