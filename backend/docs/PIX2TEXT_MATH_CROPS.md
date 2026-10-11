@@ -2,7 +2,19 @@
 
 Disabled by default. When unset or `0`, the NestJS OCR path does not spawn Pix2Text and behavior matches the pre-feature pipeline.
 
-## Enable (test / staging only)
+## HawkNexa VPS
+
+```bash
+cd /opt/apps/hawknexa/deploy
+git -C /opt/apps/hawknexa/repo pull origin main   # after deploy pulls latest
+bash install-pix2text-venv.sh                     # once, or after volume wipe
+bash upsert-ocr-env-on-vps.sh
+docker compose -f docker-compose.prod.yml up -d --no-deps backend
+```
+
+Pix2Text uses venv `/opt/pix2text` (Docker volume `hawknexa_pix2text_venv`). **pix2tex is not installed in production.**
+
+## Enable (local dev)
 
 ```powershell
 $env:OCR_PIX2TEXT_MATH_CROPS = '1'

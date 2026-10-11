@@ -16,7 +16,8 @@ upsert() {
 }
 upsert BUILD_PADDLE_OCR 1
 upsert OCR_ENGINE auto
-# Pix2Text math crops: off unless venv + weights are installed on the host (see backend/docs/PIX2TEXT_MATH_CROPS.md)
-upsert OCR_PIX2TEXT_MATH_CROPS 0
+# Pix2Text: venv in backend container (/opt/pix2text). Run install-pix2text-venv.sh before enabling.
+upsert PIX2TEXT_PYTHON /opt/pix2text/bin/python
+upsert OCR_PIX2TEXT_MATH_CROPS "${OCR_PIX2TEXT_MATH_CROPS:-1}"
 echo "=== OCR settings in ${ENV} ==="
-grep -E '^BUILD_PADDLE_OCR=|^OCR_ENGINE=|^OCR_PIX2TEXT_MATH_CROPS=' "${ENV}"
+grep -E '^BUILD_PADDLE_OCR=|^OCR_ENGINE=|^OCR_PIX2TEXT_MATH_CROPS=|^PIX2TEXT_PYTHON=' "${ENV}"

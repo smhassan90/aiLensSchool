@@ -1,0 +1,5 @@
+# Optional math-crop OCR (Pix2Text). Separate venv from Paddle: /opt/pix2text
+# rapidocr 3.9.x: cnstd needs resolve_model_key (removed in rapidocr>=3.10)
+pix2text==1.1.7
+rapidocr==3.9.1
+Pillow>=10.0.0

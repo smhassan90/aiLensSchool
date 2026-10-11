@@ -50,6 +50,9 @@ services:
     environment:
       OCR_ENGINE: ${OCR_ENGINE:-auto}
       PADDLE_OCR_PYTHON: /opt/paddleocr/bin/python
+      OCR_PIX2TEXT_MATH_CROPS: ${OCR_PIX2TEXT_MATH_CROPS:-0}
+      PIX2TEXT_PYTHON: ${PIX2TEXT_PYTHON:-/opt/pix2text/bin/python}
+      HF_HOME: /app/.cache/huggingface
       RUN_SEED: ${RUN_SEED:-false}
       # Apply additive Prisma schema changes during every production restart.
       # This keeps the VPS database aligned with the shipped Prisma client.
@@ -59,6 +62,8 @@ services:
       REDIS_URL: redis://redis:6379
     volumes:
       - hawknexa_uploads:/app/uploads
+      - hawknexa_pix2text_venv:/opt/pix2text
+      - hawknexa_hf_cache:/app/.cache
     depends_on:
       mysql:
         condition: service_healthy
@@ -123,5 +128,7 @@ volumes:
   hawknexa_mysql_data:
   hawknexa_redis_data:
   hawknexa_uploads:
+  hawknexa_pix2text_venv:
+  hawknexa_hf_cache:
   hawknexa_caddy_data:
   hawknexa_caddy_config:
