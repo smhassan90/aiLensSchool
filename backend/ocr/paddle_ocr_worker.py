@@ -60,10 +60,10 @@ def _science_rec_model_dir() -> Path | None:
     return None
 
 
-def get_engine(lang: str):
+def get_engine(lang: str, *, use_science_rec: bool = True):
     global _ENGINE, _ENGINE_KEY
     key = paddle_lang(lang)
-    rec_dir = _science_rec_model_dir()
+    rec_dir = _science_rec_model_dir() if use_science_rec else None
     engine_key = f"{key}|rec={rec_dir}" if rec_dir else key
     if _ENGINE is not None and _ENGINE_KEY == engine_key:
         return _ENGINE
@@ -354,12 +354,31 @@ def text_from_lines(lines: list[dict[str, Any]]) -> str:
 
 _DIGIT_ONLY_RE = re.compile(r"^\d{1,3}$")
 _FRAC_EXPR_RE = re.compile(r"^\d{1,3}(?:\s*[÷+\u00d7x*]\s*\d{1,2})?$")
+_FRAC_TOKEN_RE = re.compile(
+    r"^(?:\d{1,3}\s+)?\d{1,3}\s*/\s*\d{1,3}$|^\d{1,3}$"
+)
+_DIV_OP_RE = re.compile(r"^[÷:]$|^(?:div|divided)$", re.I)
+# OCR often misreads ÷ as a lone dash/dot between two fractions.
+_DIV_OP_LOOSE_RE = re.compile(r"^[-–—_=·.•]$")
 _BAR_RE = re.compile(r"^[-–—_=‾¯\-]{1,6}$")
+_LETTERED_ITEM_RE = re.compile(r"^[a-n][.)]$", re.I)
 
 
 def _is_fraction_digit(text: str) -> bool:
     t = (text or "").strip()
     return bool(_DIGIT_ONLY_RE.match(t) or _FRAC_EXPR_RE.match(t))
+
+
+def _is_fraction_token(text: str) -> bool:
+    t = (text or "").strip()
+    return bool(_FRAC_TOKEN_RE.match(t) or re.search(r"\d/\d", t))
+
+
+def _is_div_op(text: str, *, loose: bool = False) -> bool:
+    t = (text or "").strip()
+    if _DIV_OP_RE.match(t):
+        return True
+    return bool(loose and _DIV_OP_LOOSE_RE.match(t))
 
 
 def _is_vinculum(text: str) -> bool:
@@ -382,12 +401,31 @@ def compose_stacked_fractions(lines: list[dict[str, Any]]) -> list[dict[str, Any
     composed: list[dict[str, Any]] = []
 
     # Pair numerator (above) with denominator (below) when x-centers align.
-    for i, top in enumerate(lines):
-        if i not in unused or not _is_fraction_digit(top.get("text") or ""):
+    # Prefer shorter digit boxes as nums — tall full-height digits are usually
+    # mixed-number wholes (1 beside 2/5), not numerators.
+    candidates = [
+        i
+        for i, row in enumerate(lines)
+        if i in unused and _is_fraction_digit(row.get("text") or "")
+    ]
+    candidates.sort(
+        key=lambda i: (lines[i]["y1"] - lines[i]["y0"], lines[i]["y0"], lines[i]["x0"])
+    )
+    for i in candidates:
+        if i not in unused or not _is_fraction_digit(lines[i].get("text") or ""):
             continue
+        top = lines[i]
         top_h = max(1.0, top["y1"] - top["y0"])
         top_w = max(1.0, top["x1"] - top["x0"])
         top_cx = (top["x0"] + top["x1"]) / 2.0
+        # Tall digit spanning a typical fraction stack → leave for mixed whole.
+        nearby_h = [
+            lines[j]["y1"] - lines[j]["y0"]
+            for j in unused
+            if j != i and _DIGIT_ONLY_RE.match((lines[j].get("text") or "").strip())
+        ]
+        if nearby_h and top_h > max(nearby_h) * 1.55:
+            continue
         best_j: int | None = None
         best_score = 1e9
         for j, bot in enumerate(lines):
@@ -419,13 +457,15 @@ def compose_stacked_fractions(lines: list[dict[str, Any]]) -> list[dict[str, Any
         frac_x0, frac_x1 = min(top["x0"], bot["x0"]), max(top["x1"], bot["x1"])
         frac_cx = (frac_x0 + frac_x1) / 2.0
 
-        # Drop vinculum / bar tokens between the pair.
+        # Drop vinculum / bar tokens between the pair (never eat digit wholes).
         for k, mid in enumerate(lines):
             if k not in unused or k in (i, best_j):
                 continue
-            if not _is_vinculum(mid.get("text") or ""):
+            mt = (mid.get("text") or "").strip()
+            if _DIGIT_ONLY_RE.match(mt) or _is_fraction_token(mt):
+                continue
+            if not _is_vinculum(mt):
                 # Very short horizontal junk OCR sometimes emits as lone chars
-                mt = (mid.get("text") or "").strip()
                 if len(mt) > 2:
                     continue
             mid_cx = (mid["x0"] + mid["x1"]) / 2.0
@@ -435,24 +475,37 @@ def compose_stacked_fractions(lines: list[dict[str, Any]]) -> list[dict[str, Any
                 unused.discard(k)
 
         # Mixed number: whole digit left of the stacked fraction.
+        # Textbook wholes are often tall (full fraction height), so allow large
+        # vertical overlap — not only a short digit centered on the bar.
         whole_k: int | None = None
         whole_txt = ""
+        best_whole_score = 1e9
+        frac_h = max(1.0, frac_y1 - frac_y0)
         for k, whole in enumerate(lines):
             if k not in unused or k in (i, best_j):
                 continue
-            if not _is_fraction_digit(whole.get("text") or ""):
+            wt = (whole.get("text") or "").strip()
+            if not _DIGIT_ONLY_RE.match(wt):
                 continue
+            # Whole must horizontally sit just left of the fraction.
+            if whole["x1"] > frac_x0 + 8:
+                continue
+            gap_x = frac_x0 - whole["x1"]
+            if gap_x > max(42.0, top_w * 2.2):
+                continue
+            # Vertical: centers near, or tall whole overlaps the fraction band.
             wcy = (whole["y0"] + whole["y1"]) / 2.0
             fcy = (frac_y0 + frac_y1) / 2.0
-            if abs(wcy - fcy) > (frac_y1 - frac_y0) * 0.65:
+            overlap = min(whole["y1"], frac_y1) - max(whole["y0"], frac_y0)
+            tall_overlap = overlap >= frac_h * 0.35
+            centered = abs(wcy - fcy) <= frac_h * 0.75
+            if not (tall_overlap or centered):
                 continue
-            if whole["x1"] > frac_x0 + 6:
-                continue
-            if frac_x0 - whole["x1"] > max(36.0, top_w * 1.8):
-                continue
-            whole_k = k
-            whole_txt = (whole.get("text") or "").strip()
-            break
+            score = gap_x + abs(wcy - fcy) * 0.5
+            if score < best_whole_score:
+                best_whole_score = score
+                whole_k = k
+                whole_txt = wt
 
         text = f"{num}/{den}"
         x0 = frac_x0
@@ -476,7 +529,101 @@ def compose_stacked_fractions(lines: list[dict[str, Any]]) -> list[dict[str, Any
     return sorted(remaining, key=lambda r: (r["y0"], r["x0"]))
 
 
-def cluster_reading_lines(lines: list[dict[str, Any]], y_tol: float = 14.0) -> list[str]:
+def compose_fraction_division_ops(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Join left÷right fraction expressions from boxes:
+      1 2/5   ÷   4/5   →  "1 2/5 ÷ 4/5"
+    Also recovers when ÷ was misread as a lone dash/dot between two fractions.
+    """
+    if len(lines) < 2:
+        return lines
+    unused = set(range(len(lines)))
+    composed: list[dict[str, Any]] = []
+
+    for i, left in enumerate(lines):
+        if i not in unused or not _is_fraction_token(left.get("text") or ""):
+            continue
+        left_cx = (left["x0"] + left["x1"]) / 2.0
+        left_cy = (left["y0"] + left["y1"]) / 2.0
+        left_h = max(1.0, left["y1"] - left["y0"])
+
+        # Prefer an explicit ÷ (or loose OCR stand-in) just to the right of left.
+        op_k: int | None = None
+        op_score = 1e9
+        for k, op in enumerate(lines):
+            if k == i or k not in unused:
+                continue
+            if not _is_div_op(op.get("text") or "", loose=True):
+                continue
+            op_cy = (op["y0"] + op["y1"]) / 2.0
+            if abs(op_cy - left_cy) > left_h * 0.85:
+                continue
+            if op["x0"] < left["x1"] - 4:
+                continue
+            gap = op["x0"] - left["x1"]
+            if gap > 90:
+                continue
+            score = gap + abs(op_cy - left_cy)
+            if score < op_score:
+                op_score = score
+                op_k = k
+
+        right_k: int | None = None
+        right_score = 1e9
+        min_x = lines[op_k]["x1"] if op_k is not None else left["x1"]
+        for j, right in enumerate(lines):
+            if j == i or j == op_k or j not in unused:
+                continue
+            if not _is_fraction_token(right.get("text") or ""):
+                continue
+            # Avoid pairing a bare whole digit as the right operand when a frac exists.
+            rt = (right.get("text") or "").strip()
+            if _DIGIT_ONLY_RE.match(rt) and "/" not in rt:
+                continue
+            rcy = (right["y0"] + right["y1"]) / 2.0
+            if abs(rcy - left_cy) > left_h * 0.9:
+                continue
+            if right["x0"] < min_x - 2:
+                continue
+            gap = right["x0"] - min_x
+            if gap > 110:
+                continue
+            score = gap + abs(rcy - left_cy) * 2.0
+            if score < right_score:
+                right_score = score
+                right_k = j
+
+        if right_k is None:
+            continue
+        # Need either an op token or a tight left→right gap (÷ glyph dropped).
+        if op_k is None:
+            gap = lines[right_k]["x0"] - left["x1"]
+            if gap > 70:
+                continue
+
+        left_t = (left.get("text") or "").strip()
+        right_t = (lines[right_k].get("text") or "").strip()
+        text = f"{left_t} ÷ {right_t}"
+        x0 = left["x0"]
+        x1 = lines[right_k]["x1"]
+        y0 = min(left["y0"], lines[right_k]["y0"])
+        y1 = max(left["y1"], lines[right_k]["y1"])
+        unused.discard(i)
+        unused.discard(right_k)
+        if op_k is not None:
+            unused.discard(op_k)
+        composed.append({"text": text, "x0": x0, "y0": y0, "x1": x1, "y1": y1})
+
+    remaining = [lines[i] for i in sorted(unused)] + composed
+    return sorted(remaining, key=lambda r: (r["y0"], r["x0"]))
+
+
+def cluster_reading_lines(
+    lines: list[dict[str, Any]],
+    y_tol: float = 14.0,
+    *,
+    divide_exercise: bool = False,
+) -> list[str]:
     """Join same-band boxes left→right so fraction lists stay on one Example line."""
     if not lines:
         return []
@@ -502,21 +649,32 @@ def cluster_reading_lines(lines: list[dict[str, Any]], y_tol: float = 14.0) -> l
     for band in bands:
         band.sort(key=lambda r: r["x0"])
         parts: list[str] = []
-        for idx, row in enumerate(band):
+        for row in band:
             t = (row.get("text") or "").strip()
             if not t:
                 continue
-            # Insert commas between adjacent fraction tokens when OCR dropped them.
+            if _is_div_op(t, loose=False):
+                t = "÷"
+            elif _is_div_op(t, loose=True) and parts and _is_fraction_token(parts[-1]):
+                # Lone dash/dot after a fraction on a divide page → ÷
+                t = "÷" if divide_exercise else t
             if (
                 parts
-                and re.search(r"\d/\d", parts[-1])
-                and (re.search(r"^\d+\s+\d/\d", t) or re.search(r"^\d/\d", t))
+                and _is_fraction_token(parts[-1])
+                and _is_fraction_token(t)
+                and not str(parts[-1]).endswith("÷")
+                and t != "÷"
             ):
-                parts[-1] = parts[-1].rstrip(",") + ","
+                if divide_exercise:
+                    parts.append("÷")
+                else:
+                    # Math Flash Example lists keep commas between fractions.
+                    parts[-1] = parts[-1].rstrip(",") + ","
             parts.append(t)
         line = " ".join(parts)
         line = re.sub(r"\s+,", ",", line)
         line = re.sub(r",\s*", ", ", line)
+        line = re.sub(r"\s*÷\s*", " ÷ ", line)
         line = re.sub(r"[ \t]{2,}", " ", line).strip()
         if line:
             out.append(line)
@@ -857,14 +1015,27 @@ def reconstruct_worked_div_fraction_chains(text: str) -> str:
 
 def text_from_lines_with_fractions(lines: list[dict[str, Any]]) -> str:
     composed = compose_stacked_fractions(lines)
-    text = "\n".join(cluster_reading_lines(composed)).strip()
+    composed = compose_fraction_division_ops(composed)
+    probe = " ".join((r.get("text") or "") for r in composed)
+    divide_exercise = bool(
+        re.search(r"\bdivide\b", probe, re.I)
+        or len(re.findall(r"\b[a-n][.)]\b", probe, re.I)) >= 4
+    )
+    text = "\n".join(
+        cluster_reading_lines(composed, divide_exercise=divide_exercise)
+    ).strip()
     text = reconstruct_glued_example_fractions(text)
     return reconstruct_worked_div_fraction_chains(text)
 
 
-def predict_structured(image_path: str, lang: str) -> list[dict[str, Any]]:
+def predict_structured(
+    image_path: str,
+    lang: str,
+    *,
+    _science_rec_attempted: bool = False,
+) -> list[dict[str, Any]]:
     prepared = preprocess_for_ocr(image_path)
-    engine = get_engine(lang)
+    engine = get_engine(lang, use_science_rec=not _science_rec_attempted)
     lines: list[dict[str, Any]] = []
 
     # Prefer classic ocr() path — it returns boxes reliably on 2.x.
@@ -902,6 +1073,16 @@ def predict_structured(image_path: str, lang: str) -> list[dict[str, Any]]:
             Path(prepared).unlink(missing_ok=True)
         except Exception:
             pass
+
+    if not lines and _science_rec_model_dir() is not None:
+        global _ENGINE, _ENGINE_KEY
+        _ENGINE = None
+        _ENGINE_KEY = None
+        print(
+            "[paddle_ocr_worker] science rec returned no lines; retrying stock English rec",
+            file=sys.stderr,
+        )
+        return predict_structured(image_path, lang, _science_rec_attempted=True)
 
     if not lines:
         return []

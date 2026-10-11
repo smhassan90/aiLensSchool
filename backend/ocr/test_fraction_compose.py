@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import unittest
 
+import re
+
 from paddle_ocr_worker import (
     cluster_reading_lines,
+    compose_fraction_division_ops,
     compose_stacked_fractions,
     text_from_lines_with_fractions,
 )
@@ -36,6 +39,35 @@ class FractionComposeTest(unittest.TestCase):
         composed = compose_stacked_fractions(lines)
         texts = [r["text"] for r in composed]
         self.assertIn("2 1/6", texts)
+
+    def test_mixed_divide_fraction(self) -> None:
+        # a. 1 2/5 ÷ 4/5  (whole + stacked, ÷, stacked)
+        lines = [
+            {"text": "a.", "x0": 10, "y0": 40, "x1": 30, "y1": 60},
+            {"text": "1", "x0": 40, "y0": 35, "x1": 55, "y1": 85},
+            {"text": "2", "x0": 60, "y0": 30, "x1": 75, "y1": 48},
+            {"text": "5", "x0": 60, "y0": 70, "x1": 75, "y1": 88},
+            {"text": "÷", "x0": 90, "y0": 50, "x1": 105, "y1": 70},
+            {"text": "4", "x0": 120, "y0": 30, "x1": 135, "y1": 48},
+            {"text": "5", "x0": 120, "y0": 70, "x1": 135, "y1": 88},
+        ]
+        stacked = compose_stacked_fractions(lines)
+        joined = compose_fraction_division_ops(stacked)
+        texts = [r["text"] for r in joined]
+        self.assertTrue(
+            any(re.search(r"1\s+2/5\s*÷\s*4/5", t) for t in texts),
+            texts,
+        )
+
+    def test_divide_exercise_inserts_div_not_comma(self) -> None:
+        lines = [
+            {"text": "Divide the following fractions", "x0": 10, "y0": 5, "x1": 200, "y1": 25},
+            {"text": "1 2/5", "x0": 40, "y0": 40, "x1": 90, "y1": 70},
+            {"text": "4/5", "x0": 110, "y0": 40, "x1": 150, "y1": 70},
+        ]
+        text = text_from_lines_with_fractions(lines)
+        self.assertIn("1 2/5 ÷ 4/5", text)
+        self.assertNotIn("1 2/5, 4/5", text)
 
     def test_cluster_keeps_fraction_list(self) -> None:
         lines = [

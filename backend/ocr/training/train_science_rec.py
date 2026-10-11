@@ -65,8 +65,19 @@ def write_config(
     save_dir = (ROOT / "output" / "science_rec").resolve()
     save_dir.mkdir(parents=True, exist_ok=True)
     resume_line = ""
+    pretrained_line = ""
     if resume and (save_dir / "best_accuracy.pdparams").is_file():
         resume_line = (save_dir / "best_accuracy").as_posix()
+    else:
+        # Fine-tune from stock English rec weights (charset expanded in science_charset.txt).
+        for rel in (
+            "pretrained_models/en_PP-OCRv4_rec_train/best_accuracy",
+            "pretrained_models/en_PP-OCRv3_rec_train/best_accuracy",
+        ):
+            cand = (repo / rel).as_posix()
+            if Path(cand + ".pdparams").is_file():
+                pretrained_line = cand
+                break
 
     # Base on PP-OCRv4 en rec config shape (works with PaddleOCR 2.7+ tools).
     yml = dedent(
@@ -81,7 +92,7 @@ def write_config(
           save_epoch_step: 1
           eval_batch_step: [0, 50]
           cal_metric_during_train: true
-          pretrained_model:
+          pretrained_model: {pretrained_line}
           checkpoints: {resume_line}
           save_inference_dir: {(OUT_INFER).resolve().as_posix()}
           use_visualdl: false

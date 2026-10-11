@@ -74,11 +74,24 @@ FRACTION_LABELS = [
 ]
 
 
-def random_fraction_labels(rng: random.Random, n: int = 80) -> list[str]:
+def random_fraction_labels(rng: random.Random, n: int = 120) -> list[str]:
     """Procedural ÷ / mixed / slash labels so the model learns patterns, not one page."""
     out: list[str] = []
+    letters = "abcdefghijklmn"
     for _ in range(n):
-        kind = rng.choice(["div_eq", "div_stack", "mixed", "mixed_sum", "slash", "reduce"])
+        kind = rng.choice(
+            [
+                "div_eq",
+                "div_stack",
+                "mixed",
+                "mixed_sum",
+                "mixed_div",
+                "frac_div",
+                "slash",
+                "reduce",
+                "lettered_div",
+            ]
+        )
         if kind == "div_eq":
             a, b = rng.randint(12, 96), rng.randint(2, 9)
             if a % b != 0:
@@ -96,6 +109,25 @@ def random_fraction_labels(rng: random.Random, n: int = 80) -> list[str]:
             w1, n1, d1 = rng.randint(1, 9), rng.randint(1, 8), rng.randint(2, 10)
             w2, n2, d2 = rng.randint(1, 9), rng.randint(1, 8), rng.randint(2, 10)
             out.append(f"{w1} {n1}/{d1} + {w2} {n2}/{d2}")
+        elif kind == "mixed_div":
+            # Page-57 style: 1 2/5 ÷ 4/5  or  12 3/5 ÷ 4 3/8
+            w1, n1, d1 = rng.randint(1, 16), rng.randint(1, 9), rng.randint(2, 12)
+            if rng.random() < 0.5:
+                n2, d2 = rng.randint(1, 9), rng.randint(2, 12)
+                out.append(f"{w1} {n1}/{d1} ÷ {n2}/{d2}")
+            else:
+                w2, n2, d2 = rng.randint(1, 9), rng.randint(1, 8), rng.randint(2, 12)
+                out.append(f"{w1} {n1}/{d1} ÷ {w2} {n2}/{d2}")
+        elif kind == "frac_div":
+            n1, d1 = rng.randint(1, 40), rng.randint(2, 45)
+            if rng.random() < 0.4:
+                out.append(f"{n1}/{d1} ÷ {rng.randint(2, 12)}")
+            else:
+                out.append(f"{n1}/{d1} ÷ {rng.randint(1, 9)}/{rng.randint(2, 20)}")
+        elif kind == "lettered_div":
+            letter = letters[rng.randint(0, len(letters) - 1)]
+            w, n, d = rng.randint(1, 12), rng.randint(1, 9), rng.randint(2, 12)
+            out.append(f"{letter}. {w} {n}/{d} ÷ {rng.randint(1, 9)}/{rng.randint(2, 12)}")
         elif kind == "slash":
             out.append(f"{rng.randint(1, 15)}/{rng.randint(2, 20)}")
         else:
@@ -150,6 +182,22 @@ MATH_OP_LABELS = [
     "2 1/6",
     "7 11/13",
     "9 2/11",
+    "1 2/5 ÷ 4/5",
+    "12 3/5 ÷ 4 3/8",
+    "15/42 ÷ 5",
+    "37/25 ÷ 1/75",
+    "84 ÷ 21/16",
+    "14 ÷ 1/13",
+    "100 ÷ 1/10",
+    "8 3/5 ÷ 6",
+    "3/5 ÷ 4",
+    "10 1/2 ÷ 5",
+    "16 ÷ 4 3/4",
+    "4 9/10 ÷ 2 1/2",
+    "3 5/6 ÷ 1 1/6",
+    "8 1/4 ÷ 3 5/8",
+    "a. 1 2/5 ÷ 4/5",
+    "Divide the following fractions",
     "1/3",
     "2/3",
     "7/3",

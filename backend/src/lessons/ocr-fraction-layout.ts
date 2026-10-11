@@ -66,7 +66,10 @@ export function stripExamplePrefix(line: string): { prefix: string; rest: string
   if (spaced) return { prefix: spaced[1], rest: spaced[2] };
   // Paddle often glues: Example3869102792
   const glued = line.match(/^(Example)(\d.*)$/i);
-  if (glued) return { prefix: `${glued[1]}: `, rest: glued[2] };
+  if (glued) {
+    const rest = glued[2].replace(/[a-z]/gi, '');
+    return { prefix: `${glued[1]}: `, rest };
+  }
   return { prefix: '', rest: line };
 }
 
