@@ -21,7 +21,10 @@ else
     python3-venv python3-pip libgomp1 \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxcb1 \
     >/dev/null
-  rm -rf /opt/pix2text
+  if [[ -d /opt/pix2text ]] && [[ -n "$(ls -A /opt/pix2text 2>/dev/null || true)" ]]; then
+    echo "ERROR: /opt/pix2text is a non-empty mount; remove volume hawknexa_pix2text_venv to reinstall" >&2
+    exit 1
+  fi
   python3 -m venv /opt/pix2text
   /opt/pix2text/bin/pip install --no-cache-dir -U pip
   /opt/pix2text/bin/pip install --no-cache-dir -r /app/ocr/requirements-pix2text.txt
