@@ -19,18 +19,10 @@ import {
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/layout/empty-state";
 import { teachersService } from "@/services/teachers.service";
-import type { TeacherClass } from "@/lib/types";
+import { compareTeacherClasses } from "@/lib/teacher-class-sort";
 import { cn } from "@/lib/utils";
 import { teacherClassDetailHref } from "@/lib/teacher-class-links";
 import { Users } from "lucide-react";
-
-function compareClasses(a: TeacherClass, b: TeacherClass) {
-  const grade = a.gradeName.localeCompare(b.gradeName, undefined, { numeric: true, sensitivity: "base" });
-  if (grade !== 0) return grade;
-  const section = a.sectionName.localeCompare(b.sectionName, undefined, { numeric: true, sensitivity: "base" });
-  if (section !== 0) return section;
-  return a.subjectName.localeCompare(b.subjectName, undefined, { sensitivity: "base" });
-}
 
 export default function TeacherClassesPage() {
   const router = useRouter();
@@ -43,7 +35,7 @@ export default function TeacherClassesPage() {
     () =>
       [...new Map(
         (data ?? []).map((cls) => [`${cls.sectionId}:${cls.subjectId}`, cls] as const),
-      ).values()].sort(compareClasses),
+      ).values()].sort(compareTeacherClasses),
     [data],
   );
 

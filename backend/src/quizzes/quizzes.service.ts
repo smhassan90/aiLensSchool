@@ -1234,7 +1234,13 @@ export class QuizzesService {
         section: { include: { grade: { select: { id: true, name: true } } } },
         school: { select: { id: true, name: true, logo: true } },
         examConfig: { select: { id: true, name: true, startDate: true, endDate: true } },
-        createdBy: { select: { firstName: true, lastName: true } },
+        createdBy: {
+          select: {
+            firstName: true,
+            lastName: true,
+            teacherProfile: { select: { gender: true } },
+          },
+        },
       },
     });
     if (!quiz) {
@@ -1348,7 +1354,13 @@ export class QuizzesService {
             subject: { select: { id: true, name: true } },
             section: { select: { id: true, name: true, grade: { select: { id: true, name: true } } } },
             examConfig: { select: { id: true, name: true, startDate: true } },
-            createdBy: { select: { firstName: true, lastName: true } },
+            createdBy: {
+              select: {
+                firstName: true,
+                lastName: true,
+                teacherProfile: { select: { gender: true } },
+              },
+            },
             _count: { select: { questions: true, assignments: true } },
           },
         }),
@@ -1370,7 +1382,13 @@ export class QuizzesService {
         examConfig: { select: { id: true, name: true, startDate: true, endDate: true } },
         examPaperAssignment: { select: { maxMarks: true } },
         assignments: true,
-        createdBy: { select: { firstName: true, lastName: true } },
+        createdBy: {
+          select: {
+            firstName: true,
+            lastName: true,
+            teacherProfile: { select: { gender: true } },
+          },
+        },
       },
     });
     if (!quiz) {

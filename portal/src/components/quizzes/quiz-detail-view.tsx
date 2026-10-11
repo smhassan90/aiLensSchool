@@ -28,12 +28,15 @@ import { ExamQuestionEditor } from "@/components/quizzes/exam-question-editor";
 
 import { QuizAnalysis } from "@/components/quizzes/quiz-analysis";
 
+import { ExamAnswerSpaceToggle } from "@/components/exams/exam-answer-space-toggle";
+
 import { ExamPrintView } from "@/components/exams/exam-print-view";
 
 import { ExamSolutionSheet } from "@/components/exams/exam-solution-sheet";
 
 import { quizzesService } from "@/services/quizzes.service";
 
+import type { ExamAnswerSpaceMode } from "@/lib/exam-answer-space";
 import {
   canPrintTeacherExamPaper,
   examPaperLabel,
@@ -47,7 +50,7 @@ import { downloadExamPaperDocx } from "@/lib/exam-paper-docx";
 
 import { difficultyColorClass, difficultyDescription, difficultyLabel } from "@/lib/difficulty";
 
-import { personFullName } from "@/lib/person-name";
+import { teacherDisplayName } from "@/lib/person-name";
 
 
 
@@ -64,6 +67,7 @@ export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admi
 
   const [printSolution, setPrintSolution] = useState(false);
   const [docxBusy, setDocxBusy] = useState(false);
+  const [answerSpace, setAnswerSpace] = useState<ExamAnswerSpaceMode>("on_paper");
 
   const { data: quiz, isLoading, isError, error } = useQuery({
 
@@ -129,7 +133,7 @@ export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admi
     if (!quiz) return;
     setDocxBusy(true);
     try {
-      await downloadExamPaperDocx(quiz);
+      await downloadExamPaperDocx(quiz, answerSpace);
     } finally {
       setDocxBusy(false);
     }
@@ -325,7 +329,11 @@ export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admi
 
             <span className="text-sm text-muted-foreground">
 
-              {personFullName(quiz.createdBy.firstName, quiz.createdBy.lastName)}
+              {teacherDisplayName(
+                quiz.createdBy.firstName,
+                quiz.createdBy.lastName,
+                quiz.createdBy.teacherProfile?.gender,
+              )}
 
             </span>
 
@@ -391,11 +399,30 @@ export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admi
 
                 />
 
+                <ExamAnswerSpaceToggle
+                  value={answerSpace}
+                  onChange={setAnswerSpace}
+                />
+
+                <ExamPrintView
+                  quiz={quiz}
+                  showAnswers={false}
+                  answerSpace={answerSpace}
+                />
+
               </div>
 
             ) : (
 
               <div className={isPending ? "mt-6 print:hidden" : "mt-6"}>
+
+                {!printSolution ? (
+                  <ExamAnswerSpaceToggle
+                    value={answerSpace}
+                    onChange={setAnswerSpace}
+                    className="mb-4"
+                  />
+                ) : null}
 
                 {printSolution ? (
 
@@ -403,7 +430,11 @@ export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admi
 
                 ) : (
 
-                  <ExamPrintView quiz={quiz} showAnswers={false} />
+                  <ExamPrintView
+                    quiz={quiz}
+                    showAnswers={false}
+                    answerSpace={answerSpace}
+                  />
 
                 )}
 

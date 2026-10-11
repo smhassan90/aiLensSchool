@@ -1,4 +1,5 @@
 import { apiClient, buildQuery } from "@/lib/api-client";
+import { sortTeacherClasses } from "@/lib/teacher-class-sort";
 import type { TeacherAttendanceHistoryResponse } from "@/services/teacher-attendance-report.service";
 import type {
   Paginated,
@@ -214,7 +215,7 @@ export type TeacherSupervision = {
 export const teachersService = {
   myClasses() {
     return apiClient<TeacherClassAssignment[]>("/teachers/me/classes").then((items) =>
-      items.map(mapClassAssignment),
+      sortTeacherClasses(items.map(mapClassAssignment)),
     );
   },
 

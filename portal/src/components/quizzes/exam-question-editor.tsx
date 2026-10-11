@@ -10,8 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { QuizMixFields } from "@/components/quizzes/quiz-mix-fields";
 import { AiWait } from "@/components/layout/ai-wait";
+import {
+  ExamPaperMarksBanner,
+  examPaperIncludedMarks,
+} from "@/components/exams/exam-paper-marks-banner";
 import type { Quiz, QuizQuestion } from "@/lib/types";
-import { quizQuestionTypeLabel } from "@/lib/utils";
+import { isExamPaper } from "@/lib/exam-paper";
+import { formatMarks, quizQuestionTypeLabel } from "@/lib/utils";
 import { quizzesService } from "@/services/quizzes.service";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
@@ -273,12 +278,15 @@ export function ExamQuestionEditor({
     });
   };
 
-  const toggleQuestion = (questionId: string) => {
-    onChange({
-      ...quiz,
-      questions: quiz.questions?.map((q) =>
-        q.id === questionId ? { ...q, included: !q.included } : q,
-      ),
+  const toastIncludedMarks = (nextQuiz: Quiz, justIncluded: boolean) => {
+    if (!isExamPaper(nextQuiz.paperKind)) return;
+    const { includedCount, includedMarks, requiredMarks } = examPaperIncludedMarks(nextQuiz);
+    const requiredPart =
+      requiredMarks != null ? ` of ${formatMarks(requiredMarks)} required` : "";
+    toast({
+      title: justIncluded ? "Question included" : "Question excluded",
+      description: `${formatMarks(includedMarks)} marks included${requiredPart} (${includedCount} question${includedCount === 1 ? "" : "s"}).`,
+      variant: "default",
     });
   };
 
@@ -415,6 +423,7 @@ export function ExamQuestionEditor({
 
   return (
     <div className="space-y-4">
+      <ExamPaperMarksBanner quiz={quiz} />
       <p className="text-sm text-muted-foreground">
         Edit wording directly in each question. Drag to reorder, toggle include/exclude, or add more
         questions below.
@@ -450,11 +459,16 @@ export function ExamQuestionEditor({
                     size="sm"
                     variant={question.included ? "default" : "outline"}
                     onClick={() => {
-                      toggleQuestion(question.id);
-                      const next = quiz.questions?.map((q) =>
-                        q.id === question.id ? { ...q, included: !q.included } : q,
+                      const nextIncluded = !question.included;
+                      const nextQuestions = sortQuestions(
+                        (quiz.questions ?? []).map((q) =>
+                          q.id === question.id ? { ...q, included: nextIncluded } : q,
+                        ),
                       );
-                      if (next) void persistQuestions(sortQuestions(next));
+                      const nextQuiz = { ...quiz, questions: nextQuestions };
+                      onChange(nextQuiz);
+                      toastIncludedMarks(nextQuiz, nextIncluded);
+                      void persistQuestions(nextQuestions);
                     }}
                   >
                     {question.included ? "Included" : "Excluded"}

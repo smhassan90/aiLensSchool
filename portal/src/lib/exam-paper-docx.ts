@@ -11,10 +11,11 @@ import {
   UnderlineType,
   convertInchesToTwip,
 } from "docx";
+import type { ExamAnswerSpaceMode } from "@/lib/exam-answer-space";
 import { examPaperLabel } from "@/lib/exam-paper";
 import type { Quiz, QuizQuestion } from "@/lib/types";
 import { formatMarks, quizOptionLabel, quizQuestionTypeLabel } from "@/lib/utils";
-import { personFullName } from "@/lib/person-name";
+import { teacherDisplayName } from "@/lib/person-name";
 
 const BLACK = "000000";
 
@@ -87,15 +88,20 @@ function blankAnswerLines(count: number) {
   );
 }
 
-function buildBody(quiz: Quiz): Paragraph[] {
+function buildBody(quiz: Quiz, answerSpace: ExamAnswerSpaceMode = "on_paper"): Paragraph[] {
   const groups = groupedQuestions(quiz.questions ?? []);
   const totalMarks = formatMarks(quiz.totalMarks ?? 0);
   const classLabel = [quiz.section?.grade?.name, quiz.section?.name].filter(Boolean).join(" ");
   const schoolName = quiz.school?.name?.trim() || "School";
   const examDate = formatExamDate(quiz);
   const paperLabel = examPaperLabel(quiz.paperKind);
+  const writeOnAnswerSheet = answerSpace === "answer_sheet";
   const preparedBy = quiz.createdBy
-    ? personFullName(quiz.createdBy.firstName, quiz.createdBy.lastName)
+    ? teacherDisplayName(
+        quiz.createdBy.firstName,
+        quiz.createdBy.lastName,
+        quiz.createdBy.teacherProfile?.gender,
+      )
     : null;
 
   const paras: Paragraph[] = [
@@ -198,7 +204,9 @@ function buildBody(quiz: Quiz): Paragraph[] {
       spacing: { after: 200 },
       children: [
         new TextRun({
-          text: "Instructions: Read each question carefully. Attempt all questions. Write clearly. Marks for each question are shown in brackets.",
+          text: writeOnAnswerSheet
+            ? "Instructions: Read each question carefully. Attempt all questions. Write all answers on the answer sheet — do not write on this question paper. Marks for each question are shown in brackets."
+            : "Instructions: Read each question carefully. Attempt all questions. Write clearly on this question paper. Marks for each question are shown in brackets.",
           size: 18,
           italics: true,
           font: "Times New Roman",
@@ -287,7 +295,7 @@ function buildBody(quiz: Quiz): Paragraph[] {
             }),
           );
         });
-      } else {
+      } else if (!writeOnAnswerSheet) {
         const answerLines =
           question.type === "LONG_ANSWER" ? 7 : question.type === "SHORT_ANSWER" ? 3 : 1;
         paras.push(...blankAnswerLines(answerLines));
@@ -315,7 +323,10 @@ function buildBody(quiz: Quiz): Paragraph[] {
   return paras;
 }
 
-export async function buildExamPaperDocxBlob(quiz: Quiz): Promise<Blob> {
+export async function buildExamPaperDocxBlob(
+  quiz: Quiz,
+  answerSpace: ExamAnswerSpaceMode = "on_paper",
+): Promise<Blob> {
   const doc = new Document({
     sections: [
       {
@@ -355,7 +366,7 @@ export async function buildExamPaperDocxBlob(quiz: Quiz): Promise<Blob> {
             },
           },
         },
-        children: buildBody(quiz),
+        children: buildBody(quiz, answerSpace),
         footers: {
           default: new Footer({
             children: [
@@ -408,8 +419,11 @@ export function examPaperDocxFilename(quiz: Quiz): string {
   return `${paper}_${klass}_${subject || "Exam"}.docx`;
 }
 
-export async function downloadExamPaperDocx(quiz: Quiz): Promise<void> {
-  const blob = await buildExamPaperDocxBlob(quiz);
+export async function downloadExamPaperDocx(
+  quiz: Quiz,
+  answerSpace: ExamAnswerSpaceMode = "on_paper",
+): Promise<void> {
+  const blob = await buildExamPaperDocxBlob(quiz, answerSpace);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

@@ -419,7 +419,11 @@ export interface Quiz {
   examPaperAssignment?: { maxMarks: number } | null;
   section?: { id: string; name: string; grade?: { id: string; name: string } | null };
   subject?: { id: string; name: string };
-  createdBy?: { firstName: string; lastName: string } | null;
+  createdBy?: {
+    firstName: string;
+    lastName: string;
+    teacherProfile?: { gender?: "MALE" | "FEMALE" | "OTHER" | null } | null;
+  } | null;
 }
 
 export interface QuizAnalysisStudent {

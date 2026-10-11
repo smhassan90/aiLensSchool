@@ -26,13 +26,14 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden p-0 sm:items-center sm:p-4">
       <div
         className="fixed inset-0 bg-black/50"
         onClick={() => onOpenChange(false)}
         aria-hidden
       />
-      <div className="relative z-50 flex max-h-full w-full justify-center overflow-y-auto">
+      {/* No outer scroll — tall dialogs scroll inside DialogContent only (avoids blank space below). */}
+      <div className="relative z-50 flex max-h-full min-h-0 w-full justify-center overflow-hidden">
         {children}
       </div>
     </div>
@@ -49,7 +50,12 @@ export function DialogContent({
   onClose?: () => void;
 }) {
   return (
-    <div className={cn("relative my-auto w-full max-w-lg rounded-t-lg border bg-card p-4 shadow-lg sm:rounded-lg sm:p-6", className)}>
+    <div
+      className={cn(
+        "relative w-full max-w-lg max-h-[min(92dvh,100%)] overflow-y-auto rounded-t-lg border bg-card p-4 shadow-lg sm:rounded-lg sm:p-6",
+        className,
+      )}
+    >
       {onClose && (
         <Button
           variant="ghost"

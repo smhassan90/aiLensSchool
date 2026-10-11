@@ -26,7 +26,7 @@ export function personFullName(
 
 type GenderLike = 'MALE' | 'FEMALE' | 'OTHER' | string | null | undefined;
 
-/** Teacher label with honorific: "Miss Saima" / "Mr. Daniyal". */
+/** Teacher label with honorific: "Miss Saima" / "Sir Daniyal". */
 export function teacherDisplayName(
   firstName?: string | null,
   lastName?: string | null,
@@ -34,7 +34,7 @@ export function teacherDisplayName(
 ): string {
   const name = personFullName(firstName, lastName);
   if (!name) return '';
-  if (gender === 'MALE') return `Mr. ${name}`;
+  if (gender === 'MALE') return `Sir ${name}`;
   if (gender === 'FEMALE') return `Miss ${name}`;
   return name;
 }

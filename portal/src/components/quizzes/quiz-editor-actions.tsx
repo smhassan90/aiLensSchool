@@ -15,7 +15,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiClientError } from "@/lib/api-client";
-import { formatMarks } from "@/lib/utils";
+import {
+  ExamPaperMarksBanner,
+  examPaperIncludedMarks,
+} from "@/components/exams/exam-paper-marks-banner";
 import type { Quiz } from "@/lib/types";
 import { isExamPaper } from "@/lib/exam-paper";
 import { useToast } from "@/providers/toast-provider";
@@ -67,12 +70,7 @@ export function QuizEditorActions({
   const [dueAt, setDueAt] = useState("");
   const examPaper = isExamPaper(quiz.paperKind);
 
-  const includedCount = quiz.questions?.filter((q) => q.included).length ?? 0;
-  const includedMarks =
-    quiz.questions?.reduce((sum, q) => sum + (q.included ? Number(q.marks) : 0), 0) ?? 0;
-  const requiredMarks = examPaper ? quiz.examPaperAssignment?.maxMarks : undefined;
-  const marksReady =
-    requiredMarks == null || Math.round(includedMarks * 100) === requiredMarks * 100;
+  const { includedCount, marksReady } = examPaperIncludedMarks(quiz);
 
   const saveDraft = useMutation({
     mutationFn: () => quizzesService.updateQuestions(quizId, questionPayload(quiz)),
@@ -185,22 +183,7 @@ export function QuizEditorActions({
 
   return (
     <>
-      {examPaper && requiredMarks != null ? (
-        <div
-          className={`mt-6 rounded-lg border px-4 py-3 text-sm ${
-            marksReady ? "border-border bg-muted/30" : "border-amber-300 bg-amber-50 text-amber-950"
-          }`}
-        >
-          <p className="font-medium">
-            Paper total: {formatMarks(includedMarks)} / {formatMarks(requiredMarks)} marks
-          </p>
-          {!marksReady ? (
-            <p className="mt-1">
-              Adjust included question marks until the total is exactly {requiredMarks} before submitting.
-            </p>
-          ) : null}
-        </div>
-      ) : null}
+      <ExamPaperMarksBanner quiz={quiz} className="mt-6" />
       <div className="mt-6 flex flex-wrap justify-end gap-3">
         <Button
           type="button"

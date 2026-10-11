@@ -3,7 +3,7 @@
 import type { Quiz, QuizQuestion } from "@/lib/types";
 import { SchoolLetterhead } from "@/components/brand/school-letterhead";
 import { examPaperLabel } from "@/lib/exam-paper";
-import { personFullName } from "@/lib/person-name";
+import { teacherDisplayName } from "@/lib/person-name";
 
 function answerForQuestion(question: QuizQuestion) {
   if (question.correctAnswer?.trim()) return question.correctAnswer.trim();
@@ -28,7 +28,11 @@ export function ExamSolutionSheet({ quiz }: { quiz: Quiz }) {
         </p>
         {quiz.createdBy ? (
           <p className="mt-1 text-xs text-neutral-600">
-            {personFullName(quiz.createdBy.firstName, quiz.createdBy.lastName)}
+            {teacherDisplayName(
+              quiz.createdBy.firstName,
+              quiz.createdBy.lastName,
+              quiz.createdBy.teacherProfile?.gender,
+            )}
           </p>
         ) : null}
       </header>

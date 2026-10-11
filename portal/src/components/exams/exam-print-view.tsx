@@ -1,10 +1,13 @@
 "use client";
 
 import { SchoolLetterhead } from "@/components/brand/school-letterhead";
+import type { ExamAnswerSpaceMode } from "@/lib/exam-answer-space";
 import { examPaperLabel } from "@/lib/exam-paper";
 import type { Quiz, QuizQuestion } from "@/lib/types";
 import { formatMarks, quizOptionLabel, quizQuestionTypeLabel } from "@/lib/utils";
-import { personFullName } from "@/lib/person-name";
+import { teacherDisplayName } from "@/lib/person-name";
+
+export type { ExamAnswerSpaceMode };
 
 function sectionHeading(type: string, letter: string) {
   if (type === "MCQ") return `Section ${letter} — Multiple Choice Questions`;
@@ -41,9 +44,12 @@ function formatExamDate(quiz: Quiz) {
 export function ExamPrintView({
   quiz,
   showAnswers = false,
+  answerSpace = "on_paper",
 }: {
   quiz: Quiz;
   showAnswers?: boolean;
+  /** on_paper = ruling lines under short/long; answer_sheet = no writing space on QP */
+  answerSpace?: ExamAnswerSpaceMode;
 }) {
   const groups = groupedQuestions(quiz.questions ?? []);
   const totalMarks = formatMarks(quiz.totalMarks ?? 0);
@@ -51,6 +57,7 @@ export function ExamPrintView({
   const schoolName = quiz.school?.name?.trim() || "School";
   const examDate = formatExamDate(quiz);
   const paperLabel = examPaperLabel(quiz.paperKind);
+  const writeOnAnswerSheet = answerSpace === "answer_sheet";
   let number = 1;
 
   return (
@@ -94,7 +101,12 @@ export function ExamPrintView({
             </p>
             {quiz.createdBy ? (
               <p className="mt-1 font-serif text-xs italic text-neutral-800">
-                Prepared by {personFullName(quiz.createdBy.firstName, quiz.createdBy.lastName)}
+                Prepared by{" "}
+                {teacherDisplayName(
+                  quiz.createdBy.firstName,
+                  quiz.createdBy.lastName,
+                  quiz.createdBy.teacherProfile?.gender,
+                )}
               </p>
             ) : null}
           </header>
@@ -109,8 +121,9 @@ export function ExamPrintView({
           </div>
 
           <p className="mt-3 border-l-2 border-black pl-3 font-serif text-xs italic leading-relaxed text-neutral-800">
-            Instructions: Read each question carefully. Attempt all questions. Write clearly. Marks
-            for each question are shown in brackets [ ].
+            {writeOnAnswerSheet
+              ? "Instructions: Read each question carefully. Attempt all questions. Write all answers on the answer sheet — do not write on this question paper. Marks for each question are shown in brackets [ ]."
+              : "Instructions: Read each question carefully. Attempt all questions. Write clearly on this question paper. Marks for each question are shown in brackets [ ]."}
           </p>
 
           <div className="my-5 border-t border-black" />
@@ -157,7 +170,7 @@ export function ExamPrintView({
                               </li>
                             ))}
                           </ul>
-                        ) : (
+                        ) : writeOnAnswerSheet ? null : (
                           <div className="mt-3 space-y-3">
                             {Array.from({ length: answerLines }, (_, line) => (
                               <div key={line} className="h-7 border-b border-neutral-500" />

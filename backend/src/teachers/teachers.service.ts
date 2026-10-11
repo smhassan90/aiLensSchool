@@ -756,10 +756,20 @@ export class TeachersService {
       enrollmentCounts.map((row) => [row.sectionId, row._count._all]),
     );
 
-    return rows.map((row) => ({
+    const withCounts = rows.map((row) => ({
       ...row,
       studentCount: studentsBySection.get(row.sectionId) ?? 0,
     }));
+
+    // Class (grade) → section → subject for lesson / marks dropdowns.
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+    return withCounts.sort((a, b) => {
+      const grade = collator.compare(a.section?.grade?.name ?? '', b.section?.grade?.name ?? '');
+      if (grade !== 0) return grade;
+      const section = collator.compare(a.section?.name ?? '', b.section?.name ?? '');
+      if (section !== 0) return section;
+      return collator.compare(a.subject?.name ?? '', b.subject?.name ?? '');
+    });
   }
 
   /** Default subject so class teachers can enter marks when the grade has none yet. */

@@ -9,12 +9,14 @@ import { PageLoader } from "@/components/layout/page-loader";
 import { EmptyState } from "@/components/layout/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ExamAnswerSpaceToggle } from "@/components/exams/exam-answer-space-toggle";
 import { ExamPrintView } from "@/components/exams/exam-print-view";
 import { ExamSolutionSheet } from "@/components/exams/exam-solution-sheet";
 import { RejectExamPaperDialog } from "@/components/exams/reject-exam-paper-dialog";
 import { ExamDateDialog } from "@/components/exams/exam-date-dialog";
 import { quizzesService } from "@/services/quizzes.service";
 import { academicsService } from "@/services/academics.service";
+import type { ExamAnswerSpaceMode } from "@/lib/exam-answer-space";
 import {
   canPrintTeacherExamPaper,
   examPaperLabel,
@@ -25,7 +27,7 @@ import {
 } from "@/lib/exam-paper";
 import { downloadExamPaperDocx } from "@/lib/exam-paper-docx";
 import { difficultyColorClass, difficultyDescription, difficultyLabel } from "@/lib/difficulty";
-import { personFullName } from "@/lib/person-name";
+import { teacherDisplayName } from "@/lib/person-name";
 import { formatDate, localDateISO } from "@/lib/utils";
 import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
@@ -44,6 +46,7 @@ export function ExamPaperPrintScreen({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [printSolution, setPrintSolution] = useState(false);
+  const [answerSpace, setAnswerSpace] = useState<ExamAnswerSpaceMode>("on_paper");
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [examDateOpen, setExamDateOpen] = useState(false);
@@ -139,7 +142,7 @@ export function ExamPaperPrintScreen({
     if (!quiz) return;
     setDocxBusy(true);
     try {
-      await downloadExamPaperDocx(quiz);
+      await downloadExamPaperDocx(quiz, answerSpace);
       toast({ title: "Question paper downloaded", variant: "success" });
     } catch (err) {
       toast({
@@ -244,7 +247,11 @@ export function ExamPaperPrintScreen({
           ) : null}
           {quiz.createdBy ? (
             <span className="text-sm text-muted-foreground">
-              {personFullName(quiz.createdBy.firstName, quiz.createdBy.lastName)}
+              {teacherDisplayName(
+                quiz.createdBy.firstName,
+                quiz.createdBy.lastName,
+                quiz.createdBy.teacherProfile?.gender,
+              )}
             </span>
           ) : null}
         </div>
@@ -261,7 +268,18 @@ export function ExamPaperPrintScreen({
           </p>
         ) : null}
       </div>
-      {printSolution ? <ExamSolutionSheet quiz={quiz} /> : <ExamPrintView quiz={quiz} showAnswers={false} />}
+      {!printSolution ? (
+        <ExamAnswerSpaceToggle
+          value={answerSpace}
+          onChange={setAnswerSpace}
+          className="mb-4"
+        />
+      ) : null}
+      {printSolution ? (
+        <ExamSolutionSheet quiz={quiz} />
+      ) : (
+        <ExamPrintView quiz={quiz} showAnswers={false} answerSpace={answerSpace} />
+      )}
       <style>{`
         @media print {
           nav, aside { display: none !important; }
