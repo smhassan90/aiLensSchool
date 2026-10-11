@@ -1,4 +1,5 @@
 import {
+  countConsecutiveDuplicateWords,
   mergePaddleAndTesseractPageOcr,
   ocrLinesDuplicate,
   pickOcrMergePrimary,
@@ -156,6 +157,116 @@ c) Mass                        d) Velocity
     expect(merged).toMatch(/\|\s*a\)\s*\|\s*Yes\s*\|\s*Yes\s*\|\s*Yes\s*\|/i);
     expect(merged).toMatch(/remains constant/i);
     expect(merged).toMatch(/\bMass\b/i);
+  });
+
+  it('takes MCQ options and ÷ lines from Tess when Paddle mangles them', () => {
+    const paddle = `
+Exercise
+3.Which of these numbers is not divisible by 5?
+b.1703760C.704
+Let us check
+844=21
+`.trim();
+    const tess = `
+Exercise
+3. Which of these numbers is not divisible by 5?
+a. 16495          b. 1703760 c. 704
+Let us check
+84 ÷ 4 = 21
+`.trim();
+    const merged = mergePaddleAndTesseractPageOcr(paddle, tess);
+    expect(merged).toMatch(/divisible by 5/i);
+    expect(merged).toMatch(/a\.\s*16495/i);
+    expect(merged).toMatch(/b\.\s*1703760/i);
+    expect(merged).toMatch(/c\.\s*704/i);
+    expect(merged).not.toMatch(/1703760C\.704/i);
+    expect(merged).toMatch(/84\s*÷\s*4\s*=\s*21/);
+    expect(merged).not.toMatch(/^844=21$/m);
+  });
+
+  it('keeps clean Paddle over garbled Tess on multi-box math intro pages', () => {
+    const paddle = `
+YOUR DIGITAL RESOURCE
+Multiples
+2
+and Factors
+In this unit students will learn to
+find HCF of
+two numbers up to 2-digit numbers
+prime factorisation method
+division method
+find LCM of
+two numbers up to 2-digit numbers
+three numbers up to 2-digit numbers using
+prime factorisation method
+division method
+solve real Life situations involving HCF and LCM
+MATH
+FLASH
+You have already learnt:
+the rules of divisibility of 2,3,5,10
+to differentiate between prime and
+composite numbers
+Example:
+2,3,5,7,19
+Prime numbers:
+Composite numbers:1015,38,56
+KEY
+VOCABULARY
+to find factors and multiples
+to find common factors and highest common
+factor using Venn diagram and by prime
+factorisation method
+to find common multiples and lowest
+common multiple
+Multiples and Factors
+`.trim();
+    const tess = `
+YOUR DIGITAL RESOURCE
+OFFS] ¢
+«oe PW ah 4
+u I les [SF LB als
+and Fq et
+In this unit students wi learn to:
+find find of of i
+two two numbers up to 2-digjt numbers
+e three numbers up to 2-digit numbers using
+° prime factorisation metheg
+e division method
+e find of of
+° two numbers up to 2-digit numbers
+e three numbers up to 2-digit numbers using
+e prime factorisation method
+e division method
+solve solve real life situations involving and
+MATH
+FLASH
+You have already learnt:
+the the rules of divisibility of 2, 3, 5, i
+to to differentiate between prime a
+composite numbers
+Example: Example: 5719 a
+Prime numbers: Prime numbers: , os c a8 56 KEY
+Composite Composite numbers: ea VOCABULARY
+factor,common factor, to find common factor
+factor using Venn diagram multiple, Least common
+multiple iod multiple, divisible,
+Jia factorisation = attiples and lowest visibility rule
+to find common mutt
+Multiples and Factors
+`.trim();
+    expect(pickOcrMergePrimary(paddle, tess)).toBe('paddle');
+    const merged = mergePaddleAndTesseractPageOcr(paddle, tess);
+    expect(merged).toMatch(/find HCF of/i);
+    expect(merged).toMatch(/find LCM of/i);
+    expect(merged).toMatch(/solve real Life situations involving HCF and LCM/i);
+    expect(merged).not.toMatch(/\bfind find\b/i);
+    expect(merged).not.toMatch(/\btwo two\b/i);
+    expect(merged).not.toMatch(/\bthe the\b/i);
+    expect(merged).not.toMatch(/OFFS]/i);
+    expect(countConsecutiveDuplicateWords(merged)).toBeLessThan(
+      countConsecutiveDuplicateWords(tess),
+    );
   });
 
   it('stitches Tess rope opener onto Paddle mid-sentence body instead of orphan truncation', () => {

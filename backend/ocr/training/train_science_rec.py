@@ -38,6 +38,7 @@ def find_paddleocr_repo() -> Path | None:
     candidates.extend(
         [
             ROOT / "PaddleOCR",
+            BACKEND_OCR.parent / "PaddleOCR",
             BACKEND_OCR.parent.parent / "PaddleOCR",
             Path.home() / "PaddleOCR",
         ]
@@ -48,7 +49,13 @@ def find_paddleocr_repo() -> Path | None:
     return None
 
 
-def write_config(repo: Path, epochs: int, batch: int) -> Path:
+def write_config(
+    repo: Path,
+    epochs: int,
+    batch: int,
+    *,
+    resume: bool = False,
+) -> Path:
     # Paths must be absolute for train.py when cwd is the repo.
     train_list = (DATA / "train" / "rec_gt.txt").resolve()
     val_list = (DATA / "val" / "rec_gt.txt").resolve()
@@ -57,6 +64,9 @@ def write_config(repo: Path, epochs: int, batch: int) -> Path:
     charset = CHARSET.resolve()
     save_dir = (ROOT / "output" / "science_rec").resolve()
     save_dir.mkdir(parents=True, exist_ok=True)
+    resume_line = ""
+    if resume and (save_dir / "best_accuracy.pdparams").is_file():
+        resume_line = (save_dir / "best_accuracy").as_posix()
 
     # Base on PP-OCRv4 en rec config shape (works with PaddleOCR 2.7+ tools).
     yml = dedent(
@@ -72,7 +82,7 @@ def write_config(repo: Path, epochs: int, batch: int) -> Path:
           eval_batch_step: [0, 50]
           cal_metric_during_train: true
           pretrained_model:
-          checkpoints:
+          checkpoints: {resume_line}
           save_inference_dir: {(OUT_INFER).resolve().as_posix()}
           use_visualdl: false
           infer_img:
@@ -81,6 +91,7 @@ def write_config(repo: Path, epochs: int, batch: int) -> Path:
           infer_mode: false
           use_space_char: true
           distributed: false
+          export_with_pir: false
 
         Architecture:
           model_type: rec
@@ -214,6 +225,11 @@ def main() -> None:
     ap.add_argument("--epochs", type=int, default=3)
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--prepare-only", action="store_true")
+    ap.add_argument(
+        "--resume",
+        action="store_true",
+        help="Continue from output/science_rec/best_accuracy when present",
+    )
     args = ap.parse_args()
 
     if not (DATA / "train" / "rec_gt.txt").is_file():
@@ -249,7 +265,7 @@ def main() -> None:
             return
 
     assert repo is not None
-    cfg = write_config(repo, args.epochs, args.batch)
+    cfg = write_config(repo, args.epochs, args.batch, resume=args.resume)
     if args.prepare_only:
         print("Prepare-only: not starting train.")
         return
@@ -266,6 +282,7 @@ def main() -> None:
         "-o",
         f"Global.pretrained_model={(ROOT / 'output' / 'science_rec' / 'best_accuracy').as_posix()}",
         f"Global.save_inference_dir={OUT_INFER.as_posix()}",
+        "Global.export_with_pir=False",
     ]
     print("Exporting:", " ".join(export_cmd))
     try:

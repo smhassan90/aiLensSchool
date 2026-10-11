@@ -36,6 +36,7 @@ yarn-error.log*
 /ocr/training/data/
 /ocr/training/output/
 /ocr/training/PaddleOCR/
+/PaddleOCR/
 /ocr/models/science-en-rec/**
 !/ocr/models/science-en-rec/README.txt
 !/ocr/models/science-en-rec/science_charset.txt

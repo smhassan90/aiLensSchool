@@ -26,6 +26,9 @@ export function lineLooksLikeMathOrFormula(line: string): boolean {
   if (MATH_SYMBOL_RE.test(trimmed) || GREEK_LETTER_RE.test(trimmed)) return true;
   if (/\b[A-Za-zλμν]\s*=\s*[-\d.]/u.test(trimmed)) return true;
   if (/v\s*=\s*f\s*[×x*]\s*/i.test(trimmed)) return true;
+  // Division / root checks common in primary math textbooks ("Let us check").
+  if (/\d+\s*[÷\/]\s*\d+\s*=/.test(trimmed)) return true;
+  if (/√\s*\(?\s*[\dA-Za-z]/.test(trimmed)) return true;
   // Require formula shape — do not shield English question stems that mention units.
   const looksLikeQuestionProse =
     /\?/.test(trimmed) ||

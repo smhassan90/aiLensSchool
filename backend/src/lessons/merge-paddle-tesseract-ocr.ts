@@ -13,6 +13,7 @@ import {
   isProtectedStemAcronym,
   looksLikeScienceNumericalsPage,
 } from './science-ocr-clean';
+import { countSlashFractions } from './ocr-fraction-layout';
 import { stripInterleavedWeblinkSidebar } from './sidebar-layout-ocr';
 
 function normalizeLineKey(line: string): string {
@@ -139,23 +140,240 @@ function primaryWordContainmentInAlternate(primary: string, alternate: string): 
   return hit / pWords.length;
 }
 
+/** Consecutive repeated tokens: "find find", "Prime numbers: Prime numbers:". */
+export function countConsecutiveDuplicateWords(text: string): number {
+  const words = (text ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 1);
+  let dupes = 0;
+  for (let i = 1; i < words.length; i += 1) {
+    // Yes/No MCQ grids intentionally repeat short answer tokens.
+    if (words[i] === 'yes' || words[i] === 'no') continue;
+    if (words[i] === words[i - 1]) dupes += 1;
+  }
+  return dupes;
+}
+
+/**
+ * Higher = cleaner usable lesson transcript. Used to reject merges that are
+ * longer but more garbled than a single engine (colored textbook sideboxes).
+ */
+export function scoreOcrTranscriptCleanliness(text: string): number {
+  const value = (text ?? '').trim();
+  if (!value) return 0;
+  const latin = countLatinLetters(value);
+  const dupes = countConsecutiveDuplicateWords(value);
+  const lines = value.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const garbageLines = lines.filter((l) => lineIsMostlyGarbage(l)).length;
+  const symbolJunk = (value.match(/[|£€©®@#\\<>{}«»]/g) ?? []).length;
+  const cueBonus = criticalPageCueHits(value) * 40;
+  const tableBonus = countMcqOrTableSignals(value) * 28;
+  const mathOpBonus = (value.match(/[÷√×]/g) ?? []).length * 35;
+  const slashFracBonus = countSlashFractions(value) * 45;
+  // Glued Example digit soup still beats Tess garble — reconstruct can recover it.
+  const gluedExampleBonus = (value.match(/\bExample\d{5,}/gi) ?? []).length * 60;
+  const mangledOptPenalty = value
+    .split(/\r?\n/)
+    .filter((l) => lineLooksLikeMangledMcqOptions(l)).length * 40;
+  const collapsedArithPenalty = value
+    .split(/\r?\n/)
+    .filter((l) => lineLooksLikeCollapsedArithmetic(l)).length * 50;
+  const incompletePenalty = englishPageTranscriptLooksIncomplete(value) ? 120 : 0;
+  return (
+    latin +
+    cueBonus +
+    tableBonus +
+    mathOpBonus +
+    slashFracBonus +
+    gluedExampleBonus +
+    Math.min(300, Math.floor(value.length / 5)) -
+    dupes * 90 -
+    garbageLines * 35 -
+    symbolJunk * 12 -
+    mangledOptPenalty -
+    collapsedArithPenalty -
+    incompletePenalty
+  );
+}
+
+/** a./b./c./d. markers with following values (inline or stacked MCQ options). */
+export function countInlineMcqOptions(text: string): number {
+  return (text.match(/\b[a-d][.)]\s*\S+/gi) ?? []).length;
+}
+
+/** Paddle often glues options: "b.1703760C.704" or drops option a. */
+export function lineLooksLikeMangledMcqOptions(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  if (/[a-d][.)]\s*\d+\s*[A-Dc][.)]/i.test(trimmed)) return true;
+  if (/\d[A-D][.)]\d/i.test(trimmed)) return true;
+  const markers = trimmed.match(/\b[a-d][.)]/gi) ?? [];
+  if (markers.length >= 2 && !/\ba[.)]/i.test(trimmed) && /\bb[.)]/i.test(trimmed)) {
+    return true;
+  }
+  return false;
+}
+
+/** "844=21" style — operator dropped between operands. */
+export function lineLooksLikeCollapsedArithmetic(line: string): boolean {
+  const compact = line.replace(/\s+/g, '');
+  if (!compact) return false;
+  if (/[÷√×+\-/%]/.test(compact)) return false;
+  // Three+ digits stuck before "=" with a short right-hand side (e.g. 844=21).
+  return /^\d{3,}=\d{1,4}$/.test(compact);
+}
+
+export function lineHasVisibleMathOperator(line: string): boolean {
+  return /[÷√×]/.test(line) || /\d\s*[÷\/]\s*\d/.test(line) || /√\s*\(?\s*\d/.test(line);
+}
+
 /**
  * Prefer a longer alternate line when it already contains the primary reading
  * (common when Paddle starts mid-sentence and Tess has the full clause).
+ * Never replace a clean primary with a longer garbled/duplicative alternate.
  */
 export function preferFullerOcrLine(primary: string, alternate: string): string {
   const p = primary.trim();
   const a = alternate.trim();
   if (!a) return p;
   if (!p) return a;
-  const containment = primaryWordContainmentInAlternate(p, a);
+  if (lineIsMostlyGarbage(a) && !lineIsMostlyGarbage(p)) return p;
   if (
-    containment >= 0.72 &&
-    (a.length >= p.length + 18 || countLatinLetters(a) >= countLatinLetters(p) + 20)
+    countConsecutiveDuplicateWords(a) > countConsecutiveDuplicateWords(p) &&
+    !lineIsMostlyGarbage(p)
+  ) {
+    return p;
+  }
+  // Tess often keeps MCQ option letters/spacing that Paddle glues or drops.
+  if (
+    (lineLooksLikeMangledMcqOptions(p) || countInlineMcqOptions(a) >= countInlineMcqOptions(p) + 1) &&
+    countInlineMcqOptions(a) >= 2 &&
+    !lineLooksLikeMangledMcqOptions(a) &&
+    (wordOverlapRatio(p, a) >= 0.28 || primaryWordContainmentInAlternate(p, a) >= 0.5)
   ) {
     return a;
   }
+  // Tess keeps ÷ / √ that Paddle collapses ("84 ÷ 4 = 21" → "844=21").
+  if (
+    lineLooksLikeCollapsedArithmetic(p) &&
+    lineHasVisibleMathOperator(a) &&
+    (wordOverlapRatio(p, a) >= 0.2 || /\d/.test(p) && /\d/.test(a))
+  ) {
+    return a;
+  }
+  if (!lineHasVisibleMathOperator(p) && lineHasVisibleMathOperator(a)) {
+    const pDigits = (p.match(/\d+/g) ?? []).join('');
+    const aDigits = (a.match(/\d+/g) ?? []).join('');
+    if (
+      pDigits.length >= 3 &&
+      aDigits.length >= 3 &&
+      (aDigits.includes(pDigits) || pDigits.includes(aDigits.slice(0, Math.min(4, aDigits.length))))
+    ) {
+      return a;
+    }
+  }
+  const containment = primaryWordContainmentInAlternate(p, a);
+  if (
+    containment >= 0.72 &&
+    (a.length >= p.length + 18 || countLatinLetters(a) >= countLatinLetters(p) + 20) &&
+    scoreOcrTranscriptCleanliness(a) >= scoreOcrTranscriptCleanliness(p) - 40
+  ) {
+    return a;
+  }
+  // Word-stitch only when primary has clear garbage tokens; otherwise keep paddle.
+  const pWords = p.match(/\S+/g) ?? [];
+  const hasGarbagePrimary =
+    pWords.some((w) => tokenLooksGarbage(w)) || lineLooksLikeMangledMcqOptions(p);
+  if (!hasGarbagePrimary) return p;
   return mergeLineWords(p, a);
+}
+
+/**
+ * When Paddle reading is primary but Tess kept clearer a/b/c options (or ÷/√
+ * lines), graft those alternate lines in after the matching stem.
+ */
+export function enrichOptionsAndMathFromAlternate(
+  primary: string,
+  alternate: string,
+): string {
+  const p = (primary ?? '').trim();
+  const a = (alternate ?? '').trim();
+  if (!p || !a) return p;
+  if (
+    countInlineMcqOptions(a) < countInlineMcqOptions(p) + 1 &&
+    !lineHasVisibleMathOperator(a)
+  ) {
+    return p;
+  }
+
+  const out = p.split(/\r?\n/);
+  const altLines = a.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const used = new Set<number>();
+
+  for (let i = 0; i < out.length; i += 1) {
+    const line = out[i].trim();
+    if (!line) continue;
+    const matchIdx = findBestAlternateLineIndex(line, altLines, used, 0.35);
+    if (matchIdx < 0) continue;
+    const alt = altLines[matchIdx];
+    const better = preferFullerOcrLine(line, alt);
+    if (better !== line) {
+      out[i] = better;
+      used.add(matchIdx);
+    }
+  }
+
+  // Insert Tess-only option / operator lines that never matched a primary line.
+  for (let i = 0; i < altLines.length; i += 1) {
+    if (used.has(i)) continue;
+    const tl = altLines[i];
+    const isOpt =
+      lineLooksLikeMcqOrTableCell(tl) ||
+      (countInlineMcqOptions(tl) >= 2 && !lineLooksLikeMangledMcqOptions(tl));
+    const isMath = lineHasVisibleMathOperator(tl) || lineLooksLikeMathOrFormula(tl);
+    if (!isOpt && !isMath) continue;
+    if (lineContentMostlyPresentInOutput(tl, out)) continue;
+
+    let insertAt = out.length;
+    // Walk backward in alternate to find the numbered stem this option belongs to.
+    let qNum: string | undefined;
+    for (let j = i - 1; j >= 0; j -= 1) {
+      const m = altLines[j].match(/^(\d{1,2})[.)]/);
+      if (m) {
+        qNum = m[1];
+        break;
+      }
+      if (countInlineMcqOptions(altLines[j]) === 0 && altLines[j].length > 40) break;
+    }
+    if (qNum) {
+      const stemAt = out.findIndex((l) => new RegExp(`^${qNum}[.)]`).test(l.trim()));
+      if (stemAt >= 0) {
+        insertAt = stemAt + 1;
+        while (
+          insertAt < out.length &&
+          (lineLooksLikeMcqOrTableCell(out[insertAt]) ||
+            countInlineMcqOptions(out[insertAt]) >= 1 ||
+            lineLooksLikeMangledMcqOptions(out[insertAt]))
+        ) {
+          // Replace mangled option row in-place when Tess has the clean one.
+          if (lineLooksLikeMangledMcqOptions(out[insertAt]) && isOpt) {
+            out[insertAt] = tl;
+            used.add(i);
+            insertAt = -1;
+            break;
+          }
+          insertAt += 1;
+        }
+      }
+    }
+    if (insertAt < 0) continue;
+    out.splice(insertAt, 0, tl);
+    used.add(i);
+  }
+
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /** Trailing article/preposition with no sentence end → likely cut mid-clause. */
@@ -205,7 +423,19 @@ export function scoreOcrMergeCoverage(text: string): number {
   const latin = countLatinLetters(value);
   const cues = criticalPageCueHits(value);
   const incompletePenalty = englishPageTranscriptLooksIncomplete(value) ? 180 : 0;
-  return latin + cues * 90 + Math.min(400, Math.floor(value.length / 4)) - incompletePenalty;
+  const dupePenalty = countConsecutiveDuplicateWords(value) * 110;
+  const garbageLines = value
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && lineIsMostlyGarbage(l)).length;
+  return (
+    latin +
+    cues * 90 +
+    Math.min(400, Math.floor(value.length / 4)) -
+    incompletePenalty -
+    dupePenalty -
+    garbageLines * 40
+  );
 }
 
 /**
@@ -215,8 +445,23 @@ export function scoreOcrMergeCoverage(text: string): number {
 function countMcqOrTableSignals(text: string): number {
   const yesNo = (text.match(/^\s*(?:yes|no)\s*$/gim) ?? []).length;
   const options = (text.match(/^\s*[a-d][).]\s*$/gim) ?? []).length;
+  const inlineOpts = countInlineMcqOptions(text);
   const numbered = (text.match(/^\s*\d{1,2}[.)]\s+\S/gm) ?? []).length;
-  return yesNo + options + numbered;
+  // After formatOcrMcqTables, Yes/No live inside markdown rows — still count them.
+  const mdOptionRows = (text.match(/^\|\s*[a-d]\)\s*\|/gim) ?? []).length;
+  const mdYesNoCells = (text.match(/\|\s*(?:Yes|No)\s*\|/gi) ?? []).length;
+  const mdHeader = /\|[^|\n]*Reflection[^|\n]*\|[^|\n]*Refraction[^|\n]*\|/i.test(text)
+    ? 6
+    : 0;
+  return (
+    yesNo +
+    options +
+    inlineOpts +
+    numbered +
+    mdOptionRows * 4 +
+    Math.min(16, mdYesNoCells) +
+    mdHeader
+  );
 }
 
 export function pickOcrMergePrimary(
@@ -234,10 +479,11 @@ export function pickOcrMergePrimary(
   const pTable = countMcqOrTableSignals(p);
   const tTable = countMcqOrTableSignals(t);
   // Prefer the engine that captured Yes/No grids / option letters for MCQ pages.
-  if (pTable >= tTable + 4 && countLatinLetters(p) >= countLatinLetters(t) * 0.55) {
+  // Grid cells are short; latin-letter coverage alone must not veto the table engine.
+  if (pTable >= tTable + 4 && countLatinLetters(p) >= countLatinLetters(t) * 0.35) {
     return 'paddle';
   }
-  if (tTable >= pTable + 4 && countLatinLetters(t) >= countLatinLetters(p) * 0.55) {
+  if (tTable >= pTable + 4 && countLatinLetters(t) >= countLatinLetters(p) * 0.35) {
     return 'tesseract';
   }
   if (pIncomplete && !tIncomplete && countLatinLetters(t) >= countLatinLetters(p) * 0.85) {
@@ -246,8 +492,22 @@ export function pickOcrMergePrimary(
   if (tIncomplete && !pIncomplete && countLatinLetters(p) >= countLatinLetters(t) * 0.85) {
     return 'paddle';
   }
-  if (tScore >= pScore + 80) return 'tesseract';
-  if (countLatinLetters(t) >= countLatinLetters(p) + 220 && criticalPageCueHits(t) >= criticalPageCueHits(p)) {
+  // Never switch to a much dirtier engine just because it is longer
+  // (colored sideboxes: Tess duplicates words and interleaves columns).
+  const pClean = scoreOcrTranscriptCleanliness(p);
+  const tClean = scoreOcrTranscriptCleanliness(t);
+  if (tClean + 40 < pClean && countLatinLetters(p) >= 80) {
+    return 'paddle';
+  }
+  if (pClean + 40 < tClean && countLatinLetters(t) >= 80) {
+    return 'tesseract';
+  }
+  if (tScore >= pScore + 80 && tClean >= pClean - 20) return 'tesseract';
+  if (
+    countLatinLetters(t) >= countLatinLetters(p) + 220 &&
+    criticalPageCueHits(t) >= criticalPageCueHits(p) &&
+    tClean >= pClean - 20
+  ) {
     return 'tesseract';
   }
   return 'paddle';
@@ -446,11 +706,15 @@ function mergePrimaryWithAlternate(primary: string, alternate: string): string {
     }
   }
 
+  const primaryLatin = countLatinLetters(out.join('\n'));
+  const primaryAlreadyRich = primaryLatin >= 180;
+
   for (let i = 0; i < altLines.length; i += 1) {
     if (usedAlt.has(i)) continue;
     const tl = altLines[i];
     const keepShortCell = lineLooksLikeMcqOrTableCell(tl);
     if (!keepShortCell && lineIsMostlyGarbage(tl)) continue;
+    if (!keepShortCell && countConsecutiveDuplicateWords(tl) >= 2) continue;
     const isMathLine = lineLooksLikeMathOrFormula(tl);
     if (
       !keepShortCell &&
@@ -461,6 +725,17 @@ function mergePrimaryWithAlternate(primary: string, alternate: string): string {
       continue;
     }
     if (!keepShortCell && lineContentMostlyPresentInOutput(tl, out)) continue;
+    // When the primary engine already has a full page, only append alt orphans
+    // that clearly add new content (avoid sidebar interleave from Tess).
+    if (primaryAlreadyRich && !keepShortCell && !isMathLine) {
+      const words = normalizeLineKey(tl)
+        .split(' ')
+        .filter((w) => w.length > 3);
+      if (words.length < 5) continue;
+      const blob = normalizeLineKey(out.join(' '));
+      const novel = words.filter((w) => !blob.includes(w)).length;
+      if (novel / words.length < 0.45) continue;
+    }
     // Orphan opener: continuation was already consumed matching primary lines.
     if (!keepShortCell && lineLooksLikeIncompleteClause(tl)) {
       let continuationAlreadyMerged = false;
@@ -496,18 +771,21 @@ export function mergePaddleAndTesseractPageOcr(paddle: string, tesseract: string
   if (!t) return cleanMergedPageOcrText(stripInterleavedWeblinkSidebar(p));
 
   const primary = pickOcrMergePrimary(p, t);
-  const merged =
+  let merged =
     primary === 'tesseract' ? mergePrimaryWithAlternate(t, p) : mergePrimaryWithAlternate(p, t);
+  // Reading body from Paddle, but Tess often keeps MCQ a/b/c rows and ÷/√ lines.
+  const altForEnrich = primary === 'tesseract' ? p : t;
+  merged = enrichOptionsAndMathFromAlternate(merged, altForEnrich);
   // Drop interleaved Weblinks/YouTube sidebars after merge (no-op on literary pages).
   // Then collapse number duplicates / checkmark junk / science unit artifacts.
   const cleaned = formatOcrMcqTables(
     cleanMergedPageOcrText(stripInterleavedWeblinkSidebar(merged)),
   );
 
-  // Noisy Tesseract alternates can erase a clean science body that Paddle kept.
-  // Prefer the cleaned single-engine transcript when merge lost key lesson sentences.
   const paddleClean = cleanMergedPageOcrText(stripInterleavedWeblinkSidebar(p));
   const tessClean = cleanMergedPageOcrText(stripInterleavedWeblinkSidebar(t));
+
+  // Noisy Tesseract alternates can erase a clean science body that Paddle kept.
   const scienceBodyCue =
     /\bCharge is a basic characteristic\b/i.test(paddleClean) ||
     /\bCharge is a basic characteristic\b/i.test(tessClean) ||
@@ -531,5 +809,30 @@ export function mergePaddleAndTesseractPageOcr(paddle: string, tesseract: string
     if (tessHasBody) return tessClean;
   }
 
-  return cleaned;
+  // Colored multi-box textbook pages: Tess often interleaves sidebars and
+  // duplicates words ("find find"). Never ship a merge worse than the best engine.
+  // Also never drop a Yes/No / option grid that only one engine captured.
+  const candidates = [cleaned, paddleClean, tessClean].filter(Boolean);
+  const maxTable = Math.max(0, ...candidates.map((c) => countMcqOrTableSignals(c)));
+  let eligible =
+    maxTable >= 6
+      ? candidates.filter((c) => countMcqOrTableSignals(c) > maxTable - 4)
+      : candidates;
+  // Tess duplicate-word soup ("Now Now", "only only") must not beat cleaner Paddle.
+  const minDupes = Math.min(...candidates.map((c) => countConsecutiveDuplicateWords(c)));
+  if (minDupes <= 1) {
+    const lowDupe = eligible.filter((c) => countConsecutiveDuplicateWords(c) <= minDupes + 1);
+    if (lowDupe.length) eligible = lowDupe;
+  }
+  const pool = eligible.length ? eligible : candidates;
+  let best = pool[0];
+  let bestScore = scoreOcrTranscriptCleanliness(best);
+  for (const candidate of pool) {
+    const score = scoreOcrTranscriptCleanliness(candidate);
+    if (score > bestScore + 25) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+  return best;
 }

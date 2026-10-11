@@ -1,9 +1,18 @@
+import {
+  reconstructStackedFractionsInOcrText,
+  reconstructWorkedFractionMathInOcrText,
+} from './ocr-fraction-layout';
+
 /**
  * Light, page-agnostic OCR hygiene after Paddle+Tesseract merge.
  *
  * Do NOT invent lesson sentences or page-specific wording here.
- * Greek / math glyphs (λ, θ, π, √, …) must come from the recognizer —
- * see backend/ocr/training/ (synthetic textbook-background samples + fine-tune).
+ * Greek / math glyphs (λ, θ, π, √, ÷, …) and mixed-number reading should come
+ * from the recognizer — see backend/ocr/training/.
+ *
+ * Allowed here: layout restore from digits/boxes the engines already emitted
+ * (stacked 3-over-4 → 3/4; glued dividend+divisor when ÷ glyph was dropped).
+ * Never hardcode one textbook page’s numbers or prose.
  */
 
 const STEM_ACRONYM_KEEP =
@@ -139,7 +148,10 @@ export function cleanMergedPageOcrText(text: string): string {
   }
   const lines = value.split(/\r?\n/).map(cleanMergedOcrLine);
   let joined = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-  if (looksLikeScienceNumericalsPage(joined)) {
+  // Worked ÷ chains before generic digit-row pairing (282=142=7 must not become 2/4…).
+  joined = reconstructWorkedFractionMathInOcrText(joined);
+  joined = reconstructStackedFractionsInOcrText(joined);
+  if (looksLikeScienceNumericalsPage(joined) || /\bfraction/i.test(joined)) {
     joined = normalizeScienceNotationArtifacts(joined);
   }
   return joined;

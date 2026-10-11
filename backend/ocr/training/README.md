@@ -1,10 +1,12 @@
-# Science textbook OCR training (λ, θ, π, √, …)
+# Science textbook OCR training (λ, θ, π, √, ÷, …)
 
 English PaddleOCR ships **without** Greek/math glyphs in its charset, so the
-engine cannot emit `λ` / `θ` / `π` no matter how we post-process text.
+engine cannot emit `λ` / `θ` / `π` / `÷` / `√` reliably no matter how we
+post-process text (e.g. `84 ÷ 4 = 21` → `844=21`).
 
 Fix = **train the recognizer** on lines that look like your textbook pages
-(cream / pale blue / green washes), then load that model in the portal OCR worker.
+(cream / pale blue / green washes), including heavy ÷ / √ crops, then load
+that model in the portal OCR worker.
 
 ## Do not hardcode lesson wording
 

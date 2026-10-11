@@ -352,6 +352,409 @@ def text_from_lines(lines: list[dict[str, Any]]) -> str:
     return "\n".join(r["text"] for r in lines if (r.get("text") or "").strip()).strip()
 
 
+_DIGIT_ONLY_RE = re.compile(r"^\d{1,3}$")
+_FRAC_EXPR_RE = re.compile(r"^\d{1,3}(?:\s*[÷+\u00d7x*]\s*\d{1,2})?$")
+_BAR_RE = re.compile(r"^[-–—_=‾¯\-]{1,6}$")
+
+
+def _is_fraction_digit(text: str) -> bool:
+    t = (text or "").strip()
+    return bool(_DIGIT_ONLY_RE.match(t) or _FRAC_EXPR_RE.match(t))
+
+
+def _is_vinculum(text: str) -> bool:
+    t = (text or "").strip()
+    return bool(_BAR_RE.match(t)) or t in {"/", "／", "⁄"}
+
+
+def compose_stacked_fractions(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Rebuild textbook stacked fractions from Paddle boxes:
+      3          →  3/4
+      ─
+      4
+    Mixed numbers: 2 beside 1/6 → "2 1/6".
+    """
+    if len(lines) < 2:
+        return lines
+
+    unused = set(range(len(lines)))
+    composed: list[dict[str, Any]] = []
+
+    # Pair numerator (above) with denominator (below) when x-centers align.
+    for i, top in enumerate(lines):
+        if i not in unused or not _is_fraction_digit(top.get("text") or ""):
+            continue
+        top_h = max(1.0, top["y1"] - top["y0"])
+        top_w = max(1.0, top["x1"] - top["x0"])
+        top_cx = (top["x0"] + top["x1"]) / 2.0
+        best_j: int | None = None
+        best_score = 1e9
+        for j, bot in enumerate(lines):
+            if j == i or j not in unused or not _is_fraction_digit(bot.get("text") or ""):
+                continue
+            # Denominator must sit below numerator (allow tiny overlap).
+            if bot["y0"] + 2 < top["y0"] + top_h * 0.35:
+                continue
+            gap = bot["y0"] - top["y1"]
+            if gap > top_h * 2.8 or gap < -top_h * 0.35:
+                continue
+            bot_cx = (bot["x0"] + bot["x1"]) / 2.0
+            bot_w = max(1.0, bot["x1"] - bot["x0"])
+            if abs(top_cx - bot_cx) > max(18.0, top_w * 0.85, bot_w * 0.85):
+                continue
+            if max(top_w, bot_w) / min(top_w, bot_w) > 3.5:
+                continue
+            score = abs(top_cx - bot_cx) * 2.0 + abs(max(0.0, gap))
+            if score < best_score:
+                best_score = score
+                best_j = j
+        if best_j is None:
+            continue
+
+        bot = lines[best_j]
+        num = (top.get("text") or "").strip()
+        den = (bot.get("text") or "").strip()
+        frac_y0, frac_y1 = top["y0"], bot["y1"]
+        frac_x0, frac_x1 = min(top["x0"], bot["x0"]), max(top["x1"], bot["x1"])
+        frac_cx = (frac_x0 + frac_x1) / 2.0
+
+        # Drop vinculum / bar tokens between the pair.
+        for k, mid in enumerate(lines):
+            if k not in unused or k in (i, best_j):
+                continue
+            if not _is_vinculum(mid.get("text") or ""):
+                # Very short horizontal junk OCR sometimes emits as lone chars
+                mt = (mid.get("text") or "").strip()
+                if len(mt) > 2:
+                    continue
+            mid_cx = (mid["x0"] + mid["x1"]) / 2.0
+            if abs(mid_cx - frac_cx) > max(28.0, (frac_x1 - frac_x0) * 1.2):
+                continue
+            if mid["y0"] >= frac_y0 - 2 and mid["y1"] <= frac_y1 + 2:
+                unused.discard(k)
+
+        # Mixed number: whole digit left of the stacked fraction.
+        whole_k: int | None = None
+        whole_txt = ""
+        for k, whole in enumerate(lines):
+            if k not in unused or k in (i, best_j):
+                continue
+            if not _is_fraction_digit(whole.get("text") or ""):
+                continue
+            wcy = (whole["y0"] + whole["y1"]) / 2.0
+            fcy = (frac_y0 + frac_y1) / 2.0
+            if abs(wcy - fcy) > (frac_y1 - frac_y0) * 0.65:
+                continue
+            if whole["x1"] > frac_x0 + 6:
+                continue
+            if frac_x0 - whole["x1"] > max(36.0, top_w * 1.8):
+                continue
+            whole_k = k
+            whole_txt = (whole.get("text") or "").strip()
+            break
+
+        text = f"{num}/{den}"
+        x0 = frac_x0
+        if whole_k is not None:
+            text = f"{whole_txt} {text}"
+            x0 = lines[whole_k]["x0"]
+            unused.discard(whole_k)
+        unused.discard(i)
+        unused.discard(best_j)
+        composed.append(
+            {
+                "text": text,
+                "x0": x0,
+                "y0": frac_y0,
+                "x1": frac_x1,
+                "y1": frac_y1,
+            }
+        )
+
+    remaining = [lines[i] for i in sorted(unused)] + composed
+    return sorted(remaining, key=lambda r: (r["y0"], r["x0"]))
+
+
+def cluster_reading_lines(lines: list[dict[str, Any]], y_tol: float = 14.0) -> list[str]:
+    """Join same-band boxes left→right so fraction lists stay on one Example line."""
+    if not lines:
+        return []
+    ordered = sorted(lines, key=lambda r: (r["y0"], r["x0"]))
+    bands: list[list[dict[str, Any]]] = []
+    for row in ordered:
+        text = (row.get("text") or "").strip()
+        if not text:
+            continue
+        placed = False
+        for band in bands:
+            ref = band[0]
+            ref_cy = (ref["y0"] + ref["y1"]) / 2.0
+            cy = (row["y0"] + row["y1"]) / 2.0
+            if abs(cy - ref_cy) <= y_tol:
+                band.append(row)
+                placed = True
+                break
+        if not placed:
+            bands.append([row])
+
+    out: list[str] = []
+    for band in bands:
+        band.sort(key=lambda r: r["x0"])
+        parts: list[str] = []
+        for idx, row in enumerate(band):
+            t = (row.get("text") or "").strip()
+            if not t:
+                continue
+            # Insert commas between adjacent fraction tokens when OCR dropped them.
+            if (
+                parts
+                and re.search(r"\d/\d", parts[-1])
+                and (re.search(r"^\d+\s+\d/\d", t) or re.search(r"^\d/\d", t))
+            ):
+                parts[-1] = parts[-1].rstrip(",") + ","
+            parts.append(t)
+        line = " ".join(parts)
+        line = re.sub(r"\s+,", ",", line)
+        line = re.sub(r",\s*", ", ", line)
+        line = re.sub(r"[ \t]{2,}", " ", line).strip()
+        if line:
+            out.append(line)
+    return out
+
+
+def _normalize_fraction_digit_line(line: str) -> str:
+    s = (line or "").strip()
+    s = re.sub(r"(\d)'(\d)", r"\1 11 \2", s)
+    s = re.sub(r"^'(\d)", r"11 \1", s)
+    s = re.sub(r"(\d)'$", r"\1", s)
+    s = s.replace("'", " ")
+    s = re.sub(r"[^\d\s]", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _split_digit_run(digits: str, count: int) -> list[str] | None:
+    d = re.sub(r"\D", "", digits)
+    if count < 2 or len(d) < count or len(d) > count * 2:
+        return None
+    preferred = {str(n) for n in range(10, 26)}
+    parts: list[str] = []
+    pos = 0
+    for k in range(count):
+        rem_parts = count - k
+        rem_digits = len(d) - pos
+        if rem_digits < rem_parts or rem_digits > rem_parts * 2:
+            return None
+        if rem_digits == rem_parts:
+            parts.append(d[pos])
+            pos += 1
+            continue
+        two = d[pos : pos + 2]
+        take_two = (
+            rem_digits == rem_parts * 2
+            or two in preferred
+            or rem_digits - 1 > rem_parts * 2 - 2
+        )
+        if take_two and pos + 2 <= len(d):
+            parts.append(two)
+            pos += 2
+        else:
+            parts.append(d[pos])
+            pos += 1
+    return parts if pos == len(d) else None
+
+
+def reconstruct_glued_example_fractions(text: str) -> str:
+    """Turn Example3869102792 + 4'457613' into Example: 3/4, 8/11, …"""
+    if not text or not re.search(r"fraction|Example", text, re.I):
+        return text
+    lines = text.splitlines()
+    out: list[str] = []
+    used: set[int] = set()
+    for i, raw in enumerate(lines):
+        if i in used:
+            continue
+        m = re.match(r"^(Example)(\d{4,})$", raw.strip(), re.I)
+        m2 = re.match(r"^(Example\s*[:.]?\s+)([\d\s]{4,})$", raw.strip(), re.I)
+        if not m and not m2:
+            out.append(raw)
+            continue
+        prefix = f"{m.group(1)}: " if m else m2.group(1)
+        num_glued = (m.group(2) if m else m2.group(2)).replace(" ", "")
+        den_chunks: list[str] = []
+        den_idxs: list[int] = []
+        for j in range(i + 1, min(i + 5, len(lines))):
+            t = lines[j].strip()
+            if not t:
+                continue
+            lead = re.match(r"^([\d'\s]{2,}?)(?:\s+(?:are|is|equivalent)\b.*)?$", t, re.I)
+            lead2 = re.match(r"^((?:\d{1,3}[\s,]*){2,})\s+[a-z]", t, re.I)
+            chunk = None
+            if re.fullmatch(r"[\d'\s]{2,}", t) or re.fullmatch(r"\d{1,3}", t):
+                chunk = _normalize_fraction_digit_line(t)
+            elif lead and re.sub(r"\D", "", lead.group(1) or ""):
+                chunk = _normalize_fraction_digit_line(lead.group(1))
+            elif lead2:
+                chunk = _normalize_fraction_digit_line(lead2.group(1))
+            if chunk:
+                den_chunks.append(chunk)
+                den_idxs.append(j)
+                for k in range(j + 1, min(j + 4, len(lines))):
+                    nxt = lines[k].strip()
+                    if not nxt:
+                        continue
+                    if re.fullmatch(r"\d{1,3}", nxt):
+                        den_chunks.append(nxt)
+                        den_idxs.append(k)
+                        break
+                    # skip brief prose between dens and a stray "11"
+                    if len(nxt) < 48 and not re.match(r"^\d", nxt):
+                        continue
+                    break
+                break
+            if re.search(r"[a-z]{4,}", t, re.I) and den_chunks:
+                break
+            # skip short sidebar junk between num and den
+            if len(t) < 48 and not re.match(r"^\d", t):
+                continue
+            if re.search(r"[a-z]{4,}", t, re.I):
+                break
+        if not den_chunks:
+            out.append(raw)
+            continue
+        den_glued = re.sub(r"\D", "", " ".join(den_chunks))
+        preferred = {str(n) for n in range(10, 26)}
+        dens = None
+        best_score = -1
+        for c in range(min(12, len(den_glued)), 1, -1):
+            cand = _split_digit_run(den_glued, c)
+            if not cand:
+                continue
+            score = len(cand) * 2 + sum(5 for p in cand if p in preferred)
+            if score > best_score:
+                best_score = score
+                dens = cand
+        if not dens:
+            out.append(raw)
+            continue
+        nums = _split_digit_run(num_glued, len(dens))
+        if not nums:
+            out.append(raw)
+            continue
+        parts = [f"{a}/{b}" for a, b in zip(nums, dens) if b != "0"]
+        if len(parts) < 2:
+            out.append(raw)
+            continue
+        out.append(prefix + ", ".join(parts))
+        used.update(den_idxs)
+    return "\n".join(out).strip()
+
+
+def _parse_glued_div(token: str) -> str:
+    t = (token or "").strip()
+    if not re.fullmatch(r"\d{2,4}", t) or len(t) <= 2:
+        return t
+    div, left = t[-1], t[:-1]
+    if div in "23456789" and re.fullmatch(r"\d{1,2}", left):
+        return f"{left}÷{div}"
+    return t
+
+
+def _align_dens(num_segs: list[str], den_segs: list[str]) -> list[str]:
+    if len(den_segs) <= 1:
+        return den_segs
+
+    def left_val(seg: str) -> int:
+        d = re.sub(r"\D", "", seg)
+        if len(d) <= 2:
+            return int(d or 0)
+        return int(d[:-1] or 0)
+
+    used: set[int] = set()
+    out: list[str] = []
+    for ns in num_segs:
+        nleft = left_val(ns)
+        best, best_score = -1, 10**9
+        for i, ds in enumerate(den_segs):
+            if i in used:
+                continue
+            dleft = left_val(ds)
+            score = abs(dleft - nleft) + (20 if dleft < nleft else 0)
+            if score < best_score:
+                best_score, best = score, i
+        if best >= 0:
+            used.add(best)
+            out.append(den_segs[best])
+    for i, ds in enumerate(den_segs):
+        if i not in used:
+            out.append(ds)
+    return out[: len(num_segs)]
+
+
+def reconstruct_worked_div_fraction_chains(text: str) -> str:
+    """General: glued dividend+divisor rows (÷ glyph dropped) → a÷b form."""
+    if not text or not re.search(r"\d{2,4}\s*=\s*\d{1,4}", text):
+        return text
+    lines = text.splitlines()
+    out: list[str] = []
+    used: set[int] = set()
+    for i, raw in enumerate(lines):
+        if i in used:
+            continue
+        compact = re.sub(r"\s+", "", raw.strip())
+        if not re.fullmatch(r"\d{2,4}(?:=\d{1,4}){1,4}", compact):
+            out.append(raw)
+            continue
+        num_segs = [s for s in compact.split("=") if s]
+        den_bits: list[str] = []
+        den_idxs: list[int] = []
+        for j in range(i + 1, min(i + 5, len(lines))):
+            t = lines[j].strip()
+            if (
+                re.fullmatch(r"\d{1,6}", t)
+                or re.fullmatch(r"\d{2,4}(?:\s+\d{1,4})+", t)
+            ):
+                den_bits.extend(re.findall(r"\d+", t))
+                den_idxs.append(j)
+                continue
+            if den_bits:
+                break
+            if re.match(r"[a-z]", t, re.I):
+                break
+        if len(den_bits) == 1 and len(den_bits[0]) >= 5 and len(num_segs) == 2:
+            g = den_bits[0]
+            den_bits = [g[:-2], g[-2:]]
+        if len(den_bits) < max(2, len(num_segs) - 1):
+            out.append(raw)
+            continue
+        den_bits = _align_dens(num_segs, den_bits)
+        steps_num: list[str] = []
+        steps_den: list[str] = []
+        for k, ns in enumerate(num_segs):
+            ds = den_bits[k] if k < len(den_bits) else den_bits[-1]
+            if k == len(num_segs) - 1 and len(ns) <= 2 and len(ds) <= 2:
+                steps_num.append(ns)
+                steps_den.append(ds)
+            else:
+                steps_num.append(_parse_glued_div(ns))
+                steps_den.append(_parse_glued_div(ds))
+        if not any("÷" in s for s in steps_num + steps_den):
+            out.append(raw)
+            continue
+        # Emit slash-portable chain (stacked bars are restored in TS clean pass too).
+        parts = [f"({a})/({b})" if "÷" in a or "÷" in b else f"{a}/{b}" for a, b in zip(steps_num, steps_den)]
+        out.append(" = ".join(parts))
+        used.update(den_idxs)
+    return "\n".join(out).strip()
+
+
+def text_from_lines_with_fractions(lines: list[dict[str, Any]]) -> str:
+    composed = compose_stacked_fractions(lines)
+    text = "\n".join(cluster_reading_lines(composed)).strip()
+    text = reconstruct_glued_example_fractions(text)
+    return reconstruct_worked_div_fraction_chains(text)
+
+
 def predict_structured(image_path: str, lang: str) -> list[dict[str, Any]]:
     prepared = preprocess_for_ocr(image_path)
     engine = get_engine(lang)
@@ -407,7 +810,7 @@ def predict_structured(image_path: str, lang: str) -> list[dict[str, Any]]:
 
 def predict_text(image_path: str, lang: str) -> str:
     lines = predict_structured(image_path, lang)
-    return text_from_lines(lines)
+    return text_from_lines_with_fractions(lines)
 
 
 def main() -> int:
@@ -423,7 +826,7 @@ def main() -> int:
 
     try:
         lines = predict_structured(str(image), args.lang)
-        text = text_from_lines(lines)
+        text = text_from_lines_with_fractions(lines)
         print(
             json.dumps(
                 {
@@ -435,6 +838,7 @@ def main() -> int:
                     "lineCount": len(lines),
                     "columnFiltered": True,
                     "openerOk": opener_looks_complete(text or ""),
+                    "fractionComposed": True,
                 },
                 ensure_ascii=False,
             ),

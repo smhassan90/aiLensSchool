@@ -79,7 +79,7 @@ Encourage students / youtube between Step 1 and Step 2
 --- Example physics-worked-example (cleaned) ---
 Keep Worked Example Steps 1–3 and Result. No YouTube lines.
 --- Note ---
-Greek/math glyphs (λ, θ, π, √) come from the trained recognizer (backend/ocr/training), not from inventing wording.`;
+Greek/math glyphs (λ, θ, π, √, ÷) come from the trained recognizer (backend/ocr/training), not from inventing wording.`;
 
 /**
  * Short before/after snippets for science AI merge prompts.
