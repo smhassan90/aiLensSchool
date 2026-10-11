@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-10-11T20:01:06.188Z",
+  "summary": [
+    {
+      "pageId": "p39-reduce",
+      "engineMs": 11990,
+      "regionMs": 114698,
+      "snippetHit_C": 0,
+      "snippetHit_D": 0,
+      "fracScore_C": 17,
+      "fracScore_D": 32,
+      "appliedRegions": [
+        "solution_block"
+      ]
+    }
+  ]
+}

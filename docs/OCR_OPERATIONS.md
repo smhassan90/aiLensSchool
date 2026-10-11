@@ -54,7 +54,34 @@ npx tsx scripts/fractions-chapter-calibrate.ts
 
 See `docs/FRACTIONS_CHAPTER_CALIBRATION.md` and `test-fixtures/fractions-chapter-calibration/README.md`.
 
+## Math region retry (opt-in)
+
+Bounded crop re-OCR on uncertain math regions runs inside `finalizeChapterPageOcrMerge` when enabled.
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `OCR_MATH_REGION_RETRY` | off | Set `1` to enable |
+| `OCR_MATH_REGION_MAX` | `6` | Max regions per page |
+| `OCR_MATH_REGION_VARIANTS` | `2` | Preprocess variants per crop |
+| `PADDLE_OCR_REGION_TIMEOUT_MS` | `90000` | Per-crop Paddle timeout |
+
+Compare variants A–D: `npx tsx scripts/fractions-region-eval.ts` → `test-fixtures/fractions-chapter-calibration/region-eval-reports/`.
+
+## Pix2Text math crops (opt-in, disabled by default)
+
+Optional crop-level Pix2Text for exercise grids / worked solutions. **Not** full-page OCR. **pix2tex (LaTeX-OCR) is eval-only** — not used in production.
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `OCR_PIX2TEXT_MATH_CROPS` | off | Set `1` to enable |
+| `PIX2TEXT_PYTHON` | — | Isolated venv Python (see `backend/docs/PIX2TEXT_MATH_CROPS.md`) |
+| `OCR_PIX2TEXT_MAX_REGIONS` | `2` | Max math crops per page |
+| `OCR_PIX2TEXT_TIMEOUT_MS` | `120000` | Worker batch timeout |
+
+Eval harness (Pix2Text + pix2tex benchmarks): `backend/eval/specialized-math-ocr/`. Fusion regression: `npx tsx scripts/fractions-pix2text-fusion-eval.ts`.
+
 ## Known blockers
 
-- Page 57 divide grid: needs per-cell layout OCR (see `docs/OCR_AUDIT.md` D1).
+- Page 57 divide grid: production merge still weak without `OCR_PIX2TEXT_MATH_CROPS=1` and a Pix2Text venv on the host.
 - Pretrained English rec weights must be present before custom training is meaningful.
+- p39 full worked solution lacks a verified page reference (annotation).

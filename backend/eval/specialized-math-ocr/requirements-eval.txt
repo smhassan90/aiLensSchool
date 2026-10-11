@@ -1,0 +1,9 @@
+# Isolated venv for specialized math OCR benchmark only.
+# Create: python -m venv backend/eval/math-ocr-eval-venv
+# Install: pip install -r requirements-eval.txt
+#
+# Pin rapidocr: cnstd 1.2.8 imports resolve_model_key removed in rapidocr>=3.10
+pix2text==1.1.7
+pix2tex==0.1.4
+rapidocr==3.9.1
+Pillow>=10.0.0

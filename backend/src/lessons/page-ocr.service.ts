@@ -3,7 +3,9 @@ import { mkdir } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { isServerlessRuntime } from '../common/env';
-import { mergePaddleAndTesseractPageOcr } from './merge-paddle-tesseract-ocr';
+import { mergePageOcr } from './ocr-layout-reconcile';
+import type { OcrStructuredLine } from './ocr-structured-line';
+import { tesseractLinesFromRecognizeData } from './tesseract-structured';
 import {
   englishPageTranscriptLooksIncomplete,
   isPagePhotoTextReadable,
@@ -24,18 +26,9 @@ type OcrWorker = {
 
 const OCR_POOL_SIZE = 2;
 
-/** Prefer Urdu/Arabic packs for Islamiat and related subjects. */
-export function ocrLanguagesForSubject(subjectName?: string | null): string {
-  const name = (subjectName ?? '').toLowerCase();
-  if (
-    /islam|islamiyat|islamiyat|urdu|arabic|nazra|nazira|qaida|quran|qur.?an|sindhi|قرآن|اسلام|اردو/.test(
-      name,
-    )
-  ) {
-    return 'eng+urd+ara';
-  }
-  return 'eng';
-}
+import { ocrLanguagesForSubject } from './ocr-subject-lang';
+
+export { ocrLanguagesForSubject } from './ocr-subject-lang';
 
 async function mapPool<T, R>(
   items: T[],
@@ -101,6 +94,8 @@ export type PageOcrEngineBreakdown = {
   paddle: string;
   tesseract: string;
   merged: string;
+  paddleLines?: OcrStructuredLine[];
+  tesseractLines?: OcrStructuredLine[];
 };
 
 @Injectable()
@@ -168,7 +163,7 @@ export class PageOcrService implements OnModuleDestroy {
   private async readWithTesseract(
     files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
     options?: { subjectName?: string | null },
-  ): Promise<string[]> {
+  ): Promise<Array<{ text: string; lines: OcrStructuredLine[] }>> {
     if (!files.length) return [];
 
     const languages = ocrLanguagesForSubject(options?.subjectName);
@@ -194,24 +189,27 @@ export class PageOcrService implements OnModuleDestroy {
         const clean = (raw: string) => raw.replace(/\u000c/g, '').trim();
         const resultAuto = await worker.recognize(source);
         const autoText = clean(resultAuto.data.text ?? '');
+        const autoLines = tesseractLinesFromRecognizeData(resultAuto.data);
         await worker.setParameters({
           tessedit_pageseg_mode: String(tesseract.PSM.SINGLE_BLOCK),
         });
         const resultBlock = await worker.recognize(source);
         const blockText = clean(resultBlock.data.text ?? '');
+        const blockLines = tesseractLinesFromRecognizeData(resultBlock.data);
         await worker.setParameters({
           tessedit_pageseg_mode: String(tesseract.PSM.AUTO),
         });
         const text = pickBetterPageTranscript(autoText, blockText);
+        const lines = autoLines.length >= blockLines.length ? autoLines : blockLines;
         this.logger.log(
           `Tesseract page ${index + 1}: ${text.length} characters from ${file.originalname ?? 'photo'} (${this.poolLangs})`,
         );
-        return text;
+        return { text, lines };
       } catch (error) {
         this.logger.warn(
           `Tesseract failed for page ${index + 1}: ${error instanceof Error ? error.message : String(error)}`,
         );
-        return '';
+        return { text: '', lines: [] };
       }
     });
   }
@@ -219,9 +217,9 @@ export class PageOcrService implements OnModuleDestroy {
   private async readWithPaddle(
     files: Array<{ buffer: Buffer; mimetype?: string; originalname?: string }>,
     options?: { subjectName?: string | null },
-  ): Promise<string[]> {
+  ): Promise<Array<{ text: string; lines: OcrStructuredLine[] }>> {
     if (!paddleOcrEnabled() || !files.length) {
-      return files.map(() => '');
+      return files.map(() => ({ text: '', lines: [] }));
     }
     return mapPool(files, 1, async (file, index) => {
       const result = await runPaddleOcrOnBuffer(file, { subjectName: options?.subjectName });
@@ -232,12 +230,12 @@ export class PageOcrService implements OnModuleDestroy {
             `PaddleOCR not used (${result.error ?? 'unavailable'}); keeping Tesseract. Install backend/ocr/requirements-paddle.txt to enable.`,
           );
         }
-        return '';
+        return { text: '', lines: [] };
       }
       this.logger.log(
         `PaddleOCR page ${index + 1}: ${result.text.length} characters from ${file.originalname ?? 'photo'}`,
       );
-      return result.text;
+      return { text: result.text, lines: result.lines ?? [] };
     });
   }
 
@@ -252,18 +250,24 @@ export class PageOcrService implements OnModuleDestroy {
     const mode = ocrEngineMode();
 
     if (mode === 'tesseract') {
-      return this.readWithTesseract(files, options);
+      return this.readWithTesseract(files, options).then((rows) => rows.map((r) => r.text));
     }
 
-    const [paddleTexts, tessTexts] = await Promise.all([
+    const [paddleRows, tessRows] = await Promise.all([
       this.readWithPaddle(files, options),
       this.readWithTesseract(files, options),
     ]);
 
     return files.map((_, index) => {
-      const paddle = paddleTexts[index] ?? '';
-      const tess = tessTexts[index] ?? '';
-      const merged = mergePaddleAndTesseractPageOcr(paddle, tess);
+      const paddle = paddleRows[index]?.text ?? '';
+      const tess = tessRows[index]?.text ?? '';
+      const merged = mergePageOcr({
+        paddle,
+        tesseract: tess,
+        paddleLines: paddleRows[index]?.lines,
+        tesseractLines: tessRows[index]?.lines,
+        subjectName: options?.subjectName,
+      });
       if (paddle.trim() || tess.trim()) {
         this.logger.log(
           `OCR page ${index + 1} merged paddle+tesseract (paddle=${paddle.length}ch tess=${tess.length}ch out=${merged.length}ch)`,
@@ -280,7 +284,14 @@ export class PageOcrService implements OnModuleDestroy {
       subjectName?: string | null;
       onEngineProgress?: (engine: 'paddle' | 'tesseract', status: 'running' | 'done' | 'skipped') => void;
     },
-  ): Promise<Array<{ paddle: string; tesseract: string }>> {
+  ): Promise<
+    Array<{
+      paddle: string;
+      tesseract: string;
+      paddleLines?: OcrStructuredLine[];
+      tesseractLines?: OcrStructuredLine[];
+    }>
+  > {
     if (isServerlessRuntime() || !files.length) {
       return files.map(() => ({ paddle: '', tesseract: '' }));
     }
@@ -288,7 +299,7 @@ export class PageOcrService implements OnModuleDestroy {
     const onProg = options?.onEngineProgress;
     const paddlePromise =
       mode === 'tesseract'
-        ? Promise.resolve(files.map(() => ''))
+        ? Promise.resolve(files.map(() => ({ text: '', lines: [] as OcrStructuredLine[] })))
         : (async () => {
             onProg?.('paddle', 'running');
             const rows = await this.readWithPaddle(files, { subjectName: options?.subjectName });
@@ -304,10 +315,12 @@ export class PageOcrService implements OnModuleDestroy {
     if (mode === 'tesseract') {
       onProg?.('paddle', 'skipped');
     }
-    const [paddleTexts, tessTexts] = await Promise.all([paddlePromise, tessPromise]);
+    const [paddleRows, tessRows] = await Promise.all([paddlePromise, tessPromise]);
     return files.map((_, index) => ({
-      paddle: (paddleTexts[index] ?? '').trim(),
-      tesseract: (tessTexts[index] ?? '').trim(),
+      paddle: (paddleRows[index]?.text ?? '').trim(),
+      tesseract: (tessRows[index]?.text ?? '').trim(),
+      paddleLines: paddleRows[index]?.lines,
+      tesseractLines: tessRows[index]?.lines,
     }));
   }
 
@@ -317,10 +330,18 @@ export class PageOcrService implements OnModuleDestroy {
     options?: { subjectName?: string | null },
   ): Promise<PageOcrEngineBreakdown[]> {
     const engines = await this.readPageOcrEnginesParallel(files, options);
-    return engines.map(({ paddle, tesseract }) => ({
+    return engines.map(({ paddle, tesseract, paddleLines, tesseractLines }) => ({
       paddle,
       tesseract,
-      merged: mergePaddleAndTesseractPageOcr(paddle, tesseract),
+      paddleLines,
+      tesseractLines,
+      merged: mergePageOcr({
+        paddle,
+        tesseract,
+        paddleLines,
+        tesseractLines,
+        subjectName: options?.subjectName,
+      }),
     }));
   }
 
@@ -350,7 +371,8 @@ export class PageOcrService implements OnModuleDestroy {
     if (isServerlessRuntime()) {
       return files.map(() => '');
     }
-    return this.readWithTesseract(files, options);
+    const rows = await this.readWithTesseract(files, options);
+    return rows.map((r) => r.text);
   }
 
   /** One OCR string per file (no "Page N" prefix), same order as input files. */

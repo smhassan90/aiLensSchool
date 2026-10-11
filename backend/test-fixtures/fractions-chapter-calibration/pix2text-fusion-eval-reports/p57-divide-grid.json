@@ -1,0 +1,39 @@
+{
+  "pageId": "p57-divide-grid",
+  "livePix2Text": false,
+  "engineMs": 16729,
+  "fusionMs": 37,
+  "baselineC": {
+    "snippetHits": "1/1",
+    "exerciseHits": "0/4",
+    "cer": 7.7407407407407405
+  },
+  "fusionF": {
+    "snippetHits": "1/1",
+    "exerciseHits": "4/4",
+    "cer": 10.592592592592593,
+    "appliedRegions": [
+      "exercise_band"
+    ],
+    "skippedRegions": []
+  },
+  "note": "exercise hits cover a,b,e,n only — not full grid",
+  "textC": "7.Divide the following fractions\n21/21, 66/6, 8 4/6\nk.\nn. 5/58 n. -4\nReal-life Story Sums\nL.If 4 children ate of a bowl of ice cream then how much\nice cream of the bowl did each child have?\nA pile of Math textbooks on a table is exactly 14 cm high.\nIf each book is I cm thick, how many books make up the pile?\n3Maham has 36 chocolates.She gives of them to her best friend,\nLaila, then shares the rest between herself and 4 other friends\nHow many chocolates does Maham get?\n4A piece of ribbon is 5 m long If it is cut into 14 equal pieces,\nhow Long will each piece be?\n5.A cupcake takes just of an hour to bake How many cup cakes\ncan be baked in I hours?\nOXFORD\nFractions\na. 12 +4 55 9 2",
+  "textF": "7.Divide the following fractions\na. 12/5 ÷4/5 b. 15/42 ÷5 c. 37/25 ÷1/75 d. 84 ÷2/1 e. 123/5 ÷43/8 f. 14 ÷1/13 g. 100 ÷1/10 h. 83/5 ÷1 i. 3/5 ÷4 j. 101/2 ÷5 k. 16 ÷43/4 L. 49/10 ÷m. 35/6 ÷11/6 n. 81/4 ÷35/8\nReal-life tor Sums\nl. If 4 children ote 8/9 MCT区ARSamO ice crem ofte bowl did ech hid hove?\nA pile of Mathtowh\nReal-life Story Sums\nL.If 4 children ate of a bowl of ice cream then how much\nice cream of the bowl did each child have?\nA pile of Math textbooks on a table is exactly 14 cm high.\nIf each book is I cm thick, how many books make up the pile?\n3Maham has 36 chocolates.She gives of them to her best friend,\nLaila, then shares the rest between herself and 4 other friends\nHow many chocolates does Maham get?\n4A piece of ribbon is 5 m long If it is cut into 14 equal pieces,\nhow Long will each piece be?\n5.A cupcake takes just of an hour to bake How many cup cakes\ncan be baked in I hours?\nOXFORD\nFractions\na. 12 +4 55 9 2",
+  "pix2textOutputs": [
+    {
+      "regionId": "exercise_band",
+      "regionKind": "exercise_grid_band",
+      "rawMarkup": "a. $1 \\frac{2} {5} \\div\\frac{4} {5}$ b. $\\frac{1 5} {4 2} \\div5$ c. $\\frac{3 7} {2 5} \\div\\frac{1} {7 5}$ d. $8 4 \\div\\frac{2} {1}$ e. $1 2 \\frac{3} {5} \\div4 \\frac{3} {8}$ f. $1 4 \\div\\frac{1} {1 3}$ g. $1 0 0 \\div\\frac{1} {1 0}$ h. $8 \\frac{3} {5} \\div1$ i. $\\frac{3} {5} \\div4$ j. $1 0 \\frac{1} {2} \\div5$ k. $1 6 \\div4 \\frac{3} {4}$ L. $4 \\frac{9} {1 0} \\div$ m. $3 \\frac{5} {6} \\div1 \\frac{1} {6}$ n. $8 \\frac{1} {4} \\div3 \\frac{5} {8}$ \r\nReal-life tor Sums\r\nl. If 4 children ote $\\frac{8} {9}$ MCT区ARSamO ice crem ofte bowl did ech hid hove?\r\nA pile of Mathtowh",
+      "plainText": "a. 12/5 ÷4/5 b. 15/42 ÷5 c. 37/25 ÷1/75 d. 84 ÷2/1 e. 123/5 ÷43/8 f. 14 ÷1/13 g. 100 ÷1/10 h. 83/5 ÷1 i. 3/5 ÷4 j. 101/2 ÷5 k. 16 ÷43/4 L. 49/10 ÷m. 35/6 ÷11/6 n. 81/4 ÷35/8\nReal-life tor Sums\nl. If 4 children ote 8/9 MCT区ARSamO ice crem ofte bowl did ech hid hove?\nA pile of Mathtowh",
+      "ms": 0,
+      "ok": true,
+      "box": {
+        "x0": 0,
+        "y0": 223,
+        "x1": 1008,
+        "y1": 749.7600000000001
+      }
+    }
+  ]
+}

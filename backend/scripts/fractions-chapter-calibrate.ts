@@ -8,6 +8,7 @@ import { join } from 'path';
 import { spawn } from 'child_process';
 import { PageOcrService } from '../src/lessons/page-ocr.service';
 import { mergePaddleAndTesseractPageOcr } from '../src/lessons/merge-paddle-tesseract-ocr';
+import { mergePageOcr, reconcilePageOcr } from '../src/lessons/ocr-layout-reconcile';
 import { filterPageTextForLessonAssembly } from '../src/lessons/page-text-sanitize';
 import {
   characterErrorRate,
@@ -120,14 +121,39 @@ async function portalEngines(imagePath: string) {
   } as Express.Multer.File;
   const ocr = new PageOcrService();
   const t0 = Date.now();
-  const [{ paddle, tesseract }] = await ocr.readPageOcrEnginesParallel([file], {
+  const [{ paddle, tesseract, paddleLines, tesseractLines }] =
+    await ocr.readPageOcrEnginesParallel([file], {
+      subjectName: 'Mathematics',
+    });
+  const tessMs = Date.now() - t0;
+  const legacyMergedRaw = mergePaddleAndTesseractPageOcr(paddle, tesseract);
+  const layoutMergedRaw = mergePageOcr({
+    paddle,
+    tesseract,
+    paddleLines,
+    tesseractLines,
     subjectName: 'Mathematics',
   });
-  const tessMs = Date.now() - t0;
-  const mergedRaw = mergePaddleAndTesseractPageOcr(paddle, tesseract);
-  const merged = filterPageTextForLessonAssembly(mergedRaw);
+  const reconcileMeta = reconcilePageOcr({
+    paddle,
+    tesseract,
+    paddleLines,
+    tesseractLines,
+    subjectName: 'Mathematics',
+  });
+  const merged = filterPageTextForLessonAssembly(layoutMergedRaw);
+  const legacyMerged = filterPageTextForLessonAssembly(legacyMergedRaw);
   await ocr.onModuleDestroy?.();
-  return { paddle, tesseract, merged, tessMs };
+  return {
+    paddle,
+    tesseract,
+    merged,
+    legacyMerged,
+    usedLayoutReconcile: reconcileMeta.usedLayoutReconcile,
+    tessMs,
+    paddleLines,
+    tesseractLines,
+  };
 }
 
 async function main() {
@@ -219,7 +245,24 @@ async function main() {
       paddleText: paddleDetail.text || engines.paddle,
       tesseractText: engines.tesseract,
       mergedText: engines.merged,
-      paddleLines: paddleDetail.lines,
+      legacyMergedText: engines.legacyMerged,
+      usedLayoutReconcile: engines.usedLayoutReconcile,
+      paddleLines: paddleDetail.lines.length ? paddleDetail.lines : engines.paddleLines,
+      tesseractLines: engines.tesseractLines,
+      metricsByVariant: {
+        paddleCER: page.verifiedSnippets[0]?.reviewStatus === 'reference'
+          ? characterErrorRate(engines.paddle, page.verifiedSnippets.map((s) => s.text).join('\n'))
+          : null,
+        tesseractCER: page.verifiedSnippets[0]?.reviewStatus === 'reference'
+          ? characterErrorRate(engines.tesseract, page.verifiedSnippets.map((s) => s.text).join('\n'))
+          : null,
+        legacyMergeCER: page.verifiedSnippets[0]?.reviewStatus === 'reference'
+          ? characterErrorRate(engines.legacyMerged, page.verifiedSnippets.map((s) => s.text).join('\n'))
+          : null,
+        layoutMergeCER: page.verifiedSnippets[0]?.reviewStatus === 'reference'
+          ? characterErrorRate(engines.merged, page.verifiedSnippets.map((s) => s.text).join('\n'))
+          : null,
+      },
       verifiedSnippets: page.verifiedSnippets,
       exerciseItems: page.exerciseItems,
       exerciseResults,

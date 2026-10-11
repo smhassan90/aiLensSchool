@@ -1,0 +1,225 @@
+{
+  "counts": {
+    "PASS": 16,
+    "PARTIAL": 0,
+    "FAIL": 2
+  },
+  "rows": [
+    {
+      "page": "ch03-opener",
+      "pageId": "ch03-opener",
+      "grade": "PASS",
+      "usedLayoutReconcile": false,
+      "introDupes": 0,
+      "noise": 6,
+      "finalLen": 1001,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 39,
+      "pageId": "p39-reduce",
+      "grade": "FAIL",
+      "usedLayoutReconcile": false,
+      "introDupes": 1,
+      "noise": 17,
+      "finalLen": 843,
+      "reasons": [
+        "no faithful 28/40 fraction relationship"
+      ]
+    },
+    {
+      "page": 40,
+      "pageId": "p40-add",
+      "grade": "PASS",
+      "usedLayoutReconcile": false,
+      "introDupes": 0,
+      "noise": 2,
+      "finalLen": 153,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 43,
+      "pageId": "p43-mult-whole",
+      "grade": "PASS",
+      "usedLayoutReconcile": false,
+      "introDupes": 0,
+      "noise": 0,
+      "finalLen": 380,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 44,
+      "pageId": "p44-mult-frac",
+      "grade": "PASS",
+      "usedLayoutReconcile": false,
+      "introDupes": 0,
+      "noise": 9,
+      "finalLen": 363,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 45,
+      "pageId": "p45-mixed",
+      "grade": "PASS",
+      "usedLayoutReconcile": false,
+      "introDupes": 0,
+      "noise": 3,
+      "finalLen": 661,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 46,
+      "pageId": "p46-brackets",
+      "grade": "PASS",
+      "usedLayoutReconcile": true,
+      "introDupes": 0,
+      "noise": 0,
+      "finalLen": 107,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 47,
+      "pageId": "p47-exercise-3b",
+      "grade": "PASS",
+      "usedLayoutReconcile": false,
+      "introDupes": 0,
+      "noise": 19,
+      "finalLen": 680,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 48,
+      "pageId": "p48-grid",
+      "grade": "PASS",
+      "usedLayoutReconcile": true,
+      "introDupes": 0,
+      "noise": 18,
+      "finalLen": 492,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 49,
+      "pageId": "p49-mult-grid",
+      "grade": "PASS",
+      "usedLayoutReconcile": false,
+      "introDupes": 0,
+      "noise": 0,
+      "finalLen": 248,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 50,
+      "pageId": "p50-story",
+      "grade": "PASS",
+      "usedLayoutReconcile": false,
+      "introDupes": 0,
+      "noise": 15,
+      "finalLen": 626,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 51,
+      "pageId": "p51-division",
+      "grade": "PASS",
+      "usedLayoutReconcile": false,
+      "introDupes": 0,
+      "noise": 0,
+      "finalLen": 723,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 52,
+      "pageId": "p52-rules",
+      "grade": "PASS",
+      "usedLayoutReconcile": false,
+      "introDupes": 0,
+      "noise": 11,
+      "finalLen": 398,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 53,
+      "pageId": "p53-divide-1",
+      "grade": "PASS",
+      "usedLayoutReconcile": true,
+      "introDupes": 0,
+      "noise": 18,
+      "finalLen": 678,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 54,
+      "pageId": "p54-divide-frac",
+      "grade": "PASS",
+      "usedLayoutReconcile": true,
+      "introDupes": 0,
+      "noise": 37,
+      "finalLen": 993,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 55,
+      "pageId": "p55-exercise-3c",
+      "grade": "PASS",
+      "usedLayoutReconcile": false,
+      "introDupes": 0,
+      "noise": 3,
+      "finalLen": 770,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 56,
+      "pageId": "p56-divide-grid",
+      "grade": "PASS",
+      "usedLayoutReconcile": true,
+      "introDupes": 0,
+      "noise": 21,
+      "finalLen": 210,
+      "reasons": [
+        "heuristic checks ok"
+      ]
+    },
+    {
+      "page": 57,
+      "pageId": "p57-divide-grid",
+      "grade": "FAIL",
+      "usedLayoutReconcile": false,
+      "introDupes": 0,
+      "noise": 3,
+      "finalLen": 686,
+      "reasons": [
+        "exercise a mixed number missing"
+      ]
+    }
+  ]
+}

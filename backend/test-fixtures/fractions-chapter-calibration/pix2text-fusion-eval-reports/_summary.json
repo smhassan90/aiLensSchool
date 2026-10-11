@@ -1,0 +1,67 @@
+{
+  "generatedAt": "2026-10-11T20:37:00.344Z",
+  "livePix2Text": false,
+  "summary": [
+    {
+      "pageId": "p39-reduce",
+      "livePix2Text": false,
+      "engineMs": 24927,
+      "fusionMs": 69,
+      "baselineC": {
+        "snippetHits": "0/1",
+        "exerciseHits": "0/0",
+        "cer": 69.25
+      },
+      "fusionF": {
+        "snippetHits": "0/1",
+        "exerciseHits": "0/0",
+        "cer": 69.25,
+        "appliedRegions": [],
+        "skippedRegions": [],
+        "workerError": "mock_no_fixture"
+      },
+      "note": "p39 full solution REQUIRES_ANNOTATION — snippet-only metrics"
+    },
+    {
+      "pageId": "p57-divide-grid",
+      "livePix2Text": false,
+      "engineMs": 16729,
+      "fusionMs": 37,
+      "baselineC": {
+        "snippetHits": "1/1",
+        "exerciseHits": "0/4",
+        "cer": 7.7407407407407405
+      },
+      "fusionF": {
+        "snippetHits": "1/1",
+        "exerciseHits": "4/4",
+        "cer": 10.592592592592593,
+        "appliedRegions": [
+          "exercise_band"
+        ],
+        "skippedRegions": []
+      },
+      "note": "exercise hits cover a,b,e,n only — not full grid"
+    },
+    {
+      "pageId": "p43-mult-whole",
+      "livePix2Text": false,
+      "engineMs": 21315,
+      "fusionMs": 1,
+      "baselineC": {
+        "snippetHits": "1/2",
+        "exerciseHits": "0/0",
+        "cer": 8.414634146341463
+      },
+      "fusionF": {
+        "snippetHits": "1/2",
+        "exerciseHits": "0/0",
+        "cer": 8.414634146341463,
+        "appliedRegions": [],
+        "skippedRegions": []
+      },
+      "note": "snippet-level reference"
+    }
+  ],
+  "recommendation": "Do not enable in production by default. p57 mock/live fusion can improve curated cells; p39 needs annotation."
+}

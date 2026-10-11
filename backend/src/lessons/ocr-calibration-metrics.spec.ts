@@ -1,7 +1,9 @@
 import {
   characterErrorRate,
+  duplicateLineRate,
   exactExerciseItemMatch,
   snippetFoundInTranscript,
+  wordErrorRate,
 } from './ocr-calibration-metrics';
 
 describe('ocr-calibration-metrics', () => {
@@ -12,6 +14,11 @@ describe('ocr-calibration-metrics', () => {
   it('computes CER', () => {
     expect(characterErrorRate('abc', 'abc')).toBe(0);
     expect(characterErrorRate('ab', 'abc')).toBeCloseTo(1 / 3, 5);
+  });
+
+  it('computes WER and duplicate line rate', () => {
+    expect(wordErrorRate('a b c', 'a b c')).toBe(0);
+    expect(duplicateLineRate('intro\nintro\nbody')).toBeGreaterThan(0);
   });
 
   it('matches exercise label + expression on unseen numbers', () => {

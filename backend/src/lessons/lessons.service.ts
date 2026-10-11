@@ -83,7 +83,11 @@ import {
   assembleChapterLessonFromPageTexts,
   intelligentMergePageOcrTranscripts,
 } from './merge-page-ocr-with-ai';
-import { mergePaddleAndTesseractPageOcr } from './merge-paddle-tesseract-ocr';
+import { mergePageOcr } from './ocr-layout-reconcile';
+import { applyMathRegionRecovery, mathRegionRecoveryEnabled } from './ocr-math-region-recovery';
+import { applyPix2TextMathCropFusion } from './ocr-pix2text-math-fusion';
+import { pix2textMathCropsEnabled } from './pix2text-math.runner';
+import type { OcrStructuredLine } from './ocr-structured-line';
 import { OcrUploadProgressService } from './ocr-upload-progress.service';
 import { ocrLanguagesForSubject } from './page-ocr.service';
 import { isServerlessRuntime, readEnv } from '../common/env';
@@ -561,6 +565,17 @@ export class LessonsService {
     return `${label} is not clear enough to read. Re-upload a clearer photo: hold the phone straight above the page, use bright even light, keep the full page flat and in focus.`;
   }
 
+  private async pageImageDimensions(
+    buffer: Buffer,
+  ): Promise<{ width: number; height: number }> {
+    const sharpModule = await import('sharp');
+    const sharpFn =
+      (sharpModule as { default?: (i: Buffer) => import('sharp').Sharp }).default ??
+      (sharpModule as unknown as (i: Buffer) => import('sharp').Sharp);
+    const meta = await sharpFn(buffer).metadata();
+    return { width: meta.width ?? 0, height: meta.height ?? 0 };
+  }
+
   private visionAvailable(): boolean {
     return Boolean(
       readEnv('OPENAI_API_KEY') ||
@@ -623,9 +638,19 @@ export class LessonsService {
     tesseract: string,
     orientOcrText: string,
     subject: { name: string },
+    structured?: {
+      paddleLines?: OcrStructuredLine[];
+      tesseractLines?: OcrStructuredLine[];
+    },
   ): { text: string; merged: string } {
     const filterOpts = this.assemblyFilterOptions(subject);
-    const mergedRaw = mergePaddleAndTesseractPageOcr(paddle, tesseract);
+    const mergedRaw = mergePageOcr({
+      paddle,
+      tesseract,
+      paddleLines: structured?.paddleLines,
+      tesseractLines: structured?.tesseractLines,
+      subjectName: subject.name,
+    });
     let merged = filterPageTextForLessonAssembly(mergedRaw, filterOpts);
     if (looksLikeGarbledLatinOcr(merged)) {
       const paddleClean = (paddle ?? '').trim();
@@ -671,19 +696,86 @@ export class LessonsService {
       gradeName?: string;
       schoolId?: string;
       userId?: string;
+      paddleLines?: OcrStructuredLine[];
+      tesseractLines?: OcrStructuredLine[];
+      pageImageBuffer?: Buffer;
+      pageImageWidth?: number;
+      pageImageHeight?: number;
     },
   ): Promise<{ text: string; merged: string; usedAi: boolean }> {
     const filterOpts = this.assemblyFilterOptions(subject);
     const englishPrimary = ocrLanguagesForSubject(subject.name) === 'eng';
-    const rule = this.ruleMergeChapterPageOcr(paddle, tesseract, orientOcrText, subject);
+    if (
+      options?.pageImageBuffer?.length &&
+      (!options.pageImageWidth || !options.pageImageHeight)
+    ) {
+      const dim = await this.pageImageDimensions(options.pageImageBuffer);
+      options.pageImageWidth = dim.width;
+      options.pageImageHeight = dim.height;
+    }
+    const rule = this.ruleMergeChapterPageOcr(paddle, tesseract, orientOcrText, subject, {
+      paddleLines: options?.paddleLines,
+      tesseractLines: options?.tesseractLines,
+    });
+
+    let ruleMerged = rule.merged;
+    let ruleOcrText = rule.text;
+    if (
+      options?.pageImageBuffer?.length &&
+      options.pageImageWidth &&
+      options.pageImageHeight
+    ) {
+      if (mathRegionRecoveryEnabled()) {
+        const recovered = await applyMathRegionRecovery({
+          imageBuffer: options.pageImageBuffer,
+          imageWidth: options.pageImageWidth,
+          imageHeight: options.pageImageHeight,
+          baseTranscript: rule.merged,
+          paddleLines: options.paddleLines,
+          tesseractLines: options.tesseractLines,
+          subjectName: subject.name,
+        });
+        if (recovered.text.trim() && recovered.appliedRegions.length) {
+          ruleMerged = filterPageTextForLessonAssembly(recovered.text, filterOpts);
+          ruleOcrText = filterPageTextForLessonAssembly(
+            pickBetterPageTranscript(ruleMerged, rule.text),
+            filterOpts,
+          );
+        }
+      }
+      if (pix2textMathCropsEnabled()) {
+        const pixFused = await applyPix2TextMathCropFusion({
+          imageBuffer: options.pageImageBuffer,
+          imageWidth: options.pageImageWidth,
+          imageHeight: options.pageImageHeight,
+          baseTranscript: ruleMerged,
+          paddleLines: options.paddleLines,
+          tesseractLines: options.tesseractLines,
+          subjectName: subject.name,
+        });
+        if (pixFused.appliedRegions.length && pixFused.text.trim()) {
+          ruleMerged = filterPageTextForLessonAssembly(pixFused.text, filterOpts);
+          ruleOcrText = filterPageTextForLessonAssembly(
+            pickBetterPageTranscript(ruleMerged, rule.text),
+            filterOpts,
+          );
+          if (pixFused.pix2textOutputs.length) {
+            this.logger.debug(
+              `Pix2Text math crops applied=${pixFused.appliedRegions.join(',')} skipped=${pixFused.skippedRegions.join(',')}`,
+            );
+          }
+        }
+      }
+    }
+    const ruleForFinalize = { text: ruleOcrText, merged: ruleMerged };
 
     const wantsAiFill =
       englishPrimary &&
       (looksLikePoemOrReadingPage(paddle) ||
         looksLikePoemOrReadingPage(tesseract) ||
-        looksLikePoemOrReadingPage(rule.merged) ||
-        englishPageTranscriptLooksIncomplete(rule.merged) ||
-        englishPageTranscriptLooksIncomplete(rule.text));
+        looksLikePoemOrReadingPage(ruleForFinalize.merged) ||
+        englishPageTranscriptLooksIncomplete(ruleForFinalize.merged) ||
+        englishPageTranscriptLooksIncomplete(ruleForFinalize.text));
 
     // Vision on every page is slow; default off. Set OCR_MERGE_VISION=1 to enable.
     let visionText = '';
@@ -695,9 +787,9 @@ export class LessonsService {
       options.schoolId &&
       options.userId &&
       this.visionAvailable() &&
-      (englishPageTranscriptLooksIncomplete(rule.merged) ||
-        englishPageTranscriptLooksIncomplete(rule.text) ||
-        pageTextNeedsVisionRetry(rule.merged))
+      (englishPageTranscriptLooksIncomplete(ruleForFinalize.merged) ||
+        englishPageTranscriptLooksIncomplete(ruleForFinalize.text) ||
+        pageTextNeedsVisionRetry(ruleForFinalize.merged))
     ) {
       try {
         visionText = (
@@ -727,10 +819,12 @@ export class LessonsService {
       visionText: visionText || undefined,
       subjectName: subject.name,
       skipAi,
+      ruleMerged: ruleForFinalize.merged,
     });
 
-    let merged = filterPageTextForLessonAssembly(aiMerged || rule.merged, filterOpts);
-    if (!merged.trim()) merged = rule.merged;
+    const mergedDraft = usedAi && aiMerged?.trim() ? aiMerged : ruleForFinalize.merged;
+    let merged = filterPageTextForLessonAssembly(mergedDraft, filterOpts);
+    if (!merged.trim()) merged = ruleForFinalize.merged;
     if (visionText) {
       merged = mergeEnglishPageVisionWithOcr(visionText, merged);
       merged = filterPageTextForLessonAssembly(merged, filterOpts);
@@ -745,7 +839,7 @@ export class LessonsService {
     if (text.trim() || merged.trim()) {
       return { text: text || merged, merged, usedAi: usedAi || Boolean(visionText) };
     }
-    return { text: rule.text, merged: rule.merged, usedAi: false };
+    return { text: ruleForFinalize.text, merged: ruleForFinalize.merged, usedAi: false };
   }
 
   private async persistChapterPageEngineOcr(
@@ -761,6 +855,9 @@ export class LessonsService {
       gradeName?: string;
       schoolId?: string;
       userId?: string;
+      paddleLines?: OcrStructuredLine[];
+      tesseractLines?: OcrStructuredLine[];
+      pageImageBuffer?: Buffer;
     },
   ): Promise<void> {
     if (uploadId && lessonId) {
@@ -770,12 +867,25 @@ export class LessonsService {
         message: 'Merging PaddleOCR and Tesseract (AI fill when needed)…',
       });
     }
+    let pageImageWidth = 0;
+    let pageImageHeight = 0;
+    const pageImageBuffer = finalizeOpts?.pageImageBuffer;
+    if (pageImageBuffer?.length) {
+      const dim = await this.pageImageDimensions(pageImageBuffer);
+      pageImageWidth = dim.width;
+      pageImageHeight = dim.height;
+    }
     const { text, merged, usedAi } = await this.finalizeChapterPageOcrMerge(
       paddle,
       tesseract,
       orientOcrText,
       subject,
-      finalizeOpts,
+      {
+        ...finalizeOpts,
+        pageImageBuffer,
+        pageImageWidth,
+        pageImageHeight,
+      },
     );
     await this.prisma.lessonSource.update({
       where: { id: sourceId },
@@ -811,10 +921,10 @@ export class LessonsService {
     ocrEngines?: { paddle: string; tesseract: string; merged: string };
   }> {
     const orient = await this.pickBestOrientedPagePhoto(file, subject);
-    const [{ paddle, tesseract }] = await this.pageOcr.readPageOcrEnginesParallel(
-      [orient.ocrFile],
-      { subjectName: subject.name },
-    );
+    const [{ paddle, tesseract, paddleLines, tesseractLines }] =
+      await this.pageOcr.readPageOcrEnginesParallel([orient.ocrFile], {
+        subjectName: subject.name,
+      });
     const { text, merged } = await this.finalizeChapterPageOcrMerge(
       paddle,
       tesseract,
@@ -825,6 +935,8 @@ export class LessonsService {
         gradeName: grade.name,
         schoolId,
         userId,
+        paddleLines,
+        tesseractLines,
       },
     );
     return {
@@ -1273,8 +1385,11 @@ export class LessonsService {
 
         let paddle: string;
         let tesseract: string;
+        let paddleLines: OcrStructuredLine[] | undefined;
+        let tesseractLines: OcrStructuredLine[] | undefined;
         try {
-          [{ paddle, tesseract }] = await this.pageOcr.readPageOcrEnginesParallel(
+          [{ paddle, tesseract, paddleLines, tesseractLines }] =
+            await this.pageOcr.readPageOcrEnginesParallel(
             [orient.ocrFile],
             {
               subjectName: lesson.subject.name,
@@ -1359,6 +1474,9 @@ export class LessonsService {
               gradeName: grade.name,
               schoolId,
               userId: user.id,
+              paddleLines,
+              tesseractLines,
+              pageImageBuffer: orient.ocrFile.buffer,
             },
           ),
         );
@@ -1463,9 +1581,8 @@ export class LessonsService {
         tesseract: 'running',
       });
     }
-    const [{ paddle, tesseract }] = await this.pageOcr.readPageOcrEnginesParallel(
-      [orient.ocrFile],
-      {
+    const [{ paddle, tesseract, paddleLines, tesseractLines }] =
+      await this.pageOcr.readPageOcrEnginesParallel([orient.ocrFile], {
         subjectName: lesson.subject.name,
         onEngineProgress: (engine, status) => {
           if (!uploadId) return;
@@ -1482,8 +1599,7 @@ export class LessonsService {
                   : 'Tesseract finished.',
           });
         },
-      },
-    );
+      });
     const { text, merged } = await this.finalizeChapterPageOcrMerge(
       paddle,
       tesseract,
@@ -1494,6 +1610,9 @@ export class LessonsService {
         gradeName: grade.name,
         schoolId: lesson.schoolId,
         userId: user.id,
+        paddleLines,
+        tesseractLines,
+        pageImageBuffer: orient.ocrFile.buffer,
       },
     );
     const asset = await this.filesService.saveSchoolUpload(
@@ -1655,10 +1774,10 @@ export class LessonsService {
       });
     }
 
-    const [{ paddle, tesseract }] = await this.pageOcr.readPageOcrEnginesParallel(
-      [orient.ocrFile],
-      { subjectName: lesson.subject.name },
-    );
+    const [{ paddle, tesseract, paddleLines, tesseractLines }] =
+      await this.pageOcr.readPageOcrEnginesParallel([orient.ocrFile], {
+        subjectName: lesson.subject.name,
+      });
 
     await this.prisma.lessonSource.update({
       where: { id: sourceId },
@@ -1681,6 +1800,9 @@ export class LessonsService {
         gradeName: grade.name,
         schoolId: lesson.schoolId,
         userId: user.id,
+        paddleLines,
+        tesseractLines,
+        pageImageBuffer: orient.ocrFile.buffer,
       },
     );
 

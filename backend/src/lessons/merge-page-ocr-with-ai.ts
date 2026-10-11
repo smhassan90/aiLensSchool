@@ -360,6 +360,8 @@ export type IntelligentPageOcrMergeInput = {
   visionText?: string;
   subjectName?: string | null;
   skipAi?: boolean;
+  /** Portal rule merge (e.g. layout-aware mergePageOcr). Used when AI is skipped. */
+  ruleMerged?: string;
 };
 
 /**
@@ -381,13 +383,16 @@ export async function intelligentMergePageOcrTranscripts(
     usedAi,
   });
 
+  const portalRule = (input.ruleMerged ?? '').trim();
+  const nonAiBaseline = portalRule || ruleFallback;
+
   if (input.skipAi || readEnv('OCR_AI_MERGE') === '0') {
-    return finalize(ruleFallback, false);
+    return finalize(nonAiBaseline, false);
   }
 
   const hasAi = Boolean(readEnv('CURSOR_API_KEY')?.trim() || readEnv('OPENAI_API_KEY')?.trim());
   if (!hasAi || (!paddle && !tesseract && !input.visionText?.trim())) {
-    return finalize(ruleFallback, false);
+    return finalize(nonAiBaseline, false);
   }
 
   const sourceBlob = [ruleFallback, paddle, tesseract, input.visionText ?? ''].join('\n');

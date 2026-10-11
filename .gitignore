@@ -206,3 +206,4 @@ scripts/hawknexa_sync_state.json
 **/.venv-paddle/
 **/.venv/
 **/venv/
+backend/eval/math-ocr-eval-venv/

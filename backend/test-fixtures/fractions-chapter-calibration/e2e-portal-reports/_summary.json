@@ -1,0 +1,131 @@
+{
+  "generatedAt": "2026-10-11T19:45:58.236Z",
+  "summary": [
+    {
+      "pageId": "ch03-opener",
+      "bookPage": null,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\ch03-opener.json"
+    },
+    {
+      "pageId": "p39-reduce",
+      "bookPage": 39,
+      "introDupes": 1,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p39-reduce.json"
+    },
+    {
+      "pageId": "p40-add",
+      "bookPage": 40,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p40-add.json"
+    },
+    {
+      "pageId": "p43-mult-whole",
+      "bookPage": 43,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p43-mult-whole.json"
+    },
+    {
+      "pageId": "p44-mult-frac",
+      "bookPage": 44,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p44-mult-frac.json"
+    },
+    {
+      "pageId": "p45-mixed",
+      "bookPage": 45,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p45-mixed.json"
+    },
+    {
+      "pageId": "p46-brackets",
+      "bookPage": 46,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p46-brackets.json"
+    },
+    {
+      "pageId": "p47-exercise-3b",
+      "bookPage": 47,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p47-exercise-3b.json"
+    },
+    {
+      "pageId": "p48-grid",
+      "bookPage": 48,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p48-grid.json"
+    },
+    {
+      "pageId": "p49-mult-grid",
+      "bookPage": 49,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p49-mult-grid.json"
+    },
+    {
+      "pageId": "p50-story",
+      "bookPage": 50,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p50-story.json"
+    },
+    {
+      "pageId": "p51-division",
+      "bookPage": 51,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p51-division.json"
+    },
+    {
+      "pageId": "p52-rules",
+      "bookPage": 52,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p52-rules.json"
+    },
+    {
+      "pageId": "p53-divide-1",
+      "bookPage": 53,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p53-divide-1.json"
+    },
+    {
+      "pageId": "p54-divide-frac",
+      "bookPage": 54,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p54-divide-frac.json"
+    },
+    {
+      "pageId": "p55-exercise-3c",
+      "bookPage": 55,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p55-exercise-3c.json"
+    },
+    {
+      "pageId": "p56-divide-grid",
+      "bookPage": 56,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p56-divide-grid.json"
+    },
+    {
+      "pageId": "p57-divide-grid",
+      "bookPage": 57,
+      "introDupes": 0,
+      "glued": false,
+      "reportPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\e2e-portal-reports\\p57-divide-grid.json"
+    }
+  ]
+}

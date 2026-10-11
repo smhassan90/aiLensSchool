@@ -1,0 +1,18 @@
+{
+  "note": "Normalized [x0,y0,x1,y1] fractions of page width/height. Tune against JPEG; not ground-truth answers.",
+  "pages": {
+    "p39-reduce": {
+      "full": [0, 0, 1, 1],
+      "worked_solution": [0.06, 0.38, 0.58, 0.62],
+      "example_fraction": [0.08, 0.30, 0.45, 0.38]
+    },
+    "p57-divide-grid": {
+      "full": [0, 0, 1, 1],
+      "divide_grid": [0.04, 0.10, 0.72, 0.40]
+    },
+    "p43-mult-whole": {
+      "full": [0, 0, 1, 1],
+      "lesson_math": [0.06, 0.22, 0.85, 0.55]
+    }
+  }
+}

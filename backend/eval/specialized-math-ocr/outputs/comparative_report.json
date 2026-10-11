@@ -1,0 +1,599 @@
+{
+  "generatedAt": "2026-10-11T20:24:02Z",
+  "environment": {
+    "python": "3.12.7 (tags/v3.12.7:0b05ead, Oct  1 2024, 03:06:41) [MSC v.1941 64 bit (AMD64)]",
+    "pix2text": {
+      "version": "1.1.7",
+      "loadMs": 2000,
+      "license": "MIT (Pix2Text); cnstd Apache-2.0",
+      "rapidocrPin": "3.9.1 (required for cnstd resolve_model_key)"
+    },
+    "pix2tex": {
+      "version": "0.1.4",
+      "loadMs": 889,
+      "license": "MIT (verify upstream LaTeX-OCR)"
+    },
+    "venv": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\eval\\math-ocr-eval-venv"
+  },
+  "referenceQuality": {
+    "p39-reduce": {
+      "verifiedSnippets": [
+        {
+          "id": "reduce",
+          "text": "Reduce 28/40",
+          "regionType": "math",
+          "reviewStatus": "reference"
+        }
+      ],
+      "note": "Only snippet-level reference (Reduce 28/40). Full worked solution REQUIRES_ANNOTATION.",
+      "exerciseItems": []
+    },
+    "p57-divide-grid": {
+      "verifiedSnippets": [
+        {
+          "id": "heading",
+          "text": "Divide the following fractions",
+          "regionType": "heading",
+          "reviewStatus": "reference"
+        }
+      ],
+      "exerciseItems": [
+        {
+          "label": "a",
+          "text": "1 2/5 ÷ 4/5",
+          "regionType": "exercise_cell",
+          "reviewStatus": "reference"
+        },
+        {
+          "label": "b",
+          "text": "15/42 ÷ 5",
+          "regionType": "exercise_cell",
+          "reviewStatus": "reference"
+        },
+        {
+          "label": "e",
+          "text": "12 3/5 ÷ 4 3/8",
+          "regionType": "exercise_cell",
+          "reviewStatus": "reference"
+        },
+        {
+          "label": "n",
+          "text": "8 1/4 ÷ 3 5/8",
+          "regionType": "exercise_cell",
+          "reviewStatus": "reference"
+        }
+      ],
+      "note": "Exercise cells are human-curated labels for metrics; not full-page transcript."
+    },
+    "p43-mult-whole": {
+      "verifiedSnippets": [
+        {
+          "id": "title",
+          "text": "Multiplication of fractions",
+          "regionType": "heading",
+          "reviewStatus": "reference"
+        },
+        {
+          "id": "ex-3x-quarter",
+          "text": "3 × 1/4 = 3/4",
+          "regionType": "math",
+          "reviewStatus": "reference"
+        }
+      ],
+      "note": "Snippet-level only."
+    }
+  },
+  "pages": {
+    "p39-reduce": {
+      "baseline_ABCD": {
+        "A_paddle": "Now we will deal with addition subtraction multiplicotion, and Now we will deal with addition, subtractionmultiplication, and\ndivision of different-types of fractions division of different types of fractions.\nAddition and subtraction of two or more fractions\nDo you remember that a fraction is in its lowest term when L is the\nonly common factor between the numerator and the denominator?\nExamples:\nReduce 28.to the Lowest term\n40\nSolution:\n2821427\n402202 10\nor we can divide directly by 4.\n284=7\n010\nHence, I is the only common factor of7 and 10.\nTherefore 28in its Lowest termis7\n40, 10\n2.42+7\n5\nREMEMBER\n=4+7++\n5 10/10\nDo not forget to\n+=+n= make the\ndenominators same\nreduce to the lowest\n+ term\nconvert an improper\n11+ fraction to a mixed\n2\nfraction\nFractions\nOXEORD",
+        "B_tesseract": "|                  Re NE\ni         i a\n© Now we will deal with addition, subtraction, multiplication, and\nEi division of different tupes of fractions;                           TNS\n|e                                          at Hel pals\n| Addition and subtraction of two or more fractions\nke        Do you remember that ai fraction isin its lowest term, when | is the        “Tie\ni        only common factor between the numerator and the denominator?’         =\n1        Examples:                                                                          5\n         |. Reduce 28 to the lowest term.                            =                     |\nSolution:                                               3        EY  )\n|                                                        ~~\n8:2 _ 1422 _ 7                         CO\n        f= 20:2 0                                    Ve\n|       or we can divide directly by 4.                           f=, 3\n         8:4 _ 7                                               on\n        os 10                                              i\n|        Hence, | is the only common factor of 7 and 10.           fei   \\\nTherefore, 28. in its lowest term is Zz                             a\n       i   42 + 7                                                   TI.\n|           “e+e                        REMEMBER\n|            =        2X2 + Bs\n             [Fe 22 +)                       Do not forget to:\n= firth i f+ 62)           make the\n 10               10                        denominators same\n           =)                             + reduce to the lowest:            3\n_                     +o                                   term                 |\nI           w      if                                  + convert an improper         a8\nI            Sills                                        fraction to a mixed |       =\ni             |                              “fraction      Basal Ca.\nid           ===                                                   a\n| |           é                                         Toe\ni                                                                            re\ni                                                                     cui\n= EE         =         =       >                      =r",
+        "C_merge": "Now we will deal with addition, subtractionmultiplication, and\ndivision of different-types of fractions division of different types of fractions.\nAddition and subtraction of two or more fractions\nke Do you remember that ai fraction isin its lowest term, when | is the “Tie\ni only common factor between the numerator and the denominator?’ =\n1 Examples: 5\nReduce 28.to the Lowest term\n40\nSolution: 3 EY )\n2/4, 21/22, 2/21\n| or we can divide directly by 4. f=, 3\n28÷4 = 7\n────── = ────\n010 = 10\nHence, I is the only common factor of7 and 10.\nTherefore 28in its Lowest termis7\n40, 10\n2.42+7\n5\nREMEMBER\n=4+7++\n5 10/10\n[Fe 22 +) Do not forget to:\n= firth i f+ 62) make the\n10 denominators same\n=) + reduce to the lowest: 3\n+ term\nI w if + convert an improper a8\nI Sills fraction to a mixed | =\n2\ni | “fraction Basal Ca.\nFractions\nOXEORD\nf= 20:2 0 Ve",
+        "D_region_retry": "Now we will deal with addition, subtractionmultiplication, and\ndivision of different-types of fractions division of different types of fractions.\nAddition and subtraction of two or more fractions\nke Do you remember that ai fraction isin its lowest term, when | is the “Tie\ni only common factor between the numerator and the denominator?’ =\n1 Examples: 5\nReduce 28.to the Lowest term\n40\nSolution: 3 EY )\nSotution:\nnd cd noireun bo\nSolution:\nor we can divide directly by 4\n2/28, 4/4, 21/40, 22/4, 2/7, 21/10\nor we can divide directly by 4.\nHence, I is the only common factor of 7 and 10.\n28 in its owest termis\nTherefore, 73/10\n00\nX\nHence, I is the only common factor of7 and 10.\nTherefore 28in its Lowest termis7\n40, 10\n2.42+7\n5\nREMEMBER\n=4+7++\n5 10/10\n[Fe 22 +) Do not forget to:\n= firth i f+ 62) make the\n10 denominators same\n=) + reduce to the lowest: 3\n+ term\nI w if + convert an improper a8\nI Sills fraction to a mixed | =\n2\ni | “fraction Basal Ca.\nFractions\nOXEORD\nf= 20:2 0 Ve",
+        "engineMs": 11990,
+        "regionMs": 114698,
+        "variantMetrics": {
+          "A": {
+            "cer": 63.333333333333336,
+            "wer": 64.5,
+            "fracScore": -4,
+            "snippetHitRate": 0
+          },
+          "B": {
+            "cer": 73.58333333333333,
+            "wer": 105.5,
+            "fracScore": -4,
+            "snippetHitRate": 0
+          },
+          "C": {
+            "cer": 69.25,
+            "wer": 82.5,
+            "fracScore": 17,
+            "snippetHitRate": 0
+          },
+          "D": {
+            "cer": 80.83333333333333,
+            "wer": 94.5,
+            "fracScore": 32,
+            "snippetHitRate": 0
+          }
+        }
+      },
+      "image": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\p39-reduce.jpg",
+      "candidates": {
+        "E_pix2text_full": {
+          "text": "wewilel nithadtnsutncton,mnutipliotion ond\ndivision of different types of froctions.\nAddition and subtraction of two or more fractions\nDo you remember thot fracio is in ts lowest term, when is the\nonly comon actor bten the numrtor n te denominton\nExamples $\\frac{2 8} {4 0}$ to the lowest term.\nl. Reduce\nSolution:\n $\\frac{2 8 \\div2} {4 0 \\div2}=\\frac{1 4 \\div2} {2 0 \\div2}=\\frac{7} {1 0}$ \nor we can divide directly by $4$ \n $\\frac{2 8 \\div4} {4 0 \\div4}=\\frac{7} {1 0}$ \ne only common factor of 7 and 10.\nTherefore, $\\frac{2 8} {4 0}$ in its lowes term is $\\frac{7} {1 0}$ \n2.\n$$\n\\begin{aligned} {} & {{} \\frac{L_{5}^{2}} {5}+7 \\frac{1} {1 0}} \\\\ {} & {{}=\\frac{1} {4}+7 \\frac{1} {1 0}+\\frac{2} {5}+\\frac{1} {1 0} \\rangle} \\\\ {} & {{}=\\frac{1} {1}+\\left( \\frac{2} {5} \\times\\frac{2} {2}+\\frac{1} {1 0} \\right)} \\\\ {} & {{}=\\frac{1} {1}+\\left( \\frac{4} {1 0} \\right)=\\frac{1} {1 0}+\\left( \\frac{5} {1 0} \\right)} \\\\ {} & {{}=\\frac{1} {1}+\\left( \\frac{5} {4 0} \\right)} \\\\ {} & {{}=\\frac{1} {1}+\\frac{1} {2}} \\\\ {} & {{}=\\frac{1} {1} \\frac{1} {2}} \\\\ {} & {{}=\\frac{1} {1} \\frac{1} {2}} \\\\ \\end{aligned}\n$$\nREAEABED\nDo not forget to:\n·make the\ndenominators some\n. reduce to the lowest\nterm\n。convert on improper\nMaA0 \nxFOR (39 Fractions ",
+          "ms": 20170,
+          "error": null
+        },
+        "E_pix2text_worked_solution": {
+          "text": "4UT 4UT\nor we can divide directly by $4$ \n $\\frac{2 8 \\div4} {4 0 \\div4}=\\frac{7} {1 0}$  $7$ or Hence, I is the only common foctor of Therefore, $\\frac{2 8} {4 0}$ in its lowest term is $\\frac{7} {1 0}$ \n2.\n$$\n\\begin{matrix} 4 \\frac{2} {5}+7 \\frac{1} {1 0} \\\\ =( 4+7 )+( \\frac{2} {5}+\\frac{1} {1 0} ) \\end{matrix}\n$$\n",
+          "ms": 5073,
+          "error": null
+        },
+        "F_pix2tex_worked_solution": {
+          "text": "\\begin{array}{l}{{\\left.\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad{\\Bigl\\|\\quad\\quad\\quad}\\\\ {\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad}\\\\ {\\quad2\\quad\\quad-\\quad\\quad1}\\\\ {\\quad{\\qquad\\quad\\quad\\quad\\quad\\quad{\\qquad\\quad\\quad}\\quad\\quad\\quad}\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad=\\quad(\\operatorname{dffin\\quad}-\\quad\\quad\\quad\\quad\\quad\\quad}\\quad\\quad\\quad\\quad\\quad\\quad{\\quad(\\quad\\quad}\\quad\\quad}\\\\ {\\quad\\quad\\quad{\\quad\\quad\\quad\\quad\\quad\\quad{\\quad\\quad}\\quad\\quad\\quad\\quad\\quad{\\quad}\\quad\\quad}\\quad\\quad{\\quad(\\quad}\\quad\\quad}\\\\ {\\quad\\quad\\quad\\quad\\quad(\\quad\\quad\\quad(\\quad\\quad\\quad{\\quad}\\\\ {\\quad\\quad(\\quad(\\quad\\quad}\\\\ {\\quad=\\quad\\quad{\\quad}\\quad\\quad\\quad(\\quad{\\quad{\\quad}\\\\ {\\quad(\\quad(\\quad\\quad\\quad\\quad{\\quad}\\\\ {\\quad{\\quad\\quad}\\\\ {\\quad\\quad\\quad\\quad}\\\\ {\\quad\\quad}\\quad\\quad\\quad{\\quad{\\quad}\\\\ {\\quad\\quad\\quad{\\quad}\\\\ {\\quad\\quad\\quad\\quad(",
+          "ms": 41094,
+          "error": null,
+          "format": "latex"
+        },
+        "E_pix2text_example_fraction": {
+          "text": "Solution:\n$$\n\\frac{2 8 \\div2} {1 0 \\div2}=\\frac{1 4 \\div2} {2 0 \\div2}=\\frac{7} {1 0}\n$$\n",
+          "ms": 3004,
+          "error": null
+        },
+        "F_pix2tex_example_fraction": {
+          "text": "\\begin{array}{r l}{\\nabla\\!}&{{}\\scriptstyle\\nabla\\!\\!}\\\\ {\\frac{28\\div}{2R\\sin\\mp\\infty}=\\frac{14\\div\\ 2}{18\\pi\\pm\\infty}=\\frac{1}{14\\pm\\infty}\\equiv\\frac{1}{14\\pm\\infty}\\equiv\\frac{7}{14}\\\\ {14}\\end{array}",
+          "ms": 3354,
+          "error": null,
+          "format": "latex"
+        }
+      },
+      "regions": {
+        "full": {
+          "cropMeta": {
+            "width": 768,
+            "height": 1024,
+            "pageWidth": 768,
+            "pageHeight": 1024,
+            "boxPx": [
+              0,
+              0,
+              768,
+              1024
+            ]
+          },
+          "cropPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\eval\\specialized-math-ocr\\outputs\\p39-reduce__full.jpg",
+          "pix2text": {
+            "text": "wewilel nithadtnsutncton,mnutipliotion ond\ndivision of different types of froctions.\nAddition and subtraction of two or more fractions\nDo you remember thot fracio is in ts lowest term, when is the\nonly comon actor bten the numrtor n te denominton\nExamples $\\frac{2 8} {4 0}$ to the lowest term.\nl. Reduce\nSolution:\n $\\frac{2 8 \\div2} {4 0 \\div2}=\\frac{1 4 \\div2} {2 0 \\div2}=\\frac{7} {1 0}$ \nor we can divide directly by $4$ \n $\\frac{2 8 \\div4} {4 0 \\div4}=\\frac{7} {1 0}$ \ne only common factor of 7 and 10.\nTherefore, $\\frac{2 8} {4 0}$ in its lowes term is $\\frac{7} {1 0}$ \n2.\n$$\n\\begin{aligned} {} & {{} \\frac{L_{5}^{2}} {5}+7 \\frac{1} {1 0}} \\\\ {} & {{}=\\frac{1} {4}+7 \\frac{1} {1 0}+\\frac{2} {5}+\\frac{1} {1 0} \\rangle} \\\\ {} & {{}=\\frac{1} {1}+\\left( \\frac{2} {5} \\times\\frac{2} {2}+\\frac{1} {1 0} \\right)} \\\\ {} & {{}=\\frac{1} {1}+\\left( \\frac{4} {1 0} \\right)=\\frac{1} {1 0}+\\left( \\frac{5} {1 0} \\right)} \\\\ {} & {{}=\\frac{1} {1}+\\left( \\frac{5} {4 0} \\right)} \\\\ {} & {{}=\\frac{1} {1}+\\frac{1} {2}} \\\\ {} & {{}=\\frac{1} {1} \\frac{1} {2}} \\\\ {} & {{}=\\frac{1} {1} \\frac{1} {2}} \\\\ \\end{aligned}\n$$\nREAEABED\nDo not forget to:\n·make the\ndenominators some\n. reduce to the lowest\nterm\n。convert on improper\nMaA0 \nxFOR (39 Fractions ",
+            "ms": 20170,
+            "error": null
+          }
+        },
+        "worked_solution": {
+          "cropMeta": {
+            "width": 399,
+            "height": 245,
+            "pageWidth": 768,
+            "pageHeight": 1024,
+            "boxPx": [
+              46,
+              389,
+              445,
+              634
+            ]
+          },
+          "cropPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\eval\\specialized-math-ocr\\outputs\\p39-reduce__worked_solution.jpg",
+          "pix2text": {
+            "text": "4UT 4UT\nor we can divide directly by $4$ \n $\\frac{2 8 \\div4} {4 0 \\div4}=\\frac{7} {1 0}$  $7$ or Hence, I is the only common foctor of Therefore, $\\frac{2 8} {4 0}$ in its lowest term is $\\frac{7} {1 0}$ \n2.\n$$\n\\begin{matrix} 4 \\frac{2} {5}+7 \\frac{1} {1 0} \\\\ =( 4+7 )+( \\frac{2} {5}+\\frac{1} {1 0} ) \\end{matrix}\n$$\n",
+            "ms": 5073,
+            "error": null
+          },
+          "pix2tex": {
+            "text": "\\begin{array}{l}{{\\left.\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad{\\Bigl\\|\\quad\\quad\\quad}\\\\ {\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad}\\\\ {\\quad2\\quad\\quad-\\quad\\quad1}\\\\ {\\quad{\\qquad\\quad\\quad\\quad\\quad\\quad{\\qquad\\quad\\quad}\\quad\\quad\\quad}\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad\\quad=\\quad(\\operatorname{dffin\\quad}-\\quad\\quad\\quad\\quad\\quad\\quad}\\quad\\quad\\quad\\quad\\quad\\quad{\\quad(\\quad\\quad}\\quad\\quad}\\\\ {\\quad\\quad\\quad{\\quad\\quad\\quad\\quad\\quad\\quad{\\quad\\quad}\\quad\\quad\\quad\\quad\\quad{\\quad}\\quad\\quad}\\quad\\quad{\\quad(\\quad}\\quad\\quad}\\\\ {\\quad\\quad\\quad\\quad\\quad(\\quad\\quad\\quad(\\quad\\quad\\quad{\\quad}\\\\ {\\quad\\quad(\\quad(\\quad\\quad}\\\\ {\\quad=\\quad\\quad{\\quad}\\quad\\quad\\quad(\\quad{\\quad{\\quad}\\\\ {\\quad(\\quad(\\quad\\quad\\quad\\quad{\\quad}\\\\ {\\quad{\\quad\\quad}\\\\ {\\quad\\quad\\quad\\quad}\\\\ {\\quad\\quad}\\quad\\quad\\quad{\\quad{\\quad}\\\\ {\\quad\\quad\\quad{\\quad}\\\\ {\\quad\\quad\\quad\\quad(",
+            "ms": 41094,
+            "error": null,
+            "format": "latex"
+          }
+        },
+        "example_fraction": {
+          "cropMeta": {
+            "width": 284,
+            "height": 82,
+            "pageWidth": 768,
+            "pageHeight": 1024,
+            "boxPx": [
+              61,
+              307,
+              345,
+              389
+            ]
+          },
+          "cropPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\eval\\specialized-math-ocr\\outputs\\p39-reduce__example_fraction.jpg",
+          "pix2text": {
+            "text": "Solution:\n$$\n\\frac{2 8 \\div2} {1 0 \\div2}=\\frac{1 4 \\div2} {2 0 \\div2}=\\frac{7} {1 0}\n$$\n",
+            "ms": 3004,
+            "error": null
+          },
+          "pix2tex": {
+            "text": "\\begin{array}{r l}{\\nabla\\!}&{{}\\scriptstyle\\nabla\\!\\!}\\\\ {\\frac{28\\div}{2R\\sin\\mp\\infty}=\\frac{14\\div\\ 2}{18\\pi\\pm\\infty}=\\frac{1}{14\\pm\\infty}\\equiv\\frac{1}{14\\pm\\infty}\\equiv\\frac{7}{14}\\\\ {14}\\end{array}",
+            "ms": 3354,
+            "error": null,
+            "format": "latex"
+          }
+        }
+      },
+      "metrics": {
+        "E_pix2text_full": {
+          "snippetHits": {
+            "Reduce 28/40": false
+          },
+          "exerciseHits": {},
+          "exerciseCellCer": {},
+          "exerciseExactMatchRate": null,
+          "textLen": 1237,
+          "ms": 20170,
+          "error": null,
+          "snippetCer": {
+            "Reduce 28/40": 6350.0
+          }
+        },
+        "E_pix2text_worked_solution": {
+          "snippetHits": {
+            "Reduce 28/40": false
+          },
+          "exerciseHits": {},
+          "exerciseCellCer": {},
+          "exerciseExactMatchRate": null,
+          "textLen": 318,
+          "ms": 5073,
+          "error": null,
+          "snippetCer": {
+            "Reduce 28/40": 1533.33
+          }
+        },
+        "F_pix2tex_worked_solution": {
+          "snippetHits": {
+            "Reduce 28/40": false
+          },
+          "exerciseHits": {},
+          "exerciseCellCer": {},
+          "exerciseExactMatchRate": null,
+          "textLen": 1172,
+          "ms": 41094,
+          "error": null,
+          "snippetCer": {
+            "Reduce 28/40": 733.33
+          }
+        },
+        "E_pix2text_example_fraction": {
+          "snippetHits": {
+            "Reduce 28/40": false
+          },
+          "exerciseHits": {},
+          "exerciseCellCer": {},
+          "exerciseExactMatchRate": null,
+          "textLen": 89,
+          "ms": 3004,
+          "error": null,
+          "snippetCer": {
+            "Reduce 28/40": 258.33
+          }
+        },
+        "F_pix2tex_example_fraction": {
+          "snippetHits": {
+            "Reduce 28/40": false
+          },
+          "exerciseHits": {},
+          "exerciseCellCer": {},
+          "exerciseExactMatchRate": null,
+          "textLen": 207,
+          "ms": 3354,
+          "error": null,
+          "snippetCer": {
+            "Reduce 28/40": 508.33
+          }
+        }
+      }
+    },
+    "p57-divide-grid": {
+      "baseline_ABCD": {
+        "A_paddle": "7.Divide the following fractions\nd. 2166 d. 84\nh. 2166 h.\nk.\nn. 5/58 n. -4\nReal-life Story Sums\nL.If 4 children ate  of a bowl of ice cream then how much\nice cream of the bowl did each child have?\nA pile of Math textbooks on a table is exactly 14  cm high.\nIf each book is I cm thick, how many books make up the pile?\n3Maham has 36 chocolates.She gives  of them to her best friend,\nLaila, then shares the rest between herself and 4 other friends\nHow many chocolates does Maham get?\n4A piece of ribbon is 5  m long If it is cut into 14 equal pieces,\nhow Long will each piece be?\n5.A cupcake takes just  of an hour to bake How many cup cakes\ncan be baked in I hours?\nOXFORD\nFractions",
+        "B_tesseract": "7. Divide the following fractions:\n\na. 12 +4    55    9         2\npec 5    ye  ¢ 87.0 I     L210\n|      3507s RES\n100 +L    3\ng   0  io  h: 8% 26\nk. 16543   le\nL “To 25\n\nIdea & of a bowl of ice cream, then how much\n\nice cream of the bowl did each child have?\n\nA pile of Math textbooks on a table is exactly 14 & cm high.\n\nIf each book is IL cm thick, hew many books make up the pile?\nMaham has 36 chocolates. She gives = of them to her best friend\nLaile, then shares the rest between herself and 4 other friends.\nHow many chocolates does Maham get?\n\nA piece of ribbon is 5 2 m long: If it is cut into 14 equal pieces,\nhow long will each piece be?\n\nA cupcake takes just + of an hour to bake. How many cup cakes\n\ncan be baked in 1 hours?\n\n7",
+        "C_merge": "7.Divide the following fractions\n21/21, 66/6, 8 4/6\nk.\nn. 5/58 n. -4\nReal-life Story Sums\nL.If 4 children ate of a bowl of ice cream then how much\nice cream of the bowl did each child have?\nA pile of Math textbooks on a table is exactly 14 cm high.\nIf each book is I cm thick, how many books make up the pile?\n3Maham has 36 chocolates.She gives of them to her best friend,\nLaila, then shares the rest between herself and 4 other friends\nHow many chocolates does Maham get?\n4A piece of ribbon is 5 m long If it is cut into 14 equal pieces,\nhow Long will each piece be?\n5.A cupcake takes just of an hour to bake How many cup cakes\ncan be baked in I hours?\nOXFORD\nFractions\na. 12 +4 55 9 2",
+        "D_region_retry": "7.Divide the following fractions\n37\n5/10, 24/8, 3/13, 2 7/3, 5 5/5, 8 4/58\nd.84\n+4\n>Real-Life Story Sums\nIf 4 children ate of a bow of ice cream, then how mu\nice cream of the bowl did each child have?\n2Apile otMath\nReal-life Story Sums\nL.If 4 children ate of a bowl of ice cream then how much\nice cream of the bowl did each child have?\nA pile of Math textbooks on a table is exactly 14 cm high.\nIf each book is I cm thick, how many books make up the pile?\n3Maham has 36 chocolates.She gives of them to her best friend,\nLaila, then shares the rest between herself and 4 other friends\nHow many chocolates does Maham get?\n4A piece of ribbon is 5 m long If it is cut into 14 equal pieces,\nhow Long will each piece be?\n5.A cupcake takes just of an hour to bake How many cup cakes\ncan be baked in I hours?\nOXFORD\nFractions\na. 12 +4 55 9 2",
+        "engineMs": 17077,
+        "regionMs": 125411,
+        "variantMetrics": {
+          "A": {
+            "cer": 21.533333333333335,
+            "wer": 34,
+            "fracScore": 4,
+            "snippetHitRate": 1
+          },
+          "B": {
+            "cer": 22.1,
+            "wer": 38.75,
+            "fracScore": 0,
+            "snippetHitRate": 1
+          },
+          "C": {
+            "cer": 21.866666666666667,
+            "wer": 34.75,
+            "fracScore": 16,
+            "snippetHitRate": 1
+          },
+          "D": {
+            "cer": 26.733333333333334,
+            "wer": 42.25,
+            "fracScore": 24,
+            "snippetHitRate": 1
+          }
+        }
+      },
+      "image": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\p57-divide-grid.jpg",
+      "candidates": {
+        "E_pix2text_full": {
+          "text": "% $1 \\frac{2} {5} \\div\\frac{4} {5}$ b. $\\frac{1 5} {4 2} \\div5$ c. $\\frac{3 7} {2 5} \\div\\frac{1} {7 5}$  $\\div\\frac{1} {1 0}$ h. $8 \\frac{3} {5} \\div6$ \nlowngrnoton\nm. $3 \\frac{5} {6} \\div1 \\frac{1} {6}$ : $1 0 \\frac{1} {2} \\div5$ k. d. $8 4 \\div\\frac{2 1} {1 6}$ \ne. $1 2 \\frac{3} {5} \\div4 \\frac{3} {8}$ f. $1 4 \\div\\frac{1} {1 3}$ g.100 $4 \\frac{9} {1 0} \\div2 \\frac{1} {2}$ \ni. $\\frac{3} {5} \\div4$ j. $8 \\frac{1} {4} \\div3 \\frac{5} {8}$  $1 6 \\div4 \\frac{3} {4}$ l.\nD Rel-life Story Sus\nl. If 4 children ote $\\frac{8} {9}$ of bom ofiecrom, teh how wch $\\frac{2} {5}$ cm high.\niecrem othe bowl dech chid houe? $\\frac{4} {9}$ of them t her best friend 2. A pile of Math $1 \\frac{1} {5}$ 生生中\nMan ok gntktn anan e nGnglr 3. Mohom hos 36 chocolotes. She gives $1 \\frac{1} {2}$ .\nHE $\\frac{3} {5}$ m long. If it is cut into I4 equal pieces,\nHow many chocolate\n4. A piece of ribbon is 5\nhow long will each piece be?\ns. Acucke toksjust $\\frac{1} {4}$ ofon hourt tsen Houmngue gpeg\n%u 57 rotions",
+          "ms": 13989,
+          "error": null
+        },
+        "E_pix2text_divide_grid": {
+          "text": "a. $1 \\frac{2} {5} \\div\\frac{4} {5}$ b. $\\frac{1 5} {4 2} \\div5$ c. $\\frac{3 7} {2 5} \\div\\frac{1} {7 5}$ d. $8 4 \\div\\frac{2} {1}$ e. $1 2 \\frac{3} {5} \\div4 \\frac{3} {8}$ f. $1 4 \\div\\frac{1} {1 3}$ g. $1 0 0 \\div\\frac{1} {1 0}$ h. $8 \\frac{3} {5} \\div1$ i. $\\frac{3} {5} \\div4$ j. $1 0 \\frac{1} {2} \\div5$ k. $1 6 \\div4 \\frac{3} {4}$ L. $4 \\frac{9} {1 0} \\div$ m. $3 \\frac{5} {6} \\div1 \\frac{1} {6}$ n. $8 \\frac{1} {4} \\div3 \\frac{5} {8}$ \nReal-life tor Sums\nl. If 4 children ote $\\frac{8} {9}$ MCT区ARSamO ice crem ofte bowl did ech hid hove?\nA pile of Mathtowh\n",
+          "ms": 10209,
+          "error": null
+        },
+        "F_pix2tex_divide_grid": {
+          "text": "\\begin{array}{l}{\\Gamma_{\\left(\\frac{11}{2}\\right)}^{\\mathrm{N}}}\\\\ {\\left\\{\\frac{11}{3}\\right\\}}\\\\ {\\frac{11}{45}}}\\\\ {\\H_{\\left(\\frac{11}{6}\\right)}}\\\\ {\\Delta=\\Delta\\overline{{{11}}}}\\end{array}",
+          "ms": 3218,
+          "error": null,
+          "format": "latex"
+        }
+      },
+      "regions": {
+        "full": {
+          "cropMeta": {
+            "width": 768,
+            "height": 1024,
+            "pageWidth": 768,
+            "pageHeight": 1024,
+            "boxPx": [
+              0,
+              0,
+              768,
+              1024
+            ]
+          },
+          "cropPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\eval\\specialized-math-ocr\\outputs\\p57-divide-grid__full.jpg",
+          "pix2text": {
+            "text": "% $1 \\frac{2} {5} \\div\\frac{4} {5}$ b. $\\frac{1 5} {4 2} \\div5$ c. $\\frac{3 7} {2 5} \\div\\frac{1} {7 5}$  $\\div\\frac{1} {1 0}$ h. $8 \\frac{3} {5} \\div6$ \nlowngrnoton\nm. $3 \\frac{5} {6} \\div1 \\frac{1} {6}$ : $1 0 \\frac{1} {2} \\div5$ k. d. $8 4 \\div\\frac{2 1} {1 6}$ \ne. $1 2 \\frac{3} {5} \\div4 \\frac{3} {8}$ f. $1 4 \\div\\frac{1} {1 3}$ g.100 $4 \\frac{9} {1 0} \\div2 \\frac{1} {2}$ \ni. $\\frac{3} {5} \\div4$ j. $8 \\frac{1} {4} \\div3 \\frac{5} {8}$  $1 6 \\div4 \\frac{3} {4}$ l.\nD Rel-life Story Sus\nl. If 4 children ote $\\frac{8} {9}$ of bom ofiecrom, teh how wch $\\frac{2} {5}$ cm high.\niecrem othe bowl dech chid houe? $\\frac{4} {9}$ of them t her best friend 2. A pile of Math $1 \\frac{1} {5}$ 生生中\nMan ok gntktn anan e nGnglr 3. Mohom hos 36 chocolotes. She gives $1 \\frac{1} {2}$ .\nHE $\\frac{3} {5}$ m long. If it is cut into I4 equal pieces,\nHow many chocolate\n4. A piece of ribbon is 5\nhow long will each piece be?\ns. Acucke toksjust $\\frac{1} {4}$ ofon hourt tsen Houmngue gpeg\n%u 57 rotions",
+            "ms": 13989,
+            "error": null
+          }
+        },
+        "divide_grid": {
+          "cropMeta": {
+            "width": 522,
+            "height": 307,
+            "pageWidth": 768,
+            "pageHeight": 1024,
+            "boxPx": [
+              30,
+              102,
+              552,
+              409
+            ]
+          },
+          "cropPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\eval\\specialized-math-ocr\\outputs\\p57-divide-grid__divide_grid.jpg",
+          "pix2text": {
+            "text": "a. $1 \\frac{2} {5} \\div\\frac{4} {5}$ b. $\\frac{1 5} {4 2} \\div5$ c. $\\frac{3 7} {2 5} \\div\\frac{1} {7 5}$ d. $8 4 \\div\\frac{2} {1}$ e. $1 2 \\frac{3} {5} \\div4 \\frac{3} {8}$ f. $1 4 \\div\\frac{1} {1 3}$ g. $1 0 0 \\div\\frac{1} {1 0}$ h. $8 \\frac{3} {5} \\div1$ i. $\\frac{3} {5} \\div4$ j. $1 0 \\frac{1} {2} \\div5$ k. $1 6 \\div4 \\frac{3} {4}$ L. $4 \\frac{9} {1 0} \\div$ m. $3 \\frac{5} {6} \\div1 \\frac{1} {6}$ n. $8 \\frac{1} {4} \\div3 \\frac{5} {8}$ \nReal-life tor Sums\nl. If 4 children ote $\\frac{8} {9}$ MCT区ARSamO ice crem ofte bowl did ech hid hove?\nA pile of Mathtowh\n",
+            "ms": 10209,
+            "error": null
+          },
+          "pix2tex": {
+            "text": "\\begin{array}{l}{\\Gamma_{\\left(\\frac{11}{2}\\right)}^{\\mathrm{N}}}\\\\ {\\left\\{\\frac{11}{3}\\right\\}}\\\\ {\\frac{11}{45}}}\\\\ {\\H_{\\left(\\frac{11}{6}\\right)}}\\\\ {\\Delta=\\Delta\\overline{{{11}}}}\\end{array}",
+            "ms": 3218,
+            "error": null,
+            "format": "latex"
+          }
+        }
+      },
+      "metrics": {
+        "E_pix2text_full": {
+          "snippetHits": {
+            "Divide the following fractions": false
+          },
+          "exerciseHits": {
+            "a": false,
+            "b": true,
+            "e": true,
+            "n": false
+          },
+          "exerciseCellCer": {
+            "a": 6210.0,
+            "b": 6911.11,
+            "e": 5158.33,
+            "n": 5636.36
+          },
+          "exerciseExactMatchRate": 0.5,
+          "textLen": 992,
+          "ms": 13989,
+          "error": null,
+          "snippetCer": {
+            "Divide the following fractions": 2010.0
+          }
+        },
+        "E_pix2text_divide_grid": {
+          "snippetHits": {
+            "Divide the following fractions": false
+          },
+          "exerciseHits": {
+            "a": true,
+            "b": true,
+            "e": true,
+            "n": true
+          },
+          "exerciseCellCer": {
+            "a": 2740.0,
+            "b": 3055.56,
+            "e": 2266.67,
+            "n": 2481.82
+          },
+          "exerciseExactMatchRate": 1.0,
+          "textLen": 565,
+          "ms": 10209,
+          "error": null,
+          "snippetCer": {
+            "Divide the following fractions": 886.67
+          }
+        },
+        "F_pix2tex_divide_grid": {
+          "snippetHits": {
+            "Divide the following fractions": false
+          },
+          "exerciseHits": {
+            "a": false,
+            "b": false,
+            "e": false,
+            "n": false
+          },
+          "exerciseCellCer": {
+            "a": 620.0,
+            "b": 700.0,
+            "e": 508.33,
+            "n": 563.64
+          },
+          "exerciseExactMatchRate": 0.0,
+          "textLen": 197,
+          "ms": 3218,
+          "error": null,
+          "snippetCer": {
+            "Divide the following fractions": 220.0
+          }
+        }
+      }
+    },
+    "p43-mult-whole": {
+      "baseline_ABCD": {
+        "missing": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\region-eval-reports\\p43-mult-whole.json"
+      },
+      "image": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\p43-mult-whole.jpg",
+      "candidates": {
+        "E_pix2text_full": {
+          "text": "multiplication of fractions\nMultiplication of a fraction by a whole number\nWith the help of dliogroms it becomes easy to understond\nmutiplication of a fraction by a whole number.\nLet us toke three Os or $3 \\times\\frac{1} {4} .$  $3 \\times\\frac{1} {4}$ or three quarters\nwe on sole tisb repetd dition,thu:\n=\n$$\n\\frac{1} {4}+\\frac{1} {4}+\\frac{1} {4}=\\frac{3} {4}\n$$\nWe write $3 \\times\\frac{1} {4}=\\frac{3} {1} \\times\\frac{1} {4}=\\frac{3} {4} .$ \nExample: Work out $2 \\times\\frac{1} {3}$ using repeated aditin ond ih diagrom. Solution: $2 \\times\\frac{1} {3}$ expressed in a diagram:\n=\n+号 $\\frac{2} {3}$ \n3\nLet us toke three $\\frac{2} {5} s o r 3 \\times\\frac{2} {5} .$ \n=\n$$\n\\frac{2} {5}+\\frac{2} {5}+\\frac{2} {5}=\\frac{6} {5}=1 \\frac{1} {5}\n$$\ncansole u,sen\nLet us toke three $\\frac{2} {5} s$ 中o中南和品中\nNow take two $\\frac{3} {7} s$ \n $3 \\times\\frac{2} {5}=\\frac{3 \\times2} {5}=\\frac{6} {5}=1 \\frac{1} {5}$ or $\\frac{3} {7}+\\frac{3} {7}=\\frac{6} {7}$ \n $\\frac{2} {5}+\\frac{2} {5}+\\frac{2} {5}=\\frac{6} {5}$  $2 \\times\\frac{3} {7}=\\frac{2 \\times3} {7}=\\frac{6} {7}$ \nX%E9A (43 Fractions",
+          "ms": 13676,
+          "error": null
+        },
+        "E_pix2text_lesson_math": {
+          "text": "we cum sotue as og repeated dddition, thus: $3 \\times\\frac{1} {4}$ or three quarter\n=\n$$\n\\frac{1} {4}+\\frac{1} {4}+\\frac{1} {4}=\\frac{3} {4}\n$$\nWe write $3 \\times\\frac{1} {4}=\\frac{3} {1} \\times\\frac{1} {4}=\\frac{3} {4}$ \nExample: Work out $2 \\times\\frac{1} {3}$ ,uing repeoted oddition and with dig Solution: $2 \\times\\frac{1} {3}$ expressed in a diagram:\n=\n$$\n\\frac{1} {2}+\\frac{1} {2}=\\frac{2} {3}\n$$\n",
+          "ms": 5639,
+          "error": null
+        },
+        "F_pix2tex_lesson_math": {
+          "text": "\\frac{\\P}{\\Vert{\\Big[}{\\Big]}_{\\Vert}}",
+          "ms": 786,
+          "error": null,
+          "format": "latex"
+        }
+      },
+      "regions": {
+        "full": {
+          "cropMeta": {
+            "width": 768,
+            "height": 1024,
+            "pageWidth": 768,
+            "pageHeight": 1024,
+            "boxPx": [
+              0,
+              0,
+              768,
+              1024
+            ]
+          },
+          "cropPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\eval\\specialized-math-ocr\\outputs\\p43-mult-whole__full.jpg",
+          "pix2text": {
+            "text": "multiplication of fractions\nMultiplication of a fraction by a whole number\nWith the help of dliogroms it becomes easy to understond\nmutiplication of a fraction by a whole number.\nLet us toke three Os or $3 \\times\\frac{1} {4} .$  $3 \\times\\frac{1} {4}$ or three quarters\nwe on sole tisb repetd dition,thu:\n=\n$$\n\\frac{1} {4}+\\frac{1} {4}+\\frac{1} {4}=\\frac{3} {4}\n$$\nWe write $3 \\times\\frac{1} {4}=\\frac{3} {1} \\times\\frac{1} {4}=\\frac{3} {4} .$ \nExample: Work out $2 \\times\\frac{1} {3}$ using repeated aditin ond ih diagrom. Solution: $2 \\times\\frac{1} {3}$ expressed in a diagram:\n=\n+号 $\\frac{2} {3}$ \n3\nLet us toke three $\\frac{2} {5} s o r 3 \\times\\frac{2} {5} .$ \n=\n$$\n\\frac{2} {5}+\\frac{2} {5}+\\frac{2} {5}=\\frac{6} {5}=1 \\frac{1} {5}\n$$\ncansole u,sen\nLet us toke three $\\frac{2} {5} s$ 中o中南和品中\nNow take two $\\frac{3} {7} s$ \n $3 \\times\\frac{2} {5}=\\frac{3 \\times2} {5}=\\frac{6} {5}=1 \\frac{1} {5}$ or $\\frac{3} {7}+\\frac{3} {7}=\\frac{6} {7}$ \n $\\frac{2} {5}+\\frac{2} {5}+\\frac{2} {5}=\\frac{6} {5}$  $2 \\times\\frac{3} {7}=\\frac{2 \\times3} {7}=\\frac{6} {7}$ \nX%E9A (43 Fractions",
+            "ms": 13676,
+            "error": null
+          }
+        },
+        "lesson_math": {
+          "cropMeta": {
+            "width": 606,
+            "height": 338,
+            "pageWidth": 768,
+            "pageHeight": 1024,
+            "boxPx": [
+              46,
+              225,
+              652,
+              563
+            ]
+          },
+          "cropPath": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\eval\\specialized-math-ocr\\outputs\\p43-mult-whole__lesson_math.jpg",
+          "pix2text": {
+            "text": "we cum sotue as og repeated dddition, thus: $3 \\times\\frac{1} {4}$ or three quarter\n=\n$$\n\\frac{1} {4}+\\frac{1} {4}+\\frac{1} {4}=\\frac{3} {4}\n$$\nWe write $3 \\times\\frac{1} {4}=\\frac{3} {1} \\times\\frac{1} {4}=\\frac{3} {4}$ \nExample: Work out $2 \\times\\frac{1} {3}$ ,uing repeoted oddition and with dig Solution: $2 \\times\\frac{1} {3}$ expressed in a diagram:\n=\n$$\n\\frac{1} {2}+\\frac{1} {2}=\\frac{2} {3}\n$$\n",
+            "ms": 5639,
+            "error": null
+          },
+          "pix2tex": {
+            "text": "\\frac{\\P}{\\Vert{\\Big[}{\\Big]}_{\\Vert}}",
+            "ms": 786,
+            "error": null,
+            "format": "latex"
+          }
+        }
+      },
+      "metrics": {
+        "E_pix2text_full": {
+          "snippetHits": {
+            "Multiplication of fractions": true,
+            "3 × 1/4 = 3/4": false
+          },
+          "exerciseHits": {},
+          "exerciseCellCer": {},
+          "exerciseExactMatchRate": null,
+          "textLen": 1081,
+          "ms": 13676,
+          "error": null,
+          "snippetCer": {
+            "Multiplication of fractions": 2314.81,
+            "3 × 1/4 = 3/4": 4915.38
+          }
+        },
+        "E_pix2text_lesson_math": {
+          "snippetHits": {
+            "Multiplication of fractions": false,
+            "3 × 1/4 = 3/4": false
+          },
+          "exerciseHits": {},
+          "exerciseCellCer": {},
+          "exerciseExactMatchRate": null,
+          "textLen": 404,
+          "ms": 5639,
+          "error": null,
+          "snippetCer": {
+            "Multiplication of fractions": 788.89,
+            "3 × 1/4 = 3/4": 1676.92
+          }
+        },
+        "F_pix2tex_lesson_math": {
+          "snippetHits": {
+            "Multiplication of fractions": false,
+            "3 × 1/4 = 3/4": false
+          },
+          "exerciseHits": {},
+          "exerciseCellCer": {},
+          "exerciseExactMatchRate": null,
+          "textLen": 38,
+          "ms": 786,
+          "error": null,
+          "snippetCer": {
+            "Multiplication of fractions": 92.59,
+            "3 × 1/4 = 3/4": 84.62
+          }
+        }
+      }
+    }
+  }
+}

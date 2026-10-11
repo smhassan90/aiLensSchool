@@ -1,0 +1,53 @@
+{
+  "pageId": "p57-divide-grid",
+  "snippets": [
+    "Divide the following fractions"
+  ],
+  "engineMs": 17077,
+  "regionMs": 125411,
+  "variants": {
+    "A": {
+      "text": "7.Divide the following fractions\nd. 2166 d. 84\nh. 2166 h.\nk.\nn. 5/58 n. -4\nReal-life Story Sums\nL.If 4 children ate  of a bowl of ice cream then how much\nice cream of the bowl did each child have?\nA pile of Math textbooks on a table is exactly 14  cm high.\nIf each book is I cm thick, how many books make up the pile?\n3Maham has 36 chocolates.She gives  of them to her best friend,\nLaila, then shares the rest between herself and 4 other friends\nHow many chocolates does Maham get?\n4A piece of ribbon is 5  m long If it is cut into 14 equal pieces,\nhow Long will each piece be?\n5.A cupcake takes just  of an hour to bake How many cup cakes\ncan be baked in I hours?\nOXFORD\nFractions",
+      "cer": 21.533333333333335,
+      "wer": 34,
+      "snippetHitRate": 1,
+      "fracScore": 4
+    },
+    "B": {
+      "text": "7. Divide the following fractions:\n\na. 12 +4    55    9         2\npec 5    ye  ¢ 87.0 I     L210\n|      3507s RES\n100 +L    3\ng   0  io  h: 8% 26\nk. 16543   le\nL “To 25\n\nIdea & of a bowl of ice cream, then how much\n\nice cream of the bowl did each child have?\n\nA pile of Math textbooks on a table is exactly 14 & cm high.\n\nIf each book is IL cm thick, hew many books make up the pile?\nMaham has 36 chocolates. She gives = of them to her best friend\nLaile, then shares the rest between herself and 4 other friends.\nHow many chocolates does Maham get?\n\nA piece of ribbon is 5 2 m long: If it is cut into 14 equal pieces,\nhow long will each piece be?\n\nA cupcake takes just + of an hour to bake. How many cup cakes\n\ncan be baked in 1 hours?\n\n7",
+      "cer": 22.1,
+      "wer": 38.75,
+      "snippetHitRate": 1,
+      "fracScore": 0
+    },
+    "C": {
+      "text": "7.Divide the following fractions\n21/21, 66/6, 8 4/6\nk.\nn. 5/58 n. -4\nReal-life Story Sums\nL.If 4 children ate of a bowl of ice cream then how much\nice cream of the bowl did each child have?\nA pile of Math textbooks on a table is exactly 14 cm high.\nIf each book is I cm thick, how many books make up the pile?\n3Maham has 36 chocolates.She gives of them to her best friend,\nLaila, then shares the rest between herself and 4 other friends\nHow many chocolates does Maham get?\n4A piece of ribbon is 5 m long If it is cut into 14 equal pieces,\nhow Long will each piece be?\n5.A cupcake takes just of an hour to bake How many cup cakes\ncan be baked in I hours?\nOXFORD\nFractions\na. 12 +4 55 9 2",
+      "cer": 21.866666666666667,
+      "wer": 34.75,
+      "snippetHitRate": 1,
+      "fracScore": 16
+    },
+    "D": {
+      "text": "7.Divide the following fractions\n37\n5/10, 24/8, 3/13, 2 7/3, 5 5/5, 8 4/58\nd.84\n+4\n>Real-Life Story Sums\nIf 4 children ate of a bow of ice cream, then how mu\nice cream of the bowl did each child have?\n2Apile otMath\nReal-life Story Sums\nL.If 4 children ate of a bowl of ice cream then how much\nice cream of the bowl did each child have?\nA pile of Math textbooks on a table is exactly 14 cm high.\nIf each book is I cm thick, how many books make up the pile?\n3Maham has 36 chocolates.She gives of them to her best friend,\nLaila, then shares the rest between herself and 4 other friends\nHow many chocolates does Maham get?\n4A piece of ribbon is 5 m long If it is cut into 14 equal pieces,\nhow Long will each piece be?\n5.A cupcake takes just of an hour to bake How many cup cakes\ncan be baked in I hours?\nOXFORD\nFractions\na. 12 +4 55 9 2",
+      "cer": 26.733333333333334,
+      "wer": 42.25,
+      "snippetHitRate": 1,
+      "fracScore": 24,
+      "appliedRegions": [
+        "exercise_band"
+      ],
+      "uncertainRegions": [
+        "r4",
+        "r1",
+        "r12",
+        "r3",
+        "r5"
+      ]
+    },
+    "E": {
+      "implemented": false,
+      "note": "No specialized math model integrated in repo"
+    }
+  },
+  "legacyMergeChars": 686
+}

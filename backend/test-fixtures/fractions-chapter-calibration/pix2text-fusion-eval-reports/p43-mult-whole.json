@@ -1,0 +1,22 @@
+{
+  "pageId": "p43-mult-whole",
+  "livePix2Text": false,
+  "engineMs": 21315,
+  "fusionMs": 1,
+  "baselineC": {
+    "snippetHits": "1/2",
+    "exerciseHits": "0/0",
+    "cer": 8.414634146341463
+  },
+  "fusionF": {
+    "snippetHits": "1/2",
+    "exerciseHits": "0/0",
+    "cer": 8.414634146341463,
+    "appliedRegions": [],
+    "skippedRegions": []
+  },
+  "note": "snippet-level reference",
+  "textC": "Multiplication of fractions\nMultiplication of a fraction by a whole number\nWith the help of diagrams it becomes easy to understand\nWe can solve this by repeated addition, thus 3x or three quarters\nDid you spot the short cut? Instead of adding we can solve our sum\nvery quickly by multiplying the numerator by the whole number\n2. Now take two 2s.\nFractions\nCe rig oy vs = = 4°\n3. 3",
+  "textF": "Multiplication of fractions\nMultiplication of a fraction by a whole number\nWith the help of diagrams it becomes easy to understand\nWe can solve this by repeated addition, thus 3x or three quarters\nDid you spot the short cut? Instead of adding we can solve our sum\nvery quickly by multiplying the numerator by the whole number\n2. Now take two 2s.\nFractions\nCe rig oy vs = = 4°\n3. 3",
+  "pix2textOutputs": []
+}

@@ -38,6 +38,42 @@ export function characterErrorRate(hypothesis: string, reference: string): numbe
   return dp[m][n] / n;
 }
 
+/** Token-level WER on normalized whitespace tokens (0 = perfect). */
+export function wordErrorRate(hypothesis: string, reference: string): number {
+  const a = normalizeForMetric(hypothesis).split(' ').filter(Boolean);
+  const b = normalizeForMetric(reference).split(' ').filter(Boolean);
+  if (!b.length) return a.length ? 1 : 0;
+  const m = a.length;
+  const n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[m][n] / n;
+}
+
+/** Fraction of lines that appear more than once (near-duplicate by normalized prefix). */
+export function duplicateLineRate(transcript: string): number {
+  const lines = transcript.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return 0;
+  let dupes = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const key = lines[i].toLowerCase().slice(0, 48);
+    for (let j = 0; j < i; j += 1) {
+      if (lines[j].toLowerCase().slice(0, 48) === key) {
+        dupes += 1;
+        break;
+      }
+    }
+  }
+  return dupes / lines.length;
+}
+
 export function snippetFoundInTranscript(snippet: string, transcript: string): boolean {
   const s = normalizeForMetric(snippet);
   const t = normalizeForMetric(transcript);

@@ -1,0 +1,33 @@
+{
+  "pageId": "p56-divide-grid",
+  "bookPage": 56,
+  "image": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\p56-divide-grid.jpg",
+  "env": {
+    "OCR_ENGINE": "auto",
+    "OCR_AI_MERGE": "0"
+  },
+  "orientation": {
+    "degrees": 0,
+    "prep": "prepareOrientedVariant(0) — portal upload path"
+  },
+  "engineMs": 21342,
+  "paddle": "4.Divide the following\na.\nh.\nf.\nHint: Use reciprocal\nHow many thirds\nof the fraction\nmake 2 wholes?\n2x3=6wholes\na. 3\n7/9\n10/12\nc.\n132\n14\np\na. 6.Write division sums to match these diagrams. a.\nb.\nd\nFractions",
+  "tesseract": "5. Copy and complete this table, thinkin\n\ng very carefully.\n\n Sum |  In words\n\nQuotient\n\n|    52      How many thirds\n|    “3       make 2 wholes?\n\nHint: Use reciprocal\n{of the fraction\n2.x 3 = 6 wholes\n\n6. Write diision sums tolmatch these dia\n\na  =]",
+  "legacyMerged": "4.Divide the following\nHint: Use reciprocal\nHow many thirds\nmake 2 wholes?\na. 6.Write division sums to match these diagrams. a.\nFractions\n5. Copy and complete this table, thinkin\ng very carefully.\nQuotient",
+  "layoutRuleMerged": "4.Divide the following\na.\nh.\nf.\nHint: Use reciprocal\nHow many thirds\nof the fraction\nmake 2 wholes?\n2x3=6wholes\na. 3\n7/9\n10/13, 1/21, 2/4\nc.\np\na. 6.Write division sums to match these diagrams. a.\nb.\nd\nFractions",
+  "usedLayoutReconcile": true,
+  "finalMergedOcrText": "4.Divide the following\na.\nh.\nf.\nHint: Use reciprocal\nHow many thirds\nof the fraction\nmake 2 wholes?\n2x3=6wholes\na. 3\n7/9\n10/13, 1/21, 2/4\nc.\np\na. 6.Write division sums to match these diagrams. a.\nb.\nd\nFractions",
+  "finalOcrText": "4.Divide the following\na.\nh.\nf.\nHint: Use reciprocal\nHow many thirds\nof the fraction\nmake 2 wholes?\n2x3=6wholes\na. 3\n7/9\n10/13, 1/21, 2/4\nc.\np\na. 6.Write division sums to match these diagrams. a.\nb.\nd\nFractions",
+  "usedAi": false,
+  "persistedLessonSource": {
+    "paddleOcrText": "4.Divide the following\na.\nh.\nf.\nHint: Use reciprocal\nHow many thirds\nof the fraction\nmake 2 wholes?\n2x3=6wholes\na. 3\n7/9\n10/12\nc.\n132\n14\np\na. 6.Write division sums to match these diagrams. a.\nb.\nd\nFractions",
+    "tesseractOcrText": "5. Copy and complete this table, thinkin\n\ng very carefully.\n\n Sum |  In words\n\nQuotient\n\n|    52      How many thirds\n|    “3       make 2 wholes?\n\nHint: Use reciprocal\n{of the fraction\n2.x 3 = 6 wholes\n\n6. Write diision sums tolmatch these dia\n\na  =]",
+    "mergedOcrText": "4.Divide the following\na.\nh.\nf.\nHint: Use reciprocal\nHow many thirds\nof the fraction\nmake 2 wholes?\n2x3=6wholes\na. 3\n7/9\n10/13, 1/21, 2/4\nc.\np\na. 6.Write division sums to match these diagrams. a.\nb.\nd\nFractions",
+    "ocrText": "4.Divide the following\na.\nh.\nf.\nHint: Use reciprocal\nHow many thirds\nof the fraction\nmake 2 wholes?\n2x3=6wholes\na. 3\n7/9\n10/13, 1/21, 2/4\nc.\np\na. 6.Write division sums to match these diagrams. a.\nb.\nd\nFractions"
+  },
+  "signals": {
+    "introDuplicateCount": 0,
+    "gluedAdditionSubtraction": false,
+    "paddleIntroDupes": 0
+  }
+}

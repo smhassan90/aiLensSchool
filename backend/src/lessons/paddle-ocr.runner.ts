@@ -8,9 +8,12 @@ import { readEnv } from '../common/env';
 
 const logger = new Logger('PaddleOcrRunner');
 
+import type { OcrStructuredLine } from './ocr-structured-line';
+
 export type PaddleOcrResult = {
   ok: boolean;
   text: string;
+  lines?: OcrStructuredLine[];
   error?: string;
 };
 
@@ -89,6 +92,7 @@ export async function runPaddleOcrOnBuffer(
       imagePath,
       '--lang',
       paddleLangHint(options?.subjectName),
+      '--include-lines',
     ];
     const text = await new Promise<string>((resolve, reject) => {
       const child = spawn(pythonBinary(), args, {
@@ -137,12 +141,29 @@ export async function runPaddleOcrOnBuffer(
     const parsed = JSON.parse(lastLine) as {
       ok?: boolean;
       text?: string;
+      lines?: Array<{
+        text: string;
+        x0: number;
+        y0: number;
+        x1: number;
+        y1: number;
+        confidence?: number;
+      }>;
       error?: string;
     };
     if (!parsed.ok) {
       return { ok: false, text: '', error: parsed.error || 'PaddleOCR failed' };
     }
-    return { ok: true, text: (parsed.text ?? '').trim() };
+    const lines: OcrStructuredLine[] | undefined = parsed.lines?.map((row) => ({
+      text: row.text,
+      x0: row.x0,
+      y0: row.y0,
+      x1: row.x1,
+      y1: row.y1,
+      confidence: row.confidence,
+      engine: 'paddle',
+    }));
+    return { ok: true, text: (parsed.text ?? '').trim(), lines };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(`PaddleOCR unavailable: ${message}`);

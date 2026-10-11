@@ -1,0 +1,23 @@
+{
+  "pageId": "p39-reduce",
+  "livePix2Text": false,
+  "engineMs": 24927,
+  "fusionMs": 69,
+  "baselineC": {
+    "snippetHits": "0/1",
+    "exerciseHits": "0/0",
+    "cer": 69.25
+  },
+  "fusionF": {
+    "snippetHits": "0/1",
+    "exerciseHits": "0/0",
+    "cer": 69.25,
+    "appliedRegions": [],
+    "skippedRegions": [],
+    "workerError": "mock_no_fixture"
+  },
+  "note": "p39 full solution REQUIRES_ANNOTATION — snippet-only metrics",
+  "textC": "Now we will deal with addition, subtractionmultiplication, and\ndivision of different-types of fractions division of different types of fractions.\nAddition and subtraction of two or more fractions\nke Do you remember that ai fraction isin its lowest term, when | is the “Tie\ni only common factor between the numerator and the denominator?’ =\n1 Examples: 5\nReduce 28.to the Lowest term\n40\nSolution: 3 EY )\n2/4, 21/22, 2/21\n| or we can divide directly by 4. f=, 3\n28÷4 = 7\n────── = ────\n010 = 10\nHence, I is the only common factor of7 and 10.\nTherefore 28in its Lowest termis7\n40, 10\n2.42+7\n5\nREMEMBER\n=4+7++\n5 10/10\n[Fe 22 +) Do not forget to:\n= firth i f+ 62) make the\n10 denominators same\n=) + reduce to the lowest: 3\n+ term\nI w if + convert an improper a8\nI Sills fraction to a mixed | =\n2\ni | “fraction Basal Ca.\nFractions\nOXEORD\nf= 20:2 0 Ve",
+  "textF": "Now we will deal with addition, subtractionmultiplication, and\ndivision of different-types of fractions division of different types of fractions.\nAddition and subtraction of two or more fractions\nke Do you remember that ai fraction isin its lowest term, when | is the “Tie\ni only common factor between the numerator and the denominator?’ =\n1 Examples: 5\nReduce 28.to the Lowest term\n40\nSolution: 3 EY )\n2/4, 21/22, 2/21\n| or we can divide directly by 4. f=, 3\n28÷4 = 7\n────── = ────\n010 = 10\nHence, I is the only common factor of7 and 10.\nTherefore 28in its Lowest termis7\n40, 10\n2.42+7\n5\nREMEMBER\n=4+7++\n5 10/10\n[Fe 22 +) Do not forget to:\n= firth i f+ 62) make the\n10 denominators same\n=) + reduce to the lowest: 3\n+ term\nI w if + convert an improper a8\nI Sills fraction to a mixed | =\n2\ni | “fraction Basal Ca.\nFractions\nOXEORD\nf= 20:2 0 Ve",
+  "pix2textOutputs": []
+}

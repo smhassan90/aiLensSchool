@@ -334,8 +334,14 @@ def lines_from_result(result) -> list[dict[str, Any]]:
             box = item[0]
             payload = item[1]
             # Paddle 2.x: payload is (text, confidence). Never stringify the tuple.
+            conf = None
             if isinstance(payload, (list, tuple)) and payload:
                 text = str(payload[0]).strip()
+                if len(payload) > 1:
+                    try:
+                        conf = float(payload[1])
+                    except (TypeError, ValueError):
+                        conf = None
             elif isinstance(payload, dict):
                 text = str(payload.get("text") or payload.get("transcription") or "").strip()
             elif isinstance(payload, str):
@@ -346,7 +352,10 @@ def lines_from_result(result) -> list[dict[str, Any]]:
                 continue
             bounds = _box_bounds(box)
             if not bounds:
-                lines.append({"text": text, "x0": 0.0, "y0": float(len(lines)), "x1": 1.0, "y1": float(len(lines))})
+                row = {"text": text, "x0": 0.0, "y0": float(len(lines)), "x1": 1.0, "y1": float(len(lines))}
+                if conf is not None:
+                    row["confidence"] = conf
+                lines.append(row)
                 continue
             x0, y0, x1, y1 = bounds
             # Drop near-duplicate boxes (same text, heavily overlapping) from multi-pass noise.
@@ -363,7 +372,10 @@ def lines_from_result(result) -> list[dict[str, Any]]:
                     break
             if dup:
                 continue
-            lines.append({"text": text, "x0": x0, "y0": y0, "x1": x1, "y1": y1})
+            row = {"text": text, "x0": x0, "y0": y0, "x1": x1, "y1": y1}
+            if conf is not None:
+                row["confidence"] = conf
+            lines.append(row)
         except Exception:
             continue
     return lines

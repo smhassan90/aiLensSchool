@@ -1,0 +1,33 @@
+{
+  "pageId": "p46-brackets",
+  "bookPage": 46,
+  "image": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\p46-brackets.jpg",
+  "env": {
+    "OCR_ENGINE": "auto",
+    "OCR_AI_MERGE": "0"
+  },
+  "orientation": {
+    "degrees": 0,
+    "prep": "prepareOrientedVariant(0) — portal upload path"
+  },
+  "engineMs": 15441,
+  "paddle": "56\nEs-amples: Examples:\n2.\nX\nX2 56\n72, 3, 2\nMultiplication of two or more fractions involving brackets\nLook at the multiplication of 3 whole numbers.\n235\n=235=65=30\n=23x5=2x15=30\n=2x53=103=30\nThe same rule can be applied to fractions.\n-5\nX m-5 -2-9 -5153 10-10-1\nX\nX X\nSome more examples.\n4155\n2.\n67 5/42 NAYW\n25, 215\n-4-2",
+  "tesseract": "Multiplication of two or more fractions involving brackets   4\nLook at the multiplication of 3 whole numbers.\n2X3%X5\n=@x3)x5 =6x5 =30\noe = - x > = 30",
+  "legacyMerged": "Es-amples: Examples:\nMultiplication of two or more fractions involving brackets\nLook at the multiplication of 3 whole numbers.\nThe same rule can be applied to fractions.\nSome more examples.",
+  "layoutRuleMerged": "Multiplication of two or more fractions involving brackets 4\nLook at the multiplication of 3 whole numbers.",
+  "usedLayoutReconcile": true,
+  "finalMergedOcrText": "Multiplication of two or more fractions involving brackets 4\nLook at the multiplication of 3 whole numbers.",
+  "finalOcrText": "Multiplication of two or more fractions involving brackets 4\nLook at the multiplication of 3 whole numbers.",
+  "usedAi": false,
+  "persistedLessonSource": {
+    "paddleOcrText": "56\nEs-amples: Examples:\n2.\nX\nX2 56\n72, 3, 2\nMultiplication of two or more fractions involving brackets\nLook at the multiplication of 3 whole numbers.\n235\n=235=65=30\n=23x5=2x15=30\n=2x53=103=30\nThe same rule can be applied to fractions.\n-5\nX m-5 -2-9 -5153 10-10-1\nX\nX X\nSome more examples.\n4155\n2.\n67 5/42 NAYW\n25, 215\n-4-2",
+    "tesseractOcrText": "Multiplication of two or more fractions involving brackets   4\nLook at the multiplication of 3 whole numbers.\n2X3%X5\n=@x3)x5 =6x5 =30\noe = - x > = 30",
+    "mergedOcrText": "Multiplication of two or more fractions involving brackets 4\nLook at the multiplication of 3 whole numbers.",
+    "ocrText": "Multiplication of two or more fractions involving brackets 4\nLook at the multiplication of 3 whole numbers."
+  },
+  "signals": {
+    "introDuplicateCount": 0,
+    "gluedAdditionSubtraction": false,
+    "paddleIntroDupes": 0
+  }
+}

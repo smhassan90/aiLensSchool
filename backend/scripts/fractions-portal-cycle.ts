@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { PageOcrService } from '../src/lessons/page-ocr.service';
-import { mergePaddleAndTesseractPageOcr } from '../src/lessons/merge-paddle-tesseract-ocr';
+import { mergePageOcr } from '../src/lessons/ocr-layout-reconcile';
 import {
   orientationCandidates,
   prepareOrientedVariant,
@@ -68,7 +68,7 @@ async function portalOcr(imagePath: string): Promise<{ merged: string; paddle: s
     subjectName: 'Mathematics',
   });
   const merged = filterPageTextForLessonAssembly(
-    mergePaddleAndTesseractPageOcr(paddle, tesseract),
+    mergePageOcr({ paddle, tesseract, subjectName: 'Mathematics' }),
   );
   await ocr.onModuleDestroy?.();
   return { merged, paddle, tesseract };
