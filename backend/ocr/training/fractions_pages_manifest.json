@@ -46,10 +46,21 @@
     "asset": "c__Users_User_AppData_Roaming_Cursor_User_workspaceStorage_1174750180b1ba55948f9b3721f58d47_images_20-ff8e01c1-4df4-4b42-9af8-11b679e455a4.jpg",
     "mustMatch": ["Divide the following fractions", "1 2/5", "÷", "4/5"],
     "trainLabels": [
-      "a. 1 2/5 ÷ 4/5",
       "7. Divide the following fractions:",
-      "12 3/5 ÷ 4 3/8",
-      "14 ÷ 1/13"
+      "a. 1 2/5 ÷ 4/5",
+      "b. 15/42 ÷ 5",
+      "c. 37/25 ÷ 1/75",
+      "d. 84 ÷ 21/16",
+      "e. 12 3/5 ÷ 4 3/8",
+      "f. 14 ÷ 1/13",
+      "g. 100 ÷ 1/10",
+      "h. 8 3/5 ÷ 6",
+      "i. 3/5 ÷ 4",
+      "j. 10 1/2 ÷ 5",
+      "k. 16 ÷ 4 3/4",
+      "l. 4 9/10 ÷ 2 1/2",
+      "m. 3 5/6 ÷ 1 1/6",
+      "n. 8 1/4 ÷ 3 5/8"
     ]
   },
   {

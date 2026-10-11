@@ -184,6 +184,82 @@ def ocr_top_band(image_path: str, lang: str, fraction: float = 0.38) -> list[dic
     return sorted(lines, key=lambda r: (r["y0"], r["x0"]))
 
 
+def ocr_divide_exercise_band(
+    image_path: str,
+    lang: str,
+    *,
+    use_science_rec: bool = True,
+    y0_frac: float = 0.11,
+    y1_frac: float = 0.38,
+) -> list[dict[str, Any]]:
+    """Zoomed OCR on the multi-column divide-exercise block (stacked fractions)."""
+    try:
+        from PIL import Image, ImageEnhance, ImageOps, ImageFilter
+    except Exception:
+        return []
+
+    path = Path(image_path)
+    try:
+        im = Image.open(path).convert("RGB")
+    except Exception:
+        return []
+
+    w, h = im.size
+    y0 = max(0, int(h * y0_frac))
+    y1 = min(h, int(h * y1_frac))
+    if y1 - y0 < 80:
+        return []
+    band = im.crop((0, y0, w, y1))
+    scale = max(2.2, 1800 / max(1, min(band.width, band.height)))
+    band = band.resize(
+        (max(1, int(band.width * scale)), max(1, int(band.height * scale))),
+        Image.Resampling.LANCZOS,
+    )
+    band = ImageOps.autocontrast(band, cutoff=1)
+    band = ImageEnhance.Contrast(band).enhance(1.2)
+    band = ImageEnhance.Sharpness(band).enhance(1.3)
+    band = band.filter(ImageFilter.UnsharpMask(radius=1.0, percent=120, threshold=2))
+    band_path = path.with_name(f"{path.stem}__divide_band{path.suffix}")
+    band.save(band_path, quality=93)
+
+    engine = get_engine(lang, use_science_rec=use_science_rec)
+    try:
+        result = engine.ocr(str(band_path), cls=True)
+        lines = lines_from_result(result)
+    except Exception:
+        return []
+    finally:
+        try:
+            band_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    scale_y = (y1 - y0) / max(1.0, band.height)
+    scale_x = w / max(1.0, band.width)
+    for row in lines:
+        row["text"] = _normalize_div_glyph(_line_text(row))
+        row["y0"] = y0 + float(row["y0"]) * scale_y
+        row["y1"] = y0 + float(row["y1"]) * scale_y
+        row["x0"] = float(row["x0"]) * scale_x
+        row["x1"] = float(row["x1"]) * scale_x
+    return sorted(lines, key=lambda r: (r["y0"], r["x0"]))
+
+
+def merge_exercise_band_lines(
+    full: list[dict[str, Any]],
+    band: list[dict[str, Any]],
+    *,
+    y_cut: float = 480.0,
+) -> list[dict[str, Any]]:
+    """Replace low-quality exercise rows with a zoomed second pass."""
+    if not band:
+        return full
+    header = [r for r in full if re.search(r"divide\s+the\s+following", _line_text(r), re.I)]
+    tail = [r for r in full if float(r.get("y0") or 0) >= y_cut]
+    band = [r for r in band if float(r.get("y0") or 0) < y_cut]
+    return sorted(header + band + tail, key=lambda r: (r["y0"], r["x0"]))
+
+
 def merge_top_band_lines(
     full: list[dict[str, Any]], top: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -298,6 +374,9 @@ def pick_main_column(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
     If a narrow side band is mostly Weblinks/URLs, keep the wider body column only.
     Otherwise return lines sorted top→bottom, left→right (default reading order).
     """
+    probe = " ".join(_line_text(r) for r in lines)
+    if re.search(r"divide\s+the\s+following\s+fractions", probe, re.I):
+        return sorted(lines, key=lambda r: (r["y0"], r["x0"]))
     if len(lines) < 8:
         return sorted(lines, key=lambda r: (r["y0"], r["x0"]))
 
@@ -359,7 +438,18 @@ _FRAC_TOKEN_RE = re.compile(
 )
 _DIV_OP_RE = re.compile(r"^[÷:]$|^(?:div|divided)$", re.I)
 # OCR often misreads ÷ as a lone dash/dot between two fractions.
-_DIV_OP_LOOSE_RE = re.compile(r"^[-–—_=·.•]$")
+_DIV_OP_LOOSE_RE = re.compile(r"^[-–—_=·.•+]$")
+# Trained/stock rec may emit replacement char when ÷ is not in charset.
+_DIV_OP_GLYPH_RE = re.compile(r"^[\ufffd\u00f7]$")
+
+
+def _normalize_div_glyph(text: str) -> str:
+    t = (text or "").strip()
+    if not t:
+        return t
+    if _DIV_OP_GLYPH_RE.match(t) or "\ufffd" in t:
+        return "÷"
+    return t
 _BAR_RE = re.compile(r"^[-–—_=‾¯\-]{1,6}$")
 _LETTERED_ITEM_RE = re.compile(r"^[a-n][.)]$", re.I)
 
@@ -375,8 +465,10 @@ def _is_fraction_token(text: str) -> bool:
 
 
 def _is_div_op(text: str, *, loose: bool = False) -> bool:
-    t = (text or "").strip()
+    t = _normalize_div_glyph((text or "").strip())
     if _DIV_OP_RE.match(t):
+        return True
+    if _DIV_OP_GLYPH_RE.match((text or "").strip()):
         return True
     return bool(loose and _DIV_OP_LOOSE_RE.match(t))
 
@@ -618,6 +710,89 @@ def compose_fraction_division_ops(lines: list[dict[str, Any]]) -> list[dict[str,
     return sorted(remaining, key=lambda r: (r["y0"], r["x0"]))
 
 
+def compose_lettered_divide_items(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Grid divide exercises (a. … n.): group boxes per letter cell, then compose
+    fractions and ÷ on each row segment.
+    """
+    letters: list[tuple[int, str, dict[str, Any]]] = []
+    for i, row in enumerate(lines):
+        t = _line_text(row)
+        m = re.match(r"^([a-n])\.\s*$", t, re.I)
+        if m:
+            letters.append((i, m.group(1).lower(), row))
+    if len(letters) < 3:
+        return lines
+
+    letters.sort(key=lambda x: (x[2]["y0"], x[2]["x0"]))
+    rows: list[list[tuple[int, str, dict[str, Any]]]] = []
+    for item in letters:
+        if not rows or abs(item[2]["y0"] - rows[-1][0][2]["y0"]) > 42:
+            rows.append([item])
+        else:
+            rows[-1].append(item)
+
+    letter_idxs = {i for i, _, _ in letters}
+    unused = set(range(len(lines))) - letter_idxs
+    composed: list[dict[str, Any]] = []
+
+    for row_letters in rows:
+        for pos, (li, letter, lrow) in enumerate(row_letters):
+            x_start = float(lrow["x0"])
+            x_end = (
+                float(row_letters[pos + 1][2]["x0"])
+                if pos + 1 < len(row_letters)
+                else x_start + 320.0
+            )
+            y_mid = (float(lrow["y0"]) + float(lrow["y1"])) / 2.0
+            cell: list[dict[str, Any]] = [lrow]
+            for j, r in enumerate(lines):
+                if j in letter_idxs or j == li:
+                    continue
+                t = _line_text(r)
+                if re.search(r"divide\s+the\s+following|story\s+sums", t, re.I):
+                    continue
+                cy = (float(r["y0"]) + float(r["y1"])) / 2.0
+                cx = (float(r["x0"]) + float(r["x1"])) / 2.0
+                if abs(cy - y_mid) > 58:
+                    continue
+                if cx < x_start - 8 or cx >= x_end:
+                    continue
+                cell.append(r)
+                unused.discard(j)
+
+            sub = compose_fraction_division_ops(compose_stacked_fractions(cell))
+            parts = cluster_reading_lines(sub, divide_exercise=True, y_tol=18.0)
+            body = " ".join(parts).strip()
+            body = re.sub(r"^[a-n]\.\s*", "", body, flags=re.I)
+            text = f"{letter}. {body}".strip()
+            composed.append(
+                {
+                    "text": text,
+                    "x0": x_start,
+                    "y0": float(lrow["y0"]),
+                    "x1": x_end,
+                    "y1": max(float(r["y1"]) for r in cell),
+                }
+            )
+
+    header = [
+        lines[i]
+        for i in sorted(unused)
+        if re.search(r"divide\s+the\s+following", _line_text(lines[i]), re.I)
+    ]
+    tail = [
+        lines[i]
+        for i in sorted(unused)
+        if float(lines[i].get("y0") or 0) >= 520
+        and not re.search(r"divide\s+the\s+following", _line_text(lines[i]), re.I)
+    ]
+    for i in sorted(unused):
+        if lines[i] in header or lines[i] in tail:
+            continue
+    return sorted(header + composed + tail, key=lambda r: (r["y0"], r["x0"]))
+
+
 def cluster_reading_lines(
     lines: list[dict[str, Any]],
     y_tol: float = 14.0,
@@ -650,7 +825,7 @@ def cluster_reading_lines(
         band.sort(key=lambda r: r["x0"])
         parts: list[str] = []
         for row in band:
-            t = (row.get("text") or "").strip()
+            t = _normalize_div_glyph((row.get("text") or "").strip())
             if not t:
                 continue
             if _is_div_op(t, loose=False):
@@ -1014,18 +1189,38 @@ def reconstruct_worked_div_fraction_chains(text: str) -> str:
 
 
 def text_from_lines_with_fractions(lines: list[dict[str, Any]]) -> str:
+    probe_all = " ".join((r.get("text") or "") for r in lines)
+    divide_exercise = bool(
+        re.search(r"divide\s+the\s+following\s+fractions", probe_all, re.I)
+        or (
+            re.search(r"\bdivide\b", probe_all, re.I)
+            and len(re.findall(r"\b[a-n]\.", probe_all, re.I)) >= 3
+        )
+    )
     composed = compose_stacked_fractions(lines)
     composed = compose_fraction_division_ops(composed)
-    probe = " ".join((r.get("text") or "") for r in composed)
-    divide_exercise = bool(
-        re.search(r"\bdivide\b", probe, re.I)
-        or len(re.findall(r"\b[a-n][.)]\b", probe, re.I)) >= 4
-    )
-    text = "\n".join(
-        cluster_reading_lines(composed, divide_exercise=divide_exercise)
-    ).strip()
+    if divide_exercise and len(re.findall(r"\b[a-n]\.", probe_all, re.I)) >= 3:
+        composed = compose_lettered_divide_items(composed)
+        text = "\n".join(_line_text(r) for r in composed if _line_text(r)).strip()
+    else:
+        text = "\n".join(
+            cluster_reading_lines(composed, divide_exercise=divide_exercise)
+        ).strip()
     text = reconstruct_glued_example_fractions(text)
-    return reconstruct_worked_div_fraction_chains(text)
+    text = reconstruct_worked_div_fraction_chains(text)
+    if divide_exercise:
+        text = re.sub(
+            r"(\d(?:\s+\d{1,2})?/\d{1,3})\s*[-–—]\s*(\d(?:\s+\d{1,2})?/\d{1,3})",
+            r"\1 ÷ \2",
+            text,
+        )
+        text = re.sub(
+            r"(\d(?:\s+\d{1,2})?/\d{1,3})\s*[-–—]\s*(\d{1,3})",
+            r"\1 ÷ \2",
+            text,
+        )
+        text = re.sub(r"\s*÷\s*", " ÷ ", text)
+    return text
 
 
 def predict_structured(
@@ -1087,9 +1282,15 @@ def predict_structured(
     if not lines:
         return []
 
+    use_stock = _science_rec_attempted
     chosen = pick_main_column(lines)
     text = text_from_lines(chosen)
-    if not opener_looks_complete(text):
+    if re.search(r"divide\s+the\s+following\s+fractions", text, re.I):
+        band = ocr_divide_exercise_band(
+            image_path, lang, use_science_rec=not use_stock
+        )
+        chosen = merge_exercise_band_lines(chosen, band)
+    elif not opener_looks_complete(text):
         # Full-page pass often skips the bright top paragraph — recover from a zoomed top band.
         top = ocr_top_band(image_path, lang)
         chosen = merge_top_band_lines(chosen, top)
