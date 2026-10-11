@@ -32,6 +32,7 @@ import {
   RegenerateKeyPointsDto,
   ScanLessonDto,
   SubjectPaceQueryDto,
+  VerifyChapterPageOcrDto,
   UpdateLessonDto,
 } from './dto/lesson.dto';
 import { LessonRecordKind } from '@prisma/client';
@@ -259,6 +260,17 @@ export class LessonsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.lessonsService.refreshChapterPageOcrBreakdown(id, sourceId, user);
+  }
+
+  @Roles(RoleName.TEACHER)
+  @Patch('chapters/:id/pages/:sourceId/verified-ocr')
+  saveVerifiedChapterPageOcr(
+    @Param('id') id: string,
+    @Param('sourceId') sourceId: string,
+    @Body() dto: VerifyChapterPageOcrDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.lessonsService.saveVerifiedChapterPageOcr(id, sourceId, dto, user);
   }
 
   @Roles(RoleName.TEACHER)

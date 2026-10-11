@@ -13,6 +13,8 @@ import {
   LessonRecordKind,
   LessonSourceType,
   LessonStatus,
+  OcrReviewStatus,
+  OcrTrainingExampleStatus,
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
@@ -48,6 +50,7 @@ import {
   CreateChapterDraftDto,
   CreateChapterPasteDto,
   ReorderChapterPagesDto,
+  VerifyChapterPageOcrDto,
   CreateClassSessionDto,
   CreateLessonDto,
   ExtractLessonDto,
@@ -317,6 +320,8 @@ export class LessonsService {
       paddleOcrText?: string | null;
       tesseractOcrText?: string | null;
       mergedOcrText?: string | null;
+      verifiedOcrText?: string | null;
+      ocrReviewStatus?: OcrReviewStatus;
       fileAsset?: { url: string; originalFilename: string | null } | null;
     }>,
   ) {
@@ -324,7 +329,15 @@ export class LessonsService {
       .filter((s) => s.type === LessonSourceType.TEXTBOOK_IMAGE && s.fileAsset?.url)
       .sort((a, b) => (a.pageFrom ?? 0) - (b.pageFrom ?? 0))
       .map((s) => {
-        const raw = s.ocrText?.trim() ? coerceLessonDisplayText(s.ocrText) : '';
+        const verifiedRaw =
+          s.ocrReviewStatus === OcrReviewStatus.VERIFIED && s.verifiedOcrText?.trim()
+            ? coerceLessonDisplayText(s.verifiedOcrText)
+            : '';
+        const raw = verifiedRaw
+          ? verifiedRaw
+          : s.ocrText?.trim()
+            ? coerceLessonDisplayText(s.ocrText)
+            : '';
         const fetchedText = raw ? filterPageTextForLessonAssembly(raw) : '';
         const textForAcceptance = fetchedText.trim() || raw;
         const textQualityPercent = raw ? scorePageOcrQuality(raw) : 0;
@@ -350,6 +363,9 @@ export class LessonsService {
           ocrPaddleReady: Boolean(paddleRaw),
           ocrTesseractReady: Boolean(tessRaw),
           ocrMergedReady: Boolean(mergedRaw),
+          verifiedOcrText: verifiedRaw || undefined,
+          ocrReviewStatus: s.ocrReviewStatus ?? OcrReviewStatus.NONE,
+          ocrVerified: s.ocrReviewStatus === OcrReviewStatus.VERIFIED,
           textQualityPercent,
           textAccepted: Boolean(textForAcceptance) && isPagePhotoTextReadable(textForAcceptance),
         };
@@ -1514,6 +1530,81 @@ export class LessonsService {
         message: 'Re-upload complete.',
       });
     }
+    return this.loadPresented(lessonId);
+  }
+
+  /** Teacher-approved page transcript — stored for lesson assembly and OCR training pool. */
+  async saveVerifiedChapterPageOcr(
+    lessonId: string,
+    sourceId: string,
+    dto: VerifyChapterPageOcrDto,
+    user: AuthUser,
+  ) {
+    const lesson = await this.requireOwnedChapterLesson(lessonId, user);
+    const source = lesson.sources.find(
+      (s) => s.id === sourceId && s.type === LessonSourceType.TEXTBOOK_IMAGE,
+    );
+    if (!source) {
+      throw new NotFoundException({ code: 'PAGE_NOT_FOUND', message: 'Page photo not found' });
+    }
+    const verified = dto.verifiedOcrText.trim();
+    if (!verified) {
+      throw new BadRequestException({
+        code: 'VERIFIED_TEXT_REQUIRED',
+        message: 'Verified transcript cannot be empty',
+      });
+    }
+    const normalized = coerceLessonDisplayText(verified);
+    const splitGroup = `lesson:${lessonId}:source:${sourceId}`;
+    const paddleSnap = source.paddleOcrText?.trim() || null;
+    const tessSnap = source.tesseractOcrText?.trim() || null;
+    const mergedSnap = source.mergedOcrText?.trim() || null;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.lessonSource.update({
+        where: { id: sourceId },
+        data: {
+          verifiedOcrText: normalized,
+          ocrReviewStatus: OcrReviewStatus.VERIFIED,
+          verifiedAt: new Date(),
+          verifiedByUserId: user.id,
+          ocrText: normalized,
+        },
+      });
+      await tx.ocrTrainingExample.deleteMany({
+        where: {
+          lessonSourceId: sourceId,
+          status: OcrTrainingExampleStatus.APPROVED,
+        },
+      });
+      await tx.ocrTrainingExample.create({
+        data: {
+          schoolId: lesson.schoolId,
+          lessonSourceId: sourceId,
+          fileAssetId: source.fileAssetId,
+          regionType: 'full_page',
+          label: normalized,
+          paddleText: paddleSnap,
+          tesseractText: tessSnap,
+          mergedText: mergedSnap,
+          splitGroup,
+          status: OcrTrainingExampleStatus.APPROVED,
+          approvedByUserId: user.id,
+          engineMeta: {
+            subject: lesson.subject.name,
+            pageFrom: source.pageFrom,
+          },
+        },
+      });
+      await tx.dailyLesson.update({
+        where: { id: lessonId },
+        data: {
+          contentConfirmed: false,
+          status: LessonStatus.READY_FOR_REVIEW,
+        },
+      });
+    });
+
     return this.loadPresented(lessonId);
   }
 

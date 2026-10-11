@@ -1,0 +1,382 @@
+{
+  "pageId": "p39-reduce",
+  "bookPage": 39,
+  "layout": "worked_examples",
+  "image": "p39-reduce.jpg",
+  "models": {
+    "paddleRec": "stock_en",
+    "paddleMs": 15926,
+    "tesseractMs": 16761
+  },
+  "paddleText": "Now we will deal with additionsubtraction, multiplication, and\nNow we will deal with additionsubtractionmultiplication and\ndivision of different types of fractions.\nAddition and subtraction of two or more fractions\nDo you remember that a fraction is in its lowest term, when I is the\nonly common factor between the numerator and the denominator?\nExamples:\n1.F\n40\nSolution:\n282=142=7\n402, 202, 10\nor we can divide directly by 4.\n(28�4)/(40�4) = 7/10\nHence, I is the only common factor of 7 and 10.\nTherefore, 28 in its Lowest term is7\n10\n40/4+7\n510\n=4+7++\nREMEMBER\n5, 10\n-1+2x310 122+ Do not forget to\n+11=+n+1= make the\ndenominators same\n=1+5 10/2 reduce to the lowest\nterm\nconvert an improper\n=11+ - fraction to a mixed\n2\nfraction\n112\nFractions\nOXFORD",
+  "tesseractText": "‘Now we will deal with addition, subtraction, multiplication, and\ndivision of different types of fractions.                           J\n\nAddition and subtraction of two or more fractions\n\nDo you remember that a fraction is in its lowest term, when | is the\nonly common factor between the numerator and the denominator?\n\nExamples:\n\n|. Reduce 28 to the lowest term.\n\nSolution:\n\nz\nor we can divide directly by 4.\n\n8+6 _ 7\n\n50         10\n\nHence, | is the only common factor of 7 and 10.\nTherefore, = in its lowest term is T.\n\nZon\n2. 42+\nstg\n=       2 ptt\nG+7)+ G    TU\nSa BE\nrs 5 x2    io                      Do not forget to:\n=A 3)       + make the\n0                 10                          denominators same\n“11+ 5)                       + reduce to the lowest\n+o                        term\n2\n\n« convert an improper\nfraction to a mixed\nfraction",
+  "mergedText": "Now we will deal with addition, multiplication, and\nNow we will deal with additionsubtractionmultiplication and\ndivision of different types of fractions. J\nAddition and subtraction of two or more fractions\nDo you remember that a fraction is in its lowest term, when I is the\nonly common factor between the numerator and the denominator?\nExamples:\n1.F\n40\nSolution:\n282=142=7\n402, 202, 10\nor we can divide directly by 4.\n(28�4)/(40�4) = 7/10\nHence, I is the only common factor of 7 and 10.\nTherefore, 28 in its Lowest term is7\n10\n40/4+7\n510\n=4+7++\nREMEMBER\n5, 10\n-1+2x310 122+ Do not forget to\n+11=+n+1= make the\n0 10 denominators same\n=1+5 10/2 reduce to the lowest\n+o term\nconvert an improper\n=11+ - fraction to a mixed\n2\nfraction\n112\nFractions\nOXFORD\n2. 42+",
+  "paddleLines": [
+    {
+      "text": "Now we will deal with additionsubtraction, multiplication, and",
+      "x0": 137,
+      "y0": 67,
+      "x1": 1255,
+      "y1": 100.5
+    },
+    {
+      "text": "Now we will deal with additionsubtractionmultiplication and",
+      "x0": 121,
+      "y0": 120,
+      "x1": 1146,
+      "y1": 185
+    },
+    {
+      "text": "division of different types of fractions.",
+      "x0": 129,
+      "y0": 177,
+      "x1": 732,
+      "y1": 220
+    },
+    {
+      "text": "Addition and subtraction of two or more fractions",
+      "x0": 133,
+      "y0": 264,
+      "x1": 1142,
+      "y1": 317
+    },
+    {
+      "text": "Do you remember that a fraction is in its lowest term, when I is the",
+      "x0": 129,
+      "y0": 319,
+      "x1": 1199,
+      "y1": 375
+    },
+    {
+      "text": "only common factor between the numerator and the denominator?",
+      "x0": 129,
+      "y0": 355,
+      "x1": 1197,
+      "y1": 420
+    },
+    {
+      "text": "Examples:",
+      "x0": 129,
+      "y0": 460,
+      "x1": 281,
+      "y1": 512
+    },
+    {
+      "text": "1.F",
+      "x0": 130,
+      "y0": 520,
+      "x1": 208,
+      "y1": 559
+    },
+    {
+      "text": "40",
+      "x0": 316,
+      "y0": 542,
+      "x1": 360,
+      "y1": 571
+    },
+    {
+      "text": "Solution:",
+      "x0": 129,
+      "y0": 606,
+      "x1": 265,
+      "y1": 652
+    },
+    {
+      "text": "282=142=7",
+      "x0": 137,
+      "y0": 653,
+      "x1": 505,
+      "y1": 694
+    },
+    {
+      "text": "10",
+      "x0": 410,
+      "y0": 688,
+      "x1": 505,
+      "y1": 727
+    },
+    {
+      "text": "202",
+      "x0": 288,
+      "y0": 690,
+      "x1": 414,
+      "y1": 727
+    },
+    {
+      "text": "402",
+      "x0": 139,
+      "y0": 694,
+      "x1": 304,
+      "y1": 731
+    },
+    {
+      "text": "or we can divide directly by 4.",
+      "x0": 133,
+      "y0": 729,
+      "x1": 617,
+      "y1": 778
+    },
+    {
+      "text": "284=7",
+      "x0": 141,
+      "y0": 789,
+      "x1": 338,
+      "y1": 832
+    },
+    {
+      "text": "40410",
+      "x0": 139,
+      "y0": 824,
+      "x1": 344,
+      "y1": 865
+    },
+    {
+      "text": "Hence, I is the only common factor of 7 and 10.",
+      "x0": 133,
+      "y0": 849,
+      "x1": 895,
+      "y1": 900
+    },
+    {
+      "text": "28 in its Lowest term is7",
+      "x0": 296,
+      "y0": 897,
+      "x1": 732,
+      "y1": 976
+    },
+    {
+      "text": "Therefore,",
+      "x0": 132,
+      "y0": 919,
+      "x1": 333,
+      "y1": 978
+    },
+    {
+      "text": "10",
+      "x0": 686,
+      "y0": 947,
+      "x1": 728,
+      "y1": 976
+    },
+    {
+      "text": "40",
+      "x0": 306,
+      "y0": 950,
+      "x1": 356,
+      "y1": 985
+    },
+    {
+      "text": "4+7",
+      "x0": 186,
+      "y0": 1016,
+      "x1": 343,
+      "y1": 1072
+    },
+    {
+      "text": "2.",
+      "x0": 136,
+      "y0": 1031,
+      "x1": 212,
+      "y1": 1072
+    },
+    {
+      "text": "510",
+      "x0": 210,
+      "y0": 1051,
+      "x1": 348,
+      "y1": 1095
+    },
+    {
+      "text": "=4+7++",
+      "x0": 195,
+      "y0": 1073,
+      "x1": 521,
+      "y1": 1160
+    },
+    {
+      "text": "REMEMBER",
+      "x0": 861,
+      "y0": 1074,
+      "x1": 1098,
+      "y1": 1124
+    },
+    {
+      "text": "5",
+      "x0": 387,
+      "y0": 1118,
+      "x1": 427,
+      "y1": 1157
+    },
+    {
+      "text": "10",
+      "x0": 447,
+      "y0": 1118,
+      "x1": 509,
+      "y1": 1153
+    },
+    {
+      "text": "-1+2x310",
+      "x0": 181,
+      "y0": 1141,
+      "x1": 543,
+      "y1": 1261
+    },
+    {
+      "text": "122+",
+      "x0": 310,
+      "y0": 1176,
+      "x1": 465,
+      "y1": 1227
+    },
+    {
+      "text": "Do not forget to",
+      "x0": 865,
+      "y0": 1185,
+      "x1": 1100,
+      "y1": 1227
+    },
+    {
+      "text": "+11=+n+1=",
+      "x0": 192,
+      "y0": 1226,
+      "x1": 631,
+      "y1": 1312
+    },
+    {
+      "text": "make the",
+      "x0": 865,
+      "y0": 1236,
+      "x1": 1029,
+      "y1": 1277
+    },
+    {
+      "text": "denominators same",
+      "x0": 895,
+      "y0": 1275,
+      "x1": 1158,
+      "y1": 1310
+    },
+    {
+      "text": "10",
+      "x0": 358,
+      "y0": 1279,
+      "x1": 406,
+      "y1": 1314
+    },
+    {
+      "text": "reduce to the lowest",
+      "x0": 873,
+      "y0": 1322,
+      "x1": 1176,
+      "y1": 1363
+    },
+    {
+      "text": "=1+5",
+      "x0": 201,
+      "y0": 1330,
+      "x1": 393,
+      "y1": 1397
+    },
+    {
+      "text": "term",
+      "x0": 895,
+      "y0": 1365,
+      "x1": 966,
+      "y1": 1398
+    },
+    {
+      "text": "convert an improper",
+      "x0": 887,
+      "y0": 1405,
+      "x1": 1172,
+      "y1": 1448
+    },
+    {
+      "text": "2",
+      "x0": 348,
+      "y0": 1407,
+      "x1": 372,
+      "y1": 1434
+    },
+    {
+      "text": "=11+",
+      "x0": 210,
+      "y0": 1437,
+      "x1": 313,
+      "y1": 1484
+    },
+    {
+      "text": "-",
+      "x0": 318,
+      "y0": 1440,
+      "x1": 332,
+      "y1": 1464
+    },
+    {
+      "text": "fraction to a mixed",
+      "x0": 894,
+      "y0": 1440,
+      "x1": 1160,
+      "y1": 1485
+    },
+    {
+      "text": "2",
+      "x0": 316,
+      "y0": 1468,
+      "x1": 338,
+      "y1": 1501
+    },
+    {
+      "text": "fraction",
+      "x0": 899,
+      "y0": 1485,
+      "x1": 1010,
+      "y1": 1516
+    },
+    {
+      "text": "112",
+      "x0": 218,
+      "y0": 1493,
+      "x1": 326,
+      "y1": 1580
+    },
+    {
+      "text": "Fractions",
+      "x0": 1213,
+      "y0": 1753,
+      "x1": 1342,
+      "y1": 1790
+    },
+    {
+      "text": "OXFORD",
+      "x0": 89,
+      "y0": 1774,
+      "x1": 207,
+      "y1": 1818
+    }
+  ],
+  "verifiedSnippets": [
+    {
+      "id": "reduce",
+      "text": "Reduce 28/40",
+      "regionType": "math",
+      "reviewStatus": "reference"
+    }
+  ],
+  "exerciseItems": [],
+  "exerciseResults": [],
+  "failures": [
+    {
+      "kind": "snippet",
+      "detail": "reduce: \"Reduce 28/40\"",
+      "category": "digit_soup_fraction"
+    }
+  ],
+  "needsHumanVerification": true,
+  "metrics": {
+    "snippetHitRate": 0,
+    "exerciseExactRate": null,
+    "mergedVsReferenceCER": 62.166666666666664
+  }
+}

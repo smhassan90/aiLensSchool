@@ -37,6 +37,12 @@ def _science_rec_model_dir() -> Path | None:
     """Fine-tuned rec model (λ/θ/π charset) from ocr/training — optional."""
     import os
 
+    try:
+        from model_validate import charset_covers, inference_files_ok
+    except ImportError:
+        inference_files_ok = None
+        charset_covers = None
+
     env = (os.environ.get("PADDLE_OCR_REC_MODEL_DIR") or "").strip()
     candidates = []
     if env:
@@ -46,17 +52,34 @@ def _science_rec_model_dir() -> Path | None:
     for path in candidates:
         if not path.is_dir():
             continue
-        charset = path / "science_charset.txt"
-        has_infer = any(
-            (path / name).exists()
-            for name in (
-                "inference.pdmodel",
-                "inference.json",
-                "inference.pdiparams",
+        if inference_files_ok is not None:
+            ok, msg = inference_files_ok(path)
+            if not ok:
+                print(
+                    f"[paddle_ocr_worker] skip invalid rec model ({msg}): {path}",
+                    file=sys.stderr,
+                )
+                continue
+            ok_cs, missing = charset_covers(path)
+            if not ok_cs:
+                print(
+                    f"[paddle_ocr_worker] skip rec model missing charset symbols {missing}: {path}",
+                    file=sys.stderr,
+                )
+                continue
+        else:
+            charset = path / "science_charset.txt"
+            has_infer = any(
+                (path / name).exists()
+                for name in (
+                    "inference.pdmodel",
+                    "inference.json",
+                    "inference.pdiparams",
+                )
             )
-        )
-        if charset.is_file() and has_infer:
-            return path
+            if not (charset.is_file() and has_infer):
+                continue
+        return path
     return None
 
 
@@ -1306,6 +1329,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="PaddleOCR worker for aiLensSchool")
     parser.add_argument("--image", required=True, help="Path to image file")
     parser.add_argument("--lang", default="en", help="Language hint (en|eng|arabic|eng+urd+ara)")
+    parser.add_argument(
+        "--include-lines",
+        action="store_true",
+        help="Include structured line boxes in JSON (for calibration)",
+    )
     args = parser.parse_args()
 
     image = Path(args.image)
@@ -1316,23 +1344,22 @@ def main() -> int:
     try:
         lines = predict_structured(str(image), args.lang)
         text = text_from_lines_with_fractions(lines)
-        print(
-            json.dumps(
-                {
-                    "ok": True,
-                    "engine": "paddle",
-                    "lang": paddle_lang(args.lang),
-                    "text": text or "",
-                    "chars": len((text or "").replace(" ", "")),
-                    "lineCount": len(lines),
-                    "columnFiltered": True,
-                    "openerOk": opener_looks_complete(text or ""),
-                    "fractionComposed": True,
-                },
-                ensure_ascii=False,
-            ),
-            flush=True,
-        )
+        rec_dir = _science_rec_model_dir()
+        payload: dict[str, Any] = {
+            "ok": True,
+            "engine": "paddle",
+            "lang": paddle_lang(args.lang),
+            "text": text or "",
+            "chars": len((text or "").replace(" ", "")),
+            "lineCount": len(lines),
+            "columnFiltered": True,
+            "openerOk": opener_looks_complete(text or ""),
+            "fractionComposed": True,
+            "recModel": str(rec_dir) if rec_dir else "stock_en",
+        }
+        if args.include_lines:
+            payload["lines"] = lines
+        print(json.dumps(payload, ensure_ascii=False), flush=True)
         return 0
     except Exception as exc:  # noqa: BLE001 — worker must always emit JSON
         print(json.dumps({"ok": False, "error": str(exc)}), flush=True)

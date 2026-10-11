@@ -458,6 +458,13 @@ export class CreateClassSessionDto {
   homeworkQuestionsJson?: unknown;
 }
 
+export class VerifyChapterPageOcrDto {
+  @ApiProperty({ description: 'Teacher-verified transcript for this page photo' })
+  @IsString()
+  @MinLength(1)
+  verifiedOcrText!: string;
+}
+
 export class SubjectPaceQueryDto {
   @ApiProperty()
   @IsString()

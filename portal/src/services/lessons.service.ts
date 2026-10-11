@@ -226,6 +226,16 @@ export const lessonsService = {
     );
   },
 
+  saveVerifiedChapterPageOcr(lessonId: string, sourceId: string, verifiedOcrText: string) {
+    return apiClient<Lesson>(
+      `/lessons/chapters/${lessonId}/pages/${sourceId}/verified-ocr`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ verifiedOcrText }),
+      },
+    );
+  },
+
   deleteChapterPagePhoto(lessonId: string, sourceId: string) {
     return apiClient<Lesson>(`/lessons/chapters/${lessonId}/pages/${sourceId}`, {
       method: "DELETE",

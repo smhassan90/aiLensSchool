@@ -1,0 +1,184 @@
+{
+  "version": 1,
+  "title": "Oxford Fractions Ch.3 calibration (teacher-upload photos)",
+  "splitPolicy": "hold_out_by_page_id",
+  "pages": [
+    {
+      "id": "ch03-opener",
+      "bookPage": null,
+      "image": "ch03-opener.jpg",
+      "layout": "unit_opener",
+      "verifiedSnippets": [
+        { "id": "flash-title", "text": "MATH FLASH", "regionType": "heading", "reviewStatus": "reference" },
+        { "id": "flash-learned", "text": "You have already learnt", "regionType": "paragraph", "reviewStatus": "reference" },
+        { "id": "ex-frac-list", "text": "3/4, 8/11, 6/4", "regionType": "math", "reviewStatus": "reference" }
+      ],
+      "exerciseItems": []
+    },
+    {
+      "id": "p39-reduce",
+      "bookPage": 39,
+      "image": "p39-reduce.jpg",
+      "layout": "worked_examples",
+      "verifiedSnippets": [
+        { "id": "reduce", "text": "Reduce 28/40", "regionType": "math", "reviewStatus": "reference" }
+      ],
+      "exerciseItems": []
+    },
+    {
+      "id": "p40-add",
+      "bookPage": 40,
+      "image": "p40-add.jpg",
+      "layout": "worked_examples",
+      "verifiedSnippets": [],
+      "exerciseItems": []
+    },
+    {
+      "id": "p43-mult-whole",
+      "bookPage": 43,
+      "image": "p43-mult-whole.jpg",
+      "layout": "lesson_body",
+      "verifiedSnippets": [
+        { "id": "title", "text": "Multiplication of fractions", "regionType": "heading", "reviewStatus": "reference" },
+        { "id": "ex-3x-quarter", "text": "3 × 1/4 = 3/4", "regionType": "math", "reviewStatus": "reference" }
+      ],
+      "exerciseItems": []
+    },
+    {
+      "id": "p44-mult-frac",
+      "bookPage": 44,
+      "image": "p44-mult-frac.jpg",
+      "layout": "lesson_body",
+      "verifiedSnippets": [
+        { "id": "half-half", "text": "1/2 × 1/2 = 1/4", "regionType": "math", "reviewStatus": "reference" }
+      ],
+      "exerciseItems": []
+    },
+    {
+      "id": "p45-mixed",
+      "bookPage": 45,
+      "image": "p45-mixed.jpg",
+      "layout": "lesson_body",
+      "verifiedSnippets": [
+        { "id": "mixed-prod", "text": "4 2/5 × 3 3/4", "regionType": "math", "reviewStatus": "reference" }
+      ],
+      "exerciseItems": []
+    },
+    {
+      "id": "p46-brackets",
+      "bookPage": 46,
+      "image": "p46-brackets.jpg",
+      "layout": "lesson_body",
+      "verifiedSnippets": [],
+      "exerciseItems": []
+    },
+    {
+      "id": "p47-exercise-3b",
+      "bookPage": 47,
+      "image": "p47-exercise-3b.jpg",
+      "layout": "exercise_panel",
+      "verifiedSnippets": [
+        { "id": "panel", "text": "Exercise 3b", "regionType": "heading", "reviewStatus": "reference" }
+      ],
+      "exerciseItems": []
+    },
+    {
+      "id": "p48-grid",
+      "bookPage": 48,
+      "image": "p48-grid.jpg",
+      "layout": "exercise_grid",
+      "verifiedSnippets": [],
+      "exerciseItems": []
+    },
+    {
+      "id": "p49-mult-grid",
+      "bookPage": 49,
+      "image": "p49-mult-grid.jpg",
+      "layout": "exercise_grid",
+      "verifiedSnippets": [],
+      "exerciseItems": [
+        { "label": "10a", "text": "1/2 × 3/4", "regionType": "exercise_cell", "reviewStatus": "reference" }
+      ]
+    },
+    {
+      "id": "p50-story",
+      "bookPage": 50,
+      "image": "p50-story.jpg",
+      "layout": "exercise_grid",
+      "verifiedSnippets": [
+        { "id": "story-header", "text": "Real-Life Story Sums", "regionType": "heading", "reviewStatus": "reference" }
+      ],
+      "exerciseItems": []
+    },
+    {
+      "id": "p51-division",
+      "bookPage": 51,
+      "image": "p51-division.jpg",
+      "layout": "lesson_body",
+      "verifiedSnippets": [
+        { "id": "reciprocal", "text": "Reciprocal", "regionType": "heading", "reviewStatus": "reference" },
+        { "id": "5-9", "text": "5/9", "regionType": "math", "reviewStatus": "reference" }
+      ],
+      "exerciseItems": []
+    },
+    {
+      "id": "p52-rules",
+      "bookPage": 52,
+      "image": "p52-rules.jpg",
+      "layout": "lesson_body",
+      "verifiedSnippets": [],
+      "exerciseItems": []
+    },
+    {
+      "id": "p53-divide-1",
+      "bookPage": 53,
+      "image": "p53-divide-1.jpg",
+      "layout": "lesson_body",
+      "verifiedSnippets": [],
+      "exerciseItems": []
+    },
+    {
+      "id": "p54-divide-frac",
+      "bookPage": 54,
+      "image": "p54-divide-frac.jpg",
+      "layout": "worked_examples",
+      "verifiedSnippets": [],
+      "exerciseItems": []
+    },
+    {
+      "id": "p55-exercise-3c",
+      "bookPage": 55,
+      "image": "p55-exercise-3c.jpg",
+      "layout": "exercise_panel",
+      "verifiedSnippets": [
+        { "id": "panel", "text": "Exercise 3c", "regionType": "heading", "reviewStatus": "reference" }
+      ],
+      "exerciseItems": []
+    },
+    {
+      "id": "p56-divide-grid",
+      "bookPage": 56,
+      "image": "p56-divide-grid.jpg",
+      "layout": "exercise_grid",
+      "verifiedSnippets": [],
+      "exerciseItems": [
+        { "label": "a", "text": "1/6 ÷ 5", "regionType": "exercise_cell", "reviewStatus": "reference" }
+      ]
+    },
+    {
+      "id": "p57-divide-grid",
+      "bookPage": 57,
+      "image": "p57-divide-grid.jpg",
+      "layout": "exercise_grid",
+      "verifiedSnippets": [
+        { "id": "heading", "text": "Divide the following fractions", "regionType": "heading", "reviewStatus": "reference" }
+      ],
+      "exerciseItems": [
+        { "label": "a", "text": "1 2/5 ÷ 4/5", "regionType": "exercise_cell", "reviewStatus": "reference" },
+        { "label": "b", "text": "15/42 ÷ 5", "regionType": "exercise_cell", "reviewStatus": "reference" },
+        { "label": "e", "text": "12 3/5 ÷ 4 3/8", "regionType": "exercise_cell", "reviewStatus": "reference" },
+        { "label": "n", "text": "8 1/4 ÷ 3 5/8", "regionType": "exercise_cell", "reviewStatus": "reference" }
+      ]
+    }
+  ]
+}

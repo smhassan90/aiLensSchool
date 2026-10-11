@@ -140,6 +140,24 @@ enum LessonSourceType {
   OTHER
 }
 
+enum OcrReviewStatus {
+  NONE
+  DRAFT
+  VERIFIED
+}
+
+enum OcrTrainingExampleStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum OcrModelReleaseRole {
+  PRODUCTION
+  CANDIDATE
+  ARCHIVED
+}
+
 enum QuizStatus {
   DRAFT
   PUBLISHED
@@ -374,6 +392,8 @@ model User {
   staffAttendances           StaffAttendance[]              @relation("StaffAttendanceUser")
   recordedStaffAttendance    StaffAttendance[]              @relation("StaffAttendanceRecordedBy")
   biometricStaffMappings     BiometricDeviceUserMapping[]   @relation("BiometricStaffMapping")
+  verifiedLessonSources      LessonSource[]                 @relation("LessonSourceVerifiedBy")
+  approvedOcrTrainingExamples OcrTrainingExample[]          @relation("OcrTrainingApprovedBy")
 
   @@unique([schoolId, employeeCode])
   @@index([schoolId])
@@ -548,6 +568,7 @@ model School {
   headTeacherAssignments        HeadTeacherAssignment[]
   biometricDevices              BiometricDeviceConfig[]
   pendingBiometricPunches       PendingBiometricAttendanceLog[]
+  ocrTrainingExamples           OcrTrainingExample[]
   pricingPlanId                 String?                        @map("pricing_plan_id")
   pricingPlan                   PricingPlan?                   @relation(fields: [pricingPlanId], references: [id])
 
@@ -1279,6 +1300,10 @@ model LessonSource {
   paddleOcrText    String?          @map("paddle_ocr_text") @db.LongText
   tesseractOcrText String?          @map("tesseract_ocr_text") @db.LongText
   mergedOcrText    String?          @map("merged_ocr_text") @db.LongText
+  verifiedOcrText  String?          @map("verified_ocr_text") @db.LongText
+  ocrReviewStatus  OcrReviewStatus  @default(NONE) @map("ocr_review_status")
+  verifiedAt       DateTime?        @map("verified_at")
+  verifiedByUserId String?          @map("verified_by_user_id")
   pageFrom    Int?             @map("page_from")
   pageTo      Int?             @map("page_to")
   manualText  String?          @map("manual_text") @db.Text
@@ -1286,9 +1311,57 @@ model LessonSource {
 
   lesson    DailyLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   fileAsset FileAsset?  @relation(fields: [fileAssetId], references: [id])
+  verifiedBy User?     @relation("LessonSourceVerifiedBy", fields: [verifiedByUserId], references: [id])
+  ocrTrainingExamples OcrTrainingExample[]
 
   @@index([lessonId])
+  @@index([ocrReviewStatus])
   @@map("lesson_sources")
+}
+
+model OcrTrainingExample {
+  id               String                   @id @default(uuid())
+  schoolId         String                   @map("school_id")
+  lessonSourceId   String                   @map("lesson_source_id")
+  fileAssetId      String?                  @map("file_asset_id")
+  regionType       String                   @default("full_page") @map("region_type")
+  label            String                   @db.LongText
+  paddleText       String?                  @map("paddle_text") @db.LongText
+  tesseractText    String?                  @map("tesseract_text") @db.LongText
+  mergedText       String?                  @map("merged_text") @db.LongText
+  splitGroup       String                   @map("split_group")
+  status           OcrTrainingExampleStatus @default(APPROVED)
+  approvedByUserId String?                  @map("approved_by_user_id")
+  approvedAt       DateTime                 @default(now()) @map("approved_at")
+  engineMeta       Json?                    @map("engine_meta")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  lessonSource LessonSource @relation(fields: [lessonSourceId], references: [id], onDelete: Cascade)
+  fileAsset    FileAsset?   @relation(fields: [fileAssetId], references: [id])
+  approvedBy   User?        @relation("OcrTrainingApprovedBy", fields: [approvedByUserId], references: [id])
+
+  @@index([schoolId])
+  @@index([lessonSourceId])
+  @@index([status])
+  @@index([splitGroup])
+  @@map("ocr_training_examples")
+}
+
+model OcrModelRelease {
+  id           String              @id @default(uuid())
+  role         OcrModelReleaseRole
+  version      String
+  artifactPath String              @map("artifact_path")
+  metrics      Json?
+  datasetVersion String?           @map("dataset_version")
+  promotedAt   DateTime?           @map("promoted_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  notes        String?             @db.Text
+
+  @@index([role])
+  @@index([version])
+  @@map("ocr_model_releases")
 }
 
 model LessonConcept {
@@ -1942,6 +2015,7 @@ model FileAsset {
   school              School?              @relation(fields: [schoolId], references: [id])
   uploadedBy          User                 @relation("UploadedBy", fields: [uploadedById], references: [id])
   lessonSources       LessonSource[]
+  ocrTrainingExamples OcrTrainingExample[]
   homeworkAttachments HomeworkAttachment[]
   studentPhotos       StudentPhotoAsset[]
   products            Product[]

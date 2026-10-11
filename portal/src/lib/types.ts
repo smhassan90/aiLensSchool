@@ -327,6 +327,10 @@ export interface LessonPageSource {
   /** Raw Tesseract output from DB. */
   tesseractOcrText?: string;
   mergedOcrText?: string;
+  /** Teacher-verified transcript (distinct from raw engine output). */
+  verifiedOcrText?: string;
+  ocrReviewStatus?: "NONE" | "DRAFT" | "VERIFIED";
+  ocrVerified?: boolean;
   ocrPaddleReady?: boolean;
   ocrTesseractReady?: boolean;
   ocrMergedReady?: boolean;

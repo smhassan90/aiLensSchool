@@ -27,6 +27,7 @@ ROOT = Path(__file__).resolve().parent
 BACKEND_OCR = ROOT.parent
 DATA = ROOT / "data"
 OUT_INFER = BACKEND_OCR / "models" / "science-en-rec"
+OUT_CANDIDATE = BACKEND_OCR / "models" / "science-en-rec-candidate"
 CHARSET = ROOT / "science_charset.txt"
 
 
@@ -94,7 +95,7 @@ def write_config(
           cal_metric_during_train: true
           pretrained_model: {pretrained_line}
           checkpoints: {resume_line}
-          save_inference_dir: {(OUT_INFER).resolve().as_posix()}
+          save_inference_dir: {(OUT_CANDIDATE).resolve().as_posix()}
           use_visualdl: false
           infer_img:
           character_dict_path: {charset.as_posix()}
@@ -285,6 +286,7 @@ def main() -> None:
     print("Running:", " ".join(cmd))
     subprocess.check_call(cmd, cwd=str(repo))
     # Export inference model
+    OUT_CANDIDATE.mkdir(parents=True, exist_ok=True)
     export_cmd = [
         sys.executable,
         str(repo / "tools" / "export_model.py"),
@@ -292,17 +294,39 @@ def main() -> None:
         str(cfg),
         "-o",
         f"Global.pretrained_model={(ROOT / 'output' / 'science_rec' / 'best_accuracy').as_posix()}",
-        f"Global.save_inference_dir={OUT_INFER.as_posix()}",
+        f"Global.save_inference_dir={OUT_CANDIDATE.as_posix()}",
         "Global.export_with_pir=False",
     ]
     print("Exporting:", " ".join(export_cmd))
     try:
         subprocess.check_call(export_cmd, cwd=str(repo))
     except subprocess.CalledProcessError as exc:
-        print(f"Export failed ({exc}); copy best checkpoint manually into {OUT_INFER}", file=sys.stderr)
+        print(f"Export failed ({exc}); candidate not written to {OUT_CANDIDATE}", file=sys.stderr)
         sys.exit(exc.returncode)
-    shutil.copy2(CHARSET, OUT_INFER / "science_charset.txt")
-    print(f"Done. Point worker at {OUT_INFER}")
+    shutil.copy2(CHARSET, OUT_CANDIDATE / "science_charset.txt")
+
+    validate_py = BACKEND_OCR / "model_validate.py"
+    val_cmd = [sys.executable, str(validate_py), str(OUT_CANDIDATE)]
+    print("Validating candidate:", " ".join(val_cmd))
+    try:
+        subprocess.check_call(val_cmd, cwd=str(BACKEND_OCR))
+    except subprocess.CalledProcessError:
+        print(
+            f"Candidate failed validation; production model at {OUT_INFER} unchanged.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if OUT_INFER.exists() and (OUT_INFER / "inference.pdiparams").is_file():
+        import time
+
+        archived = BACKEND_OCR / "models" / f"science-en-rec-archived-{int(time.time())}"
+        shutil.copytree(OUT_INFER, archived, dirs_exist_ok=True)
+        print(f"Archived previous production model to {archived}")
+    if OUT_INFER.exists():
+        shutil.rmtree(OUT_INFER, ignore_errors=True)
+    shutil.copytree(OUT_CANDIDATE, OUT_INFER)
+    print(f"Promoted validated candidate to {OUT_INFER}")
 
 
 if __name__ == "__main__":

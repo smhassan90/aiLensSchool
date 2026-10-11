@@ -154,6 +154,12 @@ export function ChapterPageManager({
     title: string;
     text: string;
   } | null>(null);
+  const [verifyPage, setVerifyPage] = useState<{
+    sourceId: string;
+    pageNumber: number;
+    label: string;
+    draft: string;
+  } | null>(null);
   const uploadQueueRef = useRef<ChapterPageUploadItem[]>([]);
   const orderedIdsRef = useRef<Set<string>>(new Set());
   const uploadRunning = useRef(false);
@@ -583,6 +589,27 @@ export function ChapterPageManager({
       }),
   });
 
+  const saveVerifiedOcr = useMutation({
+    mutationFn: (payload: { sourceId: string; text: string }) =>
+      lessonsService.saveVerifiedChapterPageOcr(lessonId, payload.sourceId, payload.text),
+    onSuccess: (lesson) => {
+      setVerifyPage(null);
+      invalidate();
+      onContentUpdated(lesson);
+      toast({
+        title: "Verified transcript saved",
+        description: "This page text is marked verified and added to the training pool.",
+        variant: "success",
+      });
+    },
+    onError: (err) =>
+      toast({
+        title: "Could not save verified text",
+        description: err instanceof ApiClientError ? err.message : "Unexpected error",
+        variant: "error",
+      }),
+  });
+
   const appendText = useMutation({
     mutationFn: () => lessonsService.appendChapterText(lessonId, pasteText.trim()),
     onSuccess: (lesson) => {
@@ -771,6 +798,11 @@ export function ChapterPageManager({
                             {typeof quality === "number" && quality > 0 ? ` · ${quality}%` : ""}
                           </Badge>
                         )}
+                        {page.ocrVerified ? (
+                          <Badge variant="outline" className="gap-1 border-emerald-400 text-emerald-900">
+                            Verified transcript
+                          </Badge>
+                        ) : null}
                       </div>
                       {liveOcr ? (
                         <div className="rounded-md border border-primary/20 bg-primary/5 p-2">
@@ -818,6 +850,36 @@ export function ChapterPageManager({
                             {preview.label}
                           </Button>
                         ))}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={page.ocrVerified ? "outline" : "default"}
+                          className="h-8"
+                          disabled={reading || saveVerifiedOcr.isPending}
+                          onClick={() => {
+                            const base =
+                              page.verifiedOcrText?.trim() ||
+                              page.mergedOcrText?.trim() ||
+                              page.fetchedText?.trim() ||
+                              "";
+                            if (!base) {
+                              toast({
+                                title: "No text to verify",
+                                description: "Run OCR or paste clearer text before verifying.",
+                                variant: "error",
+                              });
+                              return;
+                            }
+                            setVerifyPage({
+                              sourceId: page.id,
+                              pageNumber: index + 1,
+                              label: page.label,
+                              draft: base,
+                            });
+                          }}
+                        >
+                          {page.ocrVerified ? "Edit verified text" : "Verify transcript"}
+                        </Button>
                         {!reading ? (
                           <>
                             <Button
@@ -1154,6 +1216,66 @@ export function ChapterPageManager({
                 dir={/[\u0600-\u06FF]/.test(pageTextView.text) ? "rtl" : "ltr"}
                 value={pageTextView.text}
               />
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={verifyPage !== null}
+        onOpenChange={(open) => !open && !saveVerifiedOcr.isPending && setVerifyPage(null)}
+      >
+        <DialogContent
+          className="max-h-[90vh] max-w-2xl overflow-y-auto"
+          onClose={() => !saveVerifiedOcr.isPending && setVerifyPage(null)}
+        >
+          {verifyPage ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Verify page {verifyPage.pageNumber} transcript</DialogTitle>
+                <DialogDescription>
+                  {verifyPage.label}. Correct the text to match the photo, then save. Verified
+                  pages feed the OCR training pool (not applied to the live model immediately).
+                </DialogDescription>
+              </DialogHeader>
+              <Textarea
+                rows={16}
+                className="min-h-[12rem] font-sans leading-relaxed"
+                dir={/[\u0600-\u06FF]/.test(verifyPage.draft) ? "rtl" : "ltr"}
+                value={verifyPage.draft}
+                onChange={(e) =>
+                  setVerifyPage((prev) => (prev ? { ...prev, draft: e.target.value } : prev))
+                }
+              />
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={saveVerifiedOcr.isPending}
+                  onClick={() => setVerifyPage(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  disabled={saveVerifiedOcr.isPending || !verifyPage.draft.trim()}
+                  onClick={() =>
+                    saveVerifiedOcr.mutate({
+                      sourceId: verifyPage.sourceId,
+                      text: verifyPage.draft.trim(),
+                    })
+                  }
+                >
+                  {saveVerifiedOcr.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                      Saving…
+                    </>
+                  ) : (
+                    "Save verified transcript"
+                  )}
+                </Button>
+              </div>
             </>
           ) : null}
         </DialogContent>
