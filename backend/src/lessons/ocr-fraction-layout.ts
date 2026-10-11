@@ -138,43 +138,199 @@ export function extractFractionDigitTokens(line: string): string[] {
   return best ?? tokenizeDigits(normalized || line);
 }
 
-/** Pair nth numerator with nth denominator → "3/4, 8/11". */
+/**
+ * Trailing dens often belong to mixed numbers (whole + n/d). OCR may drop the
+ * fraction numerator digits; we still separate whole from a surviving num
+ * (e.g. …2792 over 6,13,11 → …, 9 2/11 instead of 92/11). Does not invent
+ * missing numerators.
+ */
+export function parseTrailingMixedDigitRun(
+  digits: string,
+  dens: string[],
+): string[] | null {
+  const d = digits.replace(/\D/g, '');
+  if (!dens.length || d.length < dens.length) return null;
+  const wholes: string[] = [];
+  let pos = 0;
+  for (let i = 0; i < dens.length; i += 1) {
+    wholes.push(d[pos]!);
+    pos += 1;
+  }
+  let leftover = d.slice(pos);
+  const nums: Array<string | null> = dens.map(() => null);
+  // Assign leftover numerator digits right→left (last mixed keeps its num first).
+  let li = leftover.length;
+  for (let i = dens.length - 1; i >= 0 && li > 0; i -= 1) {
+    if (
+      li >= 2 &&
+      PREFERRED_TWO_DIGIT.has(leftover.slice(li - 2, li))
+    ) {
+      nums[i] = leftover.slice(li - 2, li);
+      li -= 2;
+    } else {
+      nums[i] = leftover.slice(li - 1, li);
+      li -= 1;
+    }
+  }
+  if (li !== 0) return null;
+  // Reject splits that invent 0 wholes/nums or tear apart 10→1 0.
+  for (let i = 0; i < dens.length; i += 1) {
+    if (wholes[i] === '0' || nums[i] === '0') return null;
+    if (nums[i] && PREFERRED_TWO_DIGIT.has(`${wholes[i]}${nums[i]}`)) {
+      return null;
+    }
+  }
+  return dens.map((den, i) => {
+    if (den === '0') return '';
+    if (nums[i]) return `${wholes[i]} ${nums[i]}/${den}`;
+    // Numerator missing in OCR — keep slash form with whole as best available digit.
+    return `${wholes[i]}/${den}`;
+  }).filter(Boolean);
+}
+
+function scoreFractionParts(parts: string[]): number {
+  let score = parts.length * 2;
+  for (const p of parts) {
+    const mixed = p.match(/^(\d{1,2})\s+(\d{1,2})\/(\d{1,2})$/);
+    const simple = p.match(/^(\d{1,2})\/(\d{1,2})$/);
+    if (mixed) {
+      score += 8;
+      const num = Number(mixed[2]);
+      const den = Number(mixed[3]);
+      if (num === 0) score -= 20;
+      if (PREFERRED_TWO_DIGIT.has(`${mixed[1]}${mixed[2]}`)) score -= 15;
+      if (num < den) score += 3;
+      if (num <= 20 && den <= 25) score += 2;
+    } else if (simple) {
+      const num = Number(simple[1]);
+      const den = Number(simple[2]);
+      if (num === 0) score -= 20;
+      if (num <= 25 && den <= 25) score += 2;
+      if (PREFERRED_TWO_DIGIT.has(simple[1]!)) score += 4; // keep 10/7 intact
+      if (num >= 40) score -= 10; // 92/11-style glue
+      if (den > 0 && num > den * 3) score -= 2;
+    }
+  }
+  return score;
+}
+
+/**
+ * Pair numerator digit row with dens. Tries simple 1:1 pairing and
+ * simple-prefix + trailing mixed numbers; picks the higher-scoring parse.
+ */
 export function pairFractionDigitRows(numLine: string, denLine: string): string | null {
   let dens = extractFractionDigitTokens(denLine);
-  let nums = extractFractionDigitTokens(numLine);
   const numGlued = numLine.replace(/\D/g, '');
   const denGlued =
     normalizeFractionDigitLine(denLine).replace(/\D/g, '') || denLine.replace(/\D/g, '');
 
-  // Only re-split a side when token counts disagree (avoid breaking "11" → 1,18).
-  if (
-    dens.length >= 2 &&
-    nums.length !== dens.length &&
-    numGlued.length >= dens.length &&
-    numGlued.length <= dens.length * 2
-  ) {
-    const split = splitDigitRunToCount(numGlued, dens.length);
-    if (split) nums = split;
-  } else if (
-    nums.length >= 2 &&
-    nums.length !== dens.length &&
-    denGlued.length >= nums.length &&
-    denGlued.length <= nums.length * 2
-  ) {
-    const split = splitDigitRunToCount(denGlued, nums.length);
-    if (split) dens = split;
+  if (dens.length < 2 && denGlued.length >= 4) {
+    dens = extractFractionDigitTokens(denGlued);
+  }
+  if (dens.length < 2 || numGlued.length < dens.length) return null;
+
+  let best: string[] | null = null;
+  let bestScore = -1;
+
+  // Prefer already-spaced numerator tokens (keeps 11 intact vs re-glue → 12).
+  const spacedNums = extractFractionDigitTokens(numLine);
+  const simpleNums =
+    spacedNums.length === dens.length
+      ? spacedNums
+      : splitDigitRunToCount(numGlued, dens.length);
+
+  // (A) Classic 1:1 split across all dens
+  if (simpleNums) {
+    const parts = dens
+      .map((den, i) => (den === '0' ? '' : `${simpleNums[i]}/${den}`))
+      .filter(Boolean);
+    const score = scoreFractionParts(parts);
+    if (score > bestScore) {
+      bestScore = score;
+      best = parts;
+    }
   }
 
-  if (nums.length < 2 || dens.length < 2) return null;
-  const n = Math.min(nums.length, dens.length);
-  if (n < 2) return null;
-  if (Math.abs(nums.length - dens.length) > 3) return null;
-  const parts: string[] = [];
-  for (let i = 0; i < n; i += 1) {
-    if (dens[i] === '0') continue;
-    parts.push(`${nums[i]}/${dens[i]}`);
+  // Also score a re-split of the glued run when spaced tokens disagreed / absent.
+  if (spacedNums.length === dens.length) {
+    const gluedSplit = splitDigitRunToCount(numGlued, dens.length);
+    if (gluedSplit && gluedSplit.join() !== spacedNums.join()) {
+      const parts = dens
+        .map((den, i) => (den === '0' ? '' : `${gluedSplit[i]}/${den}`))
+        .filter(Boolean);
+      const score = scoreFractionParts(parts);
+      if (score > bestScore) {
+        bestScore = score;
+        best = parts;
+      }
+    }
   }
-  return parts.length >= 2 ? parts.join(', ') : null;
+
+  // (B) Trailing mixed only when simple pairing glues absurd numerators (92/11)
+  // or a long Example row has spare digits beyond one preferred two-digit (10).
+  const simpleAbsurd = Boolean(simpleNums?.some((n) => Number(n) >= 40));
+  const extras = numGlued.length - dens.length;
+  const tryMixed =
+    simpleAbsurd || (dens.length >= 7 && extras >= 2);
+  if (!tryMixed) {
+    return best && best.length >= 2 ? best.join(', ') : null;
+  }
+
+  const maxMixed = Math.min(4, dens.length - 2);
+  for (let mixedCount = 1; mixedCount <= maxMixed; mixedCount += 1) {
+    const simpleCount = dens.length - mixedCount;
+    if (simpleCount < 2) continue;
+    // Digits for simple fracs: simpleCount .. 2*simpleCount
+    const minSimpleDigits = simpleCount;
+    const maxSimpleDigits = Math.min(
+      numGlued.length - mixedCount,
+      simpleCount * 2,
+    );
+    for (let sd = minSimpleDigits; sd <= maxSimpleDigits; sd += 1) {
+      const head = numGlued.slice(0, sd);
+      const tail = numGlued.slice(sd);
+      if (tail.length < mixedCount || tail.length > mixedCount * 2) continue;
+      const headNums = splitDigitRunToCount(head, simpleCount);
+      if (!headNums) continue;
+      const mixedParts = parseTrailingMixedDigitRun(tail, dens.slice(simpleCount));
+      if (!mixedParts) continue;
+      const parts = [
+        ...headNums.map((num, i) => `${num}/${dens[i]}`),
+        ...mixedParts,
+      ];
+      // Small bonus for recovering mixed form; do not over-reward more mixed slots.
+      const score = scoreFractionParts(parts) + 3;
+      if (score > bestScore) {
+        bestScore = score;
+        best = parts;
+      }
+    }
+  }
+
+  if (!best || best.length < 2) {
+    // Fallback: tokenized nums if already spaced
+    let nums = extractFractionDigitTokens(numLine);
+    if (
+      nums.length !== dens.length &&
+      denGlued.length >= nums.length &&
+      denGlued.length <= nums.length * 2
+    ) {
+      const split = splitDigitRunToCount(denGlued, nums.length);
+      if (split) dens = split;
+    }
+    if (nums.length >= 2 && dens.length >= 2) {
+      const n = Math.min(nums.length, dens.length);
+      if (Math.abs(nums.length - dens.length) <= 3) {
+        return dens
+          .slice(0, n)
+          .map((den, i) => (den === '0' ? '' : `${nums[i]}/${den}`))
+          .filter(Boolean)
+          .join(', ');
+      }
+    }
+    return null;
+  }
+  return best.join(', ');
 }
 
 /**
@@ -259,10 +415,14 @@ export function reconstructStackedFractionsInOcrText(text: string): string {
     const { prefix, rest } = stripExamplePrefix(raw.trim());
     const candidateNum = prefix ? rest : raw.trim();
     const glued = candidateNum.replace(/\D/g, '');
-    // Skip worked-example ÷ chains / already-stacked bars.
+    // Skip worked-example ÷ chains / already-stacked bars / algebra steps.
+    // Do not treat letter "x" in words like "mixed" as a math operator.
     if (
       /[÷─]/.test(raw) ||
-      /^\d{2,4}(?:\s*=\s*\d{1,4}){1,}/.test(raw.trim().replace(/\s/g, ''))
+      /^\d{2,4}(?:\s*=\s*\d{1,4}){1,}/.test(raw.trim().replace(/\s/g, '')) ||
+      /[=+()×]/.test(raw) ||
+      /\dx\d/i.test(raw) ||
+      /^\d+\.\s+\d/.test(raw.trim()) // "2. 4 2/5 + …" mixed-sum prompts
     ) {
       out.push(raw);
       continue;
@@ -427,16 +587,47 @@ export function reconstructGluedDivFractionChain(
     if (numSegs.length === 2 && g.length >= 5) {
       // Glued final dens: <den÷d><ansDen> (e.g. 5 digits → 3+2)
       denSegs = [g.slice(0, -2), g.slice(-2)];
+    } else if (numSegs.length >= 3 && g.length >= 6) {
+      // 40220210 → 402, 202, 10
+      const mid = Math.floor((g.length - 2) / 2);
+      denSegs = [g.slice(0, mid), g.slice(mid, -2), g.slice(-2)];
     }
   }
-  if (denSegs.length < Math.max(2, numSegs.length - 1)) return null;
+  // Allow dens one short of nums when final ans den can be derived from last ÷ den.
+  if (denSegs.length < Math.max(1, numSegs.length - 1)) return null;
   denSegs = alignDenSegsToNumSegs(numSegs, denSegs);
 
   const steps: Array<{ num: string; den: string }> = [];
   for (let i = 0; i < numSegs.length; i += 1) {
-    const denRaw = denSegs[i] ?? denSegs[denSegs.length - 1]!;
-    if (i === numSegs.length - 1 && numSegs[i].length <= 2 && denRaw.length <= 2) {
+    const isLast = i === numSegs.length - 1;
+    let denRaw = denSegs[i];
+    if (!denRaw && isLast && numSegs[i]!.length <= 2 && steps.length) {
+      // OCR often omits final plain den (10); derive from previous den÷d (20÷2→10).
+      const prev = steps[steps.length - 1]!.den;
+      const m = prev.match(/^(\d+)÷(\d+)$/);
+      if (m) {
+        const left = Number(m[1]);
+        const div = Number(m[2]);
+        if (div > 0 && left % div === 0) {
+          const simplified = left / div;
+          if (simplified >= 1 && simplified <= 99) {
+            denRaw = String(simplified);
+          }
+        }
+      }
+    }
+    if (!denRaw) denRaw = denSegs[denSegs.length - 1]!;
+    if (isLast && numSegs[i]!.length <= 2 && denRaw.length <= 2) {
       steps.push({ num: numSegs[i]!, den: denRaw });
+    } else if (isLast && numSegs[i]!.length <= 2 && denRaw.length >= 3) {
+      // Do not reuse a glued ÷ den as the simplified answer den.
+      const parsed = parseGluedDividendDivisor(denRaw);
+      const m = parsed.match(/^(\d+)÷(\d+)$/);
+      if (m && Number(m[1]) % Number(m[2]) === 0) {
+        steps.push({ num: numSegs[i]!, den: String(Number(m[1]) / Number(m[2])) });
+      } else {
+        steps.push({ num: numSegs[i]!, den: denRaw.slice(-2) });
+      }
     } else {
       steps.push({
         num: parseGluedDividendDivisor(numSegs[i]!),
@@ -496,17 +687,29 @@ export function reconstructWorkedFractionMathInOcrText(text: string): string {
     // Two-step glued dens on one token (any numbers)
     if (/^\d{3,4}=\d{1,2}$/.test(raw.replace(/\s/g, ''))) {
       const next = lines[i + 1]?.trim() ?? '';
-      if (/^\d{4,6}$/.test(next)) {
-        const chain = reconstructGluedDivFractionChain(raw, next);
+      const next2 = lines[i + 2]?.trim() ?? '';
+      if (/^\d{3,6}$/.test(next)) {
+        const denLine = /^\d{1,2}$/.test(next2) ? `${next} ${next2}` : next;
+        const chain = reconstructGluedDivFractionChain(raw, denLine);
         if (chain) {
           out.push(chain);
           used.add(i + 1);
+          if (denLine !== next) used.add(i + 2);
           continue;
         }
       }
     }
 
-    // Normalize spacing on already-recognized mixed sums (no invented digits)
+    // "2. 4 2/5 + 7 1/10" or "4 2/5 + 7 1/10" — keep problem #, normalize mixed form
+    const mixedSlashNumbered = raw.match(
+      /^(\d{1,2})[.)]\s+(\d{1,2})\s+(\d{1,2})\s*\/\s*(\d{1,2})\s*[+\uFF0B]\s*(\d{1,2})\s+(\d{1,2})\s*\/\s*(\d{1,2})$/,
+    );
+    if (mixedSlashNumbered) {
+      out.push(
+        `${mixedSlashNumbered[1]}. ${formatMixedNumber(mixedSlashNumbered[2], mixedSlashNumbered[3], mixedSlashNumbered[4])} + ${formatMixedNumber(mixedSlashNumbered[5], mixedSlashNumbered[6], mixedSlashNumbered[7])}`,
+      );
+      continue;
+    }
     const mixedSlash = raw.match(
       /^(\d{1,2})\s+(\d{1,2})\s*\/\s*(\d{1,2})\s*[+\uFF0B]\s*(\d{1,2})\s+(\d{1,2})\s*\/\s*(\d{1,2})$/,
     );
@@ -520,8 +723,45 @@ export function reconstructWorkedFractionMathInOcrText(text: string): string {
     out.push(lines[i]);
   }
 
-  return out
+  let joined = out
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+  joined = repairReduceLowestTermFromDivChain(joined);
+  return joined;
+}
+
+/**
+ * When OCR drops digits from "Reduce 28/40 …" → "Reduce 2 …", restore the
+ * fraction from a nearby restored ÷ chain (28÷2 over 40÷2). Digits come from
+ * the chain — no invented values.
+ */
+export function repairReduceLowestTermFromDivChain(text: string): string {
+  const value = (text ?? '').trim();
+  if (!value) return '';
+  // Stacked restore puts nums on row 1 and dens on row 3 — use that pair, not 28÷2 with 14÷2.
+  const stacked = value.match(
+    /(\d{2})÷(\d)[^\n]*\n[─=\s|]+\n[^\n]*?(\d{2})÷\2/,
+  );
+  if (!stacked) return value;
+  const num = stacked[1];
+  const den = stacked[3];
+  let out = value.replace(
+    /\bReduce\s+(\d{1,2})\s+to the lowest term\b/gi,
+    (full, n: string) => {
+      if (n === num || (n.length === 1 && num.startsWith(n))) {
+        return `Reduce ${num}/${den} to the lowest term`;
+      }
+      return full;
+    },
+  );
+  // "Therefore, 2 28 in its lowest term" → "Therefore, 28/40 in its lowest term"
+  out = out.replace(
+    /\bTherefore,\s*\d\s+(\d{2})\s+in its lowest term\b/gi,
+    (full, n: string) => {
+      if (n === num) return `Therefore, ${num}/${den} in its lowest term`;
+      return full;
+    },
+  );
+  return out;
 }

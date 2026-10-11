@@ -17,6 +17,14 @@ describe('ocr-fraction-layout', () => {
     );
   });
 
+  it('pairs trailing mixed numbers without gluing whole+num (92/11)', () => {
+    // Book: 3/4, 8/11, 6/4, 9/5, 10/7, 2 1/6, 7 11/13, 9 2/11
+    // OCR drops mixed numerators 1 and 11 → keep wholes; unglue 9 2/11.
+    expect(pairFractionDigitRows('3869102792', "4'457613' 11")).toBe(
+      '3/4, 8/11, 6/4, 9/5, 10/7, 2/6, 7/13, 9 2/11',
+    );
+  });
+
   it('splits glued numerators to match denominator count', () => {
     expect(splitGluedDigitsToMatchCount('386910', 5)).toBe('3 8 6 9 10');
   });
@@ -49,12 +57,38 @@ Example3869102792
 about like and unlike fractions
 `.trim();
     const out = reconstructStackedFractionsInOcrText(raw);
-    expect(out).toMatch(/3\/4/);
-    expect(out).toMatch(/8\/11/);
-    expect(out).toMatch(/6\/4/);
-    expect(out).toMatch(/9\/5/);
-    expect(out).toMatch(/10\/7/);
+    expect(out).toMatch(
+      /Example:\s*3\/4, 8\/11, 6\/4, 9\/5, 10\/7, 2\/6, 7\/13, 9 2\/11/,
+    );
+    expect(out).not.toMatch(/92\/11/);
     expect(out).not.toMatch(/Example3869102792/);
+  });
+
+  it('merge keeps Paddle Example fractions over Tess digit garble', () => {
+    const paddle = `
+MATH FLASH
+You have already learnt:
+about proper, improper, and mixed fractions
+Example3869102792
+4'457613'
+11
+about like and unlike fractions
+`.trim();
+    const tess = `
+MATH FLASH
+You have already learnt:
+about proper, improper, and mixed fractions
+Example: 8/4, 6/4, 9/5, 16/11, 2/7, 7/6, 92/13
+about Like and unlike fractions
+Example: 27/24, 83/6, 78/10
+`.trim();
+    const merged = mergePaddleAndTesseractPageOcr(paddle, tess);
+    expect(merged).toMatch(/3\/4/);
+    expect(merged).toMatch(/8\/11/);
+    expect(merged).toMatch(/9 2\/11/);
+    expect(merged).not.toMatch(/16\/11/);
+    expect(merged).not.toMatch(/27\/24/);
+    expect(merged).not.toMatch(/92\/1[13]/);
   });
 
   it('cleanMergedPageOcrText runs fraction reconstruction on math pages', () => {
@@ -93,6 +127,17 @@ Example: 3 8 6 9 10
     expect(chain).toMatch(/─/);
   });
 
+  it('derives final den from last ÷ den when OCR omits plain answer den', () => {
+    const chain = reconstructGluedDivFractionChain('282=142=7', '402 202');
+    expect(chain).toMatch(/28÷2/);
+    expect(chain).toMatch(/40÷2/);
+    expect(chain).toMatch(/14÷2/);
+    expect(chain).toMatch(/20÷2/);
+    expect(chain).toMatch(/7/);
+    expect(chain).toMatch(/10/);
+    expect(chain).not.toMatch(/20÷2\s*=\s*20÷2/);
+  });
+
   it('restores worked ÷ steps for an alternate reduce example (not one textbook page)', () => {
     const raw = `
 Solution:
@@ -113,6 +158,53 @@ or we can divide directly by 4.
     expect(out).toMatch(/5 1\/3 \+ 2 2\/9/);
     // Must not invent "Therefore…" prose that was never in the OCR.
     expect(out).not.toMatch(/Therefore/i);
+  });
+
+  it('merge keeps Reduce 28/40 ÷ chain over Tess slash garble', () => {
+    const paddle = `
+Now we will deal with addition, subtraction, multiplication, and
+division of different types of fractions.
+Examples
+1. Reduce 28/40 to the lowest term.
+Solution:
+282=142=7
+402
+202
+10
+or we can divide directly by 4.
+284=7
+404
+10
+Therefore, 28/40 in its lowest term is 7/10.
+2. 4 2/5 + 7 1/10
+=(4+7)+(2/5+1/10)
+=11+5/10
+=11+1/2
+=11 1/2
+REMEMBER
+Do not forget to:
+make the denominators same
+reduce to the lowest term
+`.trim();
+    const tess = `
+Examples:
+Reduce 2 to the lowest term
+Solution: 402 40/202
+2/28, 8/4, 21/40, 4/4, 2/7, 7/10
+or we can divide directly by 4.
+Therefore, 2 28 in its lowest term is 7/10
+REMEMBER
+=4+7++
+5 10 -1+2x31 Do not forget to
+`.trim();
+    const merged = mergePaddleAndTesseractPageOcr(paddle, tess);
+    expect(merged).toMatch(/Reduce\s*28\/40/);
+    expect(merged).toMatch(/28÷2/);
+    expect(merged).toMatch(/40÷2/);
+    expect(merged).toMatch(/4 2\/5 \+ 7 1\/10/);
+    expect(merged).not.toMatch(/2\/28,\s*8\/4/);
+    expect(merged).not.toMatch(/10\^-/);
+    expect(merged).not.toMatch(/Reduce\s+2\s+to the lowest term/);
   });
 
   it('merge prefers cleaner engine over duplicate-word soup (any page)', () => {

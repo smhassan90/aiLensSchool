@@ -151,7 +151,11 @@ export function cleanMergedPageOcrText(text: string): string {
   // Worked ÷ chains before generic digit-row pairing (282=142=7 must not become 2/4…).
   joined = reconstructWorkedFractionMathInOcrText(joined);
   joined = reconstructStackedFractionsInOcrText(joined);
-  if (looksLikeScienceNumericalsPage(joined) || /\bfraction/i.test(joined)) {
+  // Physics pages only — on fraction workbooks `5 10 -1` is 5/10, not 5×10^-1.
+  const fractionWorkbook =
+    /\bfraction/i.test(joined) &&
+    /\b(?:REMEMBER|lowest term|mixed (?:number|fraction)|Reduce\b)/i.test(joined);
+  if (looksLikeScienceNumericalsPage(joined) && !fractionWorkbook) {
     joined = normalizeScienceNotationArtifacts(joined);
   }
   return joined;

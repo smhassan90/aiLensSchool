@@ -146,7 +146,8 @@ export function countConsecutiveDuplicateWords(text: string): number {
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
-    .filter((w) => w.length > 1);
+    // Ignore pure digits — stacked ÷ steps / fraction rows repeat nums by design.
+    .filter((w) => w.length > 1 && !/^\d+$/.test(w));
   let dupes = 0;
   for (let i = 1; i < words.length; i += 1) {
     // Yes/No MCQ grids intentionally repeat short answer tokens.
@@ -171,7 +172,15 @@ export function scoreOcrTranscriptCleanliness(text: string): number {
   const cueBonus = criticalPageCueHits(value) * 40;
   const tableBonus = countMcqOrTableSignals(value) * 28;
   const mathOpBonus = (value.match(/[÷√×]/g) ?? []).length * 35;
+  // Restored reduce chains (28÷2 over 40÷2) beat Tess slash soup on fraction pages.
+  const divChainBonus = (value.match(/\d+÷\d+/g) ?? []).length * 50;
   const slashFracBonus = countSlashFractions(value) * 45;
+  // Mixed numbers (2 1/6) are a strong signal of correct fraction layout restore.
+  const mixedNumBonus = (value.match(/\b\d{1,2}\s+\d{1,2}\/\d{1,2}\b/g) ?? []).length * 55;
+  // Tess often invents 16/11, 92/13 from stacked mixed rows — penalize absurd nums.
+  const absurdFracPenalty = [...value.matchAll(/\b(\d{1,3})\/(\d{1,3})\b/g)].filter(
+    (m) => Number(m[1]) >= 40,
+  ).length * 60;
   // Glued Example digit soup still beats Tess garble — reconstruct can recover it.
   const gluedExampleBonus = (value.match(/\bExample\d{5,}/gi) ?? []).length * 60;
   const mangledOptPenalty = value
@@ -186,9 +195,12 @@ export function scoreOcrTranscriptCleanliness(text: string): number {
     cueBonus +
     tableBonus +
     mathOpBonus +
+    divChainBonus +
     slashFracBonus +
+    mixedNumBonus +
     gluedExampleBonus +
     Math.min(300, Math.floor(value.length / 5)) -
+    absurdFracPenalty -
     dupes * 90 -
     garbageLines * 35 -
     symbolJunk * 12 -
@@ -243,6 +255,14 @@ export function preferFullerOcrLine(primary: string, alternate: string): string 
   if (
     countConsecutiveDuplicateWords(a) > countConsecutiveDuplicateWords(p) &&
     !lineIsMostlyGarbage(p)
+  ) {
+    return p;
+  }
+  // Keep Paddle glued Example digit runs; cleanMergedPageOcrText restores 3/4…
+  // Tess "Example: 8/4, 16/11…" looks operator-richer but is usually wrong.
+  if (
+    /^Example\d{5,}/i.test(p) ||
+    (/^Example\s*[:.]?\s*\d{6,}/i.test(p) && !/\//.test(p))
   ) {
     return p;
   }
@@ -329,6 +349,24 @@ export function enrichOptionsAndMathFromAlternate(
   for (let i = 0; i < altLines.length; i += 1) {
     if (used.has(i)) continue;
     const tl = altLines[i];
+    // Slash-rich Tess "Example: 8/4…" is math-looking but must not graft over Paddle.
+    if (
+      lineLooksLikeExampleFractionRow(tl) &&
+      out.some((l) => lineLooksLikeExampleFractionRow(l))
+    ) {
+      continue;
+    }
+    // Keep reduce chains (glued 282=142=7 or restored 28÷2); skip Tess slash-soup.
+    const primaryHasReduceChain =
+      /\d+÷\d+/.test(out.join('\n')) ||
+      /\b\d{3,4}\s*=\s*\d{1,4}/.test(out.join('\n'));
+    if (
+      primaryHasReduceChain &&
+      (/^Solution\b/i.test(tl) ||
+        ((tl.match(/\d+\/\d+/g) ?? []).length >= 2 && !/\d+÷\d+/.test(tl) && !/\b\d{3,4}\s*=/.test(tl)))
+    ) {
+      continue;
+    }
     const isOpt =
       lineLooksLikeMcqOrTableCell(tl) ||
       (countInlineMcqOptions(tl) >= 2 && !lineLooksLikeMangledMcqOptions(tl));
@@ -492,6 +530,18 @@ export function pickOcrMergePrimary(
   if (tIncomplete && !pIncomplete && countLatinLetters(p) >= countLatinLetters(t) * 0.85) {
     return 'paddle';
   }
+  // Paddle glued Example+digit dens reconstructs (3/4…); Tess "Example: 8/4, 92/13"
+  // looks slash-richer before clean and must not become the merge base.
+  const paddleGluedExample = /\bExample\d{5,}/i.test(p);
+  const tessAbsurdFrac = [...t.matchAll(/\b(\d{1,3})\/(\d{1,3})\b/g)].some(
+    (m) => Number(m[1]) >= 40,
+  );
+  if (
+    paddleGluedExample &&
+    (tessAbsurdFrac || /\bExample\s*[:.]?\s*\d{1,3}\//i.test(t))
+  ) {
+    return 'paddle';
+  }
   // Never switch to a much dirtier engine just because it is longer
   // (colored sideboxes: Tess duplicates words and interleaves columns).
   const pClean = scoreOcrTranscriptCleanliness(p);
@@ -652,6 +702,21 @@ export function formatOcrMcqTables(text: string): string {
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/** Example digit soup or Example: 3/4, 8/11… — one per section is enough. */
+function lineLooksLikeExampleFractionRow(line: string): boolean {
+  const t = (line ?? '').trim();
+  if (!t) return false;
+  if (/^Example\d{5,}/i.test(t)) return true;
+  if (/^Example\s*[:.]?\s*\d{1,3}\s*\/\s*\d{1,3}/i.test(t)) return true;
+  if (
+    /^Example\s*[:.]?\s*[\d\s,/]{6,}$/i.test(t) &&
+    !/[a-z]{3,}/i.test(t.replace(/^example\s*[:.]?\s*/i, ''))
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function mergePrimaryWithAlternate(primary: string, alternate: string): string {
   const primaryLines = primary.split(/\r?\n/);
   const altLines = alternate.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -715,6 +780,27 @@ function mergePrimaryWithAlternate(primary: string, alternate: string): string {
     const keepShortCell = lineLooksLikeMcqOrTableCell(tl);
     if (!keepShortCell && lineIsMostlyGarbage(tl)) continue;
     if (!keepShortCell && countConsecutiveDuplicateWords(tl) >= 2) continue;
+    // Do not graft a second Example: 8/4… when Paddle already kept Example digits.
+    if (
+      lineLooksLikeExampleFractionRow(tl) &&
+      out.some((l) => lineLooksLikeExampleFractionRow(l))
+    ) {
+      continue;
+    }
+    // Do not append Tess "Solution:" / slash-soup when Paddle has a reduce chain
+    // (glued before clean, or ÷ after). Clean runs after merge.
+    const outBlob = out.join('\n');
+    const hasReduceChain =
+      /\d+÷\d+/.test(outBlob) || /\b\d{3,4}\s*=\s*\d{1,4}/.test(outBlob);
+    if (
+      hasReduceChain &&
+      (/^Solution\b/i.test(tl) ||
+        /^Therefore\b/i.test(tl) ||
+        /^Reduce\b/i.test(tl) ||
+        ((tl.match(/\d+\/\d+/g) ?? []).length >= 2 && !/\d+÷\d+/.test(tl) && !/\b\d{3,4}\s*=/.test(tl)))
+    ) {
+      continue;
+    }
     const isMathLine = lineLooksLikeMathOrFormula(tl);
     if (
       !keepShortCell &&
@@ -825,13 +911,25 @@ export function mergePaddleAndTesseractPageOcr(paddle: string, tesseract: string
     if (lowDupe.length) eligible = lowDupe;
   }
   const pool = eligible.length ? eligible : candidates;
+  const absurdFracCount = (text: string) =>
+    [...text.matchAll(/\b(\d{1,3})\/(\d{1,3})\b/g)].filter((m) => Number(m[1]) >= 40)
+      .length;
   let best = pool[0];
   let bestScore = scoreOcrTranscriptCleanliness(best);
+  let bestAbsurd = absurdFracCount(best);
   for (const candidate of pool) {
     const score = scoreOcrTranscriptCleanliness(candidate);
-    if (score > bestScore + 25) {
+    const absurd = absurdFracCount(candidate);
+    // Prefer clearly cleaner transcripts; also prefer fewer absurd Example fracs
+    // (92/13) even when scores are close after Tess slash-bonus inflation.
+    if (
+      score > bestScore + 25 ||
+      (absurd < bestAbsurd && score >= bestScore - 80) ||
+      (score > bestScore + 5 && absurd <= bestAbsurd)
+    ) {
       best = candidate;
       bestScore = score;
+      bestAbsurd = absurd;
     }
   }
   return best;

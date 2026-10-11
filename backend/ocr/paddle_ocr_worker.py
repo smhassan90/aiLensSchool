@@ -564,6 +564,118 @@ def _split_digit_run(digits: str, count: int) -> list[str] | None:
     return parts if pos == len(d) else None
 
 
+_PREFERRED_TWO_DIGIT = {str(n) for n in range(10, 26)}
+
+
+def _parse_trailing_mixed(digits: str, dens: list[str]) -> list[str] | None:
+    """whole + optional n/d for trailing dens; does not invent missing nums."""
+    d = re.sub(r"\D", "", digits)
+    if not dens or len(d) < len(dens):
+        return None
+    wholes = list(d[: len(dens)])
+    leftover = d[len(dens) :]
+    nums: list[str | None] = [None] * len(dens)
+    li = len(leftover)
+    for i in range(len(dens) - 1, -1, -1):
+        if li <= 0:
+            break
+        if li >= 2 and leftover[li - 2 : li] in _PREFERRED_TWO_DIGIT:
+            nums[i] = leftover[li - 2 : li]
+            li -= 2
+        else:
+            nums[i] = leftover[li - 1 : li]
+            li -= 1
+    if li != 0:
+        return None
+    for i, den in enumerate(dens):
+        if wholes[i] == "0" or nums[i] == "0":
+            return None
+        if nums[i] and f"{wholes[i]}{nums[i]}" in _PREFERRED_TWO_DIGIT:
+            return None
+    out: list[str] = []
+    for i, den in enumerate(dens):
+        if den == "0":
+            continue
+        if nums[i]:
+            out.append(f"{wholes[i]} {nums[i]}/{den}")
+        else:
+            out.append(f"{wholes[i]}/{den}")
+    return out or None
+
+
+def _score_fraction_parts(parts: list[str]) -> int:
+    score = len(parts) * 2
+    for p in parts:
+        mixed = re.fullmatch(r"(\d{1,2})\s+(\d{1,2})/(\d{1,2})", p)
+        simple = re.fullmatch(r"(\d{1,2})/(\d{1,2})", p)
+        if mixed:
+            score += 8
+            num, den = int(mixed.group(2)), int(mixed.group(3))
+            if num == 0:
+                score -= 20
+            if f"{mixed.group(1)}{mixed.group(2)}" in _PREFERRED_TWO_DIGIT:
+                score -= 15
+            if num < den:
+                score += 3
+            if num <= 20 and den <= 25:
+                score += 2
+        elif simple:
+            num, den = int(simple.group(1)), int(simple.group(2))
+            if num == 0:
+                score -= 20
+            if num <= 25 and den <= 25:
+                score += 2
+            if simple.group(1) in _PREFERRED_TWO_DIGIT:
+                score += 4
+            if num >= 40:
+                score -= 10
+            if den > 0 and num > den * 3:
+                score -= 2
+    return score
+
+
+def _pair_num_den_rows(num_glued: str, dens: list[str]) -> list[str] | None:
+    d = re.sub(r"\D", "", num_glued)
+    if len(dens) < 2 or len(d) < len(dens):
+        return None
+    best: list[str] | None = None
+    best_score = -1
+    simple_nums = _split_digit_run(d, len(dens))
+    if simple_nums:
+        parts = [f"{a}/{b}" for a, b in zip(simple_nums, dens) if b != "0"]
+        score = _score_fraction_parts(parts)
+        if score > best_score:
+            best_score = score
+            best = parts
+    simple_absurd = bool(simple_nums and any(int(n) >= 40 for n in simple_nums))
+    extras = len(d) - len(dens)
+    if not (simple_absurd or (len(dens) >= 7 and extras >= 2)):
+        return best if best and len(best) >= 2 else None
+    max_mixed = min(4, len(dens) - 2)
+    for mixed_count in range(1, max_mixed + 1):
+        simple_count = len(dens) - mixed_count
+        if simple_count < 2:
+            continue
+        min_sd = simple_count
+        max_sd = min(len(d) - mixed_count, simple_count * 2)
+        for sd in range(min_sd, max_sd + 1):
+            head, tail = d[:sd], d[sd:]
+            if len(tail) < mixed_count or len(tail) > mixed_count * 2:
+                continue
+            head_nums = _split_digit_run(head, simple_count)
+            if not head_nums:
+                continue
+            mixed_parts = _parse_trailing_mixed(tail, dens[simple_count:])
+            if not mixed_parts:
+                continue
+            parts = [f"{a}/{b}" for a, b in zip(head_nums, dens[:simple_count])] + mixed_parts
+            score = _score_fraction_parts(parts) + 3
+            if score > best_score:
+                best_score = score
+                best = parts
+    return best if best and len(best) >= 2 else None
+
+
 def reconstruct_glued_example_fractions(text: str) -> str:
     """Turn Example3869102792 + 4'457613' into Example: 3/4, 8/11, …"""
     if not text or not re.search(r"fraction|Example", text, re.I):
@@ -623,26 +735,21 @@ def reconstruct_glued_example_fractions(text: str) -> str:
             out.append(raw)
             continue
         den_glued = re.sub(r"\D", "", " ".join(den_chunks))
-        preferred = {str(n) for n in range(10, 26)}
         dens = None
         best_score = -1
         for c in range(min(12, len(den_glued)), 1, -1):
             cand = _split_digit_run(den_glued, c)
             if not cand:
                 continue
-            score = len(cand) * 2 + sum(5 for p in cand if p in preferred)
+            score = len(cand) * 2 + sum(5 for p in cand if p in _PREFERRED_TWO_DIGIT)
             if score > best_score:
                 best_score = score
                 dens = cand
         if not dens:
             out.append(raw)
             continue
-        nums = _split_digit_run(num_glued, len(dens))
-        if not nums:
-            out.append(raw)
-            continue
-        parts = [f"{a}/{b}" for a, b in zip(nums, dens) if b != "0"]
-        if len(parts) < 2:
+        parts = _pair_num_den_rows(num_glued, dens)
+        if not parts:
             out.append(raw)
             continue
         out.append(prefix + ", ".join(parts))
