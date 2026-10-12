@@ -1,0 +1,32 @@
+{
+  "testCaseId": "p40-add-portal-upload",
+  "imageRef": "Teacher portal upload (Oxford Fractions p.40 worked examples); VPS diagnostic copy /tmp/p40.jpg from 2026-10-12 investigation",
+  "imageSha256": "TO_BE_FILLED_BY_DIAGNOSTIC_RUN",
+  "heading": "We can add and subtract more than two fractions with different denominators in the same way.",
+  "prose": [
+    "Example section with two columns of worked solutions (problems 3–4 top, 1–2 bottom)."
+  ],
+  "examples": [
+    {
+      "id": "top-left-3",
+      "text": "7 4/8 − 3 1/8 = 4 3/8",
+      "uncertain": false
+    },
+    {
+      "id": "top-right-4",
+      "text": "3 1/5 − 2 2/15 = 1 1/15",
+      "uncertain": false
+    },
+    {
+      "id": "bottom-left-1",
+      "text": "3 3/7 + 5 3/4 + 7 1/28 = 16 3/14 (with intermediate 34/28 → 17/14 shown)",
+      "uncertain": true
+    },
+    {
+      "id": "bottom-right-2",
+      "text": "6 2/5 − 3 4/15 − 2 1/30 = 1 1/10",
+      "uncertain": true
+    }
+  ],
+  "notes": "Human transcription from visual inspection of portal upload photo (thumb shadow, two columns). Fraction cancellation marks on printed page may be ambiguous in OCR. No cell-style a–n grid."
+}

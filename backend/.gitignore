@@ -27,6 +27,7 @@ yarn-error.log*
 # local files
 /uploads
 /tmp
+/var/ocr-diagnostic/
 /.tesseract-cache
 /.venv-paddle/
 .venv-paddle/

@@ -1,3 +1,5 @@
+import { getOcrDiagnosticSession, recordImageBoundary } from './ocr-diagnostic';
+
 export type RegionPreprocessVariant = 'original' | 'grayscale' | 'upscale' | 'contrast';
 
 export type PageCropBox = {
@@ -38,5 +40,11 @@ export async function cropPageRegion(
   } else if (variant === 'upscale') {
     pipe = pipe.resize({ width: width * 2, height: height * 2, kernel: 'lanczos3' }).sharpen();
   }
-  return pipe.jpeg({ quality: 92 }).toBuffer();
+  const out = await pipe.jpeg({ quality: 92 }).toBuffer();
+  const session = getOcrDiagnosticSession();
+  if (session) {
+    const stage = `crop_${variant}_${Math.round(box.x0)}_${Math.round(box.y0)}_${Math.round(box.x1)}_${Math.round(box.y1)}`;
+    void recordImageBoundary(session, stage, out, box);
+  }
+  return out;
 }

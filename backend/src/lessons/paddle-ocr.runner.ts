@@ -5,6 +5,12 @@ import { mkdtemp, writeFile, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { readEnv } from '../common/env';
+import {
+  getOcrDiagnosticSession,
+  recordTextBoundary,
+  recordWorkerBoundary,
+} from './ocr-diagnostic';
+import { sha256Buffer } from './ocr-diagnostic/hash';
 
 const logger = new Logger('PaddleOcrRunner');
 
@@ -84,6 +90,7 @@ export async function runPaddleOcrOnBuffer(
   const imagePath = join(dir, `page${mimeToExt(file.mimetype, file.originalname)}`);
   const script = readEnv('PADDLE_OCR_WORKER') || workerScriptPath();
 
+  const inputHash = sha256Buffer(file.buffer);
   try {
     await writeFile(imagePath, file.buffer);
     const args = [
@@ -94,8 +101,9 @@ export async function runPaddleOcrOnBuffer(
       paddleLangHint(options?.subjectName),
       '--include-lines',
     ];
+    const py = pythonBinary();
     const text = await new Promise<string>((resolve, reject) => {
-      const child = spawn(pythonBinary(), args, {
+      const child = spawn(py, args, {
         env: { ...process.env, PYTHONUNBUFFERED: '1' },
         windowsHide: true,
       });
@@ -118,6 +126,16 @@ export async function runPaddleOcrOnBuffer(
       });
       child.on('close', (code) => {
         clearTimeout(timer);
+        recordWorkerBoundary(getOcrDiagnosticSession(), {
+          stage: 'paddle_worker_close',
+          engine: 'paddle',
+          inputImageSha256: inputHash,
+          exitCode: code ?? undefined,
+          stderrSnippet: stderr.slice(0, 500),
+          stdoutChars: stdout.length,
+          pythonPath: py,
+          extra: { script, args: args.filter((a) => !a.includes('page')) },
+        });
         if (code !== 0 && !stdout.trim()) {
           reject(
             new Error(
@@ -163,7 +181,9 @@ export async function runPaddleOcrOnBuffer(
       confidence: row.confidence,
       engine: 'paddle',
     }));
-    return { ok: true, text: (parsed.text ?? '').trim(), lines };
+    const outText = (parsed.text ?? '').trim();
+    recordTextBoundary(getOcrDiagnosticSession(), 'paddle_worker_parsed', outText, 'paddle');
+    return { ok: true, text: outText, lines };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(`PaddleOCR unavailable: ${message}`);

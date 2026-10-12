@@ -1,0 +1,13 @@
+{
+  "testCaseId": "p57-divide-grid",
+  "imageRef": "backend/test-fixtures/fractions-chapter-calibration/p57-divide-grid.jpg",
+  "imageSha256": "7f7d9a8665ce97fc87a0e3af15a3a6c61463c17954e521b9ef04acb2f9506be0",
+  "heading": "7. Divide the following fractions",
+  "cells": [
+    { "label": "a", "text": "1 2/5 ÷ 4/5" },
+    { "label": "b", "text": "15/42 ÷ 5" },
+    { "label": "e", "text": "12 3/5 ÷ 4 3/8" },
+    { "label": "n", "text": "8 1/4 ÷ 3 5/8" }
+  ],
+  "notes": "Reference cells from chapter_dataset.json (reviewStatus reference). Verify image hash after each diagnostic run. Story section below grid is out of scope for cell metrics."
+}

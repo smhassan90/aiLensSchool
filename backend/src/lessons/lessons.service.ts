@@ -89,6 +89,16 @@ import { applyPix2TextMathCropFusion } from './ocr-pix2text-math-fusion';
 import { pix2textMathCropsEnabled } from './pix2text-math.runner';
 import type { OcrStructuredLine } from './ocr-structured-line';
 import { OcrUploadProgressService } from './ocr-upload-progress.service';
+import {
+  beginOcrDiagnosticSession,
+  endOcrDiagnosticSession,
+  getOcrDiagnosticSession,
+  isOcrDiagnosticEnabled,
+  recordImageBoundary,
+  recordOcrDiagnosticEvent,
+  recordTextBoundary,
+  runWithOcrDiagnosticSession,
+} from './ocr-diagnostic';
 import { ocrLanguagesForSubject } from './page-ocr.service';
 import { isServerlessRuntime, readEnv } from '../common/env';
 import { FilesService } from '../files/files.service';
@@ -615,12 +625,88 @@ export class LessonsService {
       originalname: variant.vision.originalname,
       size: variant.vision.size,
     } as Express.Multer.File;
+    const session = getOcrDiagnosticSession();
+    if (session) {
+      void recordImageBoundary(session, 'orient_ocr_file', ocrFile.buffer);
+      void recordImageBoundary(session, 'orient_vision_file', visionFile.buffer);
+    }
     return {
       ocrFile,
       visionFile,
       ocrText: '',
       degrees: 0,
     };
+  }
+
+  /**
+   * Diagnostic-only: one chapter page through the same OCR path as appendChapterPhotos (no DB).
+   * Requires OCR_DIAGNOSTIC=1. Does not change merge/OCR algorithms.
+   */
+  async runDiagnosticChapterPageOcr(input: {
+    file: Express.Multer.File;
+    subjectName: string;
+    correlationId?: string;
+    testCaseId?: string;
+  }): Promise<{
+    manifestPath: string | null;
+    correlationId: string;
+    paddle: string;
+    tesseract: string;
+    ocrText: string;
+    mergedOcrText: string;
+  }> {
+    if (!isOcrDiagnosticEnabled()) {
+      throw new BadRequestException({
+        code: 'OCR_DIAGNOSTIC_DISABLED',
+        message: 'Set OCR_DIAGNOSTIC=1 to run diagnostic pipeline',
+      });
+    }
+    const session = beginOcrDiagnosticSession({
+      correlationId: input.correlationId,
+      testCaseId: input.testCaseId,
+    });
+    if (!session) {
+      throw new BadRequestException({
+        code: 'OCR_DIAGNOSTIC_SESSION_FAILED',
+        message: 'Could not start OCR diagnostic session',
+      });
+    }
+    return runWithOcrDiagnosticSession(session, async () => {
+      await recordImageBoundary(session, 'backend_received_upload', input.file.buffer);
+      const subject = { name: input.subjectName };
+      const orient = await this.pickBestOrientedPagePhoto(input.file, subject);
+      const [{ paddle, tesseract, paddleLines, tesseractLines }] =
+        await this.pageOcr.readPageOcrEnginesParallel([orient.ocrFile], {
+          subjectName: subject.name,
+        });
+      recordTextBoundary(session, 'paddle_raw', paddle, 'paddle');
+      recordTextBoundary(session, 'tesseract_raw', tesseract, 'tesseract');
+      const dim = await this.pageImageDimensions(orient.ocrFile.buffer);
+      const { text, merged } = await this.finalizeChapterPageOcrMerge(
+        paddle,
+        tesseract,
+        orient.ocrText,
+        subject,
+        {
+          paddleLines,
+          tesseractLines,
+          pageImageBuffer: orient.ocrFile.buffer,
+          pageImageWidth: dim.width,
+          pageImageHeight: dim.height,
+        },
+      );
+      recordTextBoundary(session, 'finalize_ocr_text', text);
+      recordTextBoundary(session, 'finalize_merged_ocr_text', merged);
+      const manifestPath = endOcrDiagnosticSession(session);
+      return {
+        manifestPath,
+        correlationId: session.correlationId,
+        paddle,
+        tesseract,
+        ocrText: text,
+        mergedOcrText: merged,
+      };
+    });
   }
 
   private assemblyFilterOptions(subject: { name: string }) {
@@ -720,12 +806,18 @@ export class LessonsService {
 
     let ruleMerged = rule.merged;
     let ruleOcrText = rule.text;
+    recordTextBoundary(getOcrDiagnosticSession(), 'rule_merge_merged', ruleMerged);
+    recordTextBoundary(getOcrDiagnosticSession(), 'rule_merge_ocr_text', ruleOcrText);
     if (
       options?.pageImageBuffer?.length &&
       options.pageImageWidth &&
       options.pageImageHeight
     ) {
       if (mathRegionRecoveryEnabled()) {
+        recordOcrDiagnosticEvent({
+          stage: 'branch_math_region_recovery',
+          branchEntered: true,
+        });
         const recovered = await applyMathRegionRecovery({
           imageBuffer: options.pageImageBuffer,
           imageWidth: options.pageImageWidth,
@@ -741,9 +833,30 @@ export class LessonsService {
             pickBetterPageTranscript(ruleMerged, rule.text),
             filterOpts,
           );
+          recordOcrDiagnosticEvent({
+            stage: 'math_region_recovery_applied',
+            fusionDecision: 'accept',
+            extra: { appliedRegions: recovered.appliedRegions },
+          });
+        } else {
+          recordOcrDiagnosticEvent({
+            stage: 'math_region_recovery_skipped',
+            fusionDecision: 'skip',
+            branchSkipReason: 'no_applied_regions',
+          });
         }
+      } else {
+        recordOcrDiagnosticEvent({
+          stage: 'branch_math_region_recovery',
+          branchEntered: false,
+          branchSkipReason: 'OCR_MATH_REGION_RETRY not enabled',
+        });
       }
       if (pix2textMathCropsEnabled()) {
+        recordOcrDiagnosticEvent({
+          stage: 'branch_pix2text_math_crops',
+          branchEntered: true,
+        });
         const pixFused = await applyPix2TextMathCropFusion({
           imageBuffer: options.pageImageBuffer,
           imageWidth: options.pageImageWidth,
@@ -759,12 +872,40 @@ export class LessonsService {
             pickBetterPageTranscript(ruleMerged, rule.text),
             filterOpts,
           );
+          recordOcrDiagnosticEvent({
+            stage: 'pix2text_fusion_applied',
+            fusionDecision: 'accept',
+            fusionRule: 'appliedRegions_non_empty',
+            extra: {
+              appliedRegions: pixFused.appliedRegions,
+              skippedRegions: pixFused.skippedRegions,
+              skippedReason: pixFused.skippedReason,
+            },
+          });
           if (pixFused.pix2textOutputs.length) {
             this.logger.debug(
               `Pix2Text math crops applied=${pixFused.appliedRegions.join(',')} skipped=${pixFused.skippedRegions.join(',')}`,
             );
           }
+        } else {
+          recordOcrDiagnosticEvent({
+            stage: 'pix2text_fusion_skipped',
+            fusionDecision: 'reject',
+            fusionRule: 'no_applied_regions_or_empty_text',
+            extra: {
+              appliedRegions: pixFused.appliedRegions,
+              skippedReason: pixFused.skippedReason,
+              workerError: pixFused.workerError,
+            },
+          });
         }
+        recordTextBoundary(getOcrDiagnosticSession(), 'after_pix2text_merged', ruleMerged);
+      } else {
+        recordOcrDiagnosticEvent({
+          stage: 'branch_pix2text_math_crops',
+          branchEntered: false,
+          branchSkipReason: 'OCR_PIX2TEXT_MATH_CROPS not enabled',
+        });
       }
     }
     const ruleForFinalize = { text: ruleOcrText, merged: ruleMerged };
@@ -887,12 +1028,19 @@ export class LessonsService {
         pageImageHeight,
       },
     );
+    recordTextBoundary(getOcrDiagnosticSession(), 'persist_ocr_text_before_db', text);
+    recordTextBoundary(getOcrDiagnosticSession(), 'persist_merged_ocr_text_before_db', merged);
     await this.prisma.lessonSource.update({
       where: { id: sourceId },
       data: {
         ocrText: text.trim() || null,
         mergedOcrText: merged.trim() || null,
       },
+    });
+    recordOcrDiagnosticEvent({
+      stage: 'persist_lesson_source_update',
+      fusionDecision: 'accept',
+      extra: { sourceId, usedAi },
     });
     if (uploadId && lessonId) {
       this.patchOcrUploadProgress(uploadId, lessonId, {

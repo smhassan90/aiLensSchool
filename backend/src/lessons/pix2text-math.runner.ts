@@ -5,6 +5,12 @@ import { mkdtemp, writeFile, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { readEnv } from '../common/env';
+import {
+  getOcrDiagnosticSession,
+  recordTextBoundary,
+  recordWorkerBoundary,
+} from './ocr-diagnostic';
+import { sha256Buffer } from './ocr-diagnostic/hash';
 
 const logger = new Logger('Pix2TextMathRunner');
 
@@ -81,13 +87,27 @@ export async function runPix2TextOnCrops(
       const path = join(dir, `${c.id}.jpg`);
       await writeFile(path, c.buffer);
       batch.crops.push({ id: c.id, path });
+      recordWorkerBoundary(getOcrDiagnosticSession(), {
+        stage: 'pix2text_crop_input',
+        engine: 'pix2text',
+        inputImageSha256: sha256Buffer(c.buffer),
+        extra: { cropId: c.id, bytes: c.buffer.length },
+      });
     }
     const batchPath = join(dir, 'batch.json');
     await writeFile(batchPath, JSON.stringify(batch), 'utf-8');
 
     const args = [script, '--batch-json', batchPath];
+    const py = pythonBinary();
+    const workerInvokeStart = Date.now();
+    recordWorkerBoundary(getOcrDiagnosticSession(), {
+      stage: 'pix2text_worker_invoke',
+      engine: 'pix2text',
+      pythonPath: py,
+      extra: { cropCount: crops.length, script, args: [script, '--batch-json', '<batch>'] },
+    });
     const stdout = await new Promise<string>((resolve, reject) => {
-      const child = spawn(pythonBinary(), args, {
+      const child = spawn(py, args, {
         env: { ...process.env, PYTHONUNBUFFERED: '1' },
         windowsHide: true,
       });
@@ -109,6 +129,29 @@ export async function runPix2TextOnCrops(
       });
       child.on('close', (code) => {
         clearTimeout(timer);
+        const timedOut = false;
+        const workerWallMs = Date.now() - workerInvokeStart;
+        recordWorkerBoundary(getOcrDiagnosticSession(), {
+          stage: 'pix2text_worker_close',
+          engine: 'pix2text',
+          exitCode: code ?? undefined,
+          stderrSnippet: stderr.slice(0, 500),
+          stdoutChars: out.length,
+          timeout: timedOut,
+          pythonPath: py,
+          extra: {
+            cropCount: crops.length,
+            script,
+            workerWallMs,
+            stderrChars: stderr.length,
+          },
+        });
+        recordTextBoundary(
+          getOcrDiagnosticSession(),
+          'pix2text_worker_stdout_raw',
+          out,
+          'pix2text',
+        );
         if (code !== 0 && !out.trim()) {
           reject(new Error(stderr.trim() || `Pix2Text exited ${code ?? 'unknown'}`));
           return;
@@ -134,9 +177,26 @@ export async function runPix2TextOnCrops(
     };
     try {
       parsed = JSON.parse(line) as typeof parsed;
-    } catch {
+    } catch (parseErr) {
+      recordWorkerBoundary(getOcrDiagnosticSession(), {
+        stage: 'pix2text_parse',
+        engine: 'pix2text',
+        parseError: 'malformed_json',
+        stdoutChars: line.length,
+      });
       return { ok: false, results: [], error: 'malformed_json' };
     }
+    recordWorkerBoundary(getOcrDiagnosticSession(), {
+      stage: 'pix2text_worker_parsed',
+      engine: 'pix2text',
+      extra: {
+        ok: parsed.ok,
+        version: parsed.version,
+        loadMs: parsed.loadMs,
+        resultCount: parsed.results?.length ?? 0,
+        perCropMs: (parsed.results ?? []).map((r) => ({ id: r.id, ms: r.ms, ok: r.ok })),
+      },
+    });
     if (!parsed.ok) {
       return {
         ok: false,
@@ -145,6 +205,14 @@ export async function runPix2TextOnCrops(
         version: parsed.version,
         loadMs: parsed.loadMs,
       };
+    }
+    for (const row of parsed.results ?? []) {
+      recordTextBoundary(
+        getOcrDiagnosticSession(),
+        `pix2text_raw_${row.id}`,
+        row.text ?? '',
+        'pix2text',
+      );
     }
     return {
       ok: true,
