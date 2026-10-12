@@ -1,6 +1,6 @@
 # HawkNexa production OCR — root-cause investigation
 
-**Status:** Phases 2–4 instrumentation complete locally; production manifest and portal E2E pending deploy. Evidence summary: `docs/ocr/PHASE_2_4_EVIDENCE_REPORT.md`. Production commit: **`84038f8`** (`GET /api/v1/health`).
+**Status:** Phase 5 complete — production diagnostics deployed and compared. Evidence: `docs/ocr/PHASE_5_EVIDENCE_REPORT.md`. Production commit: **`2aad881`** (`GET /api/v1/health`).
 
 ## Phase 1 — Execution path
 
@@ -53,13 +53,16 @@ Enable with **`OCR_DIAGNOSTIC=1`** only. Details: `docs/ocr/DIAGNOSTIC_ARTIFACTS
 - No divide grid → no grid fusion.
 - Pix2Text `solution_block` returned **empty**; merged text = rule merge only (Paddle/Tesseract quality dominates).
 
-## Phase 4 — Local vs production
+## Phase 5 — Confirmed findings (2026-10-12)
 
-See `docs/ocr/PRODUCTION_LOCAL_COMPARISON.md`. Full prod/local manifest diff **blocked** until diagnostic code is in the running container.
+- **Run A (`OCR_PIX2TEXT_MATH_CROPS=0`):** Production and local manifests **match** through final merge (same `paddle_raw` / `tesseract_raw` / merged SHA-256). Cell accuracy **1/4** both sides.
+- **Earliest inaccurate stage vs ground truth:** **`paddle_raw`** on `orient_ocr_file` (`59172c0b…`).
+- **Run B:** Paddle/Tesseract still match; **Pix2Text differs** — local ~180 ms stub vs prod Pix2Text **1.1.7** with **~31s+ load** and **~118s** wall time per grid worker batch.
+- **Portal p40 bytes:** not recovered (`/tmp/p40.jpg` missing on VPS).
 
-## Root cause (hypothesis — requires prod manifest confirmation)
+## Root cause (evidence-based, Run A authoritative)
 
-**Primary failure point:** OCR **engine readings on the preprocessed full-page (or wrong region) buffer** for dense fraction grids and multi-column worked examples — **before** reliable per-cell structure exists for fusion to select.
+**Primary failure point:** OCR **engine readings on the preprocessed full-page buffer** (`orient_ocr_file`) for the divide grid — **before** merge or Pix2Text can restore reference cell expressions. Production and local are **equally poor** at this stage when Pix2Text is off.
 
 **Why earlier fixes didn’t change portal UX:**
 
@@ -71,8 +74,8 @@ See `docs/ocr/PRODUCTION_LOCAL_COMPARISON.md`. Full prod/local manifest diff **b
 ## Remaining limitations
 
 - No authenticated portal upload with correlation ID yet.
-- Diagnostic not in production Docker image until next deploy.
-- Cell matcher is conservative; expression scoring documented in `evaluate-ground-truth.ts`.
+- Local Pix2Text path is **not** parity with `/opt/pix2text` — Run B comparisons are engine/fusion only on prod.
+- Cell matcher is conservative; expression scoring in `evaluate-ground-truth.ts`.
 
 ## Rollback
 
