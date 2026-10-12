@@ -22,7 +22,8 @@ type Manifest = {
 };
 
 function load(path: string): Manifest {
-  return JSON.parse(readFileSync(path, 'utf-8')) as Manifest;
+  const raw = readFileSync(path, 'utf-8').replace(/^\uFEFF/, '');
+  return JSON.parse(raw) as Manifest;
 }
 
 function byStageImages(m: Manifest): Map<string, string> {
