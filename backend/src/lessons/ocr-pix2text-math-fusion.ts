@@ -1,4 +1,5 @@
 import type { OcrStructuredLine } from './ocr-structured-line';
+import { storyContamination } from './ocr-exercise-grid-cells';
 import { detectUncertainMathRegions, type MathRegion } from './ocr-math-region-detect';
 import { cropPageRegion } from './ocr-region-image-prep';
 import {
@@ -12,6 +13,8 @@ import {
   runPix2TextOnCrops,
   type Pix2TextCropResult,
 } from './pix2text-math.runner';
+import { hasDivideExerciseGridHeading } from './ocr-exercise-grid-crop';
+import { applyExerciseGridFusion } from './ocr-exercise-grid-fusion';
 import {
   scoreFractionOcrText,
   spliceRegionIntoTranscript,
@@ -40,7 +43,7 @@ export type Pix2TextMathFusionResult = {
 };
 
 export function regionEligibleForPix2Text(region: MathRegion): boolean {
-  if (region.kind === 'exercise_grid_band') return true;
+  if (region.kind === 'exercise_grid_band') return false;
   if (region.kind === 'solution_block') return true;
   return false;
 }
@@ -88,10 +91,7 @@ function pix2textCandidateAcceptable(
 ): boolean {
   if (!plain.trim() || plain.length > 4000) return false;
   if (region.kind === 'exercise_grid_band') {
-    if (!pix2textExerciseGridPlausible(plain)) return false;
-    const storyInPlain = /real-life|story sums/i.test(plain);
-    if (storyInPlain && plain.length > 600) return false;
-    return true;
+    return false;
   }
   if (region.kind === 'solution_block') {
     return pix2textSolutionPlausible(plain);
@@ -131,6 +131,36 @@ export async function applyPix2TextMathCropFusion(input: {
     return { ...empty, skippedReason: 'subject' };
   }
 
+  const combinedForHeading = [...(input.paddleLines ?? []), ...(input.tesseractLines ?? [])];
+  if (hasDivideExerciseGridHeading(combinedForHeading, base)) {
+    const gridFusion = await applyExerciseGridFusion({
+      imageBuffer: input.imageBuffer,
+      imageWidth: input.imageWidth,
+      imageHeight: input.imageHeight,
+      baseTranscript: base,
+      paddleLines: input.paddleLines,
+      tesseractLines: input.tesseractLines,
+      runWorker: input.runWorker,
+    });
+    if (gridFusion.applied) {
+      return {
+        text: gridFusion.text,
+        appliedRegions: ['exercise_grid_cells'],
+        skippedRegions: gridFusion.uncertainLabels.map((l) => `cell_${l}`),
+        pix2textOutputs: gridFusion.cells.map((c) => ({
+          regionId: `cell_${c.label}`,
+          regionKind: 'exercise_cell',
+          rawMarkup: '',
+          plainText: c.text,
+          ms: 0,
+          ok: true,
+          error: null,
+          box: gridFusion.gridCrop ?? { x0: 0, y0: 0, x1: 0, y1: 0 },
+        })),
+      };
+    }
+  }
+
   const allRegions = detectUncertainMathRegions({
     paddleLines: input.paddleLines,
     tesseractLines: input.tesseractLines,
@@ -140,6 +170,7 @@ export async function applyPix2TextMathCropFusion(input: {
 
   const regions = allRegions
     .filter(regionEligibleForPix2Text)
+    .filter((r) => r.kind !== 'exercise_grid_band')
     .filter(cropWithinLimits)
     .slice(0, pix2textMaxRegionsPerPage());
 
@@ -214,12 +245,7 @@ export async function applyPix2TextMathCropFusion(input: {
     }
 
     const before = text;
-    const exerciseOk =
-      region.kind === 'exercise_grid_band' && pix2textExerciseGridPlausible(plain);
-    const { text: merged, applied } = spliceRegionIntoTranscript(text, region, plain, {
-      pix2textMode: true,
-      pix2textExerciseGridOk: exerciseOk,
-    });
+    const { text: merged, applied } = spliceRegionIntoTranscript(text, region, plain);
     if (!applied) {
       skippedRegions.push(region.id);
       continue;
@@ -232,10 +258,7 @@ export async function applyPix2TextMathCropFusion(input: {
       skippedRegions.push(region.id);
       continue;
     }
-    if (
-      region.kind !== 'exercise_grid_band' &&
-      scoreFractionOcrText(cleaned) < scoreFractionOcrText(before)
-    ) {
+    if (scoreFractionOcrText(cleaned) < scoreFractionOcrText(before)) {
       skippedRegions.push(region.id);
       continue;
     }

@@ -1,0 +1,6 @@
+{
+  "divide_exercise_grid": {
+    "note": "Normalized [x0,y0,x1,y1] — tight fraction grid only (p57-style). Tune per edition.",
+    "defaultBox": [0.04, 0.10, 0.72, 0.40]
+  }
+}
