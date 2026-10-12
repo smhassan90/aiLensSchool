@@ -49,6 +49,7 @@ COPY --from=builder /app/dist ./dist
 COPY ocr ./ocr
 COPY scripts/ocr-pipeline-diagnose.ts scripts/ocr-pipeline-diagnose.cjs scripts/compare-ocr-manifests.ts scripts/ocr-diagnostic-module-path.ts scripts/ocr-diagnostic-module-path.cjs ./scripts/
 COPY test-fixtures/fractions-chapter-calibration/p57-divide-grid.jpg ./test-fixtures/fractions-chapter-calibration/
+COPY test-fixtures/ocr-ground-truth ./test-fixtures/ocr-ground-truth
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # PaddleOCR + Tesseract (set BUILD_PADDLE_OCR=0 for a smaller image without Python/Paddle).

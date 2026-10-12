@@ -1,0 +1,15 @@
+{
+  "testCaseId": "p43-mult-whole",
+  "imageRef": "backend/test-fixtures/fractions-chapter-calibration/p43-mult-whole.jpg",
+  "imageSha256": "fc1380c57f20a395d463e9f3aec4eb8a53c81e83b27f5f727e8b2ea7c114dc46",
+  "heading": "Multiplication of fractions",
+  "cells": [
+    {
+      "label": "snippet",
+      "text": "3 × 1/4 = 3/4",
+      "notes": "Single verified math snippet from chapter_dataset.json (region lesson_math); not an a–n grid."
+    }
+  ],
+  "regionNorm": [0.06, 0.22, 0.85, 0.55],
+  "notes": "Reference transcription only; evaluate strict match on the expression line, not full page."
+}

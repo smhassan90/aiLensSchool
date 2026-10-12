@@ -1,5 +1,11 @@
 import { sha256Buffer, sha256Text } from './hash';
-import { evaluateCellsAgainstGroundTruth, cellExpressionMatches } from './evaluate-ground-truth';
+import {
+  evaluateCellsAgainstGroundTruth,
+  scoreCellPrediction,
+  evaluateCellsStrict,
+  cellExpressionMatches,
+  strictCellExpressionMatches,
+} from './evaluate-ground-truth';
 import { isOcrDiagnosticTestCaseAllowed } from './config';
 
 describe('ocr-diagnostic hash', () => {
@@ -35,7 +41,9 @@ describe('ocr diagnostic config', () => {
 describe('evaluate-ground-truth', () => {
   it('cellExpressionMatches preserves fraction meaning', () => {
     expect(cellExpressionMatches('a. 1 2/5 ÷ 4/5', '1 2/5 ÷ 4/5')).toBe(true);
-    expect(cellExpressionMatches('21/21', '1 2/5 ÷ 4/5')).toBe(false);
+    expect(cellExpressionMatches('e. 5', '12 3/5 ÷ 4 3/8')).toBe(false);
+    expect(strictCellExpressionMatches('e. 5', '12 3/5 ÷ 4 3/8')).toBe(false);
+    expect(evaluateCellsStrict('e. 5', [{ label: 'e', text: '12 3/5 ÷ 4 3/8' }]).exactCellHits).toBe(0);
   });
 
   it('evaluateCellsAgainstGroundTruth counts hits', () => {
@@ -46,5 +54,14 @@ describe('evaluate-ground-truth', () => {
     ]);
     expect(r.exactCellHits).toBe(2);
     expect(r.missingLabels).toHaveLength(0);
+  });
+
+  it('scoreCellPrediction rejects partial expressions and label-only bodies', () => {
+    const partial = scoreCellPrediction('e', '12 3/5 ÷ 4 3/8', '12 3/5 ÷');
+    expect(partial.strictExpressionMatch).toBe(false);
+    expect(partial.empty).toBe(false);
+    const labelOnly = scoreCellPrediction('a', '1 2/5 ÷ 4/5', 'a.');
+    expect(labelOnly.strictExpressionMatch).toBe(false);
+    expect(labelOnly.labelVisible).toBe(true);
   });
 });

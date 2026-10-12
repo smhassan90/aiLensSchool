@@ -5,6 +5,10 @@ import { prepareOrientedVariant } from '../page-image-prep';
 import { PageOcrService, ocrLanguagesForSubject } from '../page-ocr.service';
 import { mergePageOcr } from '../ocr-layout-reconcile';
 import { applyMathRegionRecovery, mathRegionRecoveryEnabled } from '../ocr-math-region-recovery';
+import {
+  applyMathCellLayoutPipeline,
+  mathCellLayoutPipelineEnabled,
+} from '../ocr-math-cell-pipeline';
 import { applyPix2TextMathCropFusion } from '../ocr-pix2text-math-fusion';
 import { intelligentMergePageOcrTranscripts } from '../merge-page-ocr-with-ai';
 import { looksLikeGarbledLatinOcr } from '../../common/garbled-latin-ocr';
@@ -88,6 +92,25 @@ async function finalizeLikePortal(
   let ruleOcrText = rule.text;
   recordTextBoundary(getOcrDiagnosticSession(), 'rule_merge_merged', ruleMerged);
   const dim = await pageDimensions(pageImageBuffer);
+  if (mathCellLayoutPipelineEnabled()) {
+    recordOcrDiagnosticEvent({ stage: 'branch_math_cell_layout', branchEntered: true });
+    const cellOut = await applyMathCellLayoutPipeline({
+      imageBuffer: pageImageBuffer,
+      imageWidth: dim.width,
+      imageHeight: dim.height,
+      baseTranscript: ruleMerged,
+      paddleLines,
+      tesseractLines,
+      subjectName,
+    });
+    if (cellOut.applied && cellOut.text.trim()) {
+      ruleMerged = filterPageTextForLessonAssembly(cellOut.text, filterOpts);
+      ruleOcrText = filterPageTextForLessonAssembly(
+        pickBetterPageTranscript(ruleMerged, rule.text),
+        filterOpts,
+      );
+    }
+  }
   if (mathRegionRecoveryEnabled()) {
     recordOcrDiagnosticEvent({ stage: 'branch_math_region_recovery', branchEntered: true });
     const recovered = await applyMathRegionRecovery({

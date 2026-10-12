@@ -1,8 +1,8 @@
 import type { OcrStructuredLine } from './ocr-structured-line';
 import type { PageCropBox } from './ocr-region-image-prep';
 
-/** Calibration default for Oxford-style divide grid (p57). */
-export const DIVIDE_GRID_CALIBRATION_BOX = [0.04, 0.1, 0.72, 0.4] as const;
+/** Calibration default for Oxford 4×4 divide grid (p57 orient 1400×1867). */
+export const DIVIDE_GRID_CALIBRATION_BOX = [0.04, 0.098, 0.72, 0.288] as const;
 
 const STORY_LINE =
   /\breal[-\s]?life\b|\bstory\s+sums?\b|\bchildren\s+ate\b|\bmaham\b|\bchocolates?\b|\bribbon\b|\bcupcake\b/i;
@@ -73,12 +73,17 @@ export function preciseDivideExerciseGridCrop(input: {
     box = { ...box, y0: Math.min(box.y1 - 40, headingBottom) };
   }
 
-  const storyLine = lines
-    .filter((l) => l.y0 >= box.y0)
+  const minGridBandPx = Math.max(48, pageH * 0.28);
+  const storyCandidates = lines
+    .filter((l) => l.y0 >= box.y0 + 80)
     .sort((a, b) => a.y0 - b.y0)
-    .find((l) => STORY_LINE.test(l.text));
+    .filter((l) => STORY_LINE.test(l.text));
+  const storyLine = storyCandidates[0];
   if (storyLine) {
-    box = { ...box, y1: Math.max(box.y0 + 40, storyLine.y0 - 4) };
+    const candidateY1 = Math.max(box.y0 + 40, storyLine.y0 - 12);
+    if (candidateY1 - box.y0 >= minGridBandPx) {
+      box = { ...box, y1: candidateY1 };
+    }
   }
 
   if (box.y1 - box.y0 < 48 || box.x1 - box.x0 < 80) return null;

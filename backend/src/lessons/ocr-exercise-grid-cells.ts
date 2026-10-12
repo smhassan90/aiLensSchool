@@ -10,6 +10,24 @@ export const EXERCISE_CELL_LABELS: ExerciseCellLabel[] = [
   'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
 ];
 
+/** Oxford divide-grid pages (e.g. p57) use four columns × four rows (a–n). */
+export const DIVIDE_EXERCISE_GRID_COLUMNS = 4;
+export const DIVIDE_EXERCISE_GRID_ROWS = 4;
+
+/** Row-major grid: index 0 = a, 1 = b, … 13 = n (4×4 on divide pages). */
+export function exerciseCellGridPosition(
+  label: ExerciseCellLabel,
+  columns = DIVIDE_EXERCISE_GRID_COLUMNS,
+): {
+  index: number;
+  row: number;
+  col: number;
+} {
+  const index = EXERCISE_CELL_LABELS.indexOf(label);
+  if (index < 0) throw new Error(`unknown label ${label}`);
+  return { index, row: Math.floor(index / columns), col: index % columns };
+}
+
 export type ExerciseCellReading = {
   label: ExerciseCellLabel;
   text: string;

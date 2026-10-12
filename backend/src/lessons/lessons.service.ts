@@ -85,6 +85,10 @@ import {
 } from './merge-page-ocr-with-ai';
 import { mergePageOcr } from './ocr-layout-reconcile';
 import { applyMathRegionRecovery, mathRegionRecoveryEnabled } from './ocr-math-region-recovery';
+import {
+  applyMathCellLayoutPipeline,
+  mathCellLayoutPipelineEnabled,
+} from './ocr-math-cell-pipeline';
 import { applyPix2TextMathCropFusion } from './ocr-pix2text-math-fusion';
 import { pix2textMathCropsEnabled } from './pix2text-math.runner';
 import type { OcrStructuredLine } from './ocr-structured-line';
@@ -813,6 +817,50 @@ export class LessonsService {
       options.pageImageWidth &&
       options.pageImageHeight
     ) {
+      if (mathCellLayoutPipelineEnabled()) {
+        recordOcrDiagnosticEvent({
+          stage: 'branch_math_cell_layout',
+          branchEntered: true,
+        });
+        const cellLayout = await applyMathCellLayoutPipeline({
+          imageBuffer: options.pageImageBuffer,
+          imageWidth: options.pageImageWidth,
+          imageHeight: options.pageImageHeight,
+          baseTranscript: ruleMerged,
+          paddleLines: options.paddleLines,
+          tesseractLines: options.tesseractLines,
+          subjectName: subject.name,
+          testCaseId: readEnv('OCR_MATH_CELL_FIXTURE')?.trim() || undefined,
+        });
+        if (cellLayout.applied && cellLayout.text.trim()) {
+          ruleMerged = filterPageTextForLessonAssembly(cellLayout.text, filterOpts);
+          ruleOcrText = filterPageTextForLessonAssembly(
+            pickBetterPageTranscript(ruleMerged, rule.text),
+            filterOpts,
+          );
+          recordOcrDiagnosticEvent({
+            stage: 'math_cell_layout_applied',
+            fusionDecision: 'accept',
+            extra: {
+              cells: cellLayout.cells.map((c) => c.label),
+              uncertain: cellLayout.uncertainLabels,
+              timingMs: cellLayout.timingMs,
+            },
+          });
+        } else {
+          recordOcrDiagnosticEvent({
+            stage: 'math_cell_layout_skipped',
+            fusionDecision: 'skip',
+            branchSkipReason: cellLayout.skippedReason ?? 'not_applied',
+          });
+        }
+      } else {
+        recordOcrDiagnosticEvent({
+          stage: 'branch_math_cell_layout',
+          branchEntered: false,
+          branchSkipReason: 'OCR_MATH_CELL_LAYOUT not enabled',
+        });
+      }
       if (mathRegionRecoveryEnabled()) {
         recordOcrDiagnosticEvent({
           stage: 'branch_math_region_recovery',

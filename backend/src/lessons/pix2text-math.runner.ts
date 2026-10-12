@@ -39,7 +39,14 @@ function workerScriptPath(): string {
   return candidates.find((p) => existsSync(p)) ?? candidates[0];
 }
 
-function pythonBinary(): string {
+export function resolvePix2TextPythonBinary(): string {
+  const evalVenv =
+    process.platform === 'win32'
+      ? join(process.cwd(), 'eval', 'math-ocr-eval-venv', 'Scripts', 'python.exe')
+      : join(process.cwd(), 'eval', 'math-ocr-eval-venv', 'bin', 'python3');
+  if (!readEnv('PIX2TEXT_PYTHON') && existsSync(evalVenv)) {
+    return evalVenv;
+  }
   return (
     readEnv('PIX2TEXT_PYTHON') ||
     readEnv('PADDLE_OCR_PYTHON') ||
@@ -98,7 +105,7 @@ export async function runPix2TextOnCrops(
     await writeFile(batchPath, JSON.stringify(batch), 'utf-8');
 
     const args = [script, '--batch-json', batchPath];
-    const py = pythonBinary();
+    const py = resolvePix2TextPythonBinary();
     const workerInvokeStart = Date.now();
     recordWorkerBoundary(getOcrDiagnosticSession(), {
       stage: 'pix2text_worker_invoke',

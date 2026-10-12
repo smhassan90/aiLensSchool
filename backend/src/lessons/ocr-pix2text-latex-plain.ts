@@ -2,14 +2,39 @@
  * Conservative LaTeX / Pix2Text markup → plain text for lesson assembly.
  */
 
+/** Protect mixed numbers (whole + num/den) before collapsing OCR digit spacing. */
+const MIXED_NUMBER_PLACEHOLDER = '\uE000';
+
+export function protectMixedNumberFractions(s: string): { text: string; restore: (t: string) => string } {
+  const slots: string[] = [];
+  const text = (s ?? '').replace(
+    /(\d+)\s+(\d+)\s*\/\s*(\d+)/g,
+    (_, whole: string, num: string, den: string) => {
+      slots.push(`${whole} ${num}/${den}`);
+      return `${MIXED_NUMBER_PLACEHOLDER}${slots.length - 1}${MIXED_NUMBER_PLACEHOLDER}`;
+    },
+  );
+  return {
+    text,
+    restore: (t: string) => {
+      let out = t;
+      for (let i = 0; i < slots.length; i++) {
+        out = out.replace(`${MIXED_NUMBER_PLACEHOLDER}${i}${MIXED_NUMBER_PLACEHOLDER}`, slots[i]);
+      }
+      return out;
+    },
+  };
+}
+
 export function collapseSpacedDigits(s: string): string {
-  let out = s ?? '';
+  const { text, restore } = protectMixedNumberFractions(s ?? '');
+  let out = text;
   let prev: string | null = null;
   while (out !== prev) {
     prev = out;
     out = out.replace(/(\d) (\d)/g, '$1$2');
   }
-  return out;
+  return restore(out);
 }
 
 export function latexFracToPlain(s: string): string {
@@ -44,5 +69,11 @@ export function pix2textPlainForFusion(raw: string): string {
     .split(/\r?\n/)
     .map((l) => latexFracToPlain(l).replace(/\s+/g, ' ').trim())
     .filter(Boolean);
-  return lines.join('\n').trim();
+  const joined = lines.join('\n').trim();
+  return stripPix2TextExerciseLabelPrefix(joined);
+}
+
+/** Remove leading exercise label when Pix2Text included it in mathrm/text (not GT-derived). */
+export function stripPix2TextExerciseLabelPrefix(plain: string): string {
+  return plain.replace(/^\s*[a-n]\s*\.\s*/i, '').trim();
 }
