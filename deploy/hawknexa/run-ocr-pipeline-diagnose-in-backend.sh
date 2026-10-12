@@ -33,7 +33,7 @@ docker compose -f docker-compose.prod.yml exec -T backend sh -c "
     echo \"missing image: \$IMG\" >&2
     exit 2
   fi
-  npx ts-node --transpile-only scripts/ocr-pipeline-diagnose.ts \"\$IMG\" \"${TEST_ID}\" Mathematics
+  node scripts/ocr-pipeline-diagnose.cjs \"\$IMG\" \"${TEST_ID}\" Mathematics
 "
 
 echo "Artifacts under backend var/ocr-diagnostic inside container (mount or docker cp as needed)."

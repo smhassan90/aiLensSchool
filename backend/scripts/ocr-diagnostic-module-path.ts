@@ -2,7 +2,7 @@ import { createRequire } from 'module';
 import { existsSync } from 'fs';
 import { join } from 'path';
 
-const require = createRequire(import.meta.url);
+const require = createRequire(__filename);
 
 /** Resolve compiled dist modules in production containers, or src when developing locally. */
 export function requireOcrDiagnosticModule<T>(basename: string): T {
