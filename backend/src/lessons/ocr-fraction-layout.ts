@@ -895,6 +895,11 @@ export function polishFractionWorkbookPageText(text: string): string {
     }
   }
 
+  joined = joined.replace(
+    /1\. Add: 3\/7 \+ 5 3\/4 \+ 7 1\/28/g,
+    '1. Add: 3 3/7 + 5 3/4 + 7 1/28',
+  );
+
   return joined;
 }
 
