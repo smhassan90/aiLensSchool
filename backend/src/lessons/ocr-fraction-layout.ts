@@ -786,6 +786,7 @@ function lineIsExercise3aNoise(line: string): boolean {
   if (/^9\s+19$/.test(t)) return true;
   if (/^12\s+30$/.test(t)) return true;
   if (/^15\s+13\s+33\s+3$/.test(t)) return true;
+  if (/^45,\s*00$/.test(t)) return true;
   return false;
 }
 
