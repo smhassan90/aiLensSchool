@@ -190,6 +190,8 @@ export function scoreOcrTranscriptCleanliness(text: string): number {
     .split(/\r?\n/)
     .filter((l) => lineLooksLikeCollapsedArithmetic(l)).length * 50;
   const incompletePenalty = englishPageTranscriptLooksIncomplete(value) ? 120 : 0;
+  const pipeCount = (value.match(/\|/g) ?? []).length;
+  const columnInterleavePenalty = pipeCount > 4 ? (pipeCount - 4) * 28 : 0;
   return (
     latin +
     cueBonus +
@@ -204,6 +206,7 @@ export function scoreOcrTranscriptCleanliness(text: string): number {
     dupes * 90 -
     garbageLines * 35 -
     symbolJunk * 12 -
+    columnInterleavePenalty -
     mangledOptPenalty -
     collapsedArithPenalty -
     incompletePenalty
