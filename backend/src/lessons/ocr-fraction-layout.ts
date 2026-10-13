@@ -424,8 +424,9 @@ export function reconstructStackedFractionsInOcrText(text: string): string {
       /[÷─]/.test(raw) ||
       /^\d{2,4}(?:\s*=\s*\d{1,4}){1,}/.test(raw.trim().replace(/\s/g, '')) ||
       /[=+()×]/.test(raw) ||
+      /\d-\d/.test(raw) ||
       /\dx\d/i.test(raw) ||
-      /^\d+\.\s+\d/.test(raw.trim()) // "2. 4 2/5 + …" mixed-sum prompts
+      /^\d+\.\s*\d/.test(raw.trim()) // "1.3572 …" or "2. 4 2/5 + …"
     ) {
       out.push(raw);
       continue;

@@ -240,6 +240,11 @@ export function stripAbsurdCommaFractionLists(text: string): string {
     const slashes = t.match(/\b\d{1,3}\/\d{1,3}\b/g) ?? [];
     if (slashes.length < 3 || !/,/.test(t)) return true;
     if (/\b(?:and|or|equal|third|half|quarters)\b/i.test(t)) return true;
+    const plausible = slashes.filter((s) => {
+      const [a, b] = s.split('/').map((x) => Number(x));
+      return a >= 1 && a <= 12 && b >= 2 && b <= 20;
+    });
+    if (plausible.length >= 2) return true;
     const absurd = slashes.filter((s) => {
       const [a, b] = s.split('/').map((x) => Number(x));
       return a > 15 || b > 40 || b === 0;

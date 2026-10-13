@@ -30,6 +30,20 @@ describe('ocr-fraction-layout', () => {
     expect(splitGluedDigitsToMatchCount('386910', 5)).toBe('3 8 6 9 10');
   });
 
+  it('does not rebuild numbered multi-fraction example prompts (1.3572 …)', () => {
+    const raw = `
+We can add and subtract more than two fractions with different
+denominators in the same way.
+Example:
+1.3572 2. 3-323
+Solution: Solution:
+Fractions
+`.trim();
+    const out = reconstructStackedFractionsInOcrText(raw);
+    expect(out).toMatch(/1\.3572/);
+    expect(out).not.toMatch(/13\/3,\s*5\/5/);
+  });
+
   it('rebuilds Example fraction rows in page text', () => {
     const raw = `
 You have already learnt:

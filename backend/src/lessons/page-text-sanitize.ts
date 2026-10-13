@@ -12,6 +12,7 @@ import {
   looksLikeScienceNumericalsPage,
   normalizeScienceNotationArtifacts,
 } from './science-ocr-clean';
+import { isOxfordFractionsWorkbookPage } from './ocr-fractions-workbook';
 import {
   lineLooksLikeWeblinkSidebar,
   stripInterleavedWeblinkSidebar,
@@ -460,6 +461,11 @@ export function filterPageTextForLessonAssembly(
   const value = (text ?? '').trim();
   if (!value) return '';
   const keepArabic = options?.keepArabicScript === true;
+
+  if (isOxfordFractionsWorkbookPage(value)) {
+    const withoutAssist = stripInterleavedWeblinkSidebar(value);
+    return cleanMergedPageOcrText(withoutAssist);
+  }
 
   // Poem / dialogue / exercise pages: keep full OCR. Block filtering was deleting
   // stanzas (King Bruce) and exercise tables (Dignity of Work).
