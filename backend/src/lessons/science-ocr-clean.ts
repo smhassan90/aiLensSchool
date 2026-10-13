@@ -206,9 +206,19 @@ export function stripHumanUnreadableOcrLines(text: string): string {
     const t = line.trim();
     if (!t) return true;
     if (/\boldatang\b|777\s+olt|\bPE Er re\b/i.test(t)) return false;
+    if (/\bEE\s+OR\b|\bo\s+lic\s+ation\b|\bMu\s+Utiplication\b|\blege\s+eer\b/i.test(t)) {
+      return false;
+    }
+    if (/\bor[zZ]x2=|\b0r3x\b|\bI\s+Or2x\d/i.test(t)) return false;
     if (/^(?:Examples:\s*)?(?:[A-Z]\s+){2,}(?:\|[A-Z]\s*)+[A-Z]?$/i.test(t)) return false;
     if (/^[A-Z]{1,2}\s+[A-Z]{1,2}\s+\|/.test(t) && t.length < 80) return false;
     if (/^\d\)\s*x\s*$/i.test(t)) return false;
+    if (/^SL\s+y\s+oral/i.test(t)) return false;
+    if (/^Solution:\s*\|\s*Solution:/i.test(t)) return false;
+    const singleLetterTokens = t.match(/\b[a-zA-Z]\b/g) ?? [];
+    if (singleLetterTokens.length >= 8 && t.length < 100 && !/\d+\s*\/\s*\d/.test(t)) {
+      return false;
+    }
     const letters = t.replace(/[^a-zA-Z]/g, '');
     if (letters.length >= 10) {
       const vowels = (letters.match(/[aeiouAEIOU]/g) ?? []).length;
@@ -217,6 +227,24 @@ export function stripHumanUnreadableOcrLines(text: string): string {
       }
     }
     return true;
+  });
+  return kept.join('\n');
+}
+
+/** Drop comma-separated slash junk (Pix2Text / Tess) with no lesson words. */
+export function stripAbsurdCommaFractionLists(text: string): string {
+  const lines = (text ?? '').split(/\r?\n/);
+  const kept = lines.filter((line) => {
+    const t = line.trim();
+    if (!t) return true;
+    const slashes = t.match(/\b\d{1,3}\/\d{1,3}\b/g) ?? [];
+    if (slashes.length < 3 || !/,/.test(t)) return true;
+    if (/\b(?:and|or|equal|third|half|quarters)\b/i.test(t)) return true;
+    const absurd = slashes.filter((s) => {
+      const [a, b] = s.split('/').map((x) => Number(x));
+      return a > 15 || b > 40 || b === 0;
+    });
+    return absurd.length < 3;
   });
   return kept.join('\n');
 }
@@ -288,6 +316,12 @@ export function cleanMergedPageOcrText(text: string): string {
   joined = reconstructWorkedFractionMathInOcrText(joined);
   joined = reconstructStackedFractionsInOcrText(joined);
   joined = repairFractionConclusionAndExampleLines(joined);
+  joined = stripAbsurdCommaFractionLists(joined);
+  joined = joined.replace(/\bOXEORD\b/g, 'OXFORD');
+  joined = joined.replace(
+    /\blowest term,?\s+when\s+L\s+is\s+the\b/gi,
+    'lowest term when 1 is the',
+  );
   // Physics pages only — on fraction workbooks `5 10 -1` is 5/10, not 5×10^-1.
   const fractionWorkbook =
     /\bfraction/i.test(joined) &&

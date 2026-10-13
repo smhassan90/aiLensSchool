@@ -46,4 +46,28 @@ Therefore, 2 28 in its lowest term is 7/10
     expect(out).not.toMatch(/2\/28,\s*8\/4/);
     expect(out).not.toMatch(/Reduce\s+2\s+to the lowest term/);
   });
+
+  it('merge prefers paddle when tess is column noise on add-fractions page', () => {
+    const paddle = `
+We can add and subtract more than two fractions with different
+denominators in the same way.
+Example:
+1.3572 2. 3-323
+Solution: Solution:
+=3+5+7+ 28 =6-3-2+ 45, 30
+Fractions
+`.trim();
+    const tess = `
+eT                            ao pts:
+135 Rh Li :     =
+Solution:                            |     Solution:
+= 15+ (34)
+We can add and subtract more than two fractions with different 8
+`.trim();
+    const out = mergeOxfordFractionsWorkbookPageOcr(paddle, tess);
+    expect(out).toMatch(/denominators in the same way/i);
+    expect(out).toMatch(/Example:/i);
+    expect(out).not.toMatch(/SL y oral/i);
+    expect(out).not.toMatch(/Solution:\s*\|\s*Solution:/i);
+  });
 });

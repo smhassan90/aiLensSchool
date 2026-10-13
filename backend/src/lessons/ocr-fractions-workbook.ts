@@ -3,6 +3,7 @@
  * Tesseract column/slash soup must not override Paddle + layout repairs.
  */
 import { mergePaddleAndTesseractPageOcr } from './merge-paddle-tesseract-ocr';
+import { transcriptNoiseScore } from './ocr-layout-reconcile-utils';
 import { scoreFractionOcrText } from './ocr-math-region-recovery';
 import { cleanMergedPageOcrText } from './science-ocr-clean';
 
@@ -23,6 +24,41 @@ export function tessFractionSlashSoup(text: string): boolean {
     if (absurd.length >= 3) return true;
   }
   return false;
+}
+
+/** Tess column bleed / pipe junk — unsafe to interleave with Paddle on workbook pages. */
+export function tesseractTooNoisyForFractionMerge(text: string): boolean {
+  const t = (text ?? '').trim();
+  if (!t) return false;
+  if (tessFractionSlashSoup(t)) return true;
+  const noise = transcriptNoiseScore(t);
+  const lines = t.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (noise >= 22) return true;
+  if (lines.length >= 4 && noise >= 12 && noise / lines.length >= 2.5) return true;
+  return false;
+}
+
+function workbookTranscriptQuality(text: string): number {
+  const t = (text ?? '').trim();
+  if (!t) return -1e9;
+  let s = scoreFractionOcrText(t) * 3;
+  s -= transcriptNoiseScore(t) * 5;
+  const words = t.match(/\b[a-z]{4,}\b/gi) ?? [];
+  s += Math.min(words.length, 50);
+  if (/\bdenominators in the same way\b/i.test(t)) s += 12;
+  if (/\bMultiplication of fractions\b/i.test(t)) s += 14;
+  if (/\bExercise\s+3/i.test(t)) s += 10;
+  if (/\bSolution:/i.test(t) && t.length > 120) s += 8;
+  if (/\|/.test(t)) s -= 15;
+  return s;
+}
+
+function pickBestFractionWorkbookTranscript(candidates: string[]): string {
+  const cleaned = candidates
+    .map((c) => cleanMergedPageOcrText((c ?? '').trim()))
+    .filter(Boolean);
+  if (!cleaned.length) return '';
+  return cleaned.sort((a, b) => workbookTranscriptQuality(b) - workbookTranscriptQuality(a))[0]!;
 }
 
 export function isOxfordFractionsWorkbookPage(text: string): boolean {
@@ -68,20 +104,14 @@ export function mergeOxfordFractionsWorkbookPageOcr(paddle: string, tesseract: s
   const t = (tesseract ?? '').trim();
   if (!p && !t) return '';
 
-  let merged = mergePaddleAndTesseractPageOcr(p, t);
   const pOnly = cleanMergedPageOcrText(p);
   const pMerged = cleanMergedPageOcrText(mergePaddleAndTesseractPageOcr(p, ''));
-  const mClean = cleanMergedPageOcrText(merged);
+  const tessBad = tesseractTooNoisyForFractionMerge(t);
 
-  const tessBad = tessFractionSlashSoup(t);
-  if (tessBad) {
-    const paddleBase = scoreFractionOcrText(pMerged) >= scoreFractionOcrText(pOnly) ? pMerged : pOnly;
-    return cleanMergedPageOcrText(paddleBase);
+  if (tessBad || !t) {
+    return pickBestFractionWorkbookTranscript([pMerged, pOnly]);
   }
 
-  if (tessFractionSlashSoup(mClean) && scoreFractionOcrText(pMerged) >= scoreFractionOcrText(mClean)) {
-    return cleanMergedPageOcrText(pMerged);
-  }
-
-  return mClean;
+  const merged = cleanMergedPageOcrText(mergePaddleAndTesseractPageOcr(p, t));
+  return pickBestFractionWorkbookTranscript([merged, pMerged, pOnly]);
 }

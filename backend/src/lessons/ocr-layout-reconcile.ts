@@ -250,6 +250,18 @@ export function reconcilePageOcr(input: PageOcrStructuredInput): PageOcrReconcil
         ),
       );
 
+  if (workbook) {
+    const flat = dedupeNearDuplicateLines(legacy.split(/\r?\n/))
+      .map((l) => splitInlineIntroClauses(l))
+      .join('\n')
+      .trim();
+    return {
+      plainText: cleanMergedPageOcrText(stripInterleavedWeblinkSidebar(flat)),
+      usedLayoutReconcile: false,
+      warnings: ['fractions_workbook_string_merge_only'],
+    };
+  }
+
   if (!hasUsableStructure(input)) {
     const flat = dedupeNearDuplicateLines(legacy.split(/\r?\n/))
       .map((l) => splitInlineIntroClauses(l))
