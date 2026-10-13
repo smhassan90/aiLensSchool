@@ -1,6 +1,6 @@
 import { isEnglishPrimarySubject } from './ocr-subject-lang';
 import { mergePaddleAndTesseractPageOcr, ocrLinesDuplicate } from './merge-paddle-tesseract-ocr';
-import { cleanMergedPageOcrText } from './science-ocr-clean';
+import { cleanMergedPageOcrText, repairWorkbookFractionIntroGluedOps } from './science-ocr-clean';
 import { stripInterleavedWeblinkSidebar } from './sidebar-layout-ocr';
 import { transcriptNoiseScore, wordOverlapRatio } from './ocr-layout-reconcile-utils';
 import type {
@@ -94,9 +94,13 @@ export function dedupeNearDuplicateLines(lines: string[]): string[] {
 
 /** Paddle sometimes emits two intro clauses on one physical line. */
 function splitInlineIntroClauses(line: string): string {
-  if (!/Now we will deal with/i.test(line)) return line;
-  const parts = line.split(/\s+(?=Now we will deal with)/i).map((p) => p.trim()).filter(Boolean);
-  if (parts.length < 2) return line;
+  const repaired = repairWorkbookFractionIntroGluedOps(line);
+  if (!/Now we will deal with/i.test(repaired)) return repaired;
+  const parts = repaired
+    .split(/\s+(?=Now we will deal with)/i)
+    .map((p) => repairWorkbookFractionIntroGluedOps(p.trim()))
+    .filter(Boolean);
+  if (parts.length < 2) return repaired;
   return dedupeNearDuplicateLines(parts).join(' ');
 }
 

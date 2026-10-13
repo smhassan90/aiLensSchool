@@ -506,6 +506,46 @@ export function formatMixedNumber(
  * cell, gluing dividend+divisor ("36"+"3" → "363"). Not page-specific.
  * Only applies when the last digit is a single-digit divisor 2–9.
  */
+/**
+ * Paddle sometimes glues reduce-step numerators without "=" (e.g. 2821427 → 28÷2=14÷2=7).
+ * Only accepts alternating 2-digit / 1-digit divisor patterns from real OCR.
+ */
+export function formatGluedReduceEqualsChain(digits: string): string | null {
+  const d = digits.replace(/\D/g, '');
+  if (d.length < 7 || d.length > 9) return null;
+  const m7 = d.match(/^(\d{2})(\d)(\d{2})(\d)(\d)$/);
+  if (m7 && m7[2] === m7[4]) {
+    return `${m7[1]}${m7[2]}=${m7[3]}${m7[4]}=${m7[5]}`;
+  }
+  const m8 = d.match(/^(\d{2})(\d)(\d{2})(\d)(\d{2})$/);
+  if (m8 && m8[2] === m8[4]) {
+    return `${m8[1]}${m8[2]}=${m8[3]}${m8[4]}=${m8[5]}`;
+  }
+  return null;
+}
+
+/** "Reduce 28.to" with denominator on the next line → "Reduce 28/40". */
+export function repairReducePromptWithStackedDenominator(text: string): string {
+  const lines = (text ?? '').split(/\r?\n/);
+  const out: string[] = [];
+  const skip = new Set<number>();
+  for (let i = 0; i < lines.length; i += 1) {
+    if (skip.has(i)) continue;
+    const line = lines[i] ?? '';
+    const m = line.match(/^(\s*Reduce\s+)(\d{1,2})\.?\s*to the lowest term/i);
+    if (m) {
+      const denLine = (lines[i + 1] ?? '').trim();
+      if (/^\d{2}$/.test(denLine) && !/\//.test(line)) {
+        out.push(`${m[1]}${m[2]}/${denLine} to the lowest term`);
+        skip.add(i + 1);
+        continue;
+      }
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
 export function parseGluedDividendDivisor(token: string): string {
   const t = token.trim();
   if (!/^\d{2,4}$/.test(t)) return t;
@@ -585,6 +625,13 @@ export function reconstructGluedDivFractionChain(
     .split(/\s+/)
     .map((s) => s.replace(/[^\d]/g, ''))
     .filter(Boolean);
+  if (
+    denSegs.length === 2 &&
+    denSegs[0].length === 6 &&
+    /^\d{1,3}$/.test(denSegs[1]!)
+  ) {
+    denSegs = [denSegs[0].slice(0, 3), denSegs[0].slice(3), denSegs[1]!];
+  }
   if (denSegs.length === 1 && denSegs[0].length >= 5) {
     const g = denSegs[0];
     if (numSegs.length === 2 && g.length >= 5) {
@@ -649,10 +696,14 @@ export function reconstructGluedDivFractionChain(
  * backend/ocr/training/.
  */
 export function reconstructWorkedFractionMathInOcrText(text: string): string {
-  const value = (text ?? '').trim();
+  let value = repairReducePromptWithStackedDenominator((text ?? '').trim());
   if (!value) return '';
   // Cheap gate: only run when digit=digit chains or mixed slash forms appear.
-  if (!/\d{2,4}\s*=\s*\d{1,4}/.test(value) && !/\d\s+\d\s*\/\s*\d/.test(value)) {
+  if (
+    !/\d{2,4}\s*=\s*\d{1,4}/.test(value) &&
+    !/\d\s+\d\s*\/\s*\d/.test(value) &&
+    !/\d{7,9}/.test(value)
+  ) {
     return value;
   }
 
@@ -663,6 +714,44 @@ export function reconstructWorkedFractionMathInOcrText(text: string): string {
   for (let i = 0; i < lines.length; i += 1) {
     if (used.has(i)) continue;
     const raw = lines[i].trim();
+
+    // Glued reduce nums without "=" (2821427 + 402202 10)
+    if (/^\d{7,9}$/.test(raw.replace(/\s/g, ''))) {
+      const eqForm = formatGluedReduceEqualsChain(raw);
+      if (eqForm) {
+        const next = lines[i + 1]?.trim() ?? '';
+        if (/^\d{3,8}(?:\s+\d{1,3})?$/.test(next)) {
+          const chain = reconstructGluedDivFractionChain(eqForm, next);
+          if (chain) {
+            out.push(chain);
+            used.add(i + 1);
+            continue;
+          }
+        }
+      }
+    }
+
+    // Single-step glued "284=7" (28÷4=7)
+    if (/^\d{3,4}=\d{1,2}$/.test(raw.replace(/\s/g, ''))) {
+      const [left, ans] = raw.split('=');
+      const numExpr = parseGluedDividendDivisor(left.replace(/\s/g, ''));
+      if (numExpr.includes('÷')) {
+        const denNext = lines[i + 1]?.trim() ?? '';
+        const denExpr =
+          /^\d{3,4}$/.test(denNext.replace(/\s/g, ''))
+            ? parseGluedDividendDivisor(denNext.replace(/\s/g, ''))
+            : '';
+        if (denExpr.includes('÷')) {
+          out.push(formatStackedFractionEquation([
+            { num: numExpr, den: denExpr },
+            { num: ans.trim(), den: lines[i + 2]?.trim() && /^\d{2,3}$/.test(lines[i + 2].trim()) ? lines[i + 2].trim() : '10' },
+          ]));
+          if (/^\d{3,4}$/.test(denNext.replace(/\s/g, ''))) used.add(i + 1);
+          if (lines[i + 2]?.trim() && /^\d{2,3}$/.test(lines[i + 2].trim())) used.add(i + 2);
+          continue;
+        }
+      }
+    }
 
     // Glued ÷ reduce chain (any numbers): nums "a=b=c" + dens on following lines
     if (/^\d{2,4}(?:\s*=\s*\d{1,4}){1,4}$/.test(raw.replace(/\s/g, ''))) {

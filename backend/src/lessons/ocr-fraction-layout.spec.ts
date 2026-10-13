@@ -3,6 +3,7 @@ import {
   pairFractionDigitRows,
   parseGluedDividendDivisor,
   reconstructGluedDivFractionChain,
+  formatGluedReduceEqualsChain,
   reconstructStackedFractionsInOcrText,
   reconstructWorkedFractionMathInOcrText,
   splitGluedDigitsToMatchCount,
@@ -125,6 +126,21 @@ Example: 3 8 6 9 10
     expect(chain).toMatch(/12÷3/);
     expect(chain).toMatch(/16÷3/);
     expect(chain).toMatch(/─/);
+  });
+
+  it('formats glued reduce nums without equals signs', () => {
+    expect(formatGluedReduceEqualsChain('2821427')).toBe('282=142=7');
+    const raw = `
+Solution:
+2821427
+402202 10
+or we can divide directly by 4.
+`.trim();
+    const out = reconstructWorkedFractionMathInOcrText(raw);
+    expect(out).toMatch(/28÷2/);
+    expect(out).toMatch(/40÷2/);
+    expect(out).toMatch(/7/);
+    expect(out).toMatch(/10/);
   });
 
   it('derives final den from last ÷ den when OCR omits plain answer den', () => {

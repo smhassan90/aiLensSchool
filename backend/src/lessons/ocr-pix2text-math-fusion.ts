@@ -77,6 +77,9 @@ export function pix2textSolutionPlausible(plain: string): boolean {
   if (!t) return false;
   if (!/\d\s*\/\s*\d/.test(t) && !/÷/.test(t)) return false;
   if (/\d{6,}/.test(t.replace(/\s/g, ''))) return false;
+  if (/\\\s*\\/.test(plain) || /\\\\/.test(plain)) return false;
+  if (/\barray\b/i.test(t) && /\b[a-z]\s+[a-z]\s+[a-z]/i.test(t)) return false;
+  if (/\b[a-z]\s+[a-z]\s+[a-z]\s+[a-z]/i.test(t) && !/\d{2}/.test(t)) return false;
   return true;
 }
 

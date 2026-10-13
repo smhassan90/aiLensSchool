@@ -122,6 +122,36 @@ export function isProtectedStemAcronym(token: string): boolean {
   return STEM_ACRONYM_KEEP.test(token.trim());
 }
 
+/** Fix glued operation words common on fraction workbook intro lines. */
+export function repairWorkbookFractionIntroGluedOps(text: string): string {
+  return (text ?? '')
+    .replace(/\badditionsubtractionmultiplication\b/gi, 'addition, subtraction, multiplication')
+    .replace(/\bsubtractionmultiplication\b/gi, 'subtraction, multiplication')
+    .replace(/\badditionsubtraction\b/gi, 'addition, subtraction')
+    .replace(
+      /\baddition subtraction multiplicotion\b/gi,
+      'addition, subtraction, multiplication',
+    )
+    .replace(/\bmultiplicotion\b/gi, 'multiplication')
+    .replace(/\bdifferent-types\b/gi, 'different types');
+}
+
+/** Drop Pix2Text/LaTeX lines that collapse to spaced letter soup. */
+export function stripGarbledPix2TextLines(text: string): string {
+  const lines = (text ?? '').split(/\r?\n/);
+  const kept = lines.filter((line) => {
+    const t = line.trim();
+    if (!t) return true;
+    if (/\\\s*\\/.test(t) || /\\\\/.test(t)) return false;
+    if (/\barray\b/i.test(t) && /\b[a-z]\s+[a-z]\s+[a-z]/i.test(t)) return false;
+    const spacedLetters = t.match(/\b[a-z]\s+[a-z]\s+[a-z]\s+[a-z]/i);
+    if (spacedLetters && !/\d\s*\/\s*\d/.test(t) && !/÷/.test(t)) return false;
+    if (/[\u4e00-\u9fff]/.test(t) && t.length < 40) return false;
+    return true;
+  });
+  return kept.join('\n');
+}
+
 /** Line-level cleanup applied after every Paddle+Tess merge. */
 export function cleanMergedOcrLine(line: string): string {
   let value = line.trim();
@@ -133,7 +163,8 @@ export function cleanMergedOcrLine(line: string): string {
 }
 
 export function cleanMergedPageOcrText(text: string): string {
-  const value = (text ?? '').trim();
+  let value = repairWorkbookFractionIntroGluedOps((text ?? '').trim());
+  value = stripGarbledPix2TextLines(value);
   if (!value) return '';
   // Literary English: only collapse obvious digit dupes / confidence junk; never rewrite story prose.
   if (LITERARY_KEEP_CUE.test(value)) {

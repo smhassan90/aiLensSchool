@@ -3,14 +3,14 @@
   "bookPage": 43,
   "image": "D:\\workspace\\aiLensSchool\\aiLensSchool\\backend\\test-fixtures\\fractions-chapter-calibration\\p43-mult-whole.jpg",
   "env": {
-    "OCR_ENGINE": "auto",
+    "OCR_ENGINE": "(default)",
     "OCR_AI_MERGE": "0"
   },
   "orientation": {
     "degrees": 0,
     "prep": "prepareOrientedVariant(0) — portal upload path"
   },
-  "engineMs": 14944,
+  "engineMs": 15006,
   "paddle": "Multiplication of fractions\nMultiplication of a fraction by a whole number\nWith the help of diagrams it becomes easy to understand\nmultiplication.of a fraction by a whole number.\nLet us take three s or 3\n4\nWe can solve this by repeated addition, thus 3x or three quarters\n4\n3/4\nWe write3x=3x=3 4 4/4\n4\n4\nExampleWork out 2using repeated addition and with a diogram\n3\nSolution2expressed in a diagrom\n3\n2m\n3/12\n3\nLet us take three 2 s or 3\n5, 5\n5 � 5 2/5, 2, 6/5\n5\nDid you spot the short cut? Instead of adding we can solve our sum\nvery quickly by multiplying the numerator by the whole number\nNow take two 3s.\nLet us take three 25.\n22+2/5, 5 � 2 5/3x2, 5 6/5, 7\n3+3-6\n7\nI Or2x3-236\n0r3x 65, 15, 7\n5, 5\nFractions\nOXFORD",
   "tesseract": "Let us take three (fs or 3x |                                             Ci\nCe    rig   oy  vs  =   =        4°\nWe can solve this by repeated addition, thus: 3 x or three quarters.           y i\n\nWe write 3 x\n\niL\n4\nExample: Work out 2 x - , Using repeated addition and with a diagram.\n\nSolution: 2X : expressed in a diagram:\n\n1\n\nsell idl\n3. 3\nLet us take three : sor 3% —\n&    ;\n220 2\n55 5\n\nDid you spot the short cut? Instead of adding, we can solve our sum.\nvery quickly by multiplying the numerator by the whole number:\n\n2.                        Now take two 2s.\n5                                                                                 7",
   "legacyMerged": "Multiplication of fractions\nMultiplication of a fraction by a whole number\nWith the help of diagrams it becomes easy to understand\nmultiplication.of a fraction by a whole number.\nLet us take three (fs or 3x | Ci\n4\nWe can solve this by repeated addition, thus 3x or three quarters\n4\n3/4\nWe write3x=3x=3 4/4\n4\n4\nExampleWork out 2using repeated addition and with a diogram\n3\nSolution2expressed in a diagrom\n3\n2m\n3/12\n3\nLet us take three 2 s or 3\n5, 5\n5 � 5 2/5, 2, 6/5\n5\nDid you spot the short cut? Instead of adding we can solve our sum\nvery quickly by multiplying the numerator by the whole number\n2. Now take two 2s.\nLet us take three 25.\n22+2/5, 5 � 2 5/3x2, 5 6/5, 7\n3+3-6\n7\nI Or2x3-236\n0r3x 65, 15, 7\n5, 5\nFractions\nOXFORD\nCe rig oy vs = = 4°\n3. 3",
