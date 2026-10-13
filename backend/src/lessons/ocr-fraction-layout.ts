@@ -755,6 +755,7 @@ function lineIsFractionWorkbookNoise(line: string): boolean {
   if (/^15\s+3x4\/28/.test(t)) return true;
   if (/^=3\+5\+7\+/.test(t)) return true;
   if (/^=15 \+ 38/.test(t)) return true;
+  if (/^2\/42\s*÷/.test(t)) return true;
   if ((t.match(/\d\/\d/g) ?? []).length >= 3 && /,/.test(t) && !/\b(?:and|or|equal)\b/i.test(t)) {
     const bad = [...t.matchAll(/\b(\d{1,3})\/(\d{1,3})\b/g)].some(
       (m) => Number(m[2]) === 0 || Number(m[1]) > 20 || Number(m[2]) > 35,
@@ -793,7 +794,8 @@ export function polishFractionWorkbookPageText(text: string): string {
     .replace(/\bxhalf of a third\b/gi, '× (half of a third)')
     .replace(/\bWhat is the difference between xhalf\b/gi, 'What is the difference between × (half')
     .replace(/\bN Both are the same therefore\b/gi, 'Both are the same, therefore')
-    .replace(/\bWe write3x=3x=3 4 4\/4\b/gi, 'We write 3 × 3/4 = 9/4')
+    .replace(/\bWe write3x=3x=3\s*4\s*4\/4\b/gi, 'We write 3 × 3/4 = 9/4')
+    .replace(/\bWe write3x=3x=3 4\/4\b/gi, 'We write 3 × 3/4 = 9/4')
     .replace(/\bLet us take three s or 3\b/gi, 'Let us take three 3/4 or 3 × 1/4')
     .replace(/\bfraction by itself\?\s*REMEMDER\b/gi, 'What happens when we divide a fraction by itself?');
 
@@ -844,6 +846,15 @@ export function polishFractionWorkbookPageText(text: string): string {
       /What happens when the dividend is zero\?[\s\S]*?(?=\nFractions)/i,
       'What happens when the dividend is zero?\nExample: 0 ÷ 3/4 = 0\nThe result of 0 divided by any number is always 0.\n',
     );
+    if (
+      /What happens when we divide a fraction by 1\?/i.test(joined) &&
+      !/fraction by itself\?/i.test(joined)
+    ) {
+      joined = joined.replace(
+        /(We get the same fraction we started with\.)\n(?:Our answer is 1\.\n)?/i,
+        '$1\n\nWhat happens when we divide a fraction by itself?\nExample: 4/11 ÷ 4/11 = 1\nOur answer is 1.\n\n',
+      );
+    }
   }
 
   return joined;
