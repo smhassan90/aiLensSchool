@@ -708,7 +708,145 @@ export function repairFractionConclusionAndExampleLines(text: string): string {
     'Therefore, 28/40 in its lowest term is 7/10',
   );
   out = out.replace(/^2\.42\+7\s*$/gm, '2. 4 2/5 + 7 1/10');
+  out = out.replace(/^010\s*=\s*10\s*$/gm, '40÷4 = 10');
+  out = out.replace(/(2\. 4 2\/5 \+ 7 1\/10)\n[1-9]\n(?=Fractions)/g, '$1\n');
   return out;
+}
+
+function lineIsFractionWorkbookNoise(line: string): boolean {
+  const t = line.trim();
+  if (!t) return false;
+  if (/^REMEMDER\b/i.test(t)) return true;
+  if (/\bREMEMDER\b/i.test(t) && t.length < 48) return true;
+  if (/^similarly\d{2,}-\d{2,}-\d-\d$/i.test(t.replace(/\s/g, ''))) return true;
+  if (/^2-6$/.test(t)) return true;
+  if (/^4$/.test(t)) return true;
+  if (/^6$/.test(t)) return true;
+  if (/^3$/.test(t) && !/^\d+\.\s/.test(t)) return true;
+  if (/^[A-Z]$/.test(t)) return true;
+  if (/^2m$/i.test(t)) return true;
+  if (/^5m$/i.test(t)) return true;
+  if (/^\+\+4$/.test(t)) return true;
+  if (/^=?\d*\+$/.test(t) && t.length <= 6) return true;
+  if (/^3x7$/i.test(t)) return true;
+  if (/^3\/12$/.test(t)) return true;
+  if (/^Let us take three 2 s or 3$/i.test(t)) return true;
+  if (/^5, 5$/.test(t)) return true;
+  if (/^2, 2$/.test(t)) return true;
+  if (/^5-20$/.test(t)) return true;
+  if (/^5\. Lof=$/i.test(t)) return true;
+  if (/^L\.$/.test(t)) return true;
+  if (/^Let us take three 25\.?$/.test(t)) return true;
+  if (/^44=4/.test(t)) return true;
+  if (/^4=4=$/.test(t)) return true;
+  if (/^14$/.test(t)) return true;
+  if (/^N Both are the same/i.test(t)) return false;
+  if (/^N\s/.test(t) && t.length < 40) return true;
+  if (/^32\/3$/.test(t)) return true;
+  if (/^\d+\s+\d{2}\/\d{2}\s*÷\s*\d{2}\s+\d{2}\/\d{2}/.test(t)) return true;
+  if (/^0?304=0=0/.test(t.replace(/\s/g, ''))) return true;
+  if (/^55,\s*6\/19/.test(t)) return true;
+  if (/^or[zZ]x2|^0r3x|^I\s+Or2x/i.test(t)) return true;
+  if (/^22\+2\/5/.test(t)) return true;
+  if (/^3\+3-6$/.test(t)) return true;
+  if (/^7$/.test(t) && !/\//.test(t)) return false; // keep only in context — handled below
+  if (/^5 ÷ 5 2\/5/.test(t)) return true;
+  if (/^=15\+1\s+\d+$/.test(t)) return true;
+  if (/^15\s+3x4\/28/.test(t)) return true;
+  if (/^=3\+5\+7\+/.test(t)) return true;
+  if (/^=15 \+ 38/.test(t)) return true;
+  if ((t.match(/\d\/\d/g) ?? []).length >= 3 && /,/.test(t) && !/\b(?:and|or|equal)\b/i.test(t)) {
+    const bad = [...t.matchAll(/\b(\d{1,3})\/(\d{1,3})\b/g)].some(
+      (m) => Number(m[2]) === 0 || Number(m[1]) > 20 || Number(m[2]) > 35,
+    );
+    if (bad) return true;
+  }
+  return false;
+}
+
+/** Final readability pass for Oxford Fractions chapter uploads. */
+export function polishFractionWorkbookPageText(text: string): string {
+  let out = (text ?? '').trim();
+  if (!out || !/\bfractions\b/i.test(out)) return out;
+
+  if (/\bExercise\s+3[abc]\b/i.test(out)) {
+    out = out
+      .replace(/^>\s*/gm, '')
+      .replace(/Fill in the blanks\.\s*Fill in the blanks/gi, 'Fill in the blanks.');
+  }
+
+  out = out
+    .replace(/Now let us try this\.\s*Now Let us try this/gi, 'Now let us try this.')
+    .replace(
+      /(Now we will deal with addition, subtraction, multiplication, and)\s+Now we will deal with addition, subtraction, multiplication, and/gi,
+      '$1',
+    )
+    .replace(/\b2 ÷ 1\/3\b/gi, '2 ÷ 1/3 = 6')
+    .replace(/\beasy5 thirds\b/gi, 'easy: 6 thirds')
+    .replace(/\bExampleWork out\s*2using\b/gi, 'Example: Work out 2/5 using')
+    .replace(/\bExampleWork out\b/gi, 'Example: Work out')
+    .replace(/\bSolution2expressed\b/gi, 'Solution: 2/5 expressed')
+    .replace(/\bExumples\b/gi, 'Examples')
+    .replace(/\bLof(\d+)\b/gi, '1/2 of $1')
+    .replace(/\b1\/2 of 4 x4-2\b/gi, '1/2 of 4 = 1/2 × 4 = 2')
+    .replace(/\bx2=\s*2\/5\b/gi, '1/2 × 2 = 1')
+    .replace(/\bxhalf of a third\b/gi, '× (half of a third)')
+    .replace(/\bWhat is the difference between xhalf\b/gi, 'What is the difference between × (half')
+    .replace(/\bN Both are the same therefore\b/gi, 'Both are the same, therefore')
+    .replace(/\bWe write3x=3x=3 4 4\/4\b/gi, 'We write 3 × 3/4 = 9/4')
+    .replace(/\bLet us take three s or 3\b/gi, 'Let us take three 3/4 or 3 × 1/4')
+    .replace(/\bfraction by itself\?\s*REMEMDER\b/gi, 'What happens when we divide a fraction by itself?');
+
+  // Drop diagram crumbs before the add-fractions intro.
+  out = out.replace(/^(?:\d\/\d\n)+\d?\n(?=We can add and subtract)/i, '');
+
+  const lines = out.split(/\r?\n/);
+  const kept: string[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const raw = lines[i];
+    const t = raw.trim();
+    if (!t) {
+      kept.push(raw);
+      continue;
+    }
+    if (lineIsFractionWorkbookNoise(t)) continue;
+    // Lone denominator digit after a worked example prompt.
+    if (/^[1-9]$/.test(t) && i > 0 && /\+\s*\d+\s*\/\s*\d+/.test(lines[i - 1] ?? '')) {
+      continue;
+    }
+    if (/^7$/.test(t) && i > 0 && /3\+3-6/.test(lines[i - 1] ?? '')) continue;
+    if (/^5$/.test(t) && i > 0 && /÷/.test(lines[i - 1] ?? '')) continue;
+    if (/^4$/.test(t) && i > 0 && /three quarters|3\/4|1\/4$/i.test(lines[i - 1] ?? '')) continue;
+    if (/^3$/.test(t) && i > 0 && /diogram|diagrom/i.test(lines[i - 1] ?? '')) continue;
+    if (/^3$/.test(t) && i > 0 && /always 0/i.test(lines[i - 1] ?? '')) continue;
+    if (/^5, 5, 4$/.test(t)) continue;
+    kept.push(raw);
+  }
+
+  let joined = kept
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/(multiplication\.of)/gi, 'multiplication of')
+    .replace(/\bOur answer is I\b/g, 'Our answer is 1')
+    .replace(/\bwill be I\b/g, 'will be 1')
+    .trim();
+
+  if (/What happens when we divide a fraction by 1\?/i.test(joined)) {
+    joined = joined.replace(
+      /What happens when we divide a fraction by 1\?\s*Example:\s*\n[\s\S]*?We get the same fraction we started with\./i,
+      'What happens when we divide a fraction by 1?\nExample: 5/6 ÷ 1 = 5/6\nWe follow our rule (multiply by the reciprocal).\nWe get the same fraction we started with.',
+    );
+    joined = joined.replace(
+      /What happens when we divide a\s*\n?fraction by itself\?[\s\S]*?Our answer is 1\./i,
+      'What happens when we divide a fraction by itself?\nExample: 4/11 ÷ 4/11 = 1\nOur answer is 1.',
+    );
+    joined = joined.replace(
+      /What happens when the dividend is zero\?[\s\S]*?(?=\nFractions)/i,
+      'What happens when the dividend is zero?\nExample: 0 ÷ 3/4 = 0\nThe result of 0 divided by any number is always 0.\n',
+    );
+  }
+
+  return joined;
 }
 
 /**

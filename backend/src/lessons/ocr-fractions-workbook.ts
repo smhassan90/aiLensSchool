@@ -106,12 +106,33 @@ export function mergeOxfordFractionsWorkbookPageOcr(paddle: string, tesseract: s
 
   const pOnly = cleanMergedPageOcrText(p);
   const pMerged = cleanMergedPageOcrText(mergePaddleAndTesseractPageOcr(p, ''));
-  const tessBad = tesseractTooNoisyForFractionMerge(t);
+  const exercisePage = /\bExercise\s+3[abc]\b/i.test(p);
+  const tessBad = tesseractTooNoisyForFractionMerge(t) || exercisePage;
 
   if (tessBad || !t) {
-    return pickBestFractionWorkbookTranscript([pMerged, pOnly]);
+    const base = pickBestFractionWorkbookTranscript([pMerged, pOnly]);
+    return cleanMergedPageOcrText(supplementFractionExampleFromTesseract(base, t));
   }
 
-  const merged = cleanMergedPageOcrText(mergePaddleAndTesseractPageOcr(p, t));
+  let merged = cleanMergedPageOcrText(mergePaddleAndTesseractPageOcr(p, t));
+  merged = supplementFractionExampleFromTesseract(merged, t);
   return pickBestFractionWorkbookTranscript([merged, pMerged, pOnly]);
+}
+
+/** Pull a clean Example line from Tess when Paddle glues "ExampleWork out". */
+function supplementFractionExampleFromTesseract(merged: string, tesseract: string): string {
+  const m = (merged ?? '').trim();
+  const tess = (tesseract ?? '').trim();
+  if (!m || !tess) return m;
+  if (!/ExampleWork out|Solution2expressed/i.test(m)) return m;
+  const ex = tess.match(/Example:\s*Work out[^\n.]{0,80}/i);
+  const sol = tess.match(/Solution:\s*[^\n.]{0,80}/i);
+  let out = m;
+  if (ex) {
+    out = out.replace(/ExampleWork out[^\n]*/i, ex[0].replace(/\s+/g, ' ').trim());
+  }
+  if (sol && /Solution2expressed/i.test(out)) {
+    out = out.replace(/Solution2expressed[^\n]*/i, sol[0].replace(/\s+/g, ' ').trim());
+  }
+  return out;
 }

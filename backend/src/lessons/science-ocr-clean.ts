@@ -1,6 +1,7 @@
 import {
   reconstructStackedFractionsInOcrText,
   reconstructWorkedFractionMathInOcrText,
+  polishFractionWorkbookPageText,
   repairFractionConclusionAndExampleLines,
 } from './ocr-fraction-layout';
 
@@ -153,14 +154,22 @@ export function stripForeignScriptFromEnglishLesson(text: string): string {
 /** Drop REMEMBER sidebar box lines (right column) on fraction workbook pages. */
 export function stripFractionRememberSidebar(text: string): string {
   const value = (text ?? '').trim();
-  if (!/\bREMEMBER\b/i.test(value) || !/\bfractions\b/i.test(value)) return value;
+  if (!/\bfractions\b/i.test(value)) return value;
+  if (!/\b(?:REMEMBER|REMEMDER)\b/i.test(value)) return value;
   const lines = value.split(/\r?\n/);
   const out: string[] = [];
   let inRemember = false;
   for (const line of lines) {
     const t = line.trim();
-    if (/^REMEMBER\b/i.test(t)) {
+    if (/^REMEMBER\b/i.test(t) || /^REMEMDER\b/i.test(t)) {
       inRemember = true;
+      continue;
+    }
+    if (/\bREMEMDER\b/i.test(t)) {
+      const stripped = t.replace(/\s*REMEMDER\s*/gi, ' ').replace(/\s+/g, ' ').trim();
+      if (stripped.length >= 12 && !/^Example:/i.test(stripped)) {
+        out.push(stripped);
+      }
       continue;
     }
     if (inRemember) {
@@ -322,6 +331,9 @@ export function cleanMergedPageOcrText(text: string): string {
   joined = reconstructStackedFractionsInOcrText(joined);
   joined = repairFractionConclusionAndExampleLines(joined);
   joined = stripAbsurdCommaFractionLists(joined);
+  if (/\bFractions\b/i.test(joined)) {
+    joined = polishFractionWorkbookPageText(joined);
+  }
   joined = joined.replace(/\bOXEORD\b/g, 'OXFORD');
   joined = joined.replace(
     /\blowest term,?\s+when\s+L\s+is\s+the\b/gi,

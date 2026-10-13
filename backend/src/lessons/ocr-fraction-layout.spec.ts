@@ -7,6 +7,7 @@ import {
   reconstructStackedFractionsInOcrText,
   reconstructWorkedFractionMathInOcrText,
   splitGluedDigitsToMatchCount,
+  polishFractionWorkbookPageText,
 } from './ocr-fraction-layout';
 import { cleanMergedPageOcrText } from './science-ocr-clean';
 import { mergePaddleAndTesseractPageOcr } from './merge-paddle-tesseract-ocr';
@@ -28,6 +29,21 @@ describe('ocr-fraction-layout', () => {
 
   it('splits glued numerators to match denominator count', () => {
     expect(splitGluedDigitsToMatchCount('386910', 5)).toBe('3 8 6 9 10');
+  });
+
+  it('polishFractionWorkbookPageText removes sidebar crumbs and repairs Lof', () => {
+    const raw = `
+Examples:
+Lof4 x4-2
+2, 2
+Multiplication of a fraction by a fraction
+2/3, 3/4, 4/0, 2/33, 6 5/9
+Fractions
+`.trim();
+    const out = polishFractionWorkbookPageText(raw);
+    expect(out).toMatch(/1\/2 of 4/);
+    expect(out).not.toMatch(/4\/0/);
+    expect(out).not.toMatch(/^2, 2$/m);
   });
 
   it('does not rebuild numbered multi-fraction example prompts (1.3572 …)', () => {
