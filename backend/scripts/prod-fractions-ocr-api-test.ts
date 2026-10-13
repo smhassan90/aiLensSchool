@@ -176,7 +176,7 @@ async function ensureTestChapter(token: string, forcedId?: string): Promise<stri
       sectionId: math.sectionId,
       subjectId: math.subjectId,
       branchId: math.branchId,
-      chapterName: `${TEST_CHAPTER_PREFIX} fractions pages 2-4`,
+      chapterName: `${TEST_CHAPTER_PREFIX} fractions pages 2-7`,
       topicName: 'Agent OCR calibration — do not use for teaching',
     }),
   });
@@ -184,29 +184,60 @@ async function ensureTestChapter(token: string, forcedId?: string): Promise<stri
 }
 
 function parseArgs() {
-  const page = process.argv.find((a) => a.startsWith('--page='))?.split('=')[1] ?? '2';
+  const pagesArg = process.argv.find((a) => a.startsWith('--pages='))?.split('=')[1];
+  const pageSingle = process.argv.find((a) => a.startsWith('--page='))?.split('=')[1];
+  const pages = (pagesArg ?? pageSingle ?? '2')
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
   const chapterId = process.argv.find((a) => a.startsWith('--chapter-id='))?.split('=')[1];
-  const replace = process.argv.includes('--replace');
-  return { page, chapterId, replace };
+  const replace = process.argv.includes('--replace') || process.argv.includes('--replace-all');
+  const waitSha = process.argv.find((a) => a.startsWith('--wait-sha='))?.split('=')[1];
+  return { pages, chapterId, replace, waitSha };
 }
 
-async function main() {
-  const { page, chapterId: argChapterId, replace } = parseArgs();
+async function fetchLiveCommit(): Promise<string | null> {
+  try {
+    const h = await fetch(`${BASE}/health`).then((r) => r.json()) as ApiWrap<{ commit?: string }>;
+    return h?.data?.commit ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function waitForDeploy(shaPrefix: string, maxMs = 600_000) {
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    const live = await fetchLiveCommit();
+    if (live?.startsWith(shaPrefix)) return live;
+    await sleep(25_000);
+  }
+  throw new Error(`Deploy wait timed out (wanted ${shaPrefix})`);
+}
+
+function resolveReplaceSourceId(sources: PageSource[], page: string): string | undefined {
+  const hit = sources.find((s) => s.label === `${page}.jpg` || s.label === `Page ${page}`);
+  if (hit) return hit.id;
+  const sorted = [...sources].sort((a, b) => a.pageOrder - b.pageOrder);
+  const idx = Number(page) - 2;
+  if (idx >= 0 && idx < sorted.length) return sorted[idx]?.id;
+  return undefined;
+}
+
+async function runOnePage(
+  token: string,
+  chapterId: string,
+  page: string,
+  replace: boolean,
+  liveCommit: string | null,
+) {
   const filePath = join(UPLOAD_DIR, `${page}.jpg`);
   if (!existsSync(filePath)) throw new Error(`Missing ${filePath}`);
-
-  const token = await login();
-  const chapterId = await ensureTestChapter(token, argChapterId);
 
   let replaceSourceId: string | undefined;
   if (replace) {
     const lesson = await apiJson<Lesson>(`/lessons/${chapterId}`, token);
-    const sources = lesson.pageSources ?? [];
-    const hit = sources.find((s) => s.label === `${page}.jpg` || s.label === `Page ${page}`);
-    if (hit) replaceSourceId = hit.id;
-    else if (sources.length >= Number(page) - 1) {
-      replaceSourceId = sources[Number(page) - 2]?.id;
-    }
+    replaceSourceId = resolveReplaceSourceId(lesson.pageSources ?? [], page);
   }
 
   await uploadPage(token, chapterId, filePath, replaceSourceId);
@@ -215,40 +246,63 @@ async function main() {
   const sources = lesson.pageSources ?? [];
   const target =
     sources.find((s) => s.label?.includes(`${page}.jpg`)) ??
-    sources.sort((a, b) => a.pageOrder - b.pageOrder)[Number(page) - 2] ??
+    [...sources].sort((a, b) => a.pageOrder - b.pageOrder)[Number(page) - 2] ??
     sources[sources.length - 1];
 
-  if (!target) throw new Error('No page source after upload');
+  if (!target) throw new Error(`No page source after upload for page ${page}`);
 
+  const merged = target.mergedOcrText ?? '';
   const report = {
     at: new Date().toISOString(),
     apiBase: BASE,
+    liveCommit,
     chapterId,
     page,
     sourceId: target.id,
     label: target.label,
     paddleOcrText: target.paddleOcrText ?? '',
     tesseractOcrText: target.tesseractOcrText ?? '',
-    mergedOcrText: target.mergedOcrText ?? '',
+    mergedOcrText: merged,
     ocrText: target.fetchedText ?? '',
     replaced: Boolean(replaceSourceId),
+    signals: {
+      hasCjk: /[\u4e00-\u9fff]/.test(merged),
+      hasDivChain: /28÷2|40÷2/.test(merged),
+      hasReduce2840: /Reduce\s+28\/40/i.test(merged),
+      hasPix2Array: /array\s+l\s+l/i.test(merged),
+    },
   };
 
   mkdirSync(OUT_DIR, { recursive: true });
   const outPath = join(OUT_DIR, `prod-page-${page}.json`);
   writeFileSync(outPath, JSON.stringify(report, null, 2));
+  return { page, outPath, report };
+}
+
+async function main() {
+  const { pages, chapterId: argChapterId, replace, waitSha } = parseArgs();
+  if (waitSha) await waitForDeploy(waitSha);
+
+  const token = await login();
+  const chapterId = await ensureTestChapter(token, argChapterId);
+  const liveCommit = await fetchLiveCommit();
+
+  const results = [];
+  for (const page of pages) {
+    results.push(await runOnePage(token, chapterId, page, replace, liveCommit));
+  }
 
   console.log(
     JSON.stringify({
       ok: true,
+      liveCommit,
       chapterId,
-      sourceId: target.id,
-      page,
-      outPath,
-      paddleChars: report.paddleOcrText.length,
-      tesseractChars: report.tesseractOcrText.length,
-      mergedChars: report.mergedOcrText.length,
-      ocrChars: report.ocrText.length,
+      results: results.map((r) => ({
+        page: r.page,
+        outPath: r.outPath,
+        mergedChars: r.report.mergedOcrText.length,
+        signals: r.report.signals,
+      })),
     }),
   );
 }

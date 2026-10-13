@@ -1,6 +1,6 @@
 import { readEnv } from '../common/env';
 import { runPaddleOcrOnBuffer } from './paddle-ocr.runner';
-import { cleanMergedPageOcrText } from './science-ocr-clean';
+import { cleanMergedPageOcrText, containsForeignScriptNoise } from './science-ocr-clean';
 import type { OcrStructuredLine } from './ocr-structured-line';
 import { detectUncertainMathRegions, type MathRegion } from './ocr-math-region-detect';
 import { cropPageRegion, type RegionPreprocessVariant } from './ocr-region-image-prep';
@@ -55,6 +55,7 @@ export function scoreFractionOcrText(text: string): number {
   s += (t.match(/\d\s*÷\s*\d/g) ?? []).length * 2;
   if (/\d{7,}/.test(t.replace(/\s/g, ''))) s -= 8;
   if ((t.match(/\|/g) ?? []).length > 3) s -= 4;
+  if (/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(t)) s -= 40;
   return s;
 }
 
@@ -335,6 +336,7 @@ export async function applyMathRegionRecovery(input: {
       const henceDup =
         (cleaned.match(/\bHence\b/gi) ?? []).length - (before.match(/\bHence\b/gi) ?? []).length;
       if (
+        !containsForeignScriptNoise(cleaned) &&
         scoreFractionOcrText(cleaned) >= scoreFractionOcrText(before) &&
         henceDup <= 0
       ) {

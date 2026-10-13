@@ -1,6 +1,7 @@
 import {
   reconstructStackedFractionsInOcrText,
   reconstructWorkedFractionMathInOcrText,
+  repairFractionConclusionAndExampleLines,
 } from './ocr-fraction-layout';
 
 /**
@@ -136,6 +137,78 @@ export function repairWorkbookFractionIntroGluedOps(text: string): string {
     .replace(/\bdifferent-types\b/gi, 'different types');
 }
 
+/** CJK / Hangul in English math lessons is almost always bad Pix2Text or wrong model output. */
+export function containsForeignScriptNoise(text: string): boolean {
+  return /[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(text ?? '');
+}
+
+export function stripForeignScriptFromEnglishLesson(text: string): string {
+  const value = (text ?? '').trim();
+  if (!value || !containsForeignScriptNoise(value)) return value;
+  const lines = value.split(/\r?\n/).filter((line) => !containsForeignScriptNoise(line));
+  const joined = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return joined.length >= value.length * 0.25 ? joined : value.replace(/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]+/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
+}
+
+/** Drop REMEMBER sidebar box lines (right column) on fraction workbook pages. */
+export function stripFractionRememberSidebar(text: string): string {
+  const value = (text ?? '').trim();
+  if (!/\bREMEMBER\b/i.test(value) || !/\bfractions\b/i.test(value)) return value;
+  const lines = value.split(/\r?\n/);
+  const out: string[] = [];
+  let inRemember = false;
+  for (const line of lines) {
+    const t = line.trim();
+    if (/^REMEMBER\b/i.test(t)) {
+      inRemember = true;
+      continue;
+    }
+    if (inRemember) {
+      if (/^Fractions$/i.test(t) || /^OXFORD/i.test(t)) {
+        inRemember = false;
+        out.push(line);
+      }
+      continue;
+    }
+    out.push(line);
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** Remove duplicate chapter intro when Paddle stitched two opening sentences. */
+export function dedupeFractionChapterIntro(text: string): string {
+  const lines = (text ?? '').split(/\r?\n/);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of lines) {
+    const key = line.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    const isIntro =
+      key.startsWith('now we will deal with') ||
+      key.startsWith('division of different types of fractions');
+    if (isIntro && key.length >= 20) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    out.push(line);
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** Drop obvious margin-column crumbs (| pipes, lone “i”, “ke”). */
+export function stripFractionMarginColumnCrumbs(text: string): string {
+  const lines = (text ?? '').split(/\r?\n/);
+  const kept = lines.filter((line) => {
+    const t = line.trim();
+    if (!t) return true;
+    if (/^[ki]\s/i.test(t) && t.length < 120) return false;
+    if (/^=\s*$/i.test(t)) return false;
+    if (/^[|]\s*/.test(t) && (t.match(/\|/g) ?? []).length >= 2) return false;
+    if (/^(?:“Tie|iH|no)$/i.test(t)) return false;
+    return true;
+  });
+  return kept.join('\n');
+}
+
 /** Drop Pix2Text/LaTeX lines that collapse to spaced letter soup. */
 export function stripGarbledPix2TextLines(text: string): string {
   const lines = (text ?? '').split(/\r?\n/);
@@ -146,7 +219,7 @@ export function stripGarbledPix2TextLines(text: string): string {
     if (/\barray\b/i.test(t) && /\b[a-z]\s+[a-z]\s+[a-z]/i.test(t)) return false;
     const spacedLetters = t.match(/\b[a-z]\s+[a-z]\s+[a-z]\s+[a-z]/i);
     if (spacedLetters && !/\d\s*\/\s*\d/.test(t) && !/÷/.test(t)) return false;
-    if (/[\u4e00-\u9fff]/.test(t) && t.length < 40) return false;
+    if (containsForeignScriptNoise(t)) return false;
     return true;
   });
   return kept.join('\n');
@@ -164,7 +237,11 @@ export function cleanMergedOcrLine(line: string): string {
 
 export function cleanMergedPageOcrText(text: string): string {
   let value = repairWorkbookFractionIntroGluedOps((text ?? '').trim());
+  value = stripForeignScriptFromEnglishLesson(value);
   value = stripGarbledPix2TextLines(value);
+  value = dedupeFractionChapterIntro(value);
+  value = stripFractionMarginColumnCrumbs(value);
+  value = stripFractionRememberSidebar(value);
   if (!value) return '';
   // Literary English: only collapse obvious digit dupes / confidence junk; never rewrite story prose.
   if (LITERARY_KEEP_CUE.test(value)) {
@@ -182,6 +259,7 @@ export function cleanMergedPageOcrText(text: string): string {
   // Worked ÷ chains before generic digit-row pairing (282=142=7 must not become 2/4…).
   joined = reconstructWorkedFractionMathInOcrText(joined);
   joined = reconstructStackedFractionsInOcrText(joined);
+  joined = repairFractionConclusionAndExampleLines(joined);
   // Physics pages only — on fraction workbooks `5 10 -1` is 5/10, not 5×10^-1.
   const fractionWorkbook =
     /\bfraction/i.test(joined) &&

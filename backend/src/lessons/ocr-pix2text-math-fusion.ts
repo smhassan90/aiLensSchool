@@ -20,7 +20,7 @@ import {
   spliceRegionIntoTranscript,
   subjectEligibleForMathRegionRecovery,
 } from './ocr-math-region-recovery';
-import { cleanMergedPageOcrText } from './science-ocr-clean';
+import { cleanMergedPageOcrText, containsForeignScriptNoise } from './science-ocr-clean';
 
 export type Pix2TextRegionOutput = {
   regionId: string;
@@ -258,6 +258,10 @@ export async function applyPix2TextMathCropFusion(input: {
     const henceDup =
       (cleaned.match(/\bHence\b/gi) ?? []).length - (before.match(/\bHence\b/gi) ?? []).length;
     if (storyDup > 0 || henceDup > 0) {
+      skippedRegions.push(region.id);
+      continue;
+    }
+    if (containsForeignScriptNoise(cleaned) || containsForeignScriptNoise(plain)) {
       skippedRegions.push(region.id);
       continue;
     }

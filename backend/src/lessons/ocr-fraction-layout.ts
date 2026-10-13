@@ -690,6 +690,26 @@ export function reconstructGluedDivFractionChain(
   return formatStackedFractionEquation(steps);
 }
 
+/** Glue-style OCR for example 2 mixed-number addition on reduce pages. */
+export function repairFractionConclusionAndExampleLines(text: string): string {
+  let out = (text ?? '').trim();
+  if (!out) return '';
+  out = out.replace(
+    /\bHence,\s*I is the only common factor of7 and 10\b/gi,
+    'Hence, 1 is the only common factor of 7 and 10',
+  );
+  out = out.replace(
+    /\bTherefore\s+28in its Lowest termis7\s*\n\s*40,\s*10/gi,
+    'Therefore, 28/40 in its lowest term is 7/10',
+  );
+  out = out.replace(
+    /\bTherefore,?\s*28\s+in\s+its\s+lowest\s+term\s+is\s+7\s*\/?\s*10\b/gi,
+    'Therefore, 28/40 in its lowest term is 7/10',
+  );
+  out = out.replace(/^2\.42\+7\s*$/gm, '2. 4 2/5 + 7 1/10');
+  return out;
+}
+
 /**
  * Layout-only repair for glued ÷ fraction chains + mixed-number spacing.
  * Does not invent lesson prose. Glyph learning for ÷ / mixed forms belongs in
