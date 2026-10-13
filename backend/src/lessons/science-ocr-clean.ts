@@ -199,6 +199,28 @@ export function dedupeFractionChapterIntro(text: string): string {
   return joined;
 }
 
+/** Lines that are clearly not human-readable lesson text. */
+export function stripHumanUnreadableOcrLines(text: string): string {
+  const lines = (text ?? '').split(/\r?\n/);
+  const kept = lines.filter((line) => {
+    const t = line.trim();
+    if (!t) return true;
+    if (/\boldatang\b|777\s+olt|\bPE Er re\b/i.test(t)) return false;
+    if (/^(?:Examples:\s*)?(?:[A-Z]\s+){2,}(?:\|[A-Z]\s*)+[A-Z]?$/i.test(t)) return false;
+    if (/^[A-Z]{1,2}\s+[A-Z]{1,2}\s+\|/.test(t) && t.length < 80) return false;
+    if (/^\d\)\s*x\s*$/i.test(t)) return false;
+    const letters = t.replace(/[^a-zA-Z]/g, '');
+    if (letters.length >= 10) {
+      const vowels = (letters.match(/[aeiouAEIOU]/g) ?? []).length;
+      if (vowels / letters.length < 0.12 && !/\d+\s*\/\s*\d/.test(t) && !/÷/.test(t)) {
+        return false;
+      }
+    }
+    return true;
+  });
+  return kept.join('\n');
+}
+
 /** Drop obvious margin-column crumbs (| pipes, lone “i”, “ke”). */
 export function stripFractionMarginColumnCrumbs(text: string): string {
   const lines = (text ?? '').split(/\r?\n/);
@@ -246,6 +268,7 @@ export function cleanMergedPageOcrText(text: string): string {
   value = stripGarbledPix2TextLines(value);
   value = dedupeFractionChapterIntro(value);
   value = stripFractionMarginColumnCrumbs(value);
+  value = stripHumanUnreadableOcrLines(value);
   value = stripFractionRememberSidebar(value);
   if (!value) return '';
   // Literary English: only collapse obvious digit dupes / confidence junk; never rewrite story prose.

@@ -90,6 +90,10 @@ import {
   mathCellLayoutPipelineEnabled,
 } from './ocr-math-cell-pipeline';
 import { applyPix2TextMathCropFusion } from './ocr-pix2text-math-fusion';
+import {
+  shouldSkipOrientHintLessonBlend,
+  skipExperimentalMathFusionOnFractionsWorkbook,
+} from './ocr-fractions-workbook';
 import { pix2textMathCropsEnabled } from './pix2text-math.runner';
 import type { OcrStructuredLine } from './ocr-structured-line';
 import { OcrUploadProgressService } from './ocr-upload-progress.service';
@@ -756,12 +760,15 @@ export class LessonsService {
     const englishPrimary = ocrLanguagesForSubject(subject.name) === 'eng';
     const orientHint =
       looksLikeGarbledLatinOcr(orientOcrText) ? '' : (orientOcrText ?? '').trim();
+    const skipOrient = shouldSkipOrientHintLessonBlend(merged, orientHint, paddle);
     const lessonSource = englishPrimary
-      ? preferEnglishLessonPageTranscript(merged, orientHint)
+      ? skipOrient
+        ? merged
+        : preferEnglishLessonPageTranscript(merged, orientHint)
       : pickBetterPageTranscript(merged, orientHint);
     const text = filterPageTextForLessonAssembly(lessonSource, filterOpts);
     if (text.trim() || merged.trim()) {
-      return { text, merged };
+      return { text: text || merged, merged };
     }
     if (isPagePhotoTextReadable(orientOcrText)) {
       return {
@@ -812,12 +819,16 @@ export class LessonsService {
     let ruleOcrText = rule.text;
     recordTextBoundary(getOcrDiagnosticSession(), 'rule_merge_merged', ruleMerged);
     recordTextBoundary(getOcrDiagnosticSession(), 'rule_merge_ocr_text', ruleOcrText);
+    const skipMathFusion = skipExperimentalMathFusionOnFractionsWorkbook(
+      `${ruleMerged}\n${paddle}\n${tesseract}`,
+    );
+
     if (
       options?.pageImageBuffer?.length &&
       options.pageImageWidth &&
       options.pageImageHeight
     ) {
-      if (mathCellLayoutPipelineEnabled()) {
+      if (mathCellLayoutPipelineEnabled() && !skipMathFusion) {
         recordOcrDiagnosticEvent({
           stage: 'branch_math_cell_layout',
           branchEntered: true,
@@ -861,7 +872,7 @@ export class LessonsService {
           branchSkipReason: 'OCR_MATH_CELL_LAYOUT not enabled',
         });
       }
-      if (mathRegionRecoveryEnabled()) {
+      if (mathRegionRecoveryEnabled() && !skipMathFusion) {
         recordOcrDiagnosticEvent({
           stage: 'branch_math_region_recovery',
           branchEntered: true,
@@ -900,7 +911,7 @@ export class LessonsService {
           branchSkipReason: 'OCR_MATH_REGION_RETRY not enabled',
         });
       }
-      if (pix2textMathCropsEnabled()) {
+      if (pix2textMathCropsEnabled() && !skipMathFusion) {
         recordOcrDiagnosticEvent({
           stage: 'branch_pix2text_math_crops',
           branchEntered: true,
@@ -1021,8 +1032,11 @@ export class LessonsService {
 
     const orientHint =
       looksLikeGarbledLatinOcr(orientOcrText) ? '' : (orientOcrText ?? '').trim();
+    const skipOrientFinalize = shouldSkipOrientHintLessonBlend(merged, orientHint, paddle);
     const lessonSource = englishPrimary
-      ? preferEnglishLessonPageTranscript(merged, orientHint)
+      ? skipOrientFinalize
+        ? merged
+        : preferEnglishLessonPageTranscript(merged, orientHint)
       : pickBetterPageTranscript(merged, orientHint);
     const text = filterPageTextForLessonAssembly(lessonSource, filterOpts);
     if (text.trim() || merged.trim()) {

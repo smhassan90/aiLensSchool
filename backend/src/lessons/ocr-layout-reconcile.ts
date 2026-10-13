@@ -1,4 +1,9 @@
+import { isMathScienceSubjectName } from '../common/math-lesson-text';
 import { isEnglishPrimarySubject } from './ocr-subject-lang';
+import {
+  isOxfordFractionsWorkbookPage,
+  mergeOxfordFractionsWorkbookPageOcr,
+} from './ocr-fractions-workbook';
 import { mergePaddleAndTesseractPageOcr, ocrLinesDuplicate } from './merge-paddle-tesseract-ocr';
 import { cleanMergedPageOcrText, repairWorkbookFractionIntroGluedOps } from './science-ocr-clean';
 import { stripInterleavedWeblinkSidebar } from './sidebar-layout-ocr';
@@ -234,11 +239,16 @@ function hasUsableStructure(input: PageOcrStructuredInput): boolean {
  */
 export function reconcilePageOcr(input: PageOcrStructuredInput): PageOcrReconcileResult {
   const warnings: string[] = [];
-  const legacy = cleanMergedPageOcrText(
-    stripInterleavedWeblinkSidebar(
-      mergePaddleAndTesseractPageOcr(input.paddle, input.tesseract),
-    ),
-  );
+  const workbook =
+    isMathScienceSubjectName(input.subjectName) &&
+    isOxfordFractionsWorkbookPage(`${input.paddle}\n${input.tesseract}`);
+  const legacy = workbook
+    ? mergeOxfordFractionsWorkbookPageOcr(input.paddle, input.tesseract)
+    : cleanMergedPageOcrText(
+        stripInterleavedWeblinkSidebar(
+          mergePaddleAndTesseractPageOcr(input.paddle, input.tesseract),
+        ),
+      );
 
   if (!hasUsableStructure(input)) {
     const flat = dedupeNearDuplicateLines(legacy.split(/\r?\n/))
