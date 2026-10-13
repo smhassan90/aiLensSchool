@@ -191,7 +191,12 @@ export function dedupeFractionChapterIntro(text: string): string {
     }
     out.push(line);
   }
-  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  let joined = out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  joined = joined.replace(
+    /\b(division of different types of fractions)\s+\1\b/gi,
+    '$1',
+  );
+  return joined;
 }
 
 /** Drop obvious margin-column crumbs (| pipes, lone “i”, “ke”). */

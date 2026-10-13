@@ -24,6 +24,7 @@ async function apiJson<T>(
   path: string,
   token: string,
   init?: RequestInit,
+  attempt = 0,
 ): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
@@ -48,6 +49,10 @@ async function apiJson<T>(
       typeof body === 'object' && body && 'message' in body
         ? String((body as { message: unknown }).message)
         : text.slice(0, 300);
+    if ((res.status === 429 || /too many requests/i.test(msg)) && attempt < 12) {
+      await sleep(8000 + attempt * 4000);
+      return apiJson<T>(path, token, init, attempt + 1);
+    }
     throw new Error(`HTTP ${res.status} ${path}: ${msg}`);
   }
   const wrapped = body as ApiWrap<T> | T;
@@ -123,7 +128,7 @@ async function pollOcrProgress(
     const phase = p?.phase ?? '';
     if (phase === 'done' || phase === 'complete' || phase === 'finished') return p;
     if (phase === 'error') throw new Error(p.message ?? 'OCR progress error');
-    await sleep(2500);
+    await sleep(5000);
   }
   throw new Error('OCR progress timed out');
 }
@@ -290,6 +295,7 @@ async function main() {
   const results = [];
   for (const page of pages) {
     results.push(await runOnePage(token, chapterId, page, replace, liveCommit));
+    await sleep(12_000);
   }
 
   console.log(
