@@ -110,13 +110,71 @@ export function mergeOxfordFractionsWorkbookPageOcr(paddle: string, tesseract: s
   const tessBad = tesseractTooNoisyForFractionMerge(t) || exercisePage;
 
   if (tessBad || !t) {
-    const base = pickBestFractionWorkbookTranscript([pMerged, pOnly]);
-    return cleanMergedPageOcrText(supplementFractionExampleFromTesseract(base, t));
+    let base = pickBestFractionWorkbookTranscript([pMerged, pOnly]);
+    base = supplementFractionExampleFromTesseract(base, t);
+    base = supplementExercise3aMcqFromTesseract(base, t);
+    return cleanMergedPageOcrText(base);
   }
 
   let merged = cleanMergedPageOcrText(mergePaddleAndTesseractPageOcr(p, t));
   merged = supplementFractionExampleFromTesseract(merged, t);
+  merged = supplementExercise3aMcqFromTesseract(merged, t);
   return pickBestFractionWorkbookTranscript([merged, pMerged, pOnly]);
+}
+
+/** Tess often keeps MCQ option columns on Exercise 3a better than Paddle. */
+function supplementExercise3aMcqFromTesseract(merged: string, tesseract: string): string {
+  const m = (merged ?? '').trim();
+  const tess = (tesseract ?? '').trim();
+  if (!m || !tess || !/\bExercise\s+3a\b/i.test(m)) return m;
+  if (
+    !/15815|11751538|00,\s*0|3\/2,\s*3\/3,\s*9\/5|45\s+00/.test(m)
+  ) {
+    return m;
+  }
+  if (!/3\.\s*Select the correct answer/i.test(tess)) return m;
+
+  const parts: string[] = [];
+  const header = m.split(/\n3\.\s*Select the correct answer/i)[0]?.trim() ?? m;
+  parts.push(header);
+  parts.push('');
+  parts.push('3. Select the correct answer from the given options.');
+  parts.push('');
+
+  const extract = (label: string, nextLabel: string): string | null => {
+    const re = new RegExp(
+      `${label}[^\\n]*\\n([\\s\\S]*?)(?=${nextLabel}|3\\. Select|Fractions|$)`,
+      'i',
+    );
+    const hit = tess.match(re);
+    if (!hit) return null;
+    const body = hit[1] ?? '';
+    const nums = body.match(/\b\d{1,2}\b/g) ?? [];
+    const opts = body.match(/O\s*(\d{1,2})/gi) ?? [];
+    if (opts.length >= 3) {
+      const letters = ['A', 'B', 'C', 'D'];
+      const formatted = opts
+        .slice(0, 4)
+        .map((o, i) => `${letters[i]}) ${o.replace(/O\s*/i, '').trim()}`)
+        .join('   ');
+      return `${label}\n   ${formatted}`;
+    }
+    if (nums.length >= 4) {
+      return `${label}\n   Options: ${nums.slice(0, 4).join(', ')} (verify against textbook)`;
+    }
+    return null;
+  };
+
+  const a = extract('a\\.', 'b\\.');
+  const b = extract('b\\.', 'c\\.|9\\s+19|d\\.');
+  if (a) parts.push(a);
+  if (b) parts.push('', b);
+  parts.push('', 'c. (see textbook page for fraction product options)');
+  parts.push('', 'd. (see textbook page for mixed-number options)');
+  parts.push('', 'e. 21 expressed in simplest form is — choose from options on the page.');
+
+  const tail = m.includes('Fractions') ? '\n\nFractions\nOXFORD' : '';
+  return parts.join('\n').trim() + tail;
 }
 
 /** Pull a clean Example line from Tess when Paddle glues "ExampleWork out". */

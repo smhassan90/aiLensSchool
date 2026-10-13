@@ -765,6 +765,30 @@ function lineIsFractionWorkbookNoise(line: string): boolean {
   return false;
 }
 
+function lineIsExercise3aNoise(line: string): boolean {
+  const t = line.trim();
+  if (!t) return false;
+  if (/^\d{6,}$/.test(t.replace(/\s/g, ''))) return true;
+  if (/^15815$/.test(t)) return true;
+  if (/11751538/.test(t)) return true;
+  if (/^00\s*0$/.test(t)) return true;
+  if (/^45\s+00$/.test(t)) return true;
+  if (/^WF$/i.test(t)) return true;
+  if (/^5m$/i.test(t)) return true;
+  if (/^4565/.test(t)) return true;
+  if (/65\s+30\/45\s*÷/.test(t)) return true;
+  if (/^3\/2,\s*3\/3,\s*9\/5/.test(t)) return true;
+  if (/^2\/5,\s*45\/5$/.test(t)) return true;
+  if (/is equal to 59\/16/.test(t)) return true;
+  if (/^00,\s*0$/.test(t)) return true;
+  if (/^33,\s*99\/2$/.test(t)) return true;
+  if (/^d\.\s*is equal\.to$/i.test(t)) return true;
+  if (/^9\s+19$/.test(t)) return true;
+  if (/^12\s+30$/.test(t)) return true;
+  if (/^15\s+13\s+33\s+3$/.test(t)) return true;
+  return false;
+}
+
 /** Final readability pass for Oxford Fractions chapter uploads. */
 export function polishFractionWorkbookPageText(text: string): string {
   let out = (text ?? '').trim();
@@ -797,7 +821,19 @@ export function polishFractionWorkbookPageText(text: string): string {
     .replace(/\bWe write3x=3x=3\s*4\s*4\/4\b/gi, 'We write 3 × 3/4 = 9/4')
     .replace(/\bWe write3x=3x=3 4\/4\b/gi, 'We write 3 × 3/4 = 9/4')
     .replace(/\bLet us take three s or 3\b/gi, 'Let us take three 3/4 or 3 × 1/4')
-    .replace(/\bfraction by itself\?\s*REMEMDER\b/gi, 'What happens when we divide a fraction by itself?');
+    .replace(/\bfraction by itself\?\s*REMEMDER\b/gi, 'What happens when we divide a fraction by itself?')
+    .replace(
+      /1\.3572\s+2\.\s*3-?323/gi,
+      '1. Add: 3 3/7 + 5 3/4 + 7 1/28\n2. Subtract: 6 2/5 - 3 4/15 - 2 1/30',
+    )
+    .replace(/Solution:\s*Solution:/gi, 'Solution:')
+    .replace(
+      /Both are the same, therefore\s*\n3 2\/6\b/gi,
+      'Both are the same, therefore:\n1/2 × 1/3 = 1/3 × 1/2 = 1/6',
+    )
+    .replace(/^4\. Five halves 5\s*$/gm, '4. Five halves: 5 × 1/2 = 5/2 = 2 1/2');
+
+  const isExercise3a = /\bExercise\s+3a\b/i.test(out);
 
   // Drop diagram crumbs before the add-fractions intro.
   out = out.replace(/^(?:\d\/\d\n)+\d?\n(?=We can add and subtract)/i, '');
@@ -812,6 +848,7 @@ export function polishFractionWorkbookPageText(text: string): string {
       continue;
     }
     if (lineIsFractionWorkbookNoise(t)) continue;
+    if (isExercise3a && lineIsExercise3aNoise(t)) continue;
     // Lone denominator digit after a worked example prompt.
     if (/^[1-9]$/.test(t) && i > 0 && /\+\s*\d+\s*\/\s*\d+/.test(lines[i - 1] ?? '')) {
       continue;
