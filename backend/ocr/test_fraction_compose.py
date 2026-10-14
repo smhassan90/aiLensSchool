@@ -8,6 +8,7 @@ import re
 
 from paddle_ocr_worker import (
     cluster_reading_lines,
+    compose_chemical_subscripts,
     compose_fraction_division_ops,
     compose_stacked_fractions,
     text_from_lines_with_fractions,
@@ -78,6 +79,17 @@ class FractionComposeTest(unittest.TestCase):
         band = cluster_reading_lines(lines)
         self.assertEqual(len(band), 1)
         self.assertIn("3/4,", band[0])
+
+    def test_compose_chemical_subscripts(self) -> None:
+        # H with lowered small "2" box to the right (H₂O fragment)
+        lines = [
+            {"text": "H", "x0": 40, "y0": 40, "x1": 55, "y1": 72},
+            {"text": "2", "x0": 56, "y0": 52, "x1": 66, "y1": 66},
+            {"text": "O", "x0": 70, "y0": 40, "x1": 85, "y1": 72},
+        ]
+        composed = compose_chemical_subscripts(lines)
+        texts = [r["text"] for r in composed]
+        self.assertIn("H₂", "".join(texts))
 
 
 if __name__ == "__main__":

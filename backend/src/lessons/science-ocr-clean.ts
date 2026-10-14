@@ -4,6 +4,11 @@ import {
   polishFractionWorkbookPageText,
   repairFractionConclusionAndExampleLines,
 } from './ocr-fraction-layout';
+import {
+  dedupeInlineRepeatedClauses,
+  looksLikeChemistryLessonPage,
+  reconstructChemistryFormulasInOcrText,
+} from './ocr-chemistry-formulas';
 
 /**
  * Light, page-agnostic OCR hygiene after Paddle+Tesseract merge.
@@ -21,7 +26,7 @@ const STEM_ACRONYM_KEEP =
   /^(?:THE|AND|FOR|SHM|RMS|LHS|RHS|DNA|OCR|USB|PDF|HTTP|HTML|CSS|API|CPU|GPU|NASA|WHO|UN|USA|UAE|UK|SI|KE|PE|EMF|AC|DC)$/;
 
 const SCIENCE_PAGE_CUE =
-  /\b(?:numericals?|wavelength|frequency|amplitude|pendulum|slinky|ripple\s*tank|ms\^-?1|m\/s|kHz|section\s*\(\s*[a-c]\s*\)|worked\s*example|simple\s*harmonic|transverse|longitudinal|diffraction|refraction|concept\s*map|self[- ]?assessment|summary|angular\s*displacement|restoring\s*force|square\s*root|infty|infinity|electrostatics?|coulomb|electroscope|capacitor|capacitance|induction|dielectric|electric\s*field|electric\s*potential|potential\s*difference|point\s*charges?|μF|uF\b|farad)\b|ms[™®]|v\s*=\s*f|T\s*=\s*2|sin\s*(?:θ|the?ta)|cos\s*(?:θ|the?ta)|a\s*∝|Q\s*=\s*C\s*V|F\s*=\s*[kK]|[λμνπωθπ√∞≅≈ε₀]/i;
+  /\b(?:numericals?|wavelength|frequency|amplitude|pendulum|slinky|ripple\s*tank|ms\^-?1|m\/s|kHz|section\s*\(\s*[a-c]\s*\)|worked\s*example|simple\s*harmonic|transverse|longitudinal|diffraction|refraction|concept\s*map|self[- ]?assessment|summary|angular\s*displacement|restoring\s*force|square\s*root|infty|infinity|electrostatics?|coulomb|electroscope|capacitor|capacitance|induction|dielectric|electric\s*field|electric\s*potential|potential\s*difference|point\s*charges?|μF|uF\b|farad|chemical\s+equilibrium|reversible\s+reaction|reactants?|products?|ammonia|dynamic\s+equilibrium|sodium\s+bicarbonate)\b|ms[™®]|v\s*=\s*f|T\s*=\s*2|sin\s*(?:θ|the?ta)|cos\s*(?:θ|the?ta)|a\s*∝|Q\s*=\s*C\s*V|F\s*=\s*[kK]|[λμνπωθπ√∞≅≈ε₀]/i;
 
 /** Literary pages: skip science-only notation rewrites (safe line cleanups still OK). */
 const LITERARY_KEEP_CUE =
@@ -299,6 +304,7 @@ export function cleanMergedOcrLine(line: string): string {
   let value = line.trim();
   if (!value) return '';
   value = stripLeadingMarkNoise(value);
+  value = dedupeInlineRepeatedClauses(value);
   value = collapseRepeatedNumericTokens(value);
   value = stripConfidenceLikeJunk(value);
   return value.replace(/[ \t]{2,}/g, ' ').trim();
@@ -345,6 +351,9 @@ export function cleanMergedPageOcrText(text: string): string {
     /\b(?:REMEMBER|lowest term|mixed (?:number|fraction)|Reduce\b)/i.test(joined);
   if (looksLikeScienceNumericalsPage(joined) && !fractionWorkbook) {
     joined = normalizeScienceNotationArtifacts(joined);
+  }
+  if (looksLikeChemistryLessonPage(joined)) {
+    joined = reconstructChemistryFormulasInOcrText(joined);
   }
   return joined;
 }

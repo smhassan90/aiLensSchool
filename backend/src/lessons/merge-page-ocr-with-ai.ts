@@ -13,6 +13,7 @@ import {
   criticalPageCueHits,
   isPagePhotoTextReadable,
 } from './page-text-sanitize';
+import { looksLikeChemistryLessonPage } from './ocr-chemistry-formulas';
 import { looksLikeScienceNumericalsPage } from './science-ocr-clean';
 
 const PAGE_OCR_MERGE_SYSTEM = `You merge OCR transcripts of the SAME English textbook page into one clean reading.
@@ -398,6 +399,7 @@ export async function intelligentMergePageOcrTranscripts(
   const sourceBlob = [ruleFallback, paddle, tesseract, input.visionText ?? ''].join('\n');
   const useScienceFewShot =
     looksLikeScienceNumericalsPage(sourceBlob) ||
+    looksLikeChemistryLessonPage(sourceBlob) ||
     textLooksLikeScienceForFewShot(sourceBlob) ||
     /\b(?:physics|chemistry|math|maths|science)\b/i.test(input.subjectName ?? '');
   const scienceFewShot = useScienceFewShot ? buildScienceOcrFewShotBlock() : '';
@@ -422,7 +424,7 @@ export async function intelligentMergePageOcrTranscripts(
     scienceFewShot ? `\n${scienceFewShot}` : '',
     '',
     useScienceFewShot
-      ? 'CRITICAL (science): Remove weblink/YouTube sidebars, collapse duplicate numbers, fix unit OCR (ms™→ms^-1, 1K the 103→1K=10^3). Keep every numerical question and parenthetical answer. Do not invent values.'
+      ? 'CRITICAL (science): Remove weblink/YouTube sidebars, collapse duplicate numbers, fix unit OCR (ms™→ms^-1, 1K the 103→1K=10^3). For chemical equations use Unicode subscripts on digits after element symbols (H₂O, Na₂CO₃, 2NaHCO₃ → Na₂CO₃ + CO₂ + H₂O) and → / ⇌ for reaction arrows. Drop duplicated intro sentences stitched twice. Keep every numerical question and parenthetical answer. Do not invent values or missing stoichiometry digits.'
       : 'CRITICAL: If any transcript contains "Akhtar came home", lessonText MUST include "Akhtar came home late from school" (cleaned) before the uncle visit. Do not invent a different opening.',
   ].join('\n');
 

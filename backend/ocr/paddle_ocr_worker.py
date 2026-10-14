@@ -513,6 +513,86 @@ def _is_vinculum(text: str) -> bool:
     return bool(_BAR_RE.match(t)) or t in {"/", "／", "⁄"}
 
 
+_SUBSCRIPT_DIGIT_TRANS = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
+_LETTER_TAIL_RE = re.compile(r"[A-Za-z]$")
+
+
+def _subscript_digit_text(text: str) -> str:
+    t = (text or "").strip()
+    if not re.fullmatch(r"\d{1,2}", t):
+        return t
+    return t.translate(_SUBSCRIPT_DIGIT_TRANS)
+
+
+def compose_chemical_subscripts(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Merge small lowered digit boxes into the element token on their left (H + 2 → H₂).
+    Runs before stacked-fraction pairing so vertical num/den stacks stay separate.
+    """
+    if len(lines) < 2:
+        return lines
+
+    heights = [
+        float(lines[i]["y1"]) - float(lines[i]["y0"])
+        for i in range(len(lines))
+        if (lines[i].get("text") or "").strip()
+    ]
+    if not heights:
+        return lines
+    median_h = sorted(heights)[len(heights) // 2]
+
+    out_lines = list(lines)
+    merged_idxs: set[int] = set()
+    for i in range(len(lines)):
+        if i in merged_idxs:
+            continue
+        sub = lines[i]
+        sub_t = (sub.get("text") or "").strip()
+        if not re.fullmatch(r"\d{1,2}", sub_t):
+            continue
+        sub_h = max(1.0, float(sub["y1"]) - float(sub["y0"]))
+        if sub_h > median_h * 0.82:
+            continue
+        sub_cy = (float(sub["y0"]) + float(sub["y1"])) / 2.0
+        best_j: int | None = None
+        best_score = 1e9
+        for j in range(len(lines)):
+            if j == i or j in merged_idxs:
+                continue
+            host = out_lines[j]
+            host_t = (host.get("text") or "").strip()
+            if not host_t or not _LETTER_TAIL_RE.search(host_t):
+                continue
+            if _is_fraction_digit(host_t) and re.fullmatch(r"\d{1,3}", host_t):
+                continue
+            gap = float(sub["x0"]) - float(host["x1"])
+            if gap < -6 or gap > max(22.0, median_h * 0.9):
+                continue
+            host_cy = (float(host["y0"]) + float(host["y1"])) / 2.0
+            if sub_cy < host_cy - median_h * 0.08 or sub_cy - host_cy < median_h * 0.02:
+                continue
+            host_h = max(1.0, float(host["y1"]) - float(host["y0"]))
+            if sub_h > host_h * 0.92:
+                continue
+            score = abs(gap) * 2.0 + abs(sub_cy - host_cy)
+            if score < best_score:
+                best_score = score
+                best_j = j
+        if best_j is None:
+            continue
+        host = out_lines[best_j]
+        out_lines[best_j] = {
+            "text": (host.get("text") or "").strip() + _subscript_digit_text(sub_t),
+            "x0": min(float(host["x0"]), float(sub["x0"])),
+            "y0": min(float(host["y0"]), float(sub["y0"])),
+            "x1": max(float(host["x1"]), float(sub["x1"])),
+            "y1": max(float(host["y1"]), float(sub["y1"])),
+        }
+        merged_idxs.add(i)
+
+    return [out_lines[k] for k in range(len(out_lines)) if k not in merged_idxs]
+
+
 def compose_stacked_fractions(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Rebuild textbook stacked fractions from Paddle boxes:
@@ -1232,7 +1312,8 @@ def text_from_lines_with_fractions(lines: list[dict[str, Any]]) -> str:
             and len(re.findall(r"\b[a-n]\.", probe_all, re.I)) >= 3
         )
     )
-    composed = compose_stacked_fractions(lines)
+    composed = compose_chemical_subscripts(lines)
+    composed = compose_stacked_fractions(composed)
     composed = compose_fraction_division_ops(composed)
     if divide_exercise and len(re.findall(r"\b[a-n]\.", probe_all, re.I)) >= 3:
         composed = compose_lettered_divide_items(composed)
