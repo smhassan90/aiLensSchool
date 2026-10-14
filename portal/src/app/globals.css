@@ -45,6 +45,18 @@
     overflow-x: hidden;
   }
 
+  /* Logged-in portal: one scroll region (main in AppShell), not html/body. */
+  html.portal-app-shell {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  html.portal-app-shell body {
+    height: 100%;
+    overflow: hidden;
+    max-width: 100%;
+  }
+
   body {
     @apply bg-background text-sm text-foreground antialiased;
     overflow-x: hidden;

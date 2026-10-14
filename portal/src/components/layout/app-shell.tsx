@@ -14,6 +14,8 @@ interface AppShellProps {
   inverted?: boolean;
 }
 
+const APP_SHELL_HTML_CLASS = "portal-app-shell";
+
 export function AppShell({ sidebar, header, children, className, inverted }: AppShellProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -23,11 +25,11 @@ export function AppShell({ sidebar, header, children, className, inverted }: App
   }, [pathname]);
 
   useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
+    document.documentElement.classList.add(APP_SHELL_HTML_CLASS);
     return () => {
-      document.body.style.overflow = "";
+      document.documentElement.classList.remove(APP_SHELL_HTML_CLASS);
     };
-  }, [open]);
+  }, []);
 
   return (
     <div className={cn("flex h-dvh overflow-hidden bg-background", className)}>
@@ -74,7 +76,9 @@ export function AppShell({ sidebar, header, children, className, inverted }: App
           </Button>
           <div className="min-w-0 flex-1">{header}</div>
         </header>
-        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">{children}</main>
+        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain">
+          {children}
+        </main>
       </div>
     </div>
   );
