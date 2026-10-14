@@ -551,7 +551,7 @@ def compose_chemical_subscripts(lines: list[dict[str, Any]]) -> list[dict[str, A
         if not re.fullmatch(r"\d{1,2}", sub_t):
             continue
         sub_h = max(1.0, float(sub["y1"]) - float(sub["y0"]))
-        if sub_h > median_h * 0.82:
+        if sub_h > median_h * 0.92:
             continue
         sub_cy = (float(sub["y0"]) + float(sub["y1"])) / 2.0
         best_j: int | None = None
@@ -566,10 +566,10 @@ def compose_chemical_subscripts(lines: list[dict[str, Any]]) -> list[dict[str, A
             if _is_fraction_digit(host_t) and re.fullmatch(r"\d{1,3}", host_t):
                 continue
             gap = float(sub["x0"]) - float(host["x1"])
-            if gap < -6 or gap > max(22.0, median_h * 0.9):
+            if gap < -10 or gap > max(32.0, median_h * 1.15):
                 continue
             host_cy = (float(host["y0"]) + float(host["y1"])) / 2.0
-            if sub_cy < host_cy - median_h * 0.08 or sub_cy - host_cy < median_h * 0.02:
+            if sub_cy < host_cy - median_h * 0.12 or sub_cy - host_cy < median_h * 0.008:
                 continue
             host_h = max(1.0, float(host["y1"]) - float(host["y0"]))
             if sub_h > host_h * 0.92:

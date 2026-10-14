@@ -45,6 +45,15 @@ Rate of forward reaction = Rate of reverse reaction
     expect(out).toMatch(/2NH₃\(g\)/);
   });
 
+  it('restores bicarbonate equation when OCR drops all subscript digits', () => {
+    const page = `
+sodium bicorbonote into sodium carbonate, water, and carbon dioxide
+2NaHCO → NaCO + CO + HO
+`.trim();
+    const out = reconstructChemistryFormulasInOcrText(page);
+    expect(out).toMatch(/2NaHCO₃ → Na₂CO₃ \+ CO₂ \+ H₂O/);
+  });
+
   it('runs through cleanMergedPageOcrText on chemistry cues', () => {
     const merged = `
 A chemical reaction contains reactants and products.

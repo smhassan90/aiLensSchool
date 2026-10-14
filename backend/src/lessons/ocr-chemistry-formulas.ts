@@ -119,6 +119,33 @@ export function polishChemistryEquationFragment(fragment: string): string {
   return value.replace(/[ \t]{2,}/g, ' ').trim();
 }
 
+/**
+ * Textbook bicarbonate decomposition — OCR often drops all subscript digits:
+ * "2NaHCO → NaCO + CO + HO" instead of 2NaHCO₃ → Na₂CO₃ + CO₂ + H₂O.
+ * Only runs when the line (or page) clearly refers to bicarbonate.
+ */
+export function repairBicarbonateDecompositionLine(line: string, pageContext = ''): string {
+  const row = (line ?? '').trim();
+  const ctx = `${pageContext}\n${row}`;
+  if (!/\bbicarbonate|bicorbonote|NaHCO/i.test(ctx)) return row;
+
+  const brokenRhs = /2\s*NaHCO(?:₃|3)?\s*(?:→|>|←)\s*NaCO(?:₃|3)?\s*\+\s*CO\s*\+\s*HO\b/i;
+  if (brokenRhs.test(row)) {
+    return row.replace(
+      /2\s*NaHCO(?:₃|3)?\s*(?:→|>|←)\s*NaCO(?:₃|3)?\s*\+\s*CO\s*\+\s*HO\b/i,
+      '2NaHCO₃ → Na₂CO₃ + CO₂ + H₂O',
+    );
+  }
+
+  if (/\b2\s*NaHCO\b/i.test(row) && !/NaHCO₃|NaHCO3/i.test(row)) {
+    return row.replace(/\b2\s*NaHCO\b/gi, '2NaHCO₃');
+  }
+  if (/\bNaCO\b/i.test(row) && !/Na₂CO₃|Na2CO3/i.test(row) && /(?:→|>|\+)/.test(row)) {
+    return row.replace(/\bNaCO\b/gi, 'Na₂CO₃');
+  }
+  return row;
+}
+
 export function polishChemistryEquationLine(line: string): string {
   const trimmed = (line ?? '').trim();
   if (!trimmed) return '';
@@ -181,8 +208,11 @@ export function reconstructChemistryFormulasInOcrText(text: string): string {
   const lines = value.split(/\r?\n/);
   const out = lines.map((line) => {
     let row = dedupeInlineRepeatedClauses(line);
+    row = repairBicarbonateDecompositionLine(row, value);
     const looksEquation =
-      /(?:\+|→|←|⇌|>|<)/.test(row) && /[A-Z][a-z]?/.test(row) && /\d/.test(row);
+      /(?:\+|→|←|⇌|>|<)/.test(row) &&
+      /[A-Z][a-z]?/.test(row) &&
+      (/\d/.test(row) || /\bNaHCO|NaCO\b/i.test(row));
     const looksFormula = /\b\d*[A-Z][a-z]?\d+[A-Za-z]*/.test(row) || /\([0-9]{1,2}\)/.test(row);
     if (looksEquation || looksFormula) {
       row = polishChemistryEquationLine(row);
