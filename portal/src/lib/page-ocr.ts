@@ -45,7 +45,9 @@ function looksLikeMangledRtlOcr(text: string) {
   return (junkHits?.length ?? 0) >= 3 && arabic < 20;
 }
 
-const OCR_MAX_EDGE = 1800;
+const OCR_MAX_EDGE = 2400;
+const UPLOAD_MAX_EDGE = 2560;
+const UPLOAD_JPEG_QUALITY = 0.9;
 const OCR_CONCURRENCY = 2;
 
 /** Downscale for faster OCR/upload while keeping textbook text readable. */
@@ -71,7 +73,7 @@ async function downscaleForOcr(file: File, maxEdge = OCR_MAX_EDGE): Promise<Blob
     ctx.drawImage(bitmap, 0, 0, width, height);
     bitmap.close();
     const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((b) => resolve(b), "image/jpeg", 0.82),
+      canvas.toBlob((b) => resolve(b), "image/jpeg", UPLOAD_JPEG_QUALITY),
     );
     return blob ?? file;
   } catch {
@@ -80,7 +82,7 @@ async function downscaleForOcr(file: File, maxEdge = OCR_MAX_EDGE): Promise<Blob
 }
 
 /** Compress photos before upload (smaller payload over the network). */
-export async function compressPhotosForUpload(files: File[], maxEdge = 1600): Promise<File[]> {
+export async function compressPhotosForUpload(files: File[], maxEdge = UPLOAD_MAX_EDGE): Promise<File[]> {
   const out: File[] = [];
   for (const file of files) {
     const blob = await downscaleForOcr(file, maxEdge);

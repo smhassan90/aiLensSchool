@@ -123,7 +123,8 @@ async function toVisionJpeg(
   originalname: string,
 ): Promise<PreparedLessonPagePhoto> {
   const sharpFn = await getSharp();
-  const maxEdge = 2000;
+  // Stored lesson page photos are shown enlarged in the portal — keep detail.
+  const maxEdge = 2560;
   const scale = Math.min(1, maxEdge / Math.max(width, height, 1));
   let pipeline = sharpFn(working);
   if (scale < 0.98) {

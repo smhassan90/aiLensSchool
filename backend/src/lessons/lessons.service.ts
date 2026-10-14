@@ -1646,10 +1646,11 @@ export class LessonsService {
           });
         }
 
+        // Store color vision JPEG for thumbnails/preview — not the greyscale OCR prep image.
         const asset = await this.filesService.saveSchoolUpload(
           schoolId,
           user.id,
-          orient.ocrFile,
+          orient.visionFile,
           'lesson-pages',
         );
         const source = await this.prisma.lessonSource.create({
@@ -1828,7 +1829,7 @@ export class LessonsService {
     const asset = await this.filesService.saveSchoolUpload(
       lesson.schoolId,
       user.id,
-      orient.ocrFile,
+      orient.visionFile,
       'lesson-pages',
     );
     await this.prisma.$transaction(async (tx) => {
