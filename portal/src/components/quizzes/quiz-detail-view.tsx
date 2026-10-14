@@ -383,33 +383,33 @@ export function QuizDetailView({ quizId, listHref, listQueryKey, variant = "admi
 
             {isDraft ? (
 
-              <div className="mt-6 space-y-4">
-
-                <ExamQuestionEditor quizId={quizId} quiz={quiz} onChange={updateQuiz} />
-
-                <QuizEditorActions
-
-                  quizId={quizId}
-
-                  quiz={quiz}
-
-                  listHref={listHref}
-
-                  listQueryKey={listQueryKey}
-
-                />
-
-                <ExamAnswerSpaceToggle
-                  value={answerSpace}
-                  onChange={setAnswerSpace}
-                />
-
-                <ExamPrintView
-                  quiz={quiz}
-                  showAnswers={false}
-                  answerSpace={answerSpace}
-                />
-
+              <div className="mt-6 print:hidden">
+                <Tabs defaultValue="edit" className="space-y-4">
+                  <TabsList className="w-full justify-start sm:w-auto">
+                    <TabsTrigger value="edit">Edit questions</TabsTrigger>
+                    <TabsTrigger value="preview">Print preview</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="edit" className="space-y-4">
+                    <ExamQuestionEditor quizId={quizId} quiz={quiz} onChange={updateQuiz} />
+                    <QuizEditorActions
+                      quizId={quizId}
+                      quiz={quiz}
+                      listHref={listHref}
+                      listQueryKey={listQueryKey}
+                    />
+                  </TabsContent>
+                  <TabsContent value="preview" className="space-y-4">
+                    <ExamAnswerSpaceToggle
+                      value={answerSpace}
+                      onChange={setAnswerSpace}
+                    />
+                    <ExamPrintView
+                      quiz={quiz}
+                      showAnswers={false}
+                      answerSpace={answerSpace}
+                    />
+                  </TabsContent>
+                </Tabs>
               </div>
 
             ) : (
