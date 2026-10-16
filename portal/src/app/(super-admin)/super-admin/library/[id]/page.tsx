@@ -33,6 +33,7 @@ export default function LibraryBookPage() {
   const [subjectLabel, setSubjectLabel] = useState("");
   const [editionYear, setEditionYear] = useState("");
   const [schoolId, setSchoolId] = useState("");
+  const [rights, setRights] = useState({ canRead: true, canWrite: false, canUpdate: false, canDelete: false });
 
   useEffect(() => {
     if (!data) return;
@@ -61,9 +62,11 @@ export default function LibraryBookPage() {
   });
 
   const grant = useMutation({
-    mutationFn: () => libraryBooksService.grant(id, schoolId),
+    mutationFn: (body?: typeof rights & { schoolId: string }) =>
+      libraryBooksService.grant(id, body ?? { schoolId, ...rights }),
     onSuccess: () => {
       setSchoolId("");
+      setRights({ canRead: true, canWrite: false, canUpdate: false, canDelete: false });
       queryClient.invalidateQueries({ queryKey: ["library-book", id] });
       queryClient.invalidateQueries({ queryKey: ["library-books"] });
       toast({ title: "School assigned", variant: "success" });
@@ -146,8 +149,18 @@ export default function LibraryBookPage() {
           {data.grants.length ? (
             <ul className="space-y-2 text-sm">
               {data.grants.map((grantRow) => (
-                <li key={grantRow.id} className="flex items-center justify-between gap-3 border-b py-2">
-                  <span>{grantRow.school.name}</span>
+                <li key={grantRow.id} className="flex flex-wrap items-center justify-between gap-3 border-b py-2">
+                  <span className="font-medium">{grantRow.school.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {[
+                      grantRow.canRead ? "Read" : null,
+                      grantRow.canWrite ? "Write" : null,
+                      grantRow.canUpdate ? "Update" : null,
+                      grantRow.canDelete ? "Delete" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "No rights"}
+                  </span>
                   <Button
                     type="button"
                     variant="outline"
@@ -180,10 +193,23 @@ export default function LibraryBookPage() {
                   ))}
               </select>
             </div>
-            <Button type="button" disabled={!schoolId || grant.isPending} onClick={() => grant.mutate()}>
+            <Button
+              type="button"
+              disabled={!schoolId || grant.isPending}
+              onClick={() => grant.mutate({ schoolId, ...rights })}
+            >
               {grant.isPending ? "Assigning…" : "Assign"}
             </Button>
           </div>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <RightCheck label="Read book" checked={rights.canRead} onChange={(canRead) => setRights((r) => ({ ...r, canRead }))} />
+            <RightCheck label="Write book" checked={rights.canWrite} onChange={(canWrite) => setRights((r) => ({ ...r, canWrite }))} />
+            <RightCheck label="Update book" checked={rights.canUpdate} onChange={(canUpdate) => setRights((r) => ({ ...r, canUpdate }))} />
+            <RightCheck label="Delete book" checked={rights.canDelete} onChange={(canDelete) => setRights((r) => ({ ...r, canDelete }))} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Read lets the school use the book for lessons, quizzes, homework, and exam papers. Write, update, and delete let the school admin add, change, or remove chapters. Deleting the book for every school stays with the super admin.
+          </p>
         </CardContent>
       </Card>
       <Card>
@@ -194,8 +220,16 @@ export default function LibraryBookPage() {
           {data.chapters.map((chapter) => (
             <div key={chapter.id} className="flex justify-between gap-4 border-b py-2">
               <span>
-                {chapter.chapterNumber != null ? `${chapter.chapterNumber}. ` : ""}
-                {chapter.title}
+                <span className="font-medium">
+                  {chapter.chapterNumber != null ? `${chapter.chapterNumber}. ` : ""}
+                  {chapter.title}
+                </span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  {chapter.uploadedBy
+                    ? `${chapter.uploadedBy.firstName} ${chapter.uploadedBy.lastName}`.trim()
+                    : "Unknown"}
+                  {chapter.uploadedBySchool?.name ? ` · ${chapter.uploadedBySchool.name}` : ""}
+                </span>
               </span>
               <span className="text-muted-foreground">{chapter.textLength.toLocaleString()} characters</span>
             </div>
@@ -203,5 +237,22 @@ export default function LibraryBookPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function RightCheck({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="inline-flex items-center gap-2">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      {label}
+    </label>
   );
 }

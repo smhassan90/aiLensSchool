@@ -1,5 +1,16 @@
 import { apiClient } from "@/lib/api-client";
 
+export type LibraryChapter = {
+  id: string;
+  chapterNumber: number | null;
+  title: string;
+  topicName: string;
+  textLength: number;
+  createdAt: string;
+  uploadedBy: { firstName: string; lastName: string } | null;
+  uploadedBySchool: { id: string; name: string } | null;
+};
+
 export type LibraryBookListItem = {
   id: string;
   title: string;
@@ -12,18 +23,19 @@ export type LibraryBookListItem = {
   createdBy: { id: string; firstName: string; lastName: string };
   originSchool: { id: string; name: string } | null;
   createdAt: string;
+  chapters: LibraryChapter[];
 };
 
 export type LibraryBookDetail = LibraryBookListItem & {
-  chapters: Array<{
+  grants: Array<{
     id: string;
-    chapterNumber: number | null;
-    title: string;
-    textLength: number;
-    addedBySchoolId: string | null;
-    createdAt: string;
+    schoolId: string;
+    canRead: boolean;
+    canWrite: boolean;
+    canUpdate: boolean;
+    canDelete: boolean;
+    school: { id: string; name: string };
   }>;
-  grants: Array<{ id: string; schoolId: string; school: { id: string; name: string } }>;
 };
 
 export const libraryBooksService = {
@@ -48,13 +60,37 @@ export const libraryBooksService = {
       body: JSON.stringify(body),
     });
   },
-  grant(id: string, schoolId: string) {
+  grant(
+    id: string,
+    body: { schoolId: string; canRead: boolean; canWrite: boolean; canUpdate: boolean; canDelete: boolean },
+  ) {
     return apiClient(`/library-books/${id}/grants`, {
       method: "POST",
-      body: JSON.stringify({ schoolId }),
+      body: JSON.stringify(body),
     });
   },
   revoke(id: string, schoolId: string) {
     return apiClient(`/library-books/${id}/grants/${schoolId}`, { method: "DELETE" });
+  },
+  remove(id: string) {
+    return apiClient(`/library-books/${id}`, { method: "DELETE" });
+  },
+  removeChapter(bookId: string, chapterId: string) {
+    return apiClient(`/library-books/${bookId}/chapters/${chapterId}`, { method: "DELETE" });
+  },
+  getChapter(bookId: string, chapterId: string) {
+    return apiClient<{ id: string; title: string; topicName: string; publishedText: string }>(
+      `/library-books/${bookId}/chapters/${chapterId}`,
+    );
+  },
+  replaceChapter(
+    bookId: string,
+    chapterId: string,
+    body: { title?: string; topicName?: string; publishedText?: string },
+  ) {
+    return apiClient(`/library-books/${bookId}/chapters/${chapterId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
   },
 };

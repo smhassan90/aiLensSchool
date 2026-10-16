@@ -22,13 +22,30 @@ export class LibraryBooksService {
     await this.ensureTables();
     await this.importLegacyChapters(actorUserId);
     const books = await this.prisma.libraryBook.findMany({
-      orderBy: [{ subjectLabel: 'asc' }, { classLabel: 'asc' }, { title: 'asc' }],
+      orderBy: [{ classLabel: 'asc' }, { subjectLabel: 'asc' }, { title: 'asc' }],
       include: {
         createdBy: { select: { id: true, firstName: true, lastName: true } },
         originSchool: { select: { id: true, name: true } },
+        chapters: {
+          orderBy: [{ chapterNumber: 'asc' }, { title: 'asc' }],
+          select: {
+            id: true,
+            chapterNumber: true,
+            title: true,
+            topicName: true,
+            addedByUserId: true,
+            addedBySchoolId: true,
+            publishedText: true,
+            createdAt: true,
+          },
+        },
         _count: { select: { chapters: true, grants: true } },
       },
     });
+    const people = await this.peopleLookup(
+      books.flatMap((book) => book.chapters.map((chapter) => chapter.addedByUserId)),
+      books.flatMap((book) => book.chapters.map((chapter) => chapter.addedBySchoolId)),
+    );
     return books.map((book) => ({
       id: book.id,
       title: book.title,
@@ -41,6 +58,7 @@ export class LibraryBooksService {
       createdBy: book.createdBy,
       originSchool: book.originSchool,
       createdAt: book.createdAt,
+      chapters: book.chapters.map((chapter) => this.presentChapter(chapter, people)),
     }));
   }
 
@@ -58,16 +76,116 @@ export class LibraryBooksService {
     if (!book) {
       throw new NotFoundException({ code: 'BOOK_NOT_FOUND', message: 'Book not found' });
     }
+    const people = await this.peopleLookup(
+      book.chapters.map((chapter) => chapter.addedByUserId),
+      book.chapters.map((chapter) => chapter.addedBySchoolId),
+    );
     return {
       ...book,
-      chapters: book.chapters.map((chapter) => ({
-        id: chapter.id,
-        chapterNumber: chapter.chapterNumber,
-        title: chapter.title,
-        textLength: chapter.publishedText.length,
-        addedBySchoolId: chapter.addedBySchoolId,
-        createdAt: chapter.createdAt,
-      })),
+      chapters: book.chapters.map((chapter) => this.presentChapter(chapter, people)),
+    };
+  }
+
+  async removeChapter(bookId: string, chapterId: string) {
+    await this.ensureTables();
+    const chapter = await this.prisma.libraryBookChapter.findFirst({
+      where: { id: chapterId, bookId },
+      select: { id: true },
+    });
+    if (!chapter) {
+      throw new NotFoundException({ code: 'CHAPTER_NOT_FOUND', message: 'Chapter not found' });
+    }
+    await this.prisma.libraryBookChapter.delete({ where: { id: chapterId } });
+    return { ok: true };
+  }
+
+  async getChapter(bookId: string, chapterId: string) {
+    await this.ensureTables();
+    const chapter = await this.prisma.libraryBookChapter.findFirst({
+      where: { id: chapterId, bookId },
+      select: { id: true, title: true, topicName: true, publishedText: true },
+    });
+    if (!chapter) {
+      throw new NotFoundException({ code: 'CHAPTER_NOT_FOUND', message: 'Chapter not found' });
+    }
+    return chapter;
+  }
+
+  async replaceChapter(
+    bookId: string,
+    chapterId: string,
+    user: { id: string; schoolId?: string | null },
+    dto: { title?: string; topicName?: string; publishedText?: string },
+  ) {
+    await this.ensureTables();
+    const chapter = await this.prisma.libraryBookChapter.findFirst({
+      where: { id: chapterId, bookId },
+      select: { id: true },
+    });
+    if (!chapter) {
+      throw new NotFoundException({ code: 'CHAPTER_NOT_FOUND', message: 'Chapter not found' });
+    }
+    const title = dto.title?.trim();
+    const topicName = dto.topicName?.trim();
+    const publishedText = dto.publishedText?.trim();
+    if (!title && topicName === undefined && !publishedText) {
+      throw new BadRequestException({
+        code: 'CONTENT_REQUIRED',
+        message: 'Change the chapter name, topic name, or content before saving',
+      });
+    }
+    return this.prisma.libraryBookChapter.update({
+      where: { id: chapterId },
+      data: {
+        ...(title ? { title: title.slice(0, 255) } : {}),
+        ...(topicName !== undefined ? { topicName: topicName.slice(0, 255) } : {}),
+        ...(publishedText ? { publishedText } : {}),
+        addedByUserId: user.id,
+        addedBySchoolId: user.schoolId || null,
+      },
+    });
+  }
+
+  private presentChapter(
+    chapter: {
+      id: string;
+      chapterNumber: number | null;
+      title: string;
+      topicName: string;
+      addedByUserId: string;
+      addedBySchoolId: string | null;
+      publishedText: string;
+      createdAt: Date;
+    },
+    people: { users: Map<string, { firstName: string; lastName: string }>; schools: Map<string, string> },
+  ) {
+    const user = people.users.get(chapter.addedByUserId);
+    return {
+      id: chapter.id,
+      chapterNumber: chapter.chapterNumber,
+      title: chapter.title,
+      topicName: chapter.topicName,
+      textLength: chapter.publishedText.length,
+      createdAt: chapter.createdAt,
+      uploadedBy: user ? { firstName: user.firstName, lastName: user.lastName } : null,
+      uploadedBySchool: chapter.addedBySchoolId
+        ? { id: chapter.addedBySchoolId, name: people.schools.get(chapter.addedBySchoolId) ?? '' }
+        : null,
+    };
+  }
+
+  private async peopleLookup(userIds: string[], schoolIds: Array<string | null>) {
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: [...new Set(userIds.filter(Boolean))] } },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    const schools = await this.prisma.school.findMany({
+      where: { id: { in: [...new Set(schoolIds.filter((id): id is string => Boolean(id)))] } },
+      select: { id: true, name: true },
+    });
+    return {
+      users: new Map(users.map((user) => [user.id, user])),
+      schools: new Map(schools.map((school) => [school.id, school.name])),
     };
   }
 
@@ -113,7 +231,7 @@ export class LibraryBooksService {
     if (!chapters.length) return;
     const bookIds = [...new Set(chapters.map((chapter) => chapter.bookId))];
     const grants = await this.prisma.libraryBookGrant.findMany({
-      where: { schoolId, bookId: { in: bookIds } },
+      where: { schoolId, bookId: { in: bookIds }, canRead: true },
       select: { bookId: true },
     });
     const granted = new Set(grants.map((grant) => grant.bookId));
@@ -150,13 +268,24 @@ export class LibraryBooksService {
     });
   }
 
-  async grant(bookId: string, schoolId: string, grantedByUserId: string) {
+  async grant(
+    bookId: string,
+    schoolId: string,
+    grantedByUserId: string,
+    rights: { canRead?: boolean; canWrite?: boolean; canUpdate?: boolean; canDelete?: boolean } = {},
+  ) {
     await this.ensureTables();
     await this.requireBook(bookId);
+    const flags = {
+      canRead: rights.canRead !== false,
+      canWrite: Boolean(rights.canWrite),
+      canUpdate: Boolean(rights.canUpdate),
+      canDelete: Boolean(rights.canDelete),
+    };
     return this.prisma.libraryBookGrant.upsert({
       where: { bookId_schoolId: { bookId, schoolId } },
-      create: { bookId, schoolId, grantedByUserId },
-      update: {},
+      create: { bookId, schoolId, grantedByUserId, ...flags },
+      update: { ...flags, grantedByUserId },
     });
   }
 
@@ -231,6 +360,25 @@ export class LibraryBooksService {
         CONSTRAINT library_book_grants_school_fk FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE
       ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `ALTER TABLE library_book_chapters ADD COLUMN topic_name VARCHAR(255) NOT NULL DEFAULT ''`,
+      );
+    } catch {
+      // Column already exists after the first library open.
+    }
+    for (const statement of [
+      `ALTER TABLE library_book_grants ADD COLUMN can_read TINYINT(1) NOT NULL DEFAULT 1`,
+      `ALTER TABLE library_book_grants ADD COLUMN can_write TINYINT(1) NOT NULL DEFAULT 0`,
+      `ALTER TABLE library_book_grants ADD COLUMN can_update TINYINT(1) NOT NULL DEFAULT 0`,
+      `ALTER TABLE library_book_grants ADD COLUMN can_delete TINYINT(1) NOT NULL DEFAULT 0`,
+    ]) {
+      try {
+        await this.prisma.$executeRawUnsafe(statement);
+      } catch {
+        // Column already exists.
+      }
+    }
   }
 
   private async importLegacyChapters(actorUserId: string) {
@@ -246,9 +394,18 @@ export class LibraryBooksService {
     for (const row of rows) {
       const existing = await this.prisma.libraryBookChapter.findUnique({
         where: { legacyLessonId: row.id },
-        select: { id: true },
+        select: { id: true, topicName: true },
       });
-      if (existing) continue;
+      if (existing) {
+        const topicName = (row.topic_name || '').trim().slice(0, 255);
+        if (topicName && !existing.topicName) {
+          await this.prisma.libraryBookChapter.update({
+            where: { id: existing.id },
+            data: { topicName },
+          });
+        }
+        continue;
+      }
       const subject = (row.subject_name || 'Subject').trim();
       const grade = (row.grade_name || '').trim();
       const catalogKey = `legacy:${subject.toLowerCase()}|${grade.toLowerCase()}`;
@@ -276,6 +433,7 @@ export class LibraryBooksService {
               bookId: book.id,
               chapterNumber: numberMatch ? Number(numberMatch[1]) : null,
               title: storedTitle,
+              topicName: (row.topic_name || '').trim().slice(0, 255),
               publishedText: row.ai_summary?.trim() || '',
               legacyLessonId: row.id,
               addedByUserId: row.created_by_id || actorUserId,

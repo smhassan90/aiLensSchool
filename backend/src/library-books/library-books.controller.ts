@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -37,6 +37,38 @@ class UpdateLibraryBookDto {
 class GrantLibraryBookDto {
   @IsString()
   schoolId!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  canRead?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  canWrite?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  canUpdate?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  canDelete?: boolean;
+}
+
+class ReplaceChapterDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  topicName?: string;
+
+  @IsOptional()
+  @IsString()
+  publishedText?: string;
 }
 
 class CreateLibraryBookDto {
@@ -94,12 +126,32 @@ export class LibraryBooksController {
 
   @Post(':id/grants')
   grant(@Param('id') id: string, @Body() dto: GrantLibraryBookDto, @CurrentUser() user: AuthUser) {
-    return this.books.grant(id, dto.schoolId, user.id);
+    return this.books.grant(id, dto.schoolId, user.id, dto);
   }
 
   @Delete(':id/grants/:schoolId')
   revoke(@Param('id') id: string, @Param('schoolId') schoolId: string) {
     return this.books.revoke(id, schoolId);
+  }
+
+  @Delete(':id/chapters/:chapterId')
+  removeChapter(@Param('id') id: string, @Param('chapterId') chapterId: string) {
+    return this.books.removeChapter(id, chapterId);
+  }
+
+  @Get(':id/chapters/:chapterId')
+  getChapter(@Param('id') id: string, @Param('chapterId') chapterId: string) {
+    return this.books.getChapter(id, chapterId);
+  }
+
+  @Patch(':id/chapters/:chapterId')
+  replaceChapter(
+    @Param('id') id: string,
+    @Param('chapterId') chapterId: string,
+    @Body() dto: ReplaceChapterDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.books.replaceChapter(id, chapterId, user, dto);
   }
 
   @Delete(':id')
