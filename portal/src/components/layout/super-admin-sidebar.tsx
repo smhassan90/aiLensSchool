@@ -5,6 +5,7 @@ import {
   FileText,
   GitBranch,
   LayoutDashboard,
+  Library,
   Receipt,
   School,
   Settings,
@@ -22,6 +23,7 @@ import { personFullName } from "@/lib/person-name";
 const navItems = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/super-admin/schools", label: "Schools", icon: School },
+  { href: "/super-admin/library", label: "Book library", icon: Library },
   { href: "/super-admin/branches", label: "Branches", icon: GitBranch },
   { href: "/super-admin/subscriptions", label: "Subscriptions", icon: CreditCard },
   { href: "/super-admin/billing", label: "Billing", icon: Receipt },

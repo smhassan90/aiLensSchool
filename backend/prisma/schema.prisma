@@ -382,6 +382,7 @@ model User {
   createdAnnouncements       Announcement[]                 @relation("AnnouncementCreatedBy")
   createdEvents              Event[]                        @relation("EventCreatedBy")
   createdLessons             DailyLesson[]                  @relation("LessonCreatedBy")
+  createdLibraryBooks        LibraryBook[]                  @relation("LibraryBookCreatedBy")
   createdDiaries             HomeDiary[]                    @relation("DiaryCreatedBy")
   recordedFeePayments        FeePayment[]                   @relation("FeeRecordedBy")
   generatedReportCards       ReportCard[]                   @relation("ReportGeneratedBy")
@@ -569,6 +570,8 @@ model School {
   biometricDevices              BiometricDeviceConfig[]
   pendingBiometricPunches       PendingBiometricAttendanceLog[]
   ocrTrainingExamples           OcrTrainingExample[]
+  libraryBooksCreated           LibraryBook[]                  @relation("LibraryBookOriginSchool")
+  libraryBookGrants             LibraryBookGrant[]
   pricingPlanId                 String?                        @map("pricing_plan_id")
   pricingPlan                   PricingPlan?                   @relation(fields: [pricingPlanId], references: [id])
 
@@ -1229,6 +1232,64 @@ model Concept {
 
   @@index([topicId])
   @@map("concepts")
+}
+
+// ===================== SHARED BOOK LIBRARY =====================
+
+model LibraryBook {
+  id                String   @id @default(uuid())
+  catalogKey        String   @unique @map("catalog_key") @db.VarChar(255)
+  title             String   @db.VarChar(255)
+  publisher         String   @default("") @db.VarChar(255)
+  classLabel        String   @default("") @map("class_label") @db.VarChar(120)
+  subjectLabel      String   @default("") @map("subject_label") @db.VarChar(120)
+  editionYear       String?  @map("edition_year") @db.VarChar(20)
+  createdByUserId   String   @map("created_by_user_id")
+  createdBySchoolId String?  @map("created_by_school_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  createdBy   User                @relation("LibraryBookCreatedBy", fields: [createdByUserId], references: [id])
+  originSchool School?            @relation("LibraryBookOriginSchool", fields: [createdBySchoolId], references: [id])
+  chapters    LibraryBookChapter[]
+  grants      LibraryBookGrant[]
+
+  @@index([createdBySchoolId])
+  @@map("library_books")
+}
+
+model LibraryBookChapter {
+  id              String   @id @default(uuid())
+  bookId          String   @map("book_id")
+  chapterNumber   Int?     @map("chapter_number")
+  title           String   @db.VarChar(255)
+  publishedText   String   @map("published_text") @db.LongText
+  legacyLessonId  String?  @unique @map("legacy_lesson_id")
+  addedByUserId   String   @map("added_by_user_id")
+  addedBySchoolId String?  @map("added_by_school_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  book LibraryBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, title])
+  @@index([bookId])
+  @@map("library_book_chapters")
+}
+
+model LibraryBookGrant {
+  id            String   @id @default(uuid())
+  bookId        String   @map("book_id")
+  schoolId      String   @map("school_id")
+  grantedByUserId String @map("granted_by_user_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  book   LibraryBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  school School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, schoolId])
+  @@index([schoolId])
+  @@map("library_book_grants")
 }
 
 // ===================== LESSONS =====================

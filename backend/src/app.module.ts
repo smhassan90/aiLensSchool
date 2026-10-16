@@ -15,6 +15,7 @@ import { ParentsModule } from './parents/parents.module';
 import { TeachersModule } from './teachers/teachers.module';
 import { AcademicsModule } from './academics/academics.module';
 import { CurriculumModule } from './curriculum/curriculum.module';
+import { LibraryBooksModule } from './library-books/library-books.module';
 import { LessonsModule } from './lessons/lessons.module';
 import { HomeworkModule } from './homework/homework.module';
 import { QuizzesModule } from './quizzes/quizzes.module';
@@ -115,6 +116,7 @@ const queuesEnabled = areQueuesEnabled();
     TeachersModule,
     AcademicsModule,
     CurriculumModule,
+    LibraryBooksModule,
     LessonsModule,
     HomeworkModule,
     QuizzesModule,
