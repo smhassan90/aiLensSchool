@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PageLoader } from "@/components/layout/page-loader";
 import { EmptyState } from "@/components/layout/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { libraryBooksService } from "@/services/library-books.service";
 import { personFullName } from "@/lib/person-name";
 import { Library } from "lucide-react";
@@ -20,7 +21,12 @@ export default function LibraryBooksPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Book library"
-        description="Shared textbooks. Fill publisher and labels here. Schools see a book only after you grant it."
+        description="Shared textbooks. A school can use a book only while it is assigned."
+        actions={
+          <Link href="/super-admin/library/new">
+            <Button>Add book</Button>
+          </Link>
+        }
       />
       {isError && (
         <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">

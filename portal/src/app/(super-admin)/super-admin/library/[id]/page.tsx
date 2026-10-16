@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { libraryBooksService } from "@/services/library-books.service";
+import { schoolsService } from "@/services/schools.service";
 import { useToast } from "@/providers/toast-provider";
 import { ArrowLeft } from "lucide-react";
 
@@ -22,11 +23,16 @@ export default function LibraryBookPage() {
     queryKey: ["library-book", id],
     queryFn: () => libraryBooksService.get(id),
   });
+  const schools = useQuery({
+    queryKey: ["schools", "library-assign"],
+    queryFn: () => schoolsService.list({ limit: 100 }),
+  });
   const [title, setTitle] = useState("");
   const [publisher, setPublisher] = useState("");
   const [classLabel, setClassLabel] = useState("");
   const [subjectLabel, setSubjectLabel] = useState("");
   const [editionYear, setEditionYear] = useState("");
+  const [schoolId, setSchoolId] = useState("");
 
   useEffect(() => {
     if (!data) return;
@@ -53,6 +59,33 @@ export default function LibraryBookPage() {
     },
     onError: (err) => toast({ title: "Could not save", description: (err as Error).message, variant: "error" }),
   });
+
+  const grant = useMutation({
+    mutationFn: () => libraryBooksService.grant(id, schoolId),
+    onSuccess: () => {
+      setSchoolId("");
+      queryClient.invalidateQueries({ queryKey: ["library-book", id] });
+      queryClient.invalidateQueries({ queryKey: ["library-books"] });
+      toast({ title: "School assigned", variant: "success" });
+    },
+    onError: (err) => toast({ title: "Could not assign", description: (err as Error).message, variant: "error" }),
+  });
+
+  const revoke = useMutation({
+    mutationFn: (targetSchoolId: string) => libraryBooksService.revoke(id, targetSchoolId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["library-book", id] });
+      queryClient.invalidateQueries({ queryKey: ["library-books"] });
+      toast({
+        title: "School unassigned",
+        description: "New quizzes, homework, and exam papers from this book are blocked. Papers already created stay.",
+        variant: "success",
+      });
+    },
+    onError: (err) => toast({ title: "Could not unassign", description: (err as Error).message, variant: "error" }),
+  });
+
+  const assignedIds = new Set(data?.grants.map((grant) => grant.schoolId) ?? []);
 
   if (isLoading || !data) return <PageLoader variant="page" />;
 
@@ -98,6 +131,57 @@ export default function LibraryBookPage() {
           <div className="sm:col-span-2">
             <Button disabled={save.isPending} onClick={() => save.mutate()}>
               {save.isPending ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-base">Schools</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Unassigning stops new quizzes, homework, and exam papers from this book. Papers already generated remain.
+          </p>
+          {data.grants.length ? (
+            <ul className="space-y-2 text-sm">
+              {data.grants.map((grantRow) => (
+                <li key={grantRow.id} className="flex items-center justify-between gap-3 border-b py-2">
+                  <span>{grantRow.school.name}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={revoke.isPending}
+                    onClick={() => revoke.mutate(grantRow.schoolId)}
+                  >
+                    Unassign
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">No school is assigned yet.</p>
+          )}
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[16rem] flex-1 space-y-2">
+              <Label>Assign to school</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={schoolId}
+                onChange={(e) => setSchoolId(e.target.value)}
+              >
+                <option value="">Select a school</option>
+                {schools.data?.items
+                  .filter((school) => !assignedIds.has(school.id))
+                  .map((school) => (
+                    <option key={school.id} value={school.id}>
+                      {school.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <Button type="button" disabled={!schoolId || grant.isPending} onClick={() => grant.mutate()}>
+              {grant.isPending ? "Assigning…" : "Assign"}
             </Button>
           </div>
         </CardContent>

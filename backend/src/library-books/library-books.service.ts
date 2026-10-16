@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 
@@ -69,6 +69,61 @@ export class LibraryBooksService {
         createdAt: chapter.createdAt,
       })),
     };
+  }
+
+  async create(
+    user: { id: string; schoolId?: string | null },
+    dto: {
+      title: string;
+      publisher?: string;
+      classLabel?: string;
+      subjectLabel?: string;
+      editionYear?: string;
+    },
+  ) {
+    await this.ensureTables();
+    const title = dto.title.trim();
+    if (!title) {
+      throw new BadRequestException({ code: 'TITLE_REQUIRED', message: 'Book name is required' });
+    }
+    const catalogKey = `manual:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
+    return this.prisma.libraryBook.create({
+      data: {
+        catalogKey,
+        title,
+        publisher: dto.publisher?.trim() || '',
+        classLabel: dto.classLabel?.trim() || '',
+        subjectLabel: dto.subjectLabel?.trim() || '',
+        editionYear: dto.editionYear?.trim() || null,
+        createdByUserId: user.id,
+        createdBySchoolId: user.schoolId || null,
+      },
+    });
+  }
+
+  /** Blocks new quizzes, homework, and exam papers after a school loses the book. Existing rows are left in place. */
+  async assertSchoolCanUseLessons(schoolId: string, lessonIds: string[]) {
+    const ids = [...new Set(lessonIds.filter(Boolean))];
+    if (!ids.length) return;
+    await this.ensureTables();
+    const chapters = await this.prisma.libraryBookChapter.findMany({
+      where: { legacyLessonId: { in: ids } },
+      select: { bookId: true, book: { select: { title: true } } },
+    });
+    if (!chapters.length) return;
+    const bookIds = [...new Set(chapters.map((chapter) => chapter.bookId))];
+    const grants = await this.prisma.libraryBookGrant.findMany({
+      where: { schoolId, bookId: { in: bookIds } },
+      select: { bookId: true },
+    });
+    const granted = new Set(grants.map((grant) => grant.bookId));
+    const missing = chapters.find((chapter) => !granted.has(chapter.bookId));
+    if (missing) {
+      throw new ForbiddenException({
+        code: 'BOOK_NOT_ASSIGNED',
+        message: `${missing.book.title} is not assigned to this school. Existing papers stay, but new quizzes, homework, and exam papers cannot be created from it.`,
+      });
+    }
   }
 
   async update(

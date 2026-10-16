@@ -42,4 +42,19 @@ export const libraryBooksService = {
       body: JSON.stringify(body),
     });
   },
+  create(body: { title: string; publisher?: string; classLabel?: string; subjectLabel?: string; editionYear?: string }) {
+    return apiClient<{ id: string }>("/library-books", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+  grant(id: string, schoolId: string) {
+    return apiClient(`/library-books/${id}/grants`, {
+      method: "POST",
+      body: JSON.stringify({ schoolId }),
+    });
+  },
+  revoke(id: string, schoolId: string) {
+    return apiClient(`/library-books/${id}/grants/${schoolId}`, { method: "DELETE" });
+  },
 };

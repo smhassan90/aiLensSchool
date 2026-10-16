@@ -38,6 +38,7 @@ import {
 } from './dto/quiz.dto';
 import { examPaperLabel, EXAM_PAPER_KINDS, isExamPaperKind } from './exam-paper';
 import { paperKindFromExamName } from './exam-config-map';
+import { LibraryBooksService } from '../library-books/library-books.service';
 import { gradeQuizAnswer } from './quiz-grading';
 import {
   buildExamCoverageBlock,
@@ -58,6 +59,7 @@ export class QuizzesService {
     private readonly parentsService: ParentsService,
     private readonly notifications: NotificationService,
     private readonly headTeachers: HeadTeachersService,
+    private readonly libraryBooks: LibraryBooksService,
   ) {}
 
   async generateFromLessons(dto: GenerateQuizDto, user: AuthUser) {
@@ -190,6 +192,7 @@ export class QuizzesService {
     }
 
     const topicSummaries: string[] = [];
+    const libraryLessonIds: string[] = [...(dto.lessonIds ?? [])];
     let rangeFrom = dto.lessonDateFrom ? new Date(dto.lessonDateFrom) : undefined;
     let rangeTo = dto.lessonDateTo ? new Date(dto.lessonDateTo) : undefined;
 
@@ -204,6 +207,7 @@ export class QuizzesService {
         include: {
           lesson: {
             select: {
+              id: true,
               topicName: true,
               chapterName: true,
               aiSummary: true,
@@ -233,7 +237,12 @@ export class QuizzesService {
       const dueDates = homework.map((item) => item.dueDate);
       rangeFrom ??= new Date(Math.min(...dueDates.map((d) => d.getTime())));
       rangeTo ??= new Date(Math.max(...dueDates.map((d) => d.getTime())));
+      for (const item of homework) {
+        if (item.lesson?.id) libraryLessonIds.push(item.lesson.id);
+      }
     }
+
+    await this.libraryBooks.assertSchoolCanUseLessons(schoolId, libraryLessonIds);
 
     if (dto.lessonIds?.length) {
       const lessonsRaw = await this.prisma.dailyLesson.findMany({

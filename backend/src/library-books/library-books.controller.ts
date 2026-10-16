@@ -39,6 +39,32 @@ class GrantLibraryBookDto {
   schoolId!: string;
 }
 
+class CreateLibraryBookDto {
+  @IsString()
+  @MaxLength(255)
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  publisher?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  classLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  subjectLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  editionYear?: string;
+}
+
 @ApiTags('Library books')
 @ApiBearerAuth()
 @Roles(RoleName.SUPER_ADMIN)
@@ -49,6 +75,11 @@ export class LibraryBooksController {
   @Get()
   list(@CurrentUser() user: AuthUser) {
     return this.books.listForSuperAdmin(user.id);
+  }
+
+  @Post()
+  create(@Body() dto: CreateLibraryBookDto, @CurrentUser() user: AuthUser) {
+    return this.books.create(user, dto);
   }
 
   @Get(':id')

@@ -15,6 +15,7 @@ import { SubmitHomeworkDto } from './dto/submit-homework.dto';
 import { ParentsService } from '../parents/parents.service';
 import { NotificationService } from '../notifications/notifications.service';
 import { resolveHeadTeacherSectionIds } from '../head-teachers/head-teacher-sections';
+import { LibraryBooksService } from '../library-books/library-books.service';
 import {
   answerKeyFromQuestions,
   buildHomeworkQuestions,
@@ -34,6 +35,7 @@ export class HomeworkService {
     private readonly tenant: TenantService,
     private readonly parentsService: ParentsService,
     private readonly notifications: NotificationService,
+    private readonly libraryBooks: LibraryBooksService,
   ) {}
 
   async create(dto: CreateHomeworkDto, user: AuthUser) {
@@ -71,6 +73,10 @@ export class HomeworkService {
           });
         }
       }
+    }
+
+    if (dto.lessonId) {
+      await this.libraryBooks.assertSchoolCanUseLessons(schoolId, [dto.lessonId]);
     }
 
     const subject = await this.prisma.subject.findFirst({

@@ -5,9 +5,10 @@ import { CommonModule } from '../common/common.module';
 import { AuditModule } from '../audit/audit.module';
 import { ParentsModule } from '../parents/parents.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { LibraryBooksModule } from '../library-books/library-books.module';
 
 @Module({
-  imports: [CommonModule, AuditModule, ParentsModule, NotificationsModule],
+  imports: [CommonModule, AuditModule, ParentsModule, NotificationsModule, LibraryBooksModule],
   providers: [HomeworkService],
   controllers: [HomeworkController],
   exports: [HomeworkService],

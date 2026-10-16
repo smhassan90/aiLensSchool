@@ -7,6 +7,7 @@ import { AiModule } from '../ai/ai.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ParentsModule } from '../parents/parents.module';
 import { HeadTeachersModule } from '../head-teachers/head-teachers.module';
+import { LibraryBooksModule } from '../library-books/library-books.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { HeadTeachersModule } from '../head-teachers/head-teachers.module';
     forwardRef(() => NotificationsModule),
     ParentsModule,
     HeadTeachersModule,
+    LibraryBooksModule,
   ],
   providers: [QuizzesService],
   controllers: [QuizzesController],
