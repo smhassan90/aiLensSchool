@@ -27,6 +27,7 @@ export default function LibraryBooksPage() {
   const [chapterName, setChapterName] = useState("");
   const [topicName, setTopicName] = useState("");
   const [draft, setDraft] = useState("");
+  const [exercises, setExercises] = useState("");
   const [sourceText, setSourceText] = useState("");
   const [lectureReady, setLectureReady] = useState(false);
   const [classFilter, setClassFilter] = useState("");
