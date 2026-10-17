@@ -1265,6 +1265,7 @@ model LibraryBookChapter {
   title           String   @db.VarChar(255)
   topicName       String   @default("") @map("topic_name") @db.VarChar(255)
   publishedText   String   @map("published_text") @db.LongText
+  exercisesText   String   @default("") @map("exercises_text") @db.LongText
   legacyLessonId  String?  @unique @map("legacy_lesson_id")
   addedByUserId   String   @map("added_by_user_id")
   addedBySchoolId String?  @map("added_by_school_id")

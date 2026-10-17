@@ -21,11 +21,13 @@ export default function LibraryBooksPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [uploadingBookId, setUploadingBookId] = useState<string | null>(null);
   const [replacing, setReplacing] = useState<LibraryChapter | null>(null);
   const [editorMode, setEditorMode] = useState<"edit" | "reupload" | null>(null);
   const [chapterName, setChapterName] = useState("");
   const [topicName, setTopicName] = useState("");
   const [draft, setDraft] = useState("");
+  const [exercises, setExercises] = useState("");
   const [classFilter, setClassFilter] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("");
   const [schoolFilter, setSchoolFilter] = useState("");
@@ -46,6 +48,28 @@ export default function LibraryBooksPage() {
     onError: (err) => toast({ title: "Could not delete book", description: (err as Error).message, variant: "error" }),
   });
 
+  const addChapter = useMutation({
+    mutationFn: () => {
+      if (!uploadingBookId) throw new Error("Choose a book");
+      return libraryBooksService.addChapter(uploadingBookId, {
+        title: chapterName.trim(),
+        topicName: topicName.trim(),
+        publishedText: draft.trim(),
+        exercisesText: exercises.trim(),
+      });
+    },
+    onSuccess: () => {
+      setUploadingBookId(null);
+      setChapterName("");
+      setTopicName("");
+      setDraft("");
+      setExercises("");
+      refresh();
+      toast({ title: "Lecture uploaded", variant: "success" });
+    },
+    onError: (err) => toast({ title: "Could not upload lecture", description: (err as Error).message, variant: "error" }),
+  });
+
   const removeChapter = useMutation({
     mutationFn: (input: { bookId: string; chapterId: string }) =>
       libraryBooksService.removeChapter(input.bookId, input.chapterId),
@@ -63,11 +87,13 @@ export default function LibraryBooksPage() {
     setChapterName(chapter.title);
     setTopicName(chapter.topicName || "");
     setDraft("");
+    setExercises("");
     try {
       const full = await libraryBooksService.getChapter(bookId, chapter.id);
       setChapterName(full.title);
       setTopicName(full.topicName || "");
       setDraft(mode === "reupload" ? "" : full.publishedText);
+      setExercises(mode === "reupload" ? "" : full.exercisesText || "");
     } catch (err) {
       toast({ title: "Could not open chapter", description: (err as Error).message, variant: "error" });
     }
@@ -80,12 +106,14 @@ export default function LibraryBooksPage() {
         title: chapterName.trim(),
         topicName: topicName.trim(),
         publishedText: draft.trim() || undefined,
+        exercisesText: exercises.trim(),
       });
     },
     onSuccess: () => {
       setReplacing(null);
       setEditorMode(null);
       setDraft("");
+      setExercises("");
       refresh();
       toast({ title: editorMode === "reupload" ? "Chapter reuploaded" : "Chapter updated", variant: "success" });
     },
@@ -235,6 +263,22 @@ export default function LibraryBooksPage() {
                       <TableRow key={`${book.id}-chapters`}>
                         <TableCell colSpan={8} className="bg-muted/30 p-0">
                           <div className="space-y-3 px-4 py-3">
+                            <div className="flex justify-end">
+                              <Button
+                                type="button"
+                                onClick={() => {
+                                  setReplacing(null);
+                                  setEditorMode(null);
+                                  setUploadingBookId(book.id);
+                                  setChapterName("");
+                                  setTopicName("");
+                                  setDraft("");
+                                  setExercises("");
+                                }}
+                              >
+                                Upload lecture
+                              </Button>
+                            </div>
                             {book.chapters.length ? (
                               book.chapters.map((chapter) => (
                                 <div key={chapter.id} className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
@@ -276,6 +320,41 @@ export default function LibraryBooksPage() {
                             ) : (
                               <p className="text-sm text-muted-foreground">No chapters in this book yet.</p>
                             )}
+                            {uploadingBookId === book.id ? (
+                              <div className="space-y-3 rounded-md border bg-background p-3">
+                                <p className="text-sm font-medium">Upload lecture</p>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <div className="space-y-1">
+                                    <Label>Lecture name</Label>
+                                    <Input value={chapterName} onChange={(e) => setChapterName(e.target.value)} placeholder="Unit 17 — Sets and Functions" />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label>Topic name</Label>
+                                    <Input value={topicName} onChange={(e) => setTopicName(e.target.value)} />
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <Label>Lesson content</Label>
+                                  <Textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Paste the lecture text" />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label>Exercises</Label>
+                                  <Textarea rows={8} value={exercises} onChange={(e) => setExercises(e.target.value)} placeholder="Exercise questions" />
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    disabled={!chapterName.trim() || !draft.trim() || addChapter.isPending}
+                                    onClick={() => addChapter.mutate()}
+                                  >
+                                    {addChapter.isPending ? "Uploading…" : "Save lecture"}
+                                  </Button>
+                                  <Button type="button" variant="outline" onClick={() => setUploadingBookId(null)}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : null}
                             {replacing && editorMode && openId === book.id ? (
                               <div className="space-y-3 rounded-md border bg-background p-3">
                                 <p className="text-sm font-medium">
@@ -292,12 +371,21 @@ export default function LibraryBooksPage() {
                                   </div>
                                 </div>
                                 <div className="space-y-1">
-                                  <Label>Content</Label>
+                                  <Label>Lesson content</Label>
                                   <Textarea
                                     rows={8}
                                     value={draft}
                                     onChange={(e) => setDraft(e.target.value)}
                                     placeholder={editorMode === "reupload" ? "Paste the new chapter text" : "Chapter text"}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label>Exercises</Label>
+                                  <Textarea
+                                    rows={8}
+                                    value={exercises}
+                                    onChange={(e) => setExercises(e.target.value)}
+                                    placeholder="Exercise questions"
                                   />
                                 </div>
                                 <div className="flex gap-2">

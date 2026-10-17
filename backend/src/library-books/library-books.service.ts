@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { splitSourceLessonAndExercises } from '../lessons/chapter-compile-repair';
 
 type LegacyRow = {
   id: string;
@@ -88,6 +89,46 @@ export class LibraryBooksService {
     };
   }
 
+  async addChapter(
+    bookId: string,
+    user: { id: string; schoolId?: string | null },
+    dto: { title: string; topicName?: string; publishedText: string; exercisesText?: string },
+  ) {
+    await this.ensureTables();
+    await this.requireBook(bookId);
+    const title = dto.title.trim().slice(0, 255);
+    const publishedText = dto.publishedText.trim();
+    if (!title || !publishedText) {
+      throw new BadRequestException({
+        code: 'CONTENT_REQUIRED',
+        message: 'Enter a lecture name and the lesson text',
+      });
+    }
+    const numberMatch = title.match(/\b(\d{1,3})\b/);
+    const duplicate = await this.prisma.libraryBookChapter.findFirst({
+      where: { bookId, title },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new BadRequestException({
+        code: 'CHAPTER_EXISTS',
+        message: 'This book already has a lecture with that name',
+      });
+    }
+    return this.prisma.libraryBookChapter.create({
+      data: {
+        bookId,
+        chapterNumber: numberMatch ? Number(numberMatch[1]) : null,
+        title,
+        topicName: (dto.topicName ?? '').trim().slice(0, 255),
+        publishedText,
+        exercisesText: (dto.exercisesText ?? '').trim(),
+        addedByUserId: user.id,
+        addedBySchoolId: user.schoolId || null,
+      },
+    });
+  }
+
   async removeChapter(bookId: string, chapterId: string) {
     await this.ensureTables();
     const chapter = await this.prisma.libraryBookChapter.findFirst({
@@ -106,7 +147,7 @@ export class LibraryBooksService {
     await this.ensureTables();
     const chapter = await this.prisma.libraryBookChapter.findFirst({
       where: { id: chapterId, bookId },
-      select: { id: true, title: true, topicName: true, publishedText: true },
+      select: { id: true, title: true, topicName: true, publishedText: true, exercisesText: true },
     });
     if (!chapter) {
       throw new NotFoundException({ code: 'CHAPTER_NOT_FOUND', message: 'Chapter not found' });
@@ -118,7 +159,7 @@ export class LibraryBooksService {
     bookId: string,
     chapterId: string,
     user: { id: string; schoolId?: string | null },
-    dto: { title?: string; topicName?: string; publishedText?: string },
+    dto: { title?: string; topicName?: string; publishedText?: string; exercisesText?: string },
   ) {
     await this.ensureTables();
     const chapter = await this.prisma.libraryBookChapter.findFirst({
@@ -131,7 +172,8 @@ export class LibraryBooksService {
     const title = dto.title?.trim();
     const topicName = dto.topicName?.trim();
     const publishedText = dto.publishedText?.trim();
-    if (!title && topicName === undefined && !publishedText) {
+    const exercisesText = dto.exercisesText?.trim();
+    if (!title && topicName === undefined && !publishedText && exercisesText === undefined) {
       throw new BadRequestException({
         code: 'CONTENT_REQUIRED',
         message: 'Change the chapter name, topic name, or content before saving',
@@ -143,6 +185,7 @@ export class LibraryBooksService {
         ...(title ? { title: title.slice(0, 255) } : {}),
         ...(topicName !== undefined ? { topicName: topicName.slice(0, 255) } : {}),
         ...(publishedText ? { publishedText } : {}),
+        ...(exercisesText !== undefined ? { exercisesText } : {}),
         addedByUserId: user.id,
         addedBySchoolId: user.schoolId || null,
       },
@@ -377,6 +420,13 @@ export class LibraryBooksService {
     } catch {
       // Column already exists after the first library open.
     }
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `ALTER TABLE library_book_chapters ADD COLUMN exercises_text LONGTEXT NOT NULL DEFAULT ('')`,
+      );
+    } catch {
+      // Column already exists after the first library open.
+    }
     for (const statement of [
       `ALTER TABLE library_book_grants ADD COLUMN can_read TINYINT(1) NOT NULL DEFAULT 1`,
       `ALTER TABLE library_book_grants ADD COLUMN can_write TINYINT(1) NOT NULL DEFAULT 0`,
@@ -469,7 +519,8 @@ export class LibraryBooksService {
               chapterNumber: numberMatch ? Number(numberMatch[1]) : null,
               title: storedTitle,
               topicName: (row.topic_name || '').trim().slice(0, 255),
-              publishedText: row.ai_summary?.trim() || '',
+              publishedText: splitSourceLessonAndExercises(row.ai_summary?.trim() || '').lessonBody,
+              exercisesText: splitSourceLessonAndExercises(row.ai_summary?.trim() || '').exercises,
               legacyLessonId: row.id,
               addedByUserId: row.created_by_id || actorUserId,
               addedBySchoolId: row.school_id,

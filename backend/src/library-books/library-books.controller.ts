@@ -55,6 +55,24 @@ class GrantLibraryBookDto {
   canDelete?: boolean;
 }
 
+class CreateChapterDto {
+  @IsString()
+  @MaxLength(255)
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  topicName?: string;
+
+  @IsString()
+  publishedText!: string;
+
+  @IsOptional()
+  @IsString()
+  exercisesText?: string;
+}
+
 class ReplaceChapterDto {
   @IsOptional()
   @IsString()
@@ -69,6 +87,10 @@ class ReplaceChapterDto {
   @IsOptional()
   @IsString()
   publishedText?: string;
+
+  @IsOptional()
+  @IsString()
+  exercisesText?: string;
 }
 
 class CreateLibraryBookDto {
@@ -132,6 +154,11 @@ export class LibraryBooksController {
   @Delete(':id/grants/:schoolId')
   revoke(@Param('id') id: string, @Param('schoolId') schoolId: string) {
     return this.books.revoke(id, schoolId);
+  }
+
+  @Post(':id/chapters')
+  addChapter(@Param('id') id: string, @Body() dto: CreateChapterDto, @CurrentUser() user: AuthUser) {
+    return this.books.addChapter(id, user, dto);
   }
 
   @Delete(':id/chapters/:chapterId')

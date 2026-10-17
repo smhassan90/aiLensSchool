@@ -2,7 +2,7 @@ import { countLatinLetters } from '../common/extract-quality';
 import { stripInterleavedWeblinkSidebar } from './sidebar-layout-ocr';
 
 const EXERCISE_HEADING =
-  /(?:^|\n)\s*(?:\*\*)?Exercise\s*[1-9][0-9]?(?:\*\*)?\b/i;
+  /(?:^|\n)\s*(?:#{1,6}\s+)?(?:\*\*)?Exercise\s*[1-9][0-9]?(?:\*\*)?\b/i;
 
 const OPENING_POEM_CUES = [
   /flung\s+h?\s*imself/i,

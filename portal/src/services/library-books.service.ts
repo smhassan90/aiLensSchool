@@ -75,18 +75,27 @@ export const libraryBooksService = {
   remove(id: string) {
     return apiClient(`/library-books/${id}`, { method: "DELETE" });
   },
+  addChapter(
+    bookId: string,
+    body: { title: string; topicName?: string; publishedText: string; exercisesText?: string },
+  ) {
+    return apiClient(`/library-books/${bookId}/chapters`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
   removeChapter(bookId: string, chapterId: string) {
     return apiClient(`/library-books/${bookId}/chapters/${chapterId}`, { method: "DELETE" });
   },
   getChapter(bookId: string, chapterId: string) {
-    return apiClient<{ id: string; title: string; topicName: string; publishedText: string }>(
+    return apiClient<{ id: string; title: string; topicName: string; publishedText: string; exercisesText: string }>(
       `/library-books/${bookId}/chapters/${chapterId}`,
     );
   },
   replaceChapter(
     bookId: string,
     chapterId: string,
-    body: { title?: string; topicName?: string; publishedText?: string },
+    body: { title?: string; topicName?: string; publishedText?: string; exercisesText?: string },
   ) {
     return apiClient(`/library-books/${bookId}/chapters/${chapterId}`, {
       method: "PATCH",
