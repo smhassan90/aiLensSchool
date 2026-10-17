@@ -55,7 +55,9 @@ export class LibraryBooksService {
       editionYear: book.editionYear,
       chapterCount: book._count.chapters,
       schoolCount: book._count.grants,
-      createdBy: book.createdBy,
+      createdBy: book.createdBy
+        ? book.createdBy
+        : { id: book.createdByUserId, firstName: 'Unknown', lastName: '' },
       originSchool: book.originSchool,
       createdAt: book.createdAt,
       chapters: book.chapters.map((chapter) => this.presentChapter(chapter, people)),
@@ -165,7 +167,7 @@ export class LibraryBooksService {
       chapterNumber: chapter.chapterNumber,
       title: chapter.title,
       topicName: chapter.topicName,
-      textLength: chapter.publishedText.length,
+      textLength: (chapter.publishedText ?? '').length,
       createdAt: chapter.createdAt,
       uploadedBy: user ? { firstName: user.firstName, lastName: user.lastName } : null,
       uploadedBySchool: chapter.addedBySchoolId

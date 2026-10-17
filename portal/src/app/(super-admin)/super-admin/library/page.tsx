@@ -101,9 +101,9 @@ export default function LibraryBooksPage() {
       if (book.classLabel) classes.add(book.classLabel);
       if (book.subjectLabel) subjects.add(book.subjectLabel);
       if (book.originSchool?.name) schools.add(book.originSchool.name);
-      const creator = personFullName(book.createdBy.firstName, book.createdBy.lastName);
+      const creator = personFullName(book.createdBy?.firstName, book.createdBy?.lastName);
       if (creator) uploaders.add(creator);
-      for (const chapter of book.chapters) {
+      for (const chapter of book.chapters ?? []) {
         if (chapter.uploadedBySchool?.name) schools.add(chapter.uploadedBySchool.name);
         const uploader = chapter.uploadedBy
           ? personFullName(chapter.uploadedBy.firstName, chapter.uploadedBy.lastName)
@@ -122,11 +122,11 @@ export default function LibraryBooksPage() {
 
   const books = useMemo(() => {
     const rows = [...(data ?? [])].sort((a, b) => {
-      const byClass = a.classLabel.localeCompare(b.classLabel);
+      const byClass = (a.classLabel ?? "").localeCompare(b.classLabel ?? "");
       if (byClass) return byClass;
-      const bySubject = a.subjectLabel.localeCompare(b.subjectLabel);
+      const bySubject = (a.subjectLabel ?? "").localeCompare(b.subjectLabel ?? "");
       if (bySubject) return bySubject;
-      return a.title.localeCompare(b.title);
+      return (a.title ?? "").localeCompare(b.title ?? "");
     });
     return rows
       .filter((book) => !classFilter || book.classLabel === classFilter)
@@ -135,7 +135,7 @@ export default function LibraryBooksPage() {
       .filter((book) => !uploaderFilter || bookMatchesUploader(book, uploaderFilter))
       .map((book) => ({
         ...book,
-        chapters: book.chapters.filter((chapter) => chapterVisible(book, chapter, schoolFilter, uploaderFilter)),
+        chapters: (book.chapters ?? []).filter((chapter) => chapterVisible(book, chapter, schoolFilter, uploaderFilter)),
       }));
   }, [data, classFilter, subjectFilter, schoolFilter, uploaderFilter]);
 
@@ -213,7 +213,7 @@ export default function LibraryBooksPage() {
                       <TableCell>{book.chapterCount}</TableCell>
                       <TableCell>{book.schoolCount}</TableCell>
                       <TableCell>
-                        {personFullName(book.createdBy.firstName, book.createdBy.lastName)}
+                        {personFullName(book.createdBy?.firstName, book.createdBy?.lastName) || "Unknown"}
                         {book.originSchool ? ` · ${book.originSchool.name}` : ""}
                       </TableCell>
                       <TableCell>
@@ -338,12 +338,12 @@ export default function LibraryBooksPage() {
 
 function bookMatchesSchool(book: LibraryBookListItem, school: string) {
   if (book.originSchool?.name === school) return true;
-  return book.chapters.some((chapter) => chapter.uploadedBySchool?.name === school);
+  return (book.chapters ?? []).some((chapter) => chapter.uploadedBySchool?.name === school);
 }
 
 function bookMatchesUploader(book: LibraryBookListItem, uploader: string) {
-  if (personFullName(book.createdBy.firstName, book.createdBy.lastName) === uploader) return true;
-  return book.chapters.some((chapter) =>
+  if (personFullName(book.createdBy?.firstName, book.createdBy?.lastName) === uploader) return true;
+  return (book.chapters ?? []).some((chapter) =>
     chapter.uploadedBy
       ? personFullName(chapter.uploadedBy.firstName, chapter.uploadedBy.lastName) === uploader
       : false,

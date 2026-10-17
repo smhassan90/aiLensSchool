@@ -20,7 +20,7 @@ export type LibraryBookListItem = {
   editionYear: string | null;
   chapterCount: number;
   schoolCount: number;
-  createdBy: { id: string; firstName: string; lastName: string };
+  createdBy: { id: string; firstName: string; lastName: string } | null;
   originSchool: { id: string; name: string } | null;
   createdAt: string;
   chapters: LibraryChapter[];

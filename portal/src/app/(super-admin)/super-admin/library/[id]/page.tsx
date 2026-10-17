@@ -88,7 +88,7 @@ export default function LibraryBookPage() {
     onError: (err) => toast({ title: "Could not unassign", description: (err as Error).message, variant: "error" }),
   });
 
-  const assignedIds = new Set(data?.grants.map((grant) => grant.schoolId) ?? []);
+  const assignedIds = new Set(data?.grants?.map((grant) => grant.schoolId) ?? []);
 
   if (isLoading || !data) return <PageLoader variant="page" />;
 
@@ -146,9 +146,9 @@ export default function LibraryBookPage() {
           <p className="text-sm text-muted-foreground">
             Unassigning stops new quizzes, homework, and exam papers from this book. Papers already generated remain.
           </p>
-          {data.grants.length ? (
+          {(data.grants ?? []).length ? (
             <ul className="space-y-2 text-sm">
-              {data.grants.map((grantRow) => (
+              {(data.grants ?? []).map((grantRow) => (
                 <li key={grantRow.id} className="flex flex-wrap items-center justify-between gap-3 border-b py-2">
                   <span className="font-medium">{grantRow.school.name}</span>
                   <span className="text-xs text-muted-foreground">
@@ -214,10 +214,10 @@ export default function LibraryBookPage() {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Chapters ({data.chapters.length})</CardTitle>
+          <CardTitle className="text-base">Chapters ({(data.chapters ?? []).length})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          {data.chapters.map((chapter) => (
+          {(data.chapters ?? []).map((chapter) => (
             <div key={chapter.id} className="flex justify-between gap-4 border-b py-2">
               <span>
                 <span className="font-medium">
@@ -231,7 +231,9 @@ export default function LibraryBookPage() {
                   {chapter.uploadedBySchool?.name ? ` · ${chapter.uploadedBySchool.name}` : ""}
                 </span>
               </span>
-              <span className="text-muted-foreground">{chapter.textLength.toLocaleString()} characters</span>
+              <span className="text-muted-foreground">
+                {(chapter.textLength ?? 0).toLocaleString()} characters
+              </span>
             </div>
           ))}
         </CardContent>
