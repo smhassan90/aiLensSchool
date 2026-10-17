@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { type HTMLAttributes } from "react";
+import { type HTMLAttributes, type TdHTMLAttributes, type ThHTMLAttributes } from "react";
 
 export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
   return (
@@ -26,7 +26,7 @@ export function TableRow({ className, ...props }: HTMLAttributes<HTMLTableRowEle
   );
 }
 
-export function TableHead({ className, ...props }: HTMLAttributes<HTMLTableCellElement>) {
+export function TableHead({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
       className={cn(
@@ -38,6 +38,6 @@ export function TableHead({ className, ...props }: HTMLAttributes<HTMLTableCellE
   );
 }
 
-export function TableCell({ className, ...props }: HTMLAttributes<HTMLTableCellElement>) {
+export function TableCell({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
   return <td className={cn("p-4 align-middle", className)} {...props} />;
 }
