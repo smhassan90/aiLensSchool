@@ -75,6 +75,17 @@ export const libraryBooksService = {
   remove(id: string) {
     return apiClient(`/library-books/${id}`, { method: "DELETE" });
   },
+  compileLecture(bookId: string, sourceText: string) {
+    return apiClient<{
+      chapterName: string;
+      topicName: string;
+      lessonBody: string;
+      exercises: string;
+    }>(`/library-books/${bookId}/compile`, {
+      method: "POST",
+      body: JSON.stringify({ sourceText }),
+    });
+  },
   addChapter(
     bookId: string,
     body: { title: string; topicName?: string; publishedText: string; exercisesText?: string },

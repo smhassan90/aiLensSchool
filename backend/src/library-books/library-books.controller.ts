@@ -55,6 +55,11 @@ class GrantLibraryBookDto {
   canDelete?: boolean;
 }
 
+class CompileLectureDto {
+  @IsString()
+  sourceText!: string;
+}
+
 class CreateChapterDto {
   @IsString()
   @MaxLength(255)
@@ -154,6 +159,11 @@ export class LibraryBooksController {
   @Delete(':id/grants/:schoolId')
   revoke(@Param('id') id: string, @Param('schoolId') schoolId: string) {
     return this.books.revoke(id, schoolId);
+  }
+
+  @Post(':id/compile')
+  compile(@Param('id') id: string, @Body() dto: CompileLectureDto, @CurrentUser() user: AuthUser) {
+    return this.books.compileLecture(id, user.id, dto.sourceText);
   }
 
   @Post(':id/chapters')

@@ -27,7 +27,8 @@ export default function LibraryBooksPage() {
   const [chapterName, setChapterName] = useState("");
   const [topicName, setTopicName] = useState("");
   const [draft, setDraft] = useState("");
-  const [exercises, setExercises] = useState("");
+  const [sourceText, setSourceText] = useState("");
+  const [lectureReady, setLectureReady] = useState(false);
   const [classFilter, setClassFilter] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("");
   const [schoolFilter, setSchoolFilter] = useState("");
@@ -48,6 +49,22 @@ export default function LibraryBooksPage() {
     onError: (err) => toast({ title: "Could not delete book", description: (err as Error).message, variant: "error" }),
   });
 
+  const compileLecture = useMutation({
+    mutationFn: () => {
+      if (!uploadingBookId) throw new Error("Choose a book");
+      return libraryBooksService.compileLecture(uploadingBookId, sourceText.trim());
+    },
+    onSuccess: (result) => {
+      if (result.chapterName) setChapterName(result.chapterName);
+      if (result.topicName) setTopicName(result.topicName);
+      setDraft(result.lessonBody);
+      setExercises(result.exercises);
+      setLectureReady(true);
+      toast({ title: "Lecture compiled", description: "Review the lesson and exercises, then save.", variant: "success" });
+    },
+    onError: (err) => toast({ title: "Could not compile", description: (err as Error).message, variant: "error" }),
+  });
+
   const addChapter = useMutation({
     mutationFn: () => {
       if (!uploadingBookId) throw new Error("Choose a book");
@@ -62,8 +79,10 @@ export default function LibraryBooksPage() {
       setUploadingBookId(null);
       setChapterName("");
       setTopicName("");
+      setSourceText("");
       setDraft("");
       setExercises("");
+      setLectureReady(false);
       refresh();
       toast({ title: "Lecture uploaded", variant: "success" });
     },
@@ -272,8 +291,10 @@ export default function LibraryBooksPage() {
                                   setUploadingBookId(book.id);
                                   setChapterName("");
                                   setTopicName("");
+                                  setSourceText("");
                                   setDraft("");
                                   setExercises("");
+                                  setLectureReady(false);
                                 }}
                               >
                                 Upload lecture
@@ -334,20 +355,44 @@ export default function LibraryBooksPage() {
                                   </div>
                                 </div>
                                 <div className="space-y-1">
-                                  <Label>Lesson content</Label>
-                                  <Textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Paste the lecture text" />
+                                  <Label>Chapter text</Label>
+                                  <Textarea
+                                    rows={8}
+                                    value={sourceText}
+                                    onChange={(e) => {
+                                      setSourceText(e.target.value);
+                                      setLectureReady(false);
+                                    }}
+                                    placeholder="Paste the full chapter, including exercises"
+                                  />
                                 </div>
-                                <div className="space-y-1">
-                                  <Label>Exercises</Label>
-                                  <Textarea rows={8} value={exercises} onChange={(e) => setExercises(e.target.value)} placeholder="Exercise questions" />
-                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  disabled={!sourceText.trim() || compileLecture.isPending}
+                                  onClick={() => compileLecture.mutate()}
+                                >
+                                  {compileLecture.isPending ? "Compiling…" : "Compile with AI"}
+                                </Button>
+                                {lectureReady ? (
+                                  <>
+                                    <div className="space-y-1">
+                                      <Label>Lesson content</Label>
+                                      <Textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Exercises</Label>
+                                      <Textarea rows={8} value={exercises} onChange={(e) => setExercises(e.target.value)} />
+                                    </div>
+                                  </>
+                                ) : null}
                                 <div className="flex gap-2">
                                   <Button
                                     type="button"
-                                    disabled={!chapterName.trim() || !draft.trim() || addChapter.isPending}
+                                    disabled={!lectureReady || !chapterName.trim() || !draft.trim() || addChapter.isPending}
                                     onClick={() => addChapter.mutate()}
                                   >
-                                    {addChapter.isPending ? "Uploading…" : "Save lecture"}
+                                    {addChapter.isPending ? "Saving…" : "Save chapter"}
                                   </Button>
                                   <Button type="button" variant="outline" onClick={() => setUploadingBookId(null)}>
                                     Cancel

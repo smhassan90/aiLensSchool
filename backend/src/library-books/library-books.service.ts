@@ -1,7 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
-import { splitSourceLessonAndExercises } from '../lessons/chapter-compile-repair';
+import { ChapterCompileService } from '../ai/services/chapter-compile.service';
+import {
+  repairCompiledChapterFromSource,
+  splitSourceLessonAndExercises,
+} from '../lessons/chapter-compile-repair';
 
 type LegacyRow = {
   id: string;
@@ -17,7 +21,10 @@ type LegacyRow = {
 
 @Injectable()
 export class LibraryBooksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly chapterCompile: ChapterCompileService,
+  ) {}
 
   async listForSuperAdmin(actorUserId: string) {
     await this.ensureTables();
@@ -127,6 +134,35 @@ export class LibraryBooksService {
         addedBySchoolId: user.schoolId || null,
       },
     });
+  }
+
+  async compileLecture(bookId: string, userId: string, sourceText: string) {
+    await this.ensureTables();
+    const book = await this.prisma.libraryBook.findUnique({
+      where: { id: bookId },
+      select: { id: true, subjectLabel: true, classLabel: true },
+    });
+    if (!book) throw new NotFoundException({ code: 'BOOK_NOT_FOUND', message: 'Book not found' });
+    const source = sourceText.trim();
+    if (!source) {
+      throw new BadRequestException({
+        code: 'CONTENT_REQUIRED',
+        message: 'Paste the chapter text before compiling',
+      });
+    }
+    const compiled = await this.chapterCompile.compile({
+      userId,
+      sourceText: source,
+      subjectName: book.subjectLabel || 'General',
+      gradeName: book.classLabel || undefined,
+    });
+    const repaired = repairCompiledChapterFromSource(source, compiled.lessonBody, compiled.exercises);
+    return {
+      chapterName: compiled.chapterName?.trim() || '',
+      topicName: compiled.topicName?.trim() || '',
+      lessonBody: repaired.lessonBody,
+      exercises: repaired.exercises,
+    };
   }
 
   async removeChapter(bookId: string, chapterId: string) {
