@@ -92,11 +92,12 @@ export class LibraryBooksService {
     await this.ensureTables();
     const chapter = await this.prisma.libraryBookChapter.findFirst({
       where: { id: chapterId, bookId },
-      select: { id: true },
+      select: { id: true, legacyLessonId: true },
     });
     if (!chapter) {
       throw new NotFoundException({ code: 'CHAPTER_NOT_FOUND', message: 'Chapter not found' });
     }
+    await this.rememberSkippedLessons(chapter.legacyLessonId ? [chapter.legacyLessonId] : []);
     await this.prisma.libraryBookChapter.delete({ where: { id: chapterId } });
     return { ok: true };
   }
@@ -300,6 +301,13 @@ export class LibraryBooksService {
   async remove(id: string) {
     await this.ensureTables();
     await this.requireBook(id);
+    const chapters = await this.prisma.libraryBookChapter.findMany({
+      where: { bookId: id },
+      select: { legacyLessonId: true },
+    });
+    await this.rememberSkippedLessons(
+      chapters.map((chapter) => chapter.legacyLessonId).filter((lessonId): lessonId is string => Boolean(lessonId)),
+    );
     await this.prisma.libraryBook.delete({ where: { id } });
     return { ok: true };
   }
@@ -381,9 +389,34 @@ export class LibraryBooksService {
         // Column already exists.
       }
     }
+    await this.prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS library_import_skips (
+        legacy_lesson_id VARCHAR(191) NOT NULL,
+        PRIMARY KEY (legacy_lesson_id)
+      ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+  }
+
+  /** Stops the next library open from importing a chapter the super admin already deleted. */
+  private async rememberSkippedLessons(lessonIds: string[]) {
+    const ids = [...new Set(lessonIds.filter(Boolean))];
+    for (const lessonId of ids) {
+      await this.prisma.$executeRaw`
+        INSERT IGNORE INTO library_import_skips (legacy_lesson_id) VALUES (${lessonId})
+      `;
+    }
+  }
+
+  private async skippedLessonIds() {
+    const rows = await this.prisma.$queryRaw<Array<{ legacy_lesson_id: string }>>`
+      SELECT legacy_lesson_id FROM library_import_skips
+    `;
+    return new Set(rows.map((row) => row.legacy_lesson_id));
+  }
   }
 
   private async importLegacyChapters(actorUserId: string) {
+    const skipped = await this.skippedLessonIds();
     const rows = await this.prisma.$queryRaw<LegacyRow[]>`
       SELECT dl.id, dl.school_id, sch.name AS school_name, dl.chapter_name, dl.topic_name,
              dl.ai_summary, dl.created_by_id, sub.name AS subject_name, g.name AS grade_name
@@ -394,6 +427,7 @@ export class LibraryBooksService {
       WHERE dl.record_kind = 'CHAPTER_LIBRARY'
     `;
     for (const row of rows) {
+      if (skipped.has(row.id)) continue;
       const existing = await this.prisma.libraryBookChapter.findUnique({
         where: { legacyLessonId: row.id },
         select: { id: true, topicName: true },
