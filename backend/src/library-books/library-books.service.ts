@@ -413,7 +413,6 @@ export class LibraryBooksService {
     `;
     return new Set(rows.map((row) => row.legacy_lesson_id));
   }
-  }
 
   private async importLegacyChapters(actorUserId: string) {
     const skipped = await this.skippedLessonIds();
