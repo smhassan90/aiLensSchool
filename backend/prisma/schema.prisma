@@ -1265,7 +1265,7 @@ model LibraryBookChapter {
   title           String   @db.VarChar(255)
   topicName       String   @default("") @map("topic_name") @db.VarChar(255)
   publishedText   String   @map("published_text") @db.LongText
-  exercisesText   String   @default("") @map("exercises_text") @db.LongText
+  exercisesText   String   @map("exercises_text") @db.LongText
   legacyLessonId  String?  @unique @map("legacy_lesson_id")
   addedByUserId   String   @map("added_by_user_id")
   addedBySchoolId String?  @map("added_by_school_id")
@@ -1296,6 +1296,13 @@ model LibraryBookGrant {
   @@unique([bookId, schoolId])
   @@index([schoolId])
   @@map("library_book_grants")
+}
+
+/// Chapters a super admin deleted, so the next library open does not import them again.
+model LibraryImportSkip {
+  legacyLessonId String @id @map("legacy_lesson_id") @db.VarChar(191)
+
+  @@map("library_import_skips")
 }
 
 // ===================== LESSONS =====================
