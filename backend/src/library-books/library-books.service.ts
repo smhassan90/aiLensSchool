@@ -7,6 +7,12 @@ import {
   splitSourceLessonAndExercises,
 } from '../lessons/chapter-compile-repair';
 
+function normalizeLanguage(value?: string) {
+  const language = (value ?? '').trim();
+  if (language === 'Urdu' || language === 'Sindhi' || language === 'English') return language;
+  return 'English';
+}
+
 type LegacyRow = {
   id: string;
   school_id: string;
@@ -60,6 +66,7 @@ export class LibraryBooksService {
       publisher: book.publisher,
       classLabel: book.classLabel,
       subjectLabel: book.subjectLabel,
+      language: book.language,
       editionYear: book.editionYear,
       chapterCount: book._count.chapters,
       schoolCount: book._count.grants,
@@ -278,6 +285,7 @@ export class LibraryBooksService {
       publisher?: string;
       classLabel?: string;
       subjectLabel?: string;
+      language?: string;
       editionYear?: string;
     },
   ) {
@@ -294,6 +302,7 @@ export class LibraryBooksService {
         publisher: dto.publisher?.trim() || '',
         classLabel: dto.classLabel?.trim() || '',
         subjectLabel: dto.subjectLabel?.trim() || '',
+        language: normalizeLanguage(dto.language),
         editionYear: dto.editionYear?.trim() || null,
         createdByUserId: user.id,
         createdBySchoolId: user.schoolId || null,
@@ -333,6 +342,7 @@ export class LibraryBooksService {
       publisher?: string;
       classLabel?: string;
       subjectLabel?: string;
+      language?: string;
       editionYear?: string;
     },
   ) {
@@ -345,6 +355,7 @@ export class LibraryBooksService {
         publisher: dto.publisher?.trim(),
         classLabel: dto.classLabel?.trim(),
         subjectLabel: dto.subjectLabel?.trim(),
+        language: dto.language !== undefined ? normalizeLanguage(dto.language) : undefined,
         editionYear: dto.editionYear?.trim() || null,
       },
     });
@@ -406,6 +417,7 @@ export class LibraryBooksService {
         publisher VARCHAR(255) NOT NULL DEFAULT '',
         class_label VARCHAR(120) NOT NULL DEFAULT '',
         subject_label VARCHAR(120) NOT NULL DEFAULT '',
+        language VARCHAR(20) NOT NULL DEFAULT 'English',
         edition_year VARCHAR(20) NULL,
         created_by_user_id VARCHAR(191) NOT NULL,
         created_by_school_id VARCHAR(191) NULL,
@@ -449,6 +461,13 @@ export class LibraryBooksService {
         CONSTRAINT library_book_grants_school_fk FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE
       ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `ALTER TABLE library_books ADD COLUMN language VARCHAR(20) NOT NULL DEFAULT 'English'`,
+      );
+    } catch {
+      // Column already exists after the first library open.
+    }
     try {
       await this.prisma.$executeRawUnsafe(
         `ALTER TABLE library_book_chapters ADD COLUMN topic_name VARCHAR(255) NOT NULL DEFAULT ''`,

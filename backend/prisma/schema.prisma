@@ -1243,6 +1243,7 @@ model LibraryBook {
   publisher         String   @default("") @db.VarChar(255)
   classLabel        String   @default("") @map("class_label") @db.VarChar(120)
   subjectLabel      String   @default("") @map("subject_label") @db.VarChar(120)
+  language          String   @default("English") @db.VarChar(20)
   editionYear       String?  @map("edition_year") @db.VarChar(20)
   createdByUserId   String   @map("created_by_user_id")
   createdBySchoolId String?  @map("created_by_school_id")

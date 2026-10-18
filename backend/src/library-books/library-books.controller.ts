@@ -31,6 +31,11 @@ class UpdateLibraryBookDto {
   @IsOptional()
   @IsString()
   @MaxLength(20)
+  language?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
   editionYear?: string;
 }
 
@@ -117,6 +122,11 @@ class CreateLibraryBookDto {
   @IsString()
   @MaxLength(120)
   subjectLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  language?: string;
 
   @IsOptional()
   @IsString()

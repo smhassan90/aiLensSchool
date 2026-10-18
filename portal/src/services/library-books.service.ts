@@ -17,6 +17,7 @@ export type LibraryBookListItem = {
   publisher: string;
   classLabel: string;
   subjectLabel: string;
+  language: string;
   editionYear: string | null;
   chapterCount: number;
   schoolCount: number;
@@ -47,14 +48,14 @@ export const libraryBooksService = {
   },
   update(
     id: string,
-    body: Partial<Pick<LibraryBookListItem, "title" | "publisher" | "classLabel" | "subjectLabel" | "editionYear">>,
+    body: Partial<Pick<LibraryBookListItem, "title" | "publisher" | "classLabel" | "subjectLabel" | "editionYear" | "language">>,
   ) {
     return apiClient<LibraryBookListItem>(`/library-books/${id}`, {
       method: "PATCH",
       body: JSON.stringify(body),
     });
   },
-  create(body: { title: string; publisher?: string; classLabel?: string; subjectLabel?: string; editionYear?: string }) {
+  create(body: { title: string; publisher?: string; classLabel?: string; subjectLabel?: string; language?: string; editionYear?: string }) {
     return apiClient<{ id: string }>("/library-books", {
       method: "POST",
       body: JSON.stringify(body),

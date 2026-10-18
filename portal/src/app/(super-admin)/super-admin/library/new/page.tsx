@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { libraryBooksService } from "@/services/library-books.service";
+import { LIBRARY_CLASSES, LIBRARY_LANGUAGES, LIBRARY_SUBJECTS, optionsWithCurrent } from "@/lib/library-book-options";
 import { useToast } from "@/providers/toast-provider";
 import { ArrowLeft } from "lucide-react";
 
@@ -20,6 +21,7 @@ export default function NewLibraryBookPage() {
   const [publisher, setPublisher] = useState("");
   const [classLabel, setClassLabel] = useState("");
   const [subjectLabel, setSubjectLabel] = useState("");
+  const [language, setLanguage] = useState("English");
   const [editionYear, setEditionYear] = useState("");
 
   const create = useMutation({
@@ -27,8 +29,9 @@ export default function NewLibraryBookPage() {
       libraryBooksService.create({
         title: title.trim(),
         publisher: publisher.trim(),
-        classLabel: classLabel.trim(),
-        subjectLabel: subjectLabel.trim(),
+        classLabel,
+        subjectLabel,
+        language,
         editionYear: editionYear.trim(),
       }),
     onSuccess: (book) => {
@@ -68,11 +71,29 @@ export default function NewLibraryBookPage() {
           </div>
           <div className="space-y-2">
             <Label>Class</Label>
-            <Input value={classLabel} onChange={(e) => setClassLabel(e.target.value)} placeholder="Class X" />
+            <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={classLabel} onChange={(e) => setClassLabel(e.target.value)}>
+              <option value="">Select a class</option>
+              {LIBRARY_CLASSES.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
           </div>
           <div className="space-y-2">
             <Label>Subject</Label>
-            <Input value={subjectLabel} onChange={(e) => setSubjectLabel(e.target.value)} placeholder="Mathematics" />
+            <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={subjectLabel} onChange={(e) => setSubjectLabel(e.target.value)}>
+              <option value="">Select a subject</option>
+              {LIBRARY_SUBJECTS.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label>Language</Label>
+            <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={language} onChange={(e) => setLanguage(e.target.value)}>
+              {LIBRARY_LANGUAGES.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
           </div>
           <div className="sm:col-span-2">
             <Button disabled={!title.trim() || create.isPending} onClick={() => create.mutate()}>

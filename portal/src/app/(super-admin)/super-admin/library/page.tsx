@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLoader } from "@/components/layout/page-loader";
 import { EmptyState } from "@/components/layout/empty-state";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,8 +14,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { libraryBooksService, type LibraryBookListItem, type LibraryChapter } from "@/services/library-books.service";
 import { personFullName } from "@/lib/person-name";
 import { useToast } from "@/providers/toast-provider";
-import { ChevronDown, Library } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ChevronDown, Library, Pencil, Trash2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LIBRARY_CLASSES, LIBRARY_LANGUAGES, LIBRARY_SUBJECTS, optionsWithCurrent } from "@/lib/library-book-options";
 
 export default function LibraryBooksPage() {
   const { toast } = useToast();
@@ -34,6 +36,18 @@ export default function LibraryBooksPage() {
   const [subjectFilter, setSubjectFilter] = useState("");
   const [schoolFilter, setSchoolFilter] = useState("");
   const [uploaderFilter, setUploaderFilter] = useState("");
+  const [editingBook, setEditingBook] = useState<LibraryBookListItem | null>(null);
+  const [bookTitle, setBookTitle] = useState("");
+  const [bookPublisher, setBookPublisher] = useState("");
+  const [bookClass, setBookClass] = useState("");
+  const [bookSubject, setBookSubject] = useState("");
+  const [bookLanguage, setBookLanguage] = useState("English");
+  const [bookYear, setBookYear] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<
+    | { kind: "book"; id: string; name: string }
+    | { kind: "chapter"; bookId: string; chapterId: string; name: string }
+    | null
+  >(null);
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["library-books"],
     queryFn: () => libraryBooksService.list(),
@@ -45,7 +59,8 @@ export default function LibraryBooksPage() {
     mutationFn: (id: string) => libraryBooksService.remove(id),
     onSuccess: () => {
       refresh();
-      toast({ title: "Book deleted", variant: "success" });
+      setConfirmDelete(null);
+      toast({ title: "Book removed", description: "It is no longer available to any school.", variant: "success" });
     },
     onError: (err) => toast({ title: "Could not delete book", description: (err as Error).message, variant: "error" }),
   });
@@ -85,7 +100,7 @@ export default function LibraryBooksPage() {
       setExercises("");
       setLectureReady(false);
       refresh();
-      toast({ title: "Lecture uploaded", variant: "success" });
+      toast({ title: "Lecture saved", description: "Lesson text and exercises are stored separately.", variant: "success" });
     },
     onError: (err) => toast({ title: "Could not upload lecture", description: (err as Error).message, variant: "error" }),
   });
@@ -94,8 +109,9 @@ export default function LibraryBooksPage() {
     mutationFn: (input: { bookId: string; chapterId: string }) =>
       libraryBooksService.removeChapter(input.bookId, input.chapterId),
     onSuccess: () => {
+      setConfirmDelete(null);
       refresh();
-      toast({ title: "Chapter deleted", variant: "success" });
+      toast({ title: "Chapter removed", description: "It will not be imported again.", variant: "success" });
     },
     onError: (err) => toast({ title: "Could not delete chapter", description: (err as Error).message, variant: "error" }),
   });
@@ -135,10 +151,40 @@ export default function LibraryBooksPage() {
       setDraft("");
       setExercises("");
       refresh();
-      toast({ title: editorMode === "reupload" ? "Chapter reuploaded" : "Chapter updated", variant: "success" });
+      toast({ title: editorMode === "reupload" ? "Chapter replaced" : "Chapter saved", variant: "success" });
     },
     onError: (err) => toast({ title: "Could not replace chapter", description: (err as Error).message, variant: "error" }),
   });
+
+  const saveBook = useMutation({
+    mutationFn: () => {
+      if (!editingBook) throw new Error("Choose a book");
+      return libraryBooksService.update(editingBook.id, {
+        title: bookTitle.trim(),
+        publisher: bookPublisher.trim(),
+        classLabel: bookClass.trim(),
+        subjectLabel: bookSubject.trim(),
+        language: bookLanguage,
+        editionYear: bookYear.trim(),
+      });
+    },
+    onSuccess: () => {
+      setEditingBook(null);
+      refresh();
+      toast({ title: "Book updated", description: "Name, class, and subject are saved.", variant: "success" });
+    },
+    onError: (err) => toast({ title: "Could not update book", description: (err as Error).message, variant: "error" }),
+  });
+
+  const openBookEditor = (book: LibraryBookListItem) => {
+    setEditingBook(book);
+    setBookTitle(book.title);
+    setBookPublisher(book.publisher || "");
+    setBookClass(book.classLabel || "");
+    setBookSubject(book.subjectLabel || "");
+    setBookLanguage(book.language || "English");
+    setBookYear(book.editionYear || "");
+  };
 
   const options = useMemo(() => {
     const classes = new Set<string>();
@@ -187,11 +233,12 @@ export default function LibraryBooksPage() {
       }));
   }, [data, classFilter, subjectFilter, schoolFilter, uploaderFilter]);
 
-  return (
+
+return (
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Book library"
-        description="Click a subject to open its chapters. Schools can use a book only while it is assigned."
+        description="Open a book to see its lectures. Assign a book before a school can use it."
         actions={
           <Link href="/super-admin/library/new">
             <Button>Add book</Button>
@@ -199,276 +246,382 @@ export default function LibraryBooksPage() {
         }
       />
       {isError && (
-        <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        <div role="alert" className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {(error as Error).message}
         </div>
       )}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-5 grid gap-3 rounded-2xl border bg-card p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
         <FilterSelect label="Class" value={classFilter} onChange={setClassFilter} options={options.classes} />
         <FilterSelect label="Subject" value={subjectFilter} onChange={setSubjectFilter} options={options.subjects} />
         <FilterSelect label="School" value={schoolFilter} onChange={setSchoolFilter} options={options.schools} />
         <FilterSelect label="Uploader" value={uploaderFilter} onChange={setUploaderFilter} options={options.uploaders} />
       </div>
-      <div className="rounded-lg border bg-card">
-        {isLoading ? (
-          <PageLoader variant="panel" />
-        ) : !books.length ? (
-          <EmptyState
-            icon={<Library className="h-10 w-10" />}
-            title="No books yet"
-            description="Chapters already saved by teachers are imported the first time this page loads."
-          />
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Book</TableHead>
-                <TableHead>Publisher</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead>Subject</TableHead>
-                <TableHead>Chapters</TableHead>
-                <TableHead>Schools</TableHead>
-                <TableHead>Added by</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {books.map((book) => {
-                const open = openId === book.id;
-                return (
-                  <Fragment key={book.id}>
-                    <TableRow>
-                      <TableCell className="font-medium">
-                        <Link href={`/super-admin/library/${book.id}`} className="hover:underline">
-                          {book.title}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{book.publisher || "—"}</TableCell>
-                      <TableCell>{book.classLabel || "—"}</TableCell>
-                      <TableCell>
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-                          onClick={() => {
-                            setOpenId(open ? null : book.id);
-                            setReplacing(null);
-                          }}
-                        >
-                          {book.subjectLabel || "Subject"}
-                          <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
-                        </button>
-                      </TableCell>
-                      <TableCell>{book.chapterCount}</TableCell>
-                      <TableCell>{book.schoolCount}</TableCell>
-                      <TableCell>
-                        {personFullName(book.createdBy?.firstName, book.createdBy?.lastName) || "Unknown"}
+      {isLoading ? (
+        <PageLoader variant="panel" />
+      ) : !books.length ? (
+        <EmptyState
+          icon={<Library className="h-10 w-10" />}
+          title="No books yet"
+          description="Add a book, then upload lectures into it."
+        />
+      ) : (
+        <div className="space-y-3">
+          {books.map((book) => {
+            const open = openId === book.id;
+            return (
+              <article key={book.id} className={cn("overflow-hidden rounded-2xl border bg-card shadow-sm", open && "ring-1 ring-primary/30")}>
+                <div className="flex items-stretch">
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-4 px-4 py-4 text-left hover:bg-muted/40"
+                    onClick={() => {
+                      setOpenId(open ? null : book.id);
+                      setReplacing(null);
+                      setEditorMode(null);
+                    }}
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-semibold text-primary">
+                      {(book.subjectLabel || book.title).slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-base font-semibold">{book.title}</span>
+                      <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        {book.publisher ? <span>{book.publisher}</span> : null}
+                        {book.classLabel ? <Badge variant="secondary">{book.classLabel}</Badge> : null}
+                        {book.subjectLabel ? <Badge>{book.subjectLabel}</Badge> : null}
+                        {book.language ? <Badge variant="outline">{book.language}</Badge> : null}
+                        <span>{book.chapterCount} lectures</span>
+                        <span>{book.schoolCount} schools</span>
+                      </span>
+                    </span>
+                    <ChevronDown className={cn("h-5 w-5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
+                  </button>
+                  <div className="flex items-center gap-1 pr-3">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Edit ${book.title}`}
+                      onClick={() => openBookEditor(book)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive"
+                      aria-label={`Delete ${book.title}`}
+                      onClick={() => setConfirmDelete({ kind: "book", id: book.id, name: book.title })}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                {open ? (
+                  <div className="space-y-4 border-t bg-muted/20 px-4 py-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-muted-foreground">
+                        Added by {personFullName(book.createdBy?.firstName, book.createdBy?.lastName) || "Unknown"}
                         {book.originSchool ? ` · ${book.originSchool.name}` : ""}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={removeBook.isPending}
-                          onClick={() => {
-                            if (window.confirm(`Delete ${book.title}? This removes it for every school.`)) {
-                              removeBook.mutate(book.id);
-                            }
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                    {open ? (
-                      <TableRow key={`${book.id}-chapters`}>
-                        <TableCell colSpan={8} className="bg-muted/30 p-0">
-                          <div className="space-y-3 px-4 py-3">
-                            <div className="flex justify-end">
+                      </p>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setReplacing(null);
+                          setEditorMode(null);
+                          setUploadingBookId(book.id);
+                          setChapterName("");
+                          setTopicName("");
+                          setSourceText("");
+                          setDraft("");
+                          setExercises("");
+                          setLectureReady(false);
+                        }}
+                      >
+                        <Upload className="h-4 w-4" />
+                        Upload lecture
+                      </Button>
+                    </div>
+                    {book.chapters.length ? (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {book.chapters.map((chapter) => (
+                          <div key={chapter.id} className="rounded-xl border bg-background p-4 shadow-sm">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="font-medium leading-snug">
+                                  {chapter.chapterNumber != null ? (
+                                    <span className="mr-2 inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-primary/10 px-1.5 text-xs text-primary">
+                                      {chapter.chapterNumber}
+                                    </span>
+                                  ) : null}
+                                  {chapter.title}
+                                </p>
+                                {chapter.topicName ? <p className="mt-1 text-sm text-muted-foreground">{chapter.topicName}</p> : null}
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                  {chapter.uploadedBy
+                                    ? personFullName(chapter.uploadedBy.firstName, chapter.uploadedBy.lastName)
+                                    : "Unknown"}
+                                  {chapter.uploadedBySchool?.name ? ` · ${chapter.uploadedBySchool.name}` : ""}
+                                </p>
+                              </div>
                               <Button
                                 type="button"
-                                onClick={() => {
-                                  setReplacing(null);
-                                  setEditorMode(null);
-                                  setUploadingBookId(book.id);
-                                  setChapterName("");
-                                  setTopicName("");
-                                  setSourceText("");
-                                  setDraft("");
-                                  setExercises("");
-                                  setLectureReady(false);
-                                }}
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive"
+                                aria-label={`Delete ${chapter.title}`}
+                                onClick={() =>
+                                  setConfirmDelete({
+                                    kind: "chapter",
+                                    bookId: book.id,
+                                    chapterId: chapter.id,
+                                    name: chapter.title,
+                                  })
+                                }
                               >
-                                Upload lecture
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
-                            {book.chapters.length ? (
-                              book.chapters.map((chapter) => (
-                                <div key={chapter.id} className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
-                                  <div>
-                                    <div className="font-medium">
-                                      {chapter.chapterNumber != null ? `${chapter.chapterNumber}. ` : ""}
-                                      {chapter.title}
-                                      {chapter.topicName ? ` — ${chapter.topicName}` : ""}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {chapter.uploadedBy
-                                        ? personFullName(chapter.uploadedBy.firstName, chapter.uploadedBy.lastName)
-                                        : "Unknown"}
-                                      {chapter.uploadedBySchool?.name ? ` · ${chapter.uploadedBySchool.name}` : ""}
-                                    </div>
-                                  </div>
-                                  <div className="flex gap-2">
-                                    <Button type="button" variant="outline" onClick={() => void openEditor(book.id, chapter, "edit")}>
-                                      Edit
-                                    </Button>
-                                    <Button type="button" variant="outline" onClick={() => void openEditor(book.id, chapter, "reupload")}>
-                                      Reupload
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      disabled={removeChapter.isPending}
-                                      onClick={() => {
-                                        if (window.confirm(`Delete ${chapter.title}?`)) {
-                                          removeChapter.mutate({ bookId: book.id, chapterId: chapter.id });
-                                        }
-                                      }}
-                                    >
-                                      Delete
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))
-                            ) : (
-                              <p className="text-sm text-muted-foreground">No chapters in this book yet.</p>
-                            )}
-                            {uploadingBookId === book.id ? (
-                              <div className="space-y-3 rounded-md border bg-background p-3">
-                                <p className="text-sm font-medium">Upload lecture</p>
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                  <div className="space-y-1">
-                                    <Label>Lecture name</Label>
-                                    <Input value={chapterName} onChange={(e) => setChapterName(e.target.value)} placeholder="Unit 17 — Sets and Functions" />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label>Topic name</Label>
-                                    <Input value={topicName} onChange={(e) => setTopicName(e.target.value)} />
-                                  </div>
-                                </div>
-                                <div className="space-y-1">
-                                  <Label>Chapter text</Label>
-                                  <Textarea
-                                    rows={8}
-                                    value={sourceText}
-                                    onChange={(e) => {
-                                      setSourceText(e.target.value);
-                                      setLectureReady(false);
-                                    }}
-                                    placeholder="Paste the full chapter, including exercises"
-                                  />
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  disabled={!sourceText.trim() || compileLecture.isPending}
-                                  onClick={() => compileLecture.mutate()}
-                                >
-                                  {compileLecture.isPending ? "Compiling…" : "Compile with AI"}
-                                </Button>
-                                {lectureReady ? (
-                                  <>
-                                    <div className="space-y-1">
-                                      <Label>Lesson content</Label>
-                                      <Textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} />
-                                    </div>
-                                    <div className="space-y-1">
-                                      <Label>Exercises</Label>
-                                      <Textarea rows={8} value={exercises} onChange={(e) => setExercises(e.target.value)} />
-                                    </div>
-                                  </>
-                                ) : null}
-                                <div className="flex gap-2">
-                                  <Button
-                                    type="button"
-                                    disabled={!lectureReady || !chapterName.trim() || !draft.trim() || addChapter.isPending}
-                                    onClick={() => addChapter.mutate()}
-                                  >
-                                    {addChapter.isPending ? "Saving…" : "Save chapter"}
-                                  </Button>
-                                  <Button type="button" variant="outline" onClick={() => setUploadingBookId(null)}>
-                                    Cancel
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : null}
-                            {replacing && editorMode && openId === book.id ? (
-                              <div className="space-y-3 rounded-md border bg-background p-3">
-                                <p className="text-sm font-medium">
-                                  {editorMode === "reupload" ? "Reupload" : "Edit"} {replacing.title}
-                                </p>
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                  <div className="space-y-1">
-                                    <Label>Chapter name</Label>
-                                    <Input value={chapterName} onChange={(e) => setChapterName(e.target.value)} />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label>Topic name</Label>
-                                    <Input value={topicName} onChange={(e) => setTopicName(e.target.value)} />
-                                  </div>
-                                </div>
-                                <div className="space-y-1">
-                                  <Label>Lesson content</Label>
-                                  <Textarea
-                                    rows={8}
-                                    value={draft}
-                                    onChange={(e) => setDraft(e.target.value)}
-                                    placeholder={editorMode === "reupload" ? "Paste the new chapter text" : "Chapter text"}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label>Exercises</Label>
-                                  <Textarea
-                                    rows={8}
-                                    value={exercises}
-                                    onChange={(e) => setExercises(e.target.value)}
-                                    placeholder="Exercise questions"
-                                  />
-                                </div>
-                                <div className="flex gap-2">
-                                  <Button
-                                    type="button"
-                                    disabled={(!chapterName.trim() && !topicName.trim() && !draft.trim()) || replaceChapter.isPending}
-                                    onClick={() => replaceChapter.mutate()}
-                                  >
-                                    {replaceChapter.isPending ? "Saving…" : "Save chapter"}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setReplacing(null);
-                                      setEditorMode(null);
-                                    }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : null}
+                            <div className="mt-3 flex gap-2">
+                              <Button type="button" size="sm" variant="outline" onClick={() => void openEditor(book.id, chapter, "edit")}>
+                                Edit
+                              </Button>
+                              <Button type="button" size="sm" variant="outline" onClick={() => void openEditor(book.id, chapter, "reupload")}>
+                                Reupload
+                              </Button>
+                            </div>
                           </div>
-                        </TableCell>
-                      </TableRow>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="rounded-xl border border-dashed bg-background px-4 py-6 text-center text-sm text-muted-foreground">
+                        No lectures in this book yet.
+                      </p>
+                    )}
+                    {uploadingBookId === book.id ? (
+                      <LecturePanel
+                        title="Upload lecture"
+                        chapterName={chapterName}
+                        topicName={topicName}
+                        sourceText={sourceText}
+                        draft={draft}
+                        exercises={exercises}
+                        lectureReady={lectureReady}
+                        compiling={compileLecture.isPending}
+                        saving={addChapter.isPending}
+                        saveLabel={addChapter.isPending ? "Saving…" : "Save chapter"}
+                        onChapterName={setChapterName}
+                        onTopicName={setTopicName}
+                        onSourceText={(value) => {
+                          setSourceText(value);
+                          setLectureReady(false);
+                        }}
+                        onDraft={setDraft}
+                        onExercises={setExercises}
+                        onCompile={() => compileLecture.mutate()}
+                        onSave={() => addChapter.mutate()}
+                        onCancel={() => setUploadingBookId(null)}
+                        showSource
+                      />
                     ) : null}
-                  </Fragment>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
+                    {replacing && editorMode && openId === book.id ? (
+                      <LecturePanel
+                        title={editorMode === "reupload" ? `Reupload ${replacing.title}` : `Edit ${replacing.title}`}
+                        chapterName={chapterName}
+                        topicName={topicName}
+                        sourceText=""
+                        draft={draft}
+                        exercises={exercises}
+                        lectureReady
+                        compiling={false}
+                        saving={replaceChapter.isPending}
+                        saveLabel={replaceChapter.isPending ? "Saving…" : "Save chapter"}
+                        onChapterName={setChapterName}
+                        onTopicName={setTopicName}
+                        onSourceText={() => undefined}
+                        onDraft={setDraft}
+                        onExercises={setExercises}
+                        onCompile={() => undefined}
+                        onSave={() => replaceChapter.mutate()}
+                        onCancel={() => {
+                          setReplacing(null);
+                          setEditorMode(null);
+                        }}
+                        showSource={false}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      )}
+      <Dialog open={Boolean(editingBook)} onOpenChange={(next) => !next && setEditingBook(null)}>
+        <DialogContent onClose={() => setEditingBook(null)}>
+          <DialogHeader>
+            <DialogTitle>Edit book</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Book name</Label>
+              <Input value={bookTitle} onChange={(e) => setBookTitle(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Publisher</Label>
+              <Input value={bookPublisher} onChange={(e) => setBookPublisher(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Edition year</Label>
+              <Input value={bookYear} onChange={(e) => setBookYear(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Class</Label>
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={bookClass} onChange={(e) => setBookClass(e.target.value)}>
+                <option value="">Select a class</option>
+                {optionsWithCurrent(LIBRARY_CLASSES, bookClass).map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Subject</Label>
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={bookSubject} onChange={(e) => setBookSubject(e.target.value)}>
+                <option value="">Select a subject</option>
+                {optionsWithCurrent(LIBRARY_SUBJECTS, bookSubject).map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Language</Label>
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={bookLanguage} onChange={(e) => setBookLanguage(e.target.value)}>
+                {LIBRARY_LANGUAGES.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setEditingBook(null)}>
+              Cancel
+            </Button>
+            <Button type="button" disabled={!bookTitle.trim() || saveBook.isPending} onClick={() => saveBook.mutate()}>
+              {saveBook.isPending ? "Saving…" : "Save book"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(confirmDelete)} onOpenChange={(next) => !next && setConfirmDelete(null)}>
+        <DialogContent onClose={() => setConfirmDelete(null)} className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{confirmDelete?.kind === "book" ? "Delete this book?" : "Delete this chapter?"}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {confirmDelete?.kind === "book"
+              ? `${confirmDelete.name} will be removed for every school. Lectures inside it are deleted too.`
+              : `${confirmDelete?.name ?? "This chapter"} will be removed and will not be imported again.`}
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setConfirmDelete(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={removeBook.isPending || removeChapter.isPending}
+              onClick={() => {
+                if (!confirmDelete) return;
+                if (confirmDelete.kind === "book") removeBook.mutate(confirmDelete.id);
+                else removeChapter.mutate({ bookId: confirmDelete.bookId, chapterId: confirmDelete.chapterId });
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function LecturePanel(props: {
+  title: string;
+  chapterName: string;
+  topicName: string;
+  sourceText: string;
+  draft: string;
+  exercises: string;
+  lectureReady: boolean;
+  compiling: boolean;
+  saving: boolean;
+  saveLabel: string;
+  showSource: boolean;
+  onChapterName: (value: string) => void;
+  onTopicName: (value: string) => void;
+  onSourceText: (value: string) => void;
+  onDraft: (value: string) => void;
+  onExercises: (value: string) => void;
+  onCompile: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="space-y-4 rounded-2xl border bg-background p-4 shadow-sm">
+      <p className="text-sm font-semibold">{props.title}</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label>Lecture name</Label>
+          <Input value={props.chapterName} onChange={(e) => props.onChapterName(e.target.value)} placeholder="Unit 17 — Sets and Functions" />
+        </div>
+        <div className="space-y-1">
+          <Label>Topic</Label>
+          <Input value={props.topicName} onChange={(e) => props.onTopicName(e.target.value)} />
+        </div>
+      </div>
+      {props.showSource ? (
+        <div className="space-y-2">
+          <Label>Chapter text</Label>
+          <Textarea
+            rows={8}
+            value={props.sourceText}
+            onChange={(e) => props.onSourceText(e.target.value)}
+            placeholder="Paste the full chapter, including exercises"
+          />
+          <Button type="button" variant="outline" disabled={!props.sourceText.trim() || props.compiling} onClick={props.onCompile}>
+            {props.compiling ? "Compiling…" : "Compile with AI"}
+          </Button>
+        </div>
+      ) : null}
+      {props.lectureReady ? (
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="space-y-1">
+            <Label>Lesson content</Label>
+            <Textarea rows={8} value={props.draft} onChange={(e) => props.onDraft(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Exercises</Label>
+            <Textarea rows={8} value={props.exercises} onChange={(e) => props.onExercises(e.target.value)} />
+          </div>
+        </div>
+      ) : null}
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          disabled={props.showSource ? !props.lectureReady || !props.chapterName.trim() || !props.draft.trim() || props.saving : props.saving}
+          onClick={props.onSave}
+        >
+          {props.saveLabel}
+        </Button>
+        <Button type="button" variant="outline" onClick={props.onCancel}>
+          Cancel
+        </Button>
       </div>
     </div>
   );
 }
+
 
 function bookMatchesSchool(book: LibraryBookListItem, school: string) {
   if (book.originSchool?.name === school) return true;

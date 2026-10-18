@@ -36,7 +36,7 @@ function toastDuration(variant: ToastVariant, override?: number) {
 
 function ToastIcon({ variant }: { variant: ToastVariant }) {
   if (variant === "success") {
-    return <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" aria-hidden />;
+    return <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />;
   }
   if (variant === "error") {
     return <XCircle className="h-5 w-5 shrink-0 text-destructive" aria-hidden />;
@@ -75,8 +75,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       className={cn(
         "rounded-lg border p-4 shadow-lg animate-in slide-in-from-right",
         t.variant === "default" && "border-border bg-card",
-        t.variant === "success" && "border-primary/30 bg-card",
-        t.variant === "error" && "border-destructive/40 bg-card",
+        t.variant === "success" && "border-emerald-300 border-l-[6px] border-l-emerald-500 bg-emerald-50 text-emerald-950 shadow-xl dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-50",
+        t.variant === "error" && "border-red-300 border-l-[6px] border-l-red-500 bg-red-50 text-red-950 shadow-xl dark:border-red-900 dark:bg-red-950 dark:text-red-50",
         t.variant === "warning" &&
           "border border-orange-300 border-l-[6px] border-l-orange-500 bg-white shadow-xl ring-1 ring-black/5 dark:border-orange-700 dark:border-l-orange-400 dark:bg-slate-900 dark:ring-white/10",
       )}
