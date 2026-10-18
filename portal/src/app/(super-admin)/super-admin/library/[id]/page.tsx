@@ -292,9 +292,16 @@ function RightCheck({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className={cn("inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm", checked ? "border-primary bg-primary/10 text-primary" : "bg-background")}>
-      <input type="checkbox" className="sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    <button
+      type="button"
+      aria-pressed={checked}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "inline-flex items-center rounded-full border px-3 py-1.5 text-sm",
+        checked ? "border-primary bg-primary/10 text-primary" : "bg-background",
+      )}
+    >
       {label}
-    </label>
+    </button>
   );
 }
