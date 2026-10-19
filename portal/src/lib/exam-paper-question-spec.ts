@@ -17,16 +17,16 @@ export interface ExamPaperQuestionSpec {
 }
 
 export const defaultQuestionSpec: ExamPaperQuestionSpec = {
-  mcqCount: 8,
-  fillBlankCount: 3,
+  mcqCount: 10,
+  fillBlankCount: 10,
   trueFalseCount: 5,
-  shortAnswerCount: 3,
-  longAnswerCount: 1,
+  shortAnswerCount: 5,
+  longAnswerCount: 5,
   mcqMarks: 1,
   fillBlankMarks: 1,
   trueFalseMarks: 1,
   shortAnswerMarks: 2,
-  longAnswerMarks: 5,
+  longAnswerMarks: 3,
 };
 
 export function sectionMarksFromSpec(spec: ExamPaperQuestionSpec): {

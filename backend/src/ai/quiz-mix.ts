@@ -141,7 +141,7 @@ export function resolveQuizMix(input: QuizMixRequest): ResolvedQuizMix {
     const mix =
       questionCount > 0
         ? { mcqCount, fillBlankCount, trueFalseCount, shortAnswerCount, longAnswerCount, openEndedCount, questionCount }
-        : { mcqCount: 8, fillBlankCount: 0, trueFalseCount: 5, shortAnswerCount: 3, longAnswerCount: 1, openEndedCount: 4, questionCount: 17 };
+        : { mcqCount: 10, fillBlankCount: 10, trueFalseCount: 5, shortAnswerCount: 5, longAnswerCount: 5, openEndedCount: 10, questionCount: 35 };
     return {
       mode: 'exam',
       ...mix,
@@ -149,9 +149,9 @@ export function resolveQuizMix(input: QuizMixRequest): ResolvedQuizMix {
       trueFalseMarks: mix.trueFalseCount ? marksOf(input.trueFalseMarks, 1) : 0,
       openEndedMarks: mix.openEndedCount ? marksOf(input.openEndedMarks, 3) : 0,
       shortAnswerMarks: mix.shortAnswerCount
-        ? marksOf(input.shortAnswerMarks ?? input.openEndedMarks, 3)
+        ? marksOf(input.shortAnswerMarks ?? input.openEndedMarks, 2)
         : 0,
-      longAnswerMarks: mix.longAnswerCount ? marksOf(input.longAnswerMarks, 5) : 0,
+      longAnswerMarks: mix.longAnswerCount ? marksOf(input.longAnswerMarks, 3) : 0,
       fillBlankMarks: mix.fillBlankCount ? marksOf(input.fillBlankMarks, 1) : 0,
     };
   }
