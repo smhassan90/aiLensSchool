@@ -310,6 +310,39 @@ export class LibraryBooksService {
     });
   }
 
+  async listGrantedBooksForSchool(schoolId: string) {
+    const grants = await this.prisma.libraryBookGrant.findMany({
+      where: { schoolId, canRead: true },
+      include: {
+        book: {
+          select: { id: true, title: true, classLabel: true, subjectLabel: true, language: true },
+        },
+      },
+      orderBy: { book: { title: 'asc' } },
+    });
+    return grants.map((grant) => grant.book);
+  }
+
+  async getGrantedChapterForSchool(schoolId: string, chapterId: string) {
+    const chapter = await this.prisma.libraryBookChapter.findFirst({
+      where: { id: chapterId },
+      include: { book: { select: { id: true, title: true } } },
+    });
+    if (!chapter) {
+      throw new NotFoundException({ code: 'CHAPTER_NOT_FOUND', message: 'Chapter not found' });
+    }
+    const grant = await this.prisma.libraryBookGrant.findFirst({
+      where: { schoolId, bookId: chapter.bookId, canRead: true },
+    });
+    if (!grant) {
+      throw new ForbiddenException({
+        code: 'BOOK_NOT_ASSIGNED',
+        message: `${chapter.book.title} is not assigned to this school.`,
+      });
+    }
+    return chapter;
+  }
+
   /** Blocks new quizzes, homework, and exam papers after a school loses the book. Existing rows are left in place. */
   async assertSchoolCanUseLessons(schoolId: string, lessonIds: string[]) {
     const ids = [...new Set(lessonIds.filter(Boolean))];

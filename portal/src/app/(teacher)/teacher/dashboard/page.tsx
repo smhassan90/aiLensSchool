@@ -16,6 +16,7 @@ import { TeacherPaceBoard } from "@/components/dashboard/teacher-pace";
 import { cn } from "@/lib/utils";
 import { teacherClassDetailHref } from "@/lib/teacher-class-links";
 import { headTeachersService } from "@/services/head-teachers.service";
+import { TodayLessonsList } from "@/components/planner/today-lessons-list";
 
 export default function TeacherDashboardPage() {
   const [coach, setCoach] = useState<Awaited<ReturnType<typeof dashboardService.teacherCoach>> | null>(null);
@@ -117,6 +118,18 @@ export default function TeacherDashboardPage() {
           </div>
         </Link>
       ) : null}
+
+      <Card className="mb-6">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base">Today&apos;s planned lessons</CardTitle>
+          <Link href="/teacher/planner/today">
+            <Button type="button" variant="outline" size="sm">Full view</Button>
+          </Link>
+        </CardHeader>
+        <CardContent>
+          <TodayLessonsList compact />
+        </CardContent>
+      </Card>
 
       {paperOverdue.length > 0 ? (
         <Link

@@ -16,7 +16,14 @@ import {
   QUIZ_GENERATION_PROMPT,
   STUDENT_ANALYSIS_PROMPT,
   TEACHER_COACH_PROMPT,
+  PLANNER_CHAPTER_ANALYSIS_SYSTEM_PROMPT,
+  TEACHING_HELP_SYSTEM_PROMPT,
 } from '../prompts';
+import { PlannerChapterAnalysisSchema } from '../schemas/planner-chapter-analysis.schema';
+import { TeachingHelpOutputSchema } from '../schemas/teaching-help.schema';
+import { heuristicTeachingHelp } from '../../academic-planner/teaching-help-heuristic';
+import { modeInstruction } from '../../academic-planner/teaching-help-prompt';
+import { heuristicChapterAnalysis } from '../../academic-planner/subject-profiles';
 import {
   difficultyInstruction,
   examChapterWeightInstructions,
@@ -370,7 +377,12 @@ export class OpenAiProvider implements AiProvider {
     };
   }
 
-  private async chat(system: string, user: string, images?: LessonImageInput[]) {
+  private async chat(
+    system: string,
+    user: string,
+    images?: LessonImageInput[],
+    maxCompletionTokens?: number,
+  ) {
     const userContent =
       images?.length
         ? [
@@ -394,6 +406,7 @@ export class OpenAiProvider implements AiProvider {
         model: this.model,
         temperature: 0.2,
         response_format: { type: 'json_object' },
+        ...(maxCompletionTokens != null ? { max_tokens: maxCompletionTokens } : {}),
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: userContent },
@@ -426,5 +439,85 @@ export class OpenAiProvider implements AiProvider {
   private estimateCost(inputTokens: number, outputTokens: number): number {
     // Rough gpt-4o-mini estimate USD
     return Number(((inputTokens * 0.00000015) + (outputTokens * 0.0000006)).toFixed(6));
+  }
+
+  async analyzePlannerChapter(
+    input: Parameters<AiProvider['analyzePlannerChapter']>[0],
+  ): Promise<AiCompletionResult<unknown>> {
+    if (!this.apiKey) {
+      const data = heuristicChapterAnalysis({
+        chapterTitle: input.chapterTitle,
+        chapterText: input.chapterText,
+        subjectName: input.subjectName,
+        periodMinutes: input.periodMinutes,
+        activityCount: input.activityCount,
+        activitiesEnabled: input.activitiesEnabled,
+      });
+      return {
+        data: PlannerChapterAnalysisSchema.parse(data),
+        provider: 'mock',
+        model: 'heuristic',
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCost: 0,
+      };
+    }
+
+    const user = `Class: ${input.classLabel}\nSubject: ${input.subjectName}\nGrade level: ${input.gradeLevel}\nChapter: ${input.chapterTitle}\nPeriod minutes: ${input.periodMinutes}\nActivities enabled: ${input.activitiesEnabled}\nActivity count: ${input.activityCount}\n\n--- CHAPTER TEXT ---\n${input.chapterText}\n--- END ---`;
+    const content = await this.chat(PLANNER_CHAPTER_ANALYSIS_SYSTEM_PROMPT, user);
+    const parsed = PlannerChapterAnalysisSchema.parse(parseModelJson(content.text));
+    return {
+      data: parsed,
+      provider: 'openai',
+      model: content.model,
+      inputTokens: content.inputTokens,
+      outputTokens: content.outputTokens,
+      estimatedCost: this.estimateCost(content.inputTokens, content.outputTokens),
+    };
+  }
+
+  async generateTeachingHelp(
+    input: Parameters<AiProvider['generateTeachingHelp']>[0],
+  ): Promise<AiCompletionResult<unknown>> {
+    if (!this.apiKey) {
+      return {
+        data: TeachingHelpOutputSchema.parse(
+          heuristicTeachingHelp({
+            lessonTitle: input.lessonTitle,
+            chapterTitle: input.chapterTitle,
+            classLabel: input.classLabel,
+            subjectName: input.subjectName,
+            objectives: input.objectives,
+            bookTitle: input.bookTitle,
+          }),
+        ),
+        provider: 'mock',
+        model: 'heuristic',
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCost: 0,
+      };
+    }
+
+    const excerptBlock = input.chapterExcerpt.trim()
+      ? `--- CHAPTER EXCERPT ---\n${input.chapterExcerpt.slice(0, 6000)}\n--- END EXCERPT ---`
+      : '--- CHAPTER EXCERPT ---\n(none — use objectives only)\n--- END EXCERPT ---';
+
+    const repair = input.repairInvalidJson
+      ? '\nYour previous JSON was invalid. Return ONLY corrected JSON matching the schema.'
+      : '';
+    const user = `${modeInstruction(input.mode)}\nClass: ${input.classLabel}\nSubject: ${input.subjectName}\nTextbook: ${input.bookTitle ?? '(not specified)'}\nChapter: ${input.chapterTitle}\nLesson: ${input.lessonTitle}\nObjectives:\n${input.objectives.map((o) => `- ${o}`).join('\n') || '(none listed)'}\nLesson stages:\n${input.stagesSummary}\n${excerptBlock}${input.teacherQuestion ? `\nTeacher focus question: ${input.teacherQuestion.slice(0, 500)}` : ''}${repair}`;
+
+    const maxOut = Number(this.config.get('TEACHING_HELP_MAX_OUTPUT_TOKENS') ?? 4096);
+    const content = await this.chat(TEACHING_HELP_SYSTEM_PROMPT, user, undefined, maxOut);
+    const parsed = TeachingHelpOutputSchema.parse(parseModelJson(content.text));
+    return {
+      data: parsed,
+      provider: 'openai',
+      model: content.model,
+      inputTokens: content.inputTokens,
+      outputTokens: content.outputTokens,
+      estimatedCost: this.estimateCost(content.inputTokens, content.outputTokens),
+    };
   }
 }

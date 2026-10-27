@@ -222,6 +222,12 @@ enum NotificationType {
   DAY_OFF_DECISION
   STUDENT_ABSENCE
   SYSTEM
+  PLANNER_SUBMITTED
+  PLANNER_DECISION
+  SCHEDULE_CHANGE_SUBMITTED
+  SCHEDULE_CHANGE_DECISION
+  TIMETABLE_PUBLISHED
+  CLASSROOM_FOLLOW_UP
 }
 
 enum DayOffRequestStatus {
@@ -244,6 +250,9 @@ enum AIRequestType {
   QUESTION_REGENERATION
   HOMEWORK_GENERATION
   STUDENT_ANALYSIS
+  PLANNER_CHAPTER_ANALYSIS
+  TEACHING_ASSISTANCE
+  TIMETABLE_EXTRACTION
 }
 
 enum AIRequestStatus {
@@ -359,42 +368,42 @@ model User {
   createdAt          DateTime   @default(now()) @map("created_at")
   updatedAt          DateTime   @updatedAt @map("updated_at")
 
-  school                     School?                        @relation(fields: [schoolId], references: [id])
-  roles                      UserRole[]
-  refreshTokens              RefreshToken[]
-  teacherProfile             TeacherProfile?
-  parentProfile              ParentProfile?
-  uploadedFiles              FileAsset[]                    @relation("UploadedBy")
-  uploadedStudentPhotos      StudentPhotoAsset[]            @relation("StudentPhotoUploadedBy")
-  reviewedStudentPhotos      StudentPhotoAsset[]            @relation("StudentPhotoReviewedBy")
-  reviewedDayOffRequests     ParentDayOffRequest[]          @relation("DayOffReviewedBy")
-  auditLogs                  AuditLog[]
-  apiExceptionLogs           ApiExceptionLog[]
-  aiRequests                 AIRequest[]
-  notifications              Notification[]
-  notificationPreferences    NotificationPreference[]
-  deviceTokens               DeviceToken[]
-  createdQuizzes             Quiz[]                         @relation("QuizCreatedBy")
-  reviewedQuizzes            Quiz[]                         @relation("QuizReviewedBy")
-  examPaperAssignments       ExamPaperAssignment[]          @relation("ExamPaperAssignedBy")
-  reviewedDeadlineExtensions ExamDeadlineExtensionRequest[] @relation("DeadlineExtensionReviewedBy")
-  createdHomework            Homework[]                     @relation("HomeworkCreatedBy")
-  createdAnnouncements       Announcement[]                 @relation("AnnouncementCreatedBy")
-  createdEvents              Event[]                        @relation("EventCreatedBy")
-  createdLessons             DailyLesson[]                  @relation("LessonCreatedBy")
-  createdLibraryBooks        LibraryBook[]                  @relation("LibraryBookCreatedBy")
-  createdDiaries             HomeDiary[]                    @relation("DiaryCreatedBy")
-  recordedFeePayments        FeePayment[]                   @relation("FeeRecordedBy")
-  generatedReportCards       ReportCard[]                   @relation("ReportGeneratedBy")
-  generatedIdCards           IdCard[]                       @relation("IdCardGeneratedBy")
-  recordedExpenses           Expense[]                      @relation("ExpenseRecordedBy")
-  recordedAssessments        AssessmentMark[]               @relation("AssessmentRecordedBy")
-  recordedTeacherAttendance  TeacherAttendance[]            @relation("TeacherAttendanceRecordedBy")
-  staffAttendances           StaffAttendance[]              @relation("StaffAttendanceUser")
-  recordedStaffAttendance    StaffAttendance[]              @relation("StaffAttendanceRecordedBy")
-  biometricStaffMappings     BiometricDeviceUserMapping[]   @relation("BiometricStaffMapping")
-  verifiedLessonSources      LessonSource[]                 @relation("LessonSourceVerifiedBy")
-  approvedOcrTrainingExamples OcrTrainingExample[]          @relation("OcrTrainingApprovedBy")
+  school                      School?                        @relation(fields: [schoolId], references: [id])
+  roles                       UserRole[]
+  refreshTokens               RefreshToken[]
+  teacherProfile              TeacherProfile?
+  parentProfile               ParentProfile?
+  uploadedFiles               FileAsset[]                    @relation("UploadedBy")
+  uploadedStudentPhotos       StudentPhotoAsset[]            @relation("StudentPhotoUploadedBy")
+  reviewedStudentPhotos       StudentPhotoAsset[]            @relation("StudentPhotoReviewedBy")
+  reviewedDayOffRequests      ParentDayOffRequest[]          @relation("DayOffReviewedBy")
+  auditLogs                   AuditLog[]
+  apiExceptionLogs            ApiExceptionLog[]
+  aiRequests                  AIRequest[]
+  notifications               Notification[]
+  notificationPreferences     NotificationPreference[]
+  deviceTokens                DeviceToken[]
+  createdQuizzes              Quiz[]                         @relation("QuizCreatedBy")
+  reviewedQuizzes             Quiz[]                         @relation("QuizReviewedBy")
+  examPaperAssignments        ExamPaperAssignment[]          @relation("ExamPaperAssignedBy")
+  reviewedDeadlineExtensions  ExamDeadlineExtensionRequest[] @relation("DeadlineExtensionReviewedBy")
+  createdHomework             Homework[]                     @relation("HomeworkCreatedBy")
+  createdAnnouncements        Announcement[]                 @relation("AnnouncementCreatedBy")
+  createdEvents               Event[]                        @relation("EventCreatedBy")
+  createdLessons              DailyLesson[]                  @relation("LessonCreatedBy")
+  createdLibraryBooks         LibraryBook[]                  @relation("LibraryBookCreatedBy")
+  createdDiaries              HomeDiary[]                    @relation("DiaryCreatedBy")
+  recordedFeePayments         FeePayment[]                   @relation("FeeRecordedBy")
+  generatedReportCards        ReportCard[]                   @relation("ReportGeneratedBy")
+  generatedIdCards            IdCard[]                       @relation("IdCardGeneratedBy")
+  recordedExpenses            Expense[]                      @relation("ExpenseRecordedBy")
+  recordedAssessments         AssessmentMark[]               @relation("AssessmentRecordedBy")
+  recordedTeacherAttendance   TeacherAttendance[]            @relation("TeacherAttendanceRecordedBy")
+  staffAttendances            StaffAttendance[]              @relation("StaffAttendanceUser")
+  recordedStaffAttendance     StaffAttendance[]              @relation("StaffAttendanceRecordedBy")
+  biometricStaffMappings      BiometricDeviceUserMapping[]   @relation("BiometricStaffMapping")
+  verifiedLessonSources       LessonSource[]                 @relation("LessonSourceVerifiedBy")
+  approvedOcrTrainingExamples OcrTrainingExample[]           @relation("OcrTrainingApprovedBy")
 
   @@unique([schoolId, employeeCode])
   @@index([schoolId])
@@ -503,15 +512,15 @@ model ApiExceptionLog {
 // ===================== SCHOOL =====================
 
 model School {
-  id        String       @id @default(uuid())
-  name      String
-  code      String       @unique
-  email     String
-  phone     String?
-  address   String?
-  city      String?
-  country   String?
-  logo      String?
+  id                String       @id @default(uuid())
+  name              String
+  code              String       @unique
+  email             String
+  phone             String?
+  address           String?
+  city              String?
+  country           String?
+  logo              String?
   status            SchoolStatus @default(ACTIVE)
   syncApiKey        String?      @unique @map("sync_api_key") @db.VarChar(120)
   autoCheckoutHours Int?         @default(24) @map("auto_checkout_hours")
@@ -570,10 +579,18 @@ model School {
   biometricDevices              BiometricDeviceConfig[]
   pendingBiometricPunches       PendingBiometricAttendanceLog[]
   ocrTrainingExamples           OcrTrainingExample[]
-  libraryBooksCreated           LibraryBook[]                  @relation("LibraryBookOriginSchool")
+  libraryBooksCreated           LibraryBook[]                   @relation("LibraryBookOriginSchool")
   libraryBookGrants             LibraryBookGrant[]
-  pricingPlanId                 String?                        @map("pricing_plan_id")
-  pricingPlan                   PricingPlan?                   @relation(fields: [pricingPlanId], references: [id])
+  pricingPlanId                 String?                         @map("pricing_plan_id")
+  pricingPlan                   PricingPlan?                    @relation(fields: [pricingPlanId], references: [id])
+  schoolCalendarDays            SchoolCalendarDay[]
+  timetableImports              TimetableImport[]
+  timetableVersions             TimetableVersion[]
+  academicPlanners              AcademicPlanner[]
+  academicPlannerVersions       AcademicPlannerVersion[]
+  plannerApprovalEvents         PlannerApprovalEvent[]
+  teachingRecords               TeachingRecord[]
+  classroomObservations         ClassroomObservation[]
 
   @@index([status])
   @@index([code])
@@ -837,6 +854,9 @@ model TeacherProfile {
   deadlineExtensionRequests ExamDeadlineExtensionRequest[]
   headTeacherAssignment     HeadTeacherAssignment?
   biometricDeviceMappings   BiometricDeviceUserMapping[]
+  timetablePeriods          TimetablePeriod[]
+  academicPlanners          AcademicPlanner[]
+  teachingRecords           TeachingRecord[]
 
   @@unique([schoolId, employeeCode])
   @@index([schoolId])
@@ -879,22 +899,25 @@ model AcademicYear {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  school          School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  branch          Branch?             @relation(fields: [branchId], references: [id])
-  terms           Term[]
-  enrollments     StudentEnrollment[]
-  teacherSubjects TeacherSubject[]
-  classSubjects   ClassSubject[]
-  lessons         DailyLesson[]
-  homework        Homework[]
-  quizzes         Quiz[]
-  attendances     Attendance[]
-  studentFees     StudentFee[]
-  homeDiaries     HomeDiary[]
-  reportCards     ReportCard[]
-  examConfigs     ExamConfig[]
-  assessmentMarks AssessmentMark[]
-  timetableSlots  TimetableSlot[]
+  school            School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  branch            Branch?             @relation(fields: [branchId], references: [id])
+  terms             Term[]
+  enrollments       StudentEnrollment[]
+  teacherSubjects   TeacherSubject[]
+  classSubjects     ClassSubject[]
+  lessons           DailyLesson[]
+  homework          Homework[]
+  quizzes           Quiz[]
+  attendances       Attendance[]
+  studentFees       StudentFee[]
+  homeDiaries       HomeDiary[]
+  reportCards       ReportCard[]
+  examConfigs       ExamConfig[]
+  assessmentMarks   AssessmentMark[]
+  timetableSlots    TimetableSlot[]
+  timetableImports  TimetableImport[]
+  timetableVersions TimetableVersion[]
+  academicPlanners  AcademicPlanner[]
 
   @@index([schoolId])
   @@index([branchId])
@@ -979,25 +1002,29 @@ model Section {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  school               School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  branch               Branch                @relation(fields: [branchId], references: [id])
-  grade                Grade                 @relation(fields: [gradeId], references: [id])
-  classTeacher         TeacherProfile?       @relation("SectionClassTeacher", fields: [classTeacherId], references: [id])
-  enrollments          StudentEnrollment[]
-  classSubjects        ClassSubject[]
-  lessons              DailyLesson[]
-  homework             Homework[]
-  quizzes              Quiz[]
-  announcements        Announcement[]
-  events               Event[]
-  attendances          Attendance[]
-  studentFees          StudentFee[]
-  homeDiaries          HomeDiary[]
-  reportCards          ReportCard[]
-  assessmentMarks      AssessmentMark[]
-  timetableSlots       TimetableSlot[]
-  examPaperAssignments ExamPaperAssignment[]
-  headTeacherSection   HeadTeacherSection?
+  school                School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  branch                Branch                 @relation(fields: [branchId], references: [id])
+  grade                 Grade                  @relation(fields: [gradeId], references: [id])
+  classTeacher          TeacherProfile?        @relation("SectionClassTeacher", fields: [classTeacherId], references: [id])
+  enrollments           StudentEnrollment[]
+  classSubjects         ClassSubject[]
+  lessons               DailyLesson[]
+  homework              Homework[]
+  quizzes               Quiz[]
+  announcements         Announcement[]
+  events                Event[]
+  attendances           Attendance[]
+  studentFees           StudentFee[]
+  homeDiaries           HomeDiary[]
+  reportCards           ReportCard[]
+  assessmentMarks       AssessmentMark[]
+  timetableSlots        TimetableSlot[]
+  examPaperAssignments  ExamPaperAssignment[]
+  headTeacherSection    HeadTeacherSection?
+  timetableVersions     TimetableVersion[]
+  academicPlanners      AcademicPlanner[]
+  teachingRecords       TeachingRecord[]
+  classroomObservations ClassroomObservation[]
 
   @@unique([branchId, gradeId, name])
   @@index([schoolId])
@@ -1058,6 +1085,9 @@ model Subject {
   assessmentMarks      AssessmentMark[]
   timetableSlots       TimetableSlot[]
   examPaperAssignments ExamPaperAssignment[]
+  timetablePeriods     TimetablePeriod[]
+  academicPlanners     AcademicPlanner[]
+  teachingRecords      TeachingRecord[]
 
   @@unique([schoolId, code])
   @@index([schoolId])
@@ -1250,10 +1280,11 @@ model LibraryBook {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
-  createdBy   User                @relation("LibraryBookCreatedBy", fields: [createdByUserId], references: [id])
-  originSchool School?            @relation("LibraryBookOriginSchool", fields: [createdBySchoolId], references: [id])
-  chapters    LibraryBookChapter[]
-  grants      LibraryBookGrant[]
+  createdBy        User                 @relation("LibraryBookCreatedBy", fields: [createdByUserId], references: [id])
+  originSchool     School?              @relation("LibraryBookOriginSchool", fields: [createdBySchoolId], references: [id])
+  chapters         LibraryBookChapter[]
+  grants           LibraryBookGrant[]
+  academicPlanners AcademicPlanner[]
 
   @@index([createdBySchoolId])
   @@map("library_books")
@@ -1273,7 +1304,8 @@ model LibraryBookChapter {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  book LibraryBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  book            LibraryBook      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  plannerChapters PlannerChapter[]
 
   @@unique([bookId, title])
   @@index([bookId])
@@ -1281,15 +1313,15 @@ model LibraryBookChapter {
 }
 
 model LibraryBookGrant {
-  id            String   @id @default(uuid())
-  bookId        String   @map("book_id")
-  schoolId      String   @map("school_id")
-  grantedByUserId String @map("granted_by_user_id")
-  canRead       Boolean  @default(true) @map("can_read")
-  canWrite      Boolean  @default(false) @map("can_write")
-  canUpdate     Boolean  @default(false) @map("can_update")
-  canDelete     Boolean  @default(false) @map("can_delete")
-  createdAt     DateTime @default(now()) @map("created_at")
+  id              String   @id @default(uuid())
+  bookId          String   @map("book_id")
+  schoolId        String   @map("school_id")
+  grantedByUserId String   @map("granted_by_user_id")
+  canRead         Boolean  @default(true) @map("can_read")
+  canWrite        Boolean  @default(false) @map("can_write")
+  canUpdate       Boolean  @default(false) @map("can_update")
+  canDelete       Boolean  @default(false) @map("can_delete")
+  createdAt       DateTime @default(now()) @map("created_at")
 
   book   LibraryBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
   school School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
@@ -1309,52 +1341,52 @@ model LibraryImportSkip {
 // ===================== LESSONS =====================
 
 model DailyLesson {
-  id             String       @id @default(uuid())
-  schoolId       String       @map("school_id")
-  branchId       String       @map("branch_id")
-  academicYearId String       @map("academic_year_id")
-  gradeId        String       @map("grade_id")
-  sectionId      String       @map("section_id")
-  subjectId      String       @map("subject_id")
-  teacherId      String       @map("teacher_id")
-  createdById    String       @map("created_by_id")
-  date           DateTime     @db.Date
-  chapterId      String?      @map("chapter_id")
-  topicId        String?      @map("topic_id")
-  chapterName    String?      @map("chapter_name")
-  topicName      String?      @map("topic_name")
-  teacherNotes   String?      @map("teacher_notes") @db.Text
-  aiSummary      String?      @map("ai_summary") @db.Text
-  pageFrom       Int?         @map("page_from")
-  pageTo         Int?         @map("page_to")
-  status         LessonStatus @default(DRAFT)
-  recordKind     LessonRecordKind @default(CLASS_SESSION) @map("record_kind")
-  sessionType    ClassSessionType? @map("session_type")
-  contentConfirmed Boolean    @default(false) @map("content_confirmed")
-  chapterProgress ChapterProgressStatus? @map("chapter_progress")
-  chapterSourceId String?    @map("chapter_source_id")
-  revisionChapterIds Json?  @map("revision_chapter_ids")
-  parentSummary  String?    @map("parent_summary") @db.Text
-  confirmedAt    DateTime?    @map("confirmed_at")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  id                 String                 @id @default(uuid())
+  schoolId           String                 @map("school_id")
+  branchId           String                 @map("branch_id")
+  academicYearId     String                 @map("academic_year_id")
+  gradeId            String                 @map("grade_id")
+  sectionId          String                 @map("section_id")
+  subjectId          String                 @map("subject_id")
+  teacherId          String                 @map("teacher_id")
+  createdById        String                 @map("created_by_id")
+  date               DateTime               @db.Date
+  chapterId          String?                @map("chapter_id")
+  topicId            String?                @map("topic_id")
+  chapterName        String?                @map("chapter_name")
+  topicName          String?                @map("topic_name")
+  teacherNotes       String?                @map("teacher_notes") @db.Text
+  aiSummary          String?                @map("ai_summary") @db.Text
+  pageFrom           Int?                   @map("page_from")
+  pageTo             Int?                   @map("page_to")
+  status             LessonStatus           @default(DRAFT)
+  recordKind         LessonRecordKind       @default(CLASS_SESSION) @map("record_kind")
+  sessionType        ClassSessionType?      @map("session_type")
+  contentConfirmed   Boolean                @default(false) @map("content_confirmed")
+  chapterProgress    ChapterProgressStatus? @map("chapter_progress")
+  chapterSourceId    String?                @map("chapter_source_id")
+  revisionChapterIds Json?                  @map("revision_chapter_ids")
+  parentSummary      String?                @map("parent_summary") @db.Text
+  confirmedAt        DateTime?              @map("confirmed_at")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
 
-  school       School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  branch       Branch          @relation(fields: [branchId], references: [id])
-  academicYear AcademicYear    @relation(fields: [academicYearId], references: [id])
-  grade        Grade           @relation(fields: [gradeId], references: [id])
-  section      Section         @relation(fields: [sectionId], references: [id])
-  subject      Subject         @relation(fields: [subjectId], references: [id])
-  teacher      TeacherProfile  @relation(fields: [teacherId], references: [id])
-  createdBy    User            @relation("LessonCreatedBy", fields: [createdById], references: [id])
-  chapter      Chapter?        @relation(fields: [chapterId], references: [id])
-  topic        Topic?          @relation(fields: [topicId], references: [id])
-  chapterSource DailyLesson?   @relation("ClassSessionChapterSource", fields: [chapterSourceId], references: [id], onDelete: SetNull)
-  classSessions DailyLesson[]  @relation("ClassSessionChapterSource")
-  sources      LessonSource[]
-  concepts     LessonConcept[]
-  homework     Homework[]
-  aiJobs       AIJob[]
+  school        School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  branch        Branch          @relation(fields: [branchId], references: [id])
+  academicYear  AcademicYear    @relation(fields: [academicYearId], references: [id])
+  grade         Grade           @relation(fields: [gradeId], references: [id])
+  section       Section         @relation(fields: [sectionId], references: [id])
+  subject       Subject         @relation(fields: [subjectId], references: [id])
+  teacher       TeacherProfile  @relation(fields: [teacherId], references: [id])
+  createdBy     User            @relation("LessonCreatedBy", fields: [createdById], references: [id])
+  chapter       Chapter?        @relation(fields: [chapterId], references: [id])
+  topic         Topic?          @relation(fields: [topicId], references: [id])
+  chapterSource DailyLesson?    @relation("ClassSessionChapterSource", fields: [chapterSourceId], references: [id], onDelete: SetNull)
+  classSessions DailyLesson[]   @relation("ClassSessionChapterSource")
+  sources       LessonSource[]
+  concepts      LessonConcept[]
+  homework      Homework[]
+  aiJobs        AIJob[]
 
   @@index([schoolId])
   @@index([branchId])
@@ -1367,10 +1399,10 @@ model DailyLesson {
 }
 
 model LessonSource {
-  id          String           @id @default(uuid())
-  lessonId    String           @map("lesson_id")
-  type        LessonSourceType
-  fileAssetId String?          @map("file_asset_id")
+  id               String           @id @default(uuid())
+  lessonId         String           @map("lesson_id")
+  type             LessonSourceType
+  fileAssetId      String?          @map("file_asset_id")
   ocrText          String?          @map("ocr_text") @db.LongText
   paddleOcrText    String?          @map("paddle_ocr_text") @db.LongText
   tesseractOcrText String?          @map("tesseract_ocr_text") @db.LongText
@@ -1379,14 +1411,14 @@ model LessonSource {
   ocrReviewStatus  OcrReviewStatus  @default(NONE) @map("ocr_review_status")
   verifiedAt       DateTime?        @map("verified_at")
   verifiedByUserId String?          @map("verified_by_user_id")
-  pageFrom    Int?             @map("page_from")
-  pageTo      Int?             @map("page_to")
-  manualText  String?          @map("manual_text") @db.Text
-  createdAt   DateTime         @default(now()) @map("created_at")
+  pageFrom         Int?             @map("page_from")
+  pageTo           Int?             @map("page_to")
+  manualText       String?          @map("manual_text") @db.Text
+  createdAt        DateTime         @default(now()) @map("created_at")
 
-  lesson    DailyLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  fileAsset FileAsset?  @relation(fields: [fileAssetId], references: [id])
-  verifiedBy User?     @relation("LessonSourceVerifiedBy", fields: [verifiedByUserId], references: [id])
+  lesson              DailyLesson          @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  fileAsset           FileAsset?           @relation(fields: [fileAssetId], references: [id])
+  verifiedBy          User?                @relation("LessonSourceVerifiedBy", fields: [verifiedByUserId], references: [id])
   ocrTrainingExamples OcrTrainingExample[]
 
   @@index([lessonId])
@@ -1424,15 +1456,15 @@ model OcrTrainingExample {
 }
 
 model OcrModelRelease {
-  id           String              @id @default(uuid())
-  role         OcrModelReleaseRole
-  version      String
-  artifactPath String              @map("artifact_path")
-  metrics      Json?
-  datasetVersion String?           @map("dataset_version")
-  promotedAt   DateTime?           @map("promoted_at")
-  createdAt    DateTime            @default(now()) @map("created_at")
-  notes        String?             @db.Text
+  id             String              @id @default(uuid())
+  role           OcrModelReleaseRole
+  version        String
+  artifactPath   String              @map("artifact_path")
+  metrics        Json?
+  datasetVersion String?             @map("dataset_version")
+  promotedAt     DateTime?           @map("promoted_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  notes          String?             @db.Text
 
   @@index([role])
   @@index([version])
@@ -1792,9 +1824,9 @@ model BiometricDeviceConfig {
   serialNumber        String?   @map("serial_number") @db.VarChar(80)
   isActive            Boolean   @default(true) @map("is_active")
   lastSyncAt          DateTime? @map("last_sync_at")
-  syncIntervalSeconds   Int       @default(300) @map("sync_interval_seconds")
-  fullSyncRequestedAt   DateTime? @map("full_sync_requested_at")
-  deviceAdminUser       String?   @map("device_admin_user") @db.VarChar(80)
+  syncIntervalSeconds Int       @default(300) @map("sync_interval_seconds")
+  fullSyncRequestedAt DateTime? @map("full_sync_requested_at")
+  deviceAdminUser     String?   @map("device_admin_user") @db.VarChar(80)
   deviceAdminPassword String?   @map("device_admin_password") @db.VarChar(255)
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
@@ -2094,6 +2126,7 @@ model FileAsset {
   homeworkAttachments HomeworkAttachment[]
   studentPhotos       StudentPhotoAsset[]
   products            Product[]
+  timetableImports    TimetableImport[]
 
   @@index([schoolId])
   @@index([uploadedById])
@@ -2570,6 +2603,7 @@ model ExamConfig {
   marks            AssessmentMark[]
   quizzes          Quiz[]
   paperAssignments ExamPaperAssignment[]
+  academicPlanners AcademicPlanner[]
 
   @@unique([academicYearId, name])
   @@index([schoolId])
@@ -2660,4 +2694,504 @@ model AssessmentMark {
   @@index([studentId])
   @@index([sectionId])
   @@map("assessment_marks")
+}
+
+// ===================== ACADEMIC PLANNER & TIMETABLES =====================
+
+enum CalendarDayKind {
+  NON_WORKING
+  WORKING
+}
+
+enum TimetableSourceType {
+  CSV
+  IMAGE
+  MANUAL
+  LEGACY
+}
+
+enum TimetableImportStatus {
+  UPLOADED
+  EXTRACTED
+  FAILED
+  PUBLISHED
+  DISCARDED
+}
+
+enum TimetableVersionStatus {
+  DRAFT
+  PUBLISHED
+  SUPERSEDED
+  DISCARDED
+}
+
+enum TimetablePeriodKind {
+  LESSON
+  BREAK
+  OTHER
+}
+
+enum PlannerExamType {
+  ASSESSMENT
+  MIDTERM
+  FINAL_TERM
+}
+
+enum PlannerStatus {
+  DRAFT
+  SUBMITTED
+  CHANGES_REQUESTED
+  REJECTED
+  PUBLISHED
+  REVISION_PENDING
+  COMPLETED
+  ARCHIVED
+}
+
+enum PlannerVersionStatus {
+  DRAFT
+  SUBMITTED
+  CHANGES_REQUESTED
+  REJECTED
+  APPROVED
+  SUPERSEDED
+  WITHDRAWN
+}
+
+enum PlannerVersionOrigin {
+  INITIAL
+  REVISION
+  RECOVERY
+}
+
+enum PlannerExamRisk {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum PlannerContentStatus {
+  AVAILABLE
+  MISSING
+  CHANGED
+}
+
+enum PlannerAnalysisSource {
+  AI
+  PROVISIONAL
+  MANUAL
+}
+
+enum PlannerLessonKind {
+  TEACHING
+  ACTIVITY
+  REVISION
+  ASSESSMENT
+}
+
+enum LessonStage {
+  INTRODUCTION
+  READING
+  EXPLANATION
+  WORKED_EXAMPLES
+  GUIDED_PRACTICE
+  INDEPENDENT_PRACTICE
+  WRITTEN_EXERCISES
+  DISCUSSION
+  PRACTICAL_DEMONSTRATION
+  ACTIVITY
+  RECITATION
+  VOCABULARY
+  GRAMMAR
+  COMPREHENSION
+  REVISION
+  ASSESSMENT
+}
+
+enum PlannerApprovalAction {
+  SUBMITTED
+  WITHDRAWN
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  PUBLISHED_DIRECTLY
+  REVISION_STARTED
+  RECOVERY_PROPOSED
+  ARCHIVED
+  COMPLETED
+}
+
+enum ScheduleChangeReason {
+  TEACHER_ABSENCE
+  SCHOOL_CLOSURE
+  LESSON_DIFFICULTY
+  PARTIAL_COMPLETION
+  INSUFFICIENT_EXERCISE_TIME
+  TIMETABLE_DISRUPTION
+  OTHER
+}
+
+enum TeachingRecordStatus {
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  PARTIAL
+  DIFFERENT_LESSON
+  NOT_TAUGHT
+  DELAYED
+}
+
+enum ObservationMatch {
+  MATCHES_PLAN
+  PARTIAL_MATCH
+  DIFFERENT_LESSON
+  NO_LESSON_OBSERVED
+  UNKNOWN
+}
+
+model SchoolCalendarDay {
+  id             String          @id @default(uuid())
+  schoolId       String          @map("school_id")
+  date           DateTime        @db.Date
+  kind           CalendarDayKind
+  scopeKey       String          @map("scope_key") @db.VarChar(80)
+  gradeId        String?         @map("grade_id")
+  sectionId      String?         @map("section_id")
+  followsWeekday Weekday?        @map("follows_weekday")
+  reason         String          @db.VarChar(255)
+  createdById    String          @map("created_by_id")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  school         School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, date, scopeKey])
+  @@index([schoolId, date])
+  @@map("school_calendar_days")
+}
+
+model TimetableImport {
+  id               String                @id @default(uuid())
+  schoolId         String                @map("school_id")
+  academicYearId   String                @map("academic_year_id")
+  fileAssetId      String?               @map("file_asset_id")
+  sourceType       TimetableSourceType   @map("source_type")
+  status           TimetableImportStatus @default(UPLOADED)
+  originalFilename String?               @map("original_filename") @db.VarChar(255)
+  extractedText    String?               @map("extracted_text") @db.LongText
+  warnings         Json?
+  aiRequestId      String?               @map("ai_request_id")
+  uploadedById     String                @map("uploaded_by_id")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+  school           School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear     AcademicYear          @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  fileAsset        FileAsset?            @relation(fields: [fileAssetId], references: [id], onDelete: SetNull)
+  versions         TimetableVersion[]
+
+  @@index([schoolId, createdAt])
+  @@map("timetable_imports")
+}
+
+model TimetableVersion {
+  id               String                 @id @default(uuid())
+  schoolId         String                 @map("school_id")
+  academicYearId   String                 @map("academic_year_id")
+  sectionId        String                 @map("section_id")
+  importId         String?                @map("import_id")
+  sourceType       TimetableSourceType    @map("source_type")
+  versionNumber    Int                    @map("version_number")
+  status           TimetableVersionStatus @default(DRAFT)
+  effectiveFrom    DateTime?              @map("effective_from") @db.Date
+  effectiveTo      DateTime?              @map("effective_to") @db.Date
+  basedOnVersionId String?                @map("based_on_version_id")
+  revision         Int                    @default(0)
+  validation       Json?
+  notes            String?                @db.Text
+  createdById      String                 @map("created_by_id")
+  publishedById    String?                @map("published_by_id")
+  publishedAt      DateTime?              @map("published_at")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+  school           School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear     AcademicYear           @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  section          Section                @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  import           TimetableImport?       @relation(fields: [importId], references: [id], onDelete: SetNull)
+  periods          TimetablePeriod[]
+
+  @@unique([sectionId, academicYearId, versionNumber])
+  @@index([schoolId, status])
+  @@index([sectionId, status, effectiveFrom])
+  @@map("timetable_versions")
+}
+
+model TimetablePeriod {
+  id             String              @id @default(uuid())
+  versionId      String              @map("version_id")
+  weekday        Weekday
+  periodNumber   Int?                @map("period_number")
+  kind           TimetablePeriodKind @default(LESSON)
+  startTime      String?             @map("start_time") @db.VarChar(5)
+  endTime        String?             @map("end_time") @db.VarChar(5)
+  label          String              @db.VarChar(120)
+  subjectId      String?             @map("subject_id")
+  teacherId      String?             @map("teacher_id")
+  room           String?             @db.VarChar(60)
+  rawSubjectText String?             @map("raw_subject_text") @db.VarChar(255)
+  rawTeacherText String?             @map("raw_teacher_text") @db.VarChar(255)
+  sortOrder      Int                 @default(0) @map("sort_order")
+  version        TimetableVersion    @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  subject        Subject?            @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  teacher        TeacherProfile?     @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  @@index([versionId, weekday])
+  @@index([teacherId])
+  @@map("timetable_periods")
+}
+
+model AcademicPlanner {
+  id                String                   @id @default(uuid())
+  schoolId          String                   @map("school_id")
+  branchId          String                   @map("branch_id")
+  academicYearId    String                   @map("academic_year_id")
+  gradeId           String                   @map("grade_id")
+  sectionId         String                   @map("section_id")
+  subjectId         String                   @map("subject_id")
+  classSubjectId    String                   @map("class_subject_id")
+  teacherId         String                   @map("teacher_id")
+  libraryBookId     String?                  @map("library_book_id")
+  examType          PlannerExamType          @map("exam_type")
+  examConfigId      String?                  @map("exam_config_id")
+  title             String                   @db.VarChar(255)
+  startDate         DateTime                 @map("start_date") @db.Date
+  examDate          DateTime                 @map("exam_date") @db.Date
+  status            PlannerStatus            @default(DRAFT)
+  approvedVersionId String?                  @unique @map("approved_version_id")
+  workingVersionId  String?                  @unique @map("working_version_id")
+  lockRevision      Int                      @default(0) @map("lock_revision")
+  createdById       String                   @map("created_by_id")
+  completedAt       DateTime?                @map("completed_at")
+  archivedAt        DateTime?                @map("archived_at")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+  school            School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear      AcademicYear             @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  section           Section                  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject           Subject                  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher           TeacherProfile           @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  libraryBook       LibraryBook?             @relation(fields: [libraryBookId], references: [id], onDelete: SetNull)
+  examConfig        ExamConfig?              @relation(fields: [examConfigId], references: [id], onDelete: SetNull)
+  versions          AcademicPlannerVersion[] @relation("PlannerVersions")
+  approvedVersion   AcademicPlannerVersion?  @relation("PlannerApprovedVersion", fields: [approvedVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  workingVersion    AcademicPlannerVersion?  @relation("PlannerWorkingVersion", fields: [workingVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  approvalEvents    PlannerApprovalEvent[]
+  teachingRecords   TeachingRecord[]
+
+  @@index([schoolId, status])
+  @@index([sectionId, subjectId, academicYearId])
+  @@index([teacherId, status])
+  @@map("academic_planners")
+}
+
+model AcademicPlannerVersion {
+  id               String                @id @default(uuid())
+  plannerId        String                @map("planner_id")
+  schoolId         String                @map("school_id")
+  versionNumber    Int                   @map("version_number")
+  status           PlannerVersionStatus  @default(DRAFT)
+  origin           PlannerVersionOrigin  @default(INITIAL)
+  basedOnVersionId String?               @map("based_on_version_id")
+  revision         Int                   @default(0)
+  settings         Json
+  summary          Json?
+  examRisk         PlannerExamRisk?      @map("exam_risk")
+  changeReason     ScheduleChangeReason? @map("change_reason")
+  changeReasonNote String?               @map("change_reason_note") @db.Text
+  impact           Json?
+  createdById      String                @map("created_by_id")
+  submittedById    String?               @map("submitted_by_id")
+  submittedAt      DateTime?             @map("submitted_at")
+  decidedById      String?               @map("decided_by_id")
+  decidedAt        DateTime?             @map("decided_at")
+  decisionComment  String?               @map("decision_comment") @db.Text
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+  planner          AcademicPlanner       @relation("PlannerVersions", fields: [plannerId], references: [id], onDelete: Cascade)
+  school           School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  approvedFor      AcademicPlanner?      @relation("PlannerApprovedVersion")
+  workingFor       AcademicPlanner?      @relation("PlannerWorkingVersion")
+  chapters         PlannerChapter[]
+  activities       PlannerActivity[]
+  lessons          PlannerLesson[]
+
+  @@unique([plannerId, versionNumber])
+  @@index([schoolId, status])
+  @@map("academic_planner_versions")
+}
+
+model PlannerChapter {
+  id                   String                 @id @default(uuid())
+  versionId            String                 @map("version_id")
+  chapterKey           String                 @map("chapter_key") @db.VarChar(64)
+  libraryBookChapterId String?                @map("library_book_chapter_id")
+  sortOrder            Int                    @map("sort_order")
+  titleSnapshot        String                 @map("title_snapshot") @db.VarChar(255)
+  contentHash          String?                @map("content_hash") @db.VarChar(64)
+  contentStatus        PlannerContentStatus   @map("content_status")
+  required             Boolean                @default(true)
+  activitiesEnabled    Boolean                @default(false) @map("activities_enabled")
+  activityCount        Int                    @default(1) @map("activity_count")
+  analysis             Json?
+  analysisSource       PlannerAnalysisSource? @map("analysis_source")
+  analysisWarnings     Json?                  @map("analysis_warnings")
+  analyzedAt           DateTime?              @map("analyzed_at")
+  version              AcademicPlannerVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  libraryBookChapter   LibraryBookChapter?    @relation(fields: [libraryBookChapterId], references: [id], onDelete: SetNull)
+  activities           PlannerActivity[]
+  lessons              PlannerLesson[]
+
+  @@unique([versionId, chapterKey])
+  @@index([libraryBookChapterId, contentHash])
+  @@map("planner_chapters")
+}
+
+model PlannerActivity {
+  id               String                 @id @default(uuid())
+  versionId        String                 @map("version_id")
+  plannerChapterId String                 @map("planner_chapter_id")
+  activityKey      String                 @map("activity_key") @db.VarChar(64)
+  title            String                 @db.VarChar(255)
+  description      String?                @db.Text
+  minutes          Int
+  afterPortionKey  String?                @map("after_portion_key") @db.VarChar(64)
+  optional         Boolean                @default(true)
+  sortOrder        Int                    @map("sort_order")
+  source           PlannerAnalysisSource
+  version          AcademicPlannerVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  chapter          PlannerChapter         @relation(fields: [plannerChapterId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, activityKey])
+  @@map("planner_activities")
+}
+
+model PlannerLesson {
+  id               String                 @id @default(uuid())
+  versionId        String                 @map("version_id")
+  plannerChapterId String?                @map("planner_chapter_id")
+  lessonKey        String                 @map("lesson_key") @db.VarChar(64)
+  sequence         Int
+  kind             PlannerLessonKind
+  title            String                 @db.VarChar(255)
+  primaryStage     LessonStage            @map("primary_stage")
+  stages           Json
+  objectives       Json
+  portionKeys      Json                   @map("portion_keys")
+  dependsOnKeys    Json                   @map("depends_on_keys")
+  plannedMinutes   Int                    @map("planned_minutes")
+  scheduledDate    DateTime?              @map("scheduled_date") @db.Date
+  periodNumber     Int?                   @map("period_number")
+  slotStartTime    String?                @map("slot_start_time") @db.VarChar(5)
+  slotEndTime      String?                @map("slot_end_time") @db.VarChar(5)
+  frozen           Boolean                @default(false)
+  isContinuation   Boolean                @default(false) @map("is_continuation")
+  notes            String?                @db.Text
+  version          AcademicPlannerVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  chapter          PlannerChapter?        @relation(fields: [plannerChapterId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, lessonKey])
+  @@unique([versionId, scheduledDate, periodNumber])
+  @@index([versionId, sequence])
+  @@map("planner_lessons")
+}
+
+model PlannerApprovalEvent {
+  id          String                @id @default(uuid())
+  schoolId    String                @map("school_id")
+  plannerId   String                @map("planner_id")
+  versionId   String                @map("version_id")
+  action      PlannerApprovalAction
+  fromStatus  String?               @map("from_status") @db.VarChar(40)
+  toStatus    String?               @map("to_status") @db.VarChar(40)
+  actorUserId String                @map("actor_user_id")
+  comment     String?               @db.Text
+  createdAt   DateTime              @default(now()) @map("created_at")
+  planner     AcademicPlanner       @relation(fields: [plannerId], references: [id], onDelete: Cascade)
+  school      School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([plannerId, createdAt])
+  @@index([schoolId, action, createdAt])
+  @@map("planner_approval_events")
+}
+
+model TeachingRecord {
+  id                     String               @id @default(uuid())
+  schoolId               String               @map("school_id")
+  plannerId              String               @map("planner_id")
+  sectionId              String               @map("section_id")
+  subjectId              String               @map("subject_id")
+  teacherId              String               @map("teacher_id")
+  recordedById           String               @map("recorded_by_id")
+  date                   DateTime             @db.Date
+  periodNumber           Int                  @default(0) @map("period_number")
+  plannerVersionId       String?              @map("planner_version_id")
+  plannedLessonKey       String?              @map("planned_lesson_key") @db.VarChar(64)
+  status                 TeachingRecordStatus
+  actualLessons          Json                 @map("actual_lessons")
+  actualLibraryChapterId String?              @map("actual_library_chapter_id")
+  completedPortionNote   String?              @map("completed_portion_note") @db.Text
+  unfinishedPortionNote  String?              @map("unfinished_portion_note") @db.Text
+  actualMinutes          Int?                 @map("actual_minutes")
+  notes                  String?              @db.Text
+  lateReport             Boolean              @default(false) @map("late_report")
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+  school                 School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  planner                AcademicPlanner      @relation(fields: [plannerId], references: [id], onDelete: Cascade)
+  section                Section              @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject                Subject              @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher                TeacherProfile       @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([plannerId, date, periodNumber])
+  @@index([schoolId, date])
+  @@index([teacherId, date])
+  @@index([plannerId, plannedLessonKey])
+  @@map("teaching_records")
+}
+
+model ClassroomObservation {
+  id                       String           @id @default(uuid())
+  schoolId                 String           @map("school_id")
+  sectionId                String           @map("section_id")
+  subjectId                String?          @map("subject_id")
+  teacherId                String?          @map("teacher_id")
+  plannerId                String?          @map("planner_id")
+  plannerVersionId         String?          @map("planner_version_id")
+  plannedLessonKey         String?          @map("planned_lesson_key") @db.VarChar(64)
+  observedLessonKey        String?          @map("observed_lesson_key") @db.VarChar(64)
+  observedLibraryChapterId String?          @map("observed_library_chapter_id")
+  observedStage            LessonStage?     @map("observed_stage")
+  date                     DateTime         @db.Date
+  periodNumber             Int?             @map("period_number")
+  observedAt               DateTime         @map("observed_at")
+  observerUserId           String           @map("observer_user_id")
+  clientRequestId          String?          @unique @map("client_request_id") @db.VarChar(64)
+  teacherPresent           Boolean?         @map("teacher_present")
+  match                    ObservationMatch
+  notes                    String?          @db.Text
+  followUpRequired         Boolean          @default(false) @map("follow_up_required")
+  followUpAction           String?          @map("follow_up_action") @db.Text
+  followUpDueDate          DateTime?        @map("follow_up_due_date") @db.Date
+  followUpResolvedAt       DateTime?        @map("follow_up_resolved_at")
+  followUpResolvedById     String?          @map("follow_up_resolved_by_id")
+  sharedWithTeacher        Boolean          @default(false) @map("shared_with_teacher")
+  createdAt                DateTime         @default(now()) @map("created_at")
+  updatedAt                DateTime         @updatedAt @map("updated_at")
+  school                   School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  section                  Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, date])
+  @@index([sectionId, date, periodNumber])
+  @@index([teacherId, date])
+  @@index([schoolId, followUpRequired, followUpResolvedAt])
+  @@map("classroom_observations")
 }

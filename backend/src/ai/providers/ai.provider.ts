@@ -77,6 +77,31 @@ export interface AiProvider {
       sayToTeacher: string;
     }>
   >;
+
+  analyzePlannerChapter(input: {
+    chapterTitle: string;
+    chapterText: string;
+    subjectName: string;
+    classLabel: string;
+    gradeLevel: number;
+    periodMinutes: number;
+    activityCount: number;
+    activitiesEnabled: boolean;
+  }): Promise<AiCompletionResult<unknown>>;
+
+  generateTeachingHelp(input: {
+    mode: import('../schemas/teaching-help.schema').TeachingAssistanceMode;
+    lessonTitle: string;
+    chapterTitle: string;
+    classLabel: string;
+    subjectName: string;
+    bookTitle: string | null;
+    objectives: string[];
+    stagesSummary: string;
+    chapterExcerpt: string;
+    teacherQuestion?: string;
+    repairInvalidJson?: boolean;
+  }): Promise<AiCompletionResult<unknown>>;
 }
 
 export const AI_PROVIDER = Symbol('AI_PROVIDER');

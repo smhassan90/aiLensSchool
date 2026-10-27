@@ -84,6 +84,13 @@ const setupSections: SetupSection[] = [
         permission: "MANAGE_CLASSES",
       },
       {
+        href: "/school/setup/academic-calendar",
+        title: "Academic calendar",
+        description: "Holidays, exams, and extra working days for planners",
+        icon: Calendar,
+        permission: "MANAGE_CLASSES",
+      },
+      {
         href: "/school/exams",
         title: "Exams & quiz targets",
         description: "Your school’s papers, marks, dates, and quiz minima — not a shared template",

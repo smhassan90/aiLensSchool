@@ -17,7 +17,10 @@ import {
 } from "@/components/ui/table";
 import { academicsService } from "@/services/academics.service";
 import { teacherDisplayNameFromUser } from "@/lib/person-name";
+import Link from "next/link";
 import { Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/providers/auth-provider";
 
 const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"] as const;
 const DAY_LABEL: Record<(typeof DAYS)[number], string> = {
@@ -39,6 +42,7 @@ function teacherLabel(
 }
 
 export default function TimetablePage() {
+  const { can } = useAuth();
   const [gradeId, setGradeId] = useState("");
   const grades = useQuery({
     queryKey: ["grades"],
@@ -78,6 +82,13 @@ export default function TimetablePage() {
           table.data?.section?.classTeacher
             ? `Class teacher: ${teacherLabel(table.data.section.classTeacher)}`
             : "Weekly periods from the school time tables"
+        }
+        actions={
+          can("MANAGE_CLASSES") ? (
+            <Link href="/school/timetable/manage">
+              <Button type="button" variant="outline" size="sm">Import &amp; publish</Button>
+            </Link>
+          ) : undefined
         }
       />
       <div className="mb-4 max-w-xs">

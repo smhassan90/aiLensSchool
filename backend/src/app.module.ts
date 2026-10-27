@@ -41,6 +41,8 @@ import { HeadTeachersModule } from './head-teachers/head-teachers.module';
 import { DeviceModule } from './device/device.module';
 import { PlatformModule } from './platform/platform.module';
 import { ExceptionLogsModule } from './exception-logs/exception-logs.module';
+import { TimetablesModule } from './timetables/timetables.module';
+import { AcademicPlannerModule } from './academic-planner/academic-planner.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -139,6 +141,8 @@ const queuesEnabled = areQueuesEnabled();
     DeviceModule,
     PlatformModule,
     ExceptionLogsModule,
+    TimetablesModule,
+    AcademicPlannerModule,
   ],
   controllers: [HealthController],
   providers: [

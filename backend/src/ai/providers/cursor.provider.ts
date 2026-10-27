@@ -901,6 +901,87 @@ export class CursorProvider implements AiProvider {
     };
   }
 
+  async analyzePlannerChapter(
+    input: Parameters<AiProvider['analyzePlannerChapter']>[0],
+  ): Promise<AiCompletionResult<unknown>> {
+    const { heuristicChapterAnalysis } = await import('../../academic-planner/subject-profiles');
+    const { PlannerChapterAnalysisSchema } = await import('../schemas/planner-chapter-analysis.schema');
+    if (!this.apiKey) {
+      const data = heuristicChapterAnalysis({
+        chapterTitle: input.chapterTitle,
+        chapterText: input.chapterText,
+        subjectName: input.subjectName,
+        periodMinutes: input.periodMinutes,
+        activityCount: input.activityCount,
+        activitiesEnabled: input.activitiesEnabled,
+      });
+      return {
+        data: PlannerChapterAnalysisSchema.parse(data),
+        provider: 'mock',
+        model: 'heuristic',
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCost: 0,
+      };
+    }
+    const user = `Class: ${input.classLabel}\nSubject: ${input.subjectName}\nGrade level: ${input.gradeLevel}\nChapter: ${input.chapterTitle}\nPeriod minutes: ${input.periodMinutes}\nActivities enabled: ${input.activitiesEnabled}\nActivity count: ${input.activityCount}\n\n--- CHAPTER TEXT ---\n${input.chapterText}\n--- END ---`;
+    const { PLANNER_CHAPTER_ANALYSIS_SYSTEM_PROMPT } = await import('../prompts');
+    const content = await this.withTimeout(
+      this.complete(PLANNER_CHAPTER_ANALYSIS_SYSTEM_PROMPT, user),
+      this.jsonTimeoutMs,
+      'Planner chapter analysis',
+    );
+    const parsed = PlannerChapterAnalysisSchema.parse(parseModelJson(content.text));
+    return { data: parsed, ...content.meta };
+  }
+
+  async generateTeachingHelp(
+    input: Parameters<import('./ai.provider').AiProvider['generateTeachingHelp']>[0],
+  ): Promise<import('./ai.provider').AiCompletionResult<unknown>> {
+    const { TeachingHelpOutputSchema } = await import('../schemas/teaching-help.schema');
+    const { heuristicTeachingHelp } = await import('../../academic-planner/teaching-help-heuristic');
+    const { modeInstruction } = await import('../../academic-planner/teaching-help-prompt');
+    const { TEACHING_HELP_SYSTEM_PROMPT } = await import('../prompts');
+    const { parseModelJson } = await import('../parse-model-json');
+
+    if (!this.apiKey) {
+      return {
+        data: TeachingHelpOutputSchema.parse(
+          heuristicTeachingHelp({
+            lessonTitle: input.lessonTitle,
+            chapterTitle: input.chapterTitle,
+            classLabel: input.classLabel,
+            subjectName: input.subjectName,
+            objectives: input.objectives,
+            bookTitle: input.bookTitle,
+          }),
+        ),
+        provider: 'mock',
+        model: 'heuristic',
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCost: 0,
+      };
+    }
+
+    const excerptBlock = input.chapterExcerpt.trim()
+      ? `--- CHAPTER EXCERPT ---\n${input.chapterExcerpt.slice(0, 6000)}\n--- END EXCERPT ---`
+      : '--- CHAPTER EXCERPT ---\n(none — use objectives only)\n--- END EXCERPT ---';
+
+    const repair = input.repairInvalidJson
+      ? '\nYour previous JSON was invalid. Return ONLY corrected JSON matching the schema.'
+      : '';
+    const user = `${modeInstruction(input.mode)}\nClass: ${input.classLabel}\nSubject: ${input.subjectName}\nTextbook: ${input.bookTitle ?? '(not specified)'}\nChapter: ${input.chapterTitle}\nLesson: ${input.lessonTitle}\nObjectives:\n${input.objectives.map((o) => `- ${o}`).join('\n') || '(none listed)'}\nLesson stages:\n${input.stagesSummary}\n${excerptBlock}${input.teacherQuestion ? `\nTeacher focus question: ${input.teacherQuestion.slice(0, 500)}` : ''}${repair}`;
+
+    const content = await this.withTimeout(
+      this.complete(TEACHING_HELP_SYSTEM_PROMPT, user),
+      this.jsonTimeoutMs,
+      'Teaching help',
+    );
+    const parsed = TeachingHelpOutputSchema.parse(parseModelJson(content.text));
+    return { data: parsed, ...content.meta };
+  }
+
   private extractJson(text: string): string {
     const trimmed = text.trim();
     const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(trimmed);
