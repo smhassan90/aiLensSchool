@@ -434,7 +434,11 @@ export const academicPlannerService = {
 
   },
 
-
+  archive(plannerId: string) {
+    return apiClient<{ id: string; archived: boolean }>(`/academic-planners/${plannerId}`, {
+      method: "DELETE",
+    });
+  },
 
   getVersion(plannerId: string, versionId: string) {
 

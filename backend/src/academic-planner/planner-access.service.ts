@@ -74,6 +74,16 @@ export class PlannerAccessService {
     throw new ForbiddenException({ code: 'PLANNER_FORBIDDEN', message: 'You cannot submit this planner' });
   }
 
+  assertCanArchive(actor: PlannerActor, planner: Pick<AcademicPlanner, 'createdById' | 'teacherId' | 'archivedAt'>) {
+    if (planner.archivedAt) {
+      throw new ForbiddenException({ code: 'PLANNER_ALREADY_ARCHIVED', message: 'This planner is already archived.' });
+    }
+    if (actor.isPrincipalOrAdmin) return;
+    if (planner.createdById === actor.userId) return;
+    if (actor.teacherProfileId && planner.teacherId === actor.teacherProfileId) return;
+    throw new ForbiddenException({ code: 'PLANNER_FORBIDDEN', message: 'You cannot delete this planner.' });
+  }
+
   assertCanDecide(actor: PlannerActor) {
     if (!actor.isPrincipalOrAdmin) {
       throw new ForbiddenException({ code: 'PLANNER_FORBIDDEN', message: 'Only principals or admins can review planners' });

@@ -29,8 +29,20 @@ export class AcademicPlannersService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(_user: AuthUser) {
-    return [];
+  async archive(user: AuthUser, plannerId: string) {
+    const actor = await this.access.resolveActor(user);
+    const planner = await this.prisma.academicPlanner.findFirst({
+      where: { id: plannerId, schoolId: actor.schoolId },
+    });
+    if (!planner) {
+      throw new NotFoundException({ code: 'PLANNER_NOT_FOUND', message: 'Planner not found' });
+    }
+    this.access.assertCanArchive(actor, planner);
+    await this.prisma.academicPlanner.update({
+      where: { id: plannerId },
+      data: { status: PlannerStatus.ARCHIVED, archivedAt: new Date() },
+    });
+    return { id: plannerId, archived: true };
   }
 
   async create(user: AuthUser, dto: CreatePlannerDto): Promise<PlannerVersionPayload> {

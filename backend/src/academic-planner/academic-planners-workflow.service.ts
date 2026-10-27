@@ -8,6 +8,7 @@ import {
   PlannerAnalysisSource,
   PlannerContentStatus,
   PlannerExamRisk,
+  PlannerStatus,
   PlannerVersionOrigin,
   PlannerVersionStatus,
   Prisma,
@@ -29,6 +30,7 @@ import { buildPlannerTeachingSlots } from './academic-planners-schedule.helper';
 import { generateSchedule, ChapterForSegments } from './schedule-engine';
 import { PlannerSettings } from './planner-types';
 import { DEFAULT_SCHOOL_TIMEZONE } from '../teachers/teacher-checkin';
+import { PlannerAccessService } from './planner-access.service';
 
 @Injectable()
 export class AcademicPlannersWorkflowService {
@@ -40,21 +42,40 @@ export class AcademicPlannersWorkflowService {
     private readonly analysis: PlannerChapterAnalysisService,
     private readonly resolver: TimetableResolverService,
     private readonly planners: AcademicPlannersService,
+    private readonly access: PlannerAccessService,
   ) {}
 
   async list(
     user: AuthUser,
     query: { status?: string; sectionId?: string; subjectId?: string; teacherId?: string; scope?: string },
   ) {
-    const schoolId = this.tenant.requireSchoolId(user);
+    const actor = await this.access.resolveActor(user);
+    const schoolId = actor.schoolId;
+    const scope = query.scope ?? 'mine';
+    const where: Prisma.AcademicPlannerWhereInput = {
+      schoolId,
+      archivedAt: null,
+      status: { not: PlannerStatus.ARCHIVED },
+      ...(query.status ? { status: query.status as PlannerStatus } : {}),
+      ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+      ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+      ...(query.teacherId ? { teacherId: query.teacherId } : {}),
+    };
+
+    const schoolWide = scope === 'school' && actor.isPrincipalOrAdmin;
+    if (!schoolWide) {
+      const or: Prisma.AcademicPlannerWhereInput[] = [{ createdById: actor.userId }];
+      if (actor.teacherProfileId) {
+        or.push({ teacherId: actor.teacherProfileId });
+      }
+      if (!actor.isPrincipalOrAdmin && !actor.teacherProfileId) {
+        return [];
+      }
+      where.OR = or;
+    }
+
     const rows = await this.prisma.academicPlanner.findMany({
-      where: {
-        schoolId,
-        ...(query.status ? { status: query.status as import('@prisma/client').PlannerStatus } : {}),
-        ...(query.sectionId ? { sectionId: query.sectionId } : {}),
-        ...(query.subjectId ? { subjectId: query.subjectId } : {}),
-        ...(query.teacherId ? { teacherId: query.teacherId } : {}),
-      },
+      where,
       include: {
         subject: { select: { name: true } },
         section: { select: { name: true, grade: { select: { name: true } } } },

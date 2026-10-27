@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { RoleName } from '@prisma/client';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -68,6 +68,11 @@ export class AcademicPlannersController {
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreatePlannerDto) {
     return this.planners.create(user, dto);
+  }
+
+  @Delete(':id')
+  archivePlanner(@CurrentUser() user: AuthUser, @Param('id') plannerId: string) {
+    return this.planners.archive(user, plannerId);
   }
 
   @Get(':id')

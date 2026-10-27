@@ -3,6 +3,7 @@
 import {
   BookOpen,
   CalendarDays,
+  CalendarRange,
   ClipboardCheck,
   ClipboardList,
   Clock,
@@ -36,6 +37,7 @@ const baseNavItems = [
   { href: "/teacher/classes", label: "My classes", icon: Users },
   { href: "/teacher/attendance", label: "Class attendance", icon: ClipboardCheck, classTeacherOnly: true },
   { href: "/teacher/day-off-requests", label: "Day-off requests", icon: CalendarDays, classTeacherOnly: true },
+  { href: "/teacher/planner", label: "Planners", icon: CalendarRange },
   { href: "/teacher/lessons", label: "Lessons", icon: BookOpen },
   { href: "/teacher/homework", label: "Homework", icon: ClipboardList },
   { href: "/teacher/quizzes", label: "Quizzes", icon: FileQuestion },
@@ -70,7 +72,11 @@ export function TeacherSidebar() {
   const navItems = [
     ...(dashboard ? [dashboard] : []),
     ...(isHeadTeacher
-      ? [{ href: "/teacher/head", label: "Academic insights", icon: School }]
+      ? [
+          { href: "/teacher/head", label: "Academic insights", icon: School },
+          { href: "/teacher/head/rounds", label: "Classroom rounds", icon: ClipboardCheck },
+          { href: "/teacher/head/planners", label: "Section planners", icon: CalendarDays },
+        ]
       : []),
     ...(supervisesStaff
       ? [{ href: "/teacher/staff-attendance", label: "Staff attendance", icon: Users }]
