@@ -36,12 +36,14 @@ export function assetUrl(path?: string | null): string | null {
 export class ApiClientError extends Error {
   code?: string;
   status: number;
+  details?: unknown;
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, details?: unknown) {
     super(message);
     this.name = "ApiClientError";
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -167,10 +169,12 @@ async function authorizedFetch<T>(path: string, init: RequestInit, baseUrl = get
   }
 
   if (!response.ok || !payload.success) {
+    const errBody = typeof payload.error === "object" ? payload.error : undefined;
     throw new ApiClientError(
       getErrorMessage(payload.error),
       response.status,
-      typeof payload.error === "object" ? payload.error.code : undefined,
+      errBody?.code,
+      errBody?.details,
     );
   }
 
