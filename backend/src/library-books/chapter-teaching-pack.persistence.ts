@@ -31,7 +31,7 @@ export async function upsertChapterTeachingPack(
         summary: input.pack.summary,
         teacherGuide: input.pack.teacherGuide as Prisma.InputJsonValue,
         source: input.source,
-        warnings: input.warnings,
+        warnings: input.warnings ?? undefined,
         promptVersion: input.promptVersion,
         generatedAt,
         readingSlices: {
