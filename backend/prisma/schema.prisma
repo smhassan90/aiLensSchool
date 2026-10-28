@@ -1306,10 +1306,97 @@ model LibraryBookChapter {
 
   book            LibraryBook      @relation(fields: [bookId], references: [id], onDelete: Cascade)
   plannerChapters PlannerChapter[]
+  teachingPack    LibraryChapterTeachingPack?
 
   @@unique([bookId, title])
   @@index([bookId])
   @@map("library_book_chapters")
+}
+
+/// AI-generated teaching metadata for a library chapter (shared across all planners using this chapter).
+model LibraryChapterTeachingPack {
+  id                   String                @id @default(uuid())
+  libraryBookChapterId String                @unique @map("library_book_chapter_id")
+  contentHash          String                @map("content_hash") @db.VarChar(64)
+  complexity           String                @db.VarChar(16)
+  summary              String                @db.Text
+  teacherGuide         Json                  @map("teacher_guide")
+  source               PlannerAnalysisSource
+  warnings             Json?
+  promptVersion        String                @map("prompt_version") @db.VarChar(64)
+  generatedAt          DateTime              @map("generated_at")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+
+  chapter        LibraryBookChapter            @relation(fields: [libraryBookChapterId], references: [id], onDelete: Cascade)
+  readingSlices  LibraryChapterReadingSlice[]
+  questions      LibraryChapterQuestionItem[]
+  activities     LibraryChapterActivityItem[]
+  revisionPoints LibraryChapterRevisionPoint[]
+
+  @@index([contentHash])
+  @@map("library_chapter_teaching_packs")
+}
+
+model LibraryChapterReadingSlice {
+  id            String   @id @default(uuid())
+  packId        String   @map("pack_id")
+  sortOrder     Int      @map("sort_order")
+  sliceKey      String   @map("slice_key") @db.VarChar(16)
+  title         String   @db.VarChar(255)
+  readingFrom   String   @map("reading_from") @db.Text
+  readingTo     String?  @map("reading_to") @db.Text
+  explainPoints Json     @map("explain_points")
+
+  pack LibraryChapterTeachingPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  @@unique([packId, sliceKey])
+  @@index([packId, sortOrder])
+  @@map("library_chapter_reading_slices")
+}
+
+model LibraryChapterQuestionItem {
+  id             String  @id @default(uuid())
+  packId         String  @map("pack_id")
+  sliceKey       String? @map("slice_key") @db.VarChar(16)
+  sortOrder      Int     @map("sort_order")
+  question       String  @db.Text
+  expectedAnswer String  @map("expected_answer") @db.Text
+  format         String  @db.VarChar(20)
+
+  pack LibraryChapterTeachingPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  @@index([packId, sortOrder])
+  @@map("library_chapter_question_items")
+}
+
+model LibraryChapterActivityItem {
+  id                     String  @id @default(uuid())
+  packId                 String  @map("pack_id")
+  sliceKey               String? @map("slice_key") @db.VarChar(16)
+  sortOrder              Int     @map("sort_order")
+  title                  String  @db.VarChar(255)
+  description            String  @db.Text
+  participationTechnique String  @map("participation_technique") @db.Text
+  materials              String? @db.Text
+
+  pack LibraryChapterTeachingPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  @@index([packId, sortOrder])
+  @@map("library_chapter_activity_items")
+}
+
+model LibraryChapterRevisionPoint {
+  id        String  @id @default(uuid())
+  packId    String  @map("pack_id")
+  sliceKey  String? @map("slice_key") @db.VarChar(16)
+  sortOrder Int     @map("sort_order")
+  point     String  @db.Text
+
+  pack LibraryChapterTeachingPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  @@index([packId, sortOrder])
+  @@map("library_chapter_revision_points")
 }
 
 model LibraryBookGrant {
