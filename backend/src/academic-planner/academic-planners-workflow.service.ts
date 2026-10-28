@@ -501,6 +501,7 @@ export class AcademicPlannersWorkflowService {
       })),
       packsByChapterId: packsForDayPlan,
       chapterTextsByLibraryId,
+      subjectName: planner.subject.name,
       teachingSlots: slotResult.slots,
       settings,
       timetableSource: slotResult.timetableSource,
@@ -823,10 +824,15 @@ export class AcademicPlannersWorkflowService {
       schoolId,
       lesson.chapter.libraryBookChapterId,
     );
+    const plannerRow = await this.prisma.academicPlanner.findUniqueOrThrow({
+      where: { id: plannerId },
+      select: { subject: { select: { name: true } } },
+    });
     const rebuilt = rebuildLessonFromPack({
       pack,
       chapterTitle: lesson.chapter.titleSnapshot,
       chapterText: loadedText.text,
+      subjectName: plannerRow.subject.name,
       portionKeys: portionKeysUse,
       kind,
       periodMinutes,

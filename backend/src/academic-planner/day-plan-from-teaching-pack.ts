@@ -3,7 +3,15 @@ import { randomUUID } from 'crypto';
 import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
 import { TeachingPackForAnalysis } from '../library-books/chapter-teaching-pack-to-analysis';
 import { allocateTeachingDaysPerChapter, splitParagraphsAcrossDays } from './day-plan-allocate';
-import { buildSimpleDayPlan, chapterContentWeight } from './day-plan-teacher-script';
+import {
+  buildChapterRecapActivity,
+  buildExpertTeachingDayPlan,
+  chapterContentWeight,
+  explainPointsForDay,
+  isLowValueContent,
+  labelForTeachingDay,
+  pickCheckQuestions,
+} from './day-plan-teacher-script';
 import {
   computeScheduleSummary,
   defaultRevisionSlots,
@@ -19,7 +27,13 @@ function packLooksIndexOnly(pack: TeachingPackForAnalysis): boolean {
   );
 }
 
-type ChapterPortion = { label: string; body: string; sliceKey?: string };
+type ChapterPortion = {
+  label: string;
+  body: string;
+  sliceKey?: string;
+  explainPoints: string[];
+  questions: string[];
+};
 
 function buildChapterPortions(
   pack: TeachingPackForAnalysis,
@@ -27,28 +41,38 @@ function buildChapterPortions(
   teachDays: number,
 ): ChapterPortion[] {
   const text = fixLibraryTextEncoding(chapterText).trim();
+  const textUsable = text.length >= 120 && !isLowValueContent(text);
   const useText =
-    text.length >= 120 && (packLooksIndexOnly(pack) || text.length > pack.summary.length * 1.2);
+    textUsable && (packLooksIndexOnly(pack) || text.length > pack.summary.length * 1.2);
+
+  const portionMeta = (dayIndex: number, sliceKey?: string): Pick<ChapterPortion, 'explainPoints' | 'questions'> => ({
+    explainPoints: explainPointsForDay(pack, dayIndex, teachDays),
+    questions: pickCheckQuestions(pack, sliceKey, 4),
+  });
 
   if (useText) {
     const chunks = splitParagraphsAcrossDays(text, teachDays);
     return chunks.map((body, i) => ({
-      label: i === 0 ? 'Introduction and opening pages' : `Continue reading — part ${i + 1}`,
-      body,
+      label: labelForTeachingDay(pack, i, teachDays),
+      body: isLowValueContent(body) ? '' : body,
+      ...portionMeta(i),
     }));
   }
 
   const slices = pack.readingSlices;
-  if (slices.length === 0 && text.length > 0) {
+  if (slices.length === 0 && textUsable) {
     return splitParagraphsAcrossDays(text, teachDays).map((body, i) => ({
-      label: i === 0 ? 'Introduction' : `Part ${i + 1}`,
-      body,
+      label: labelForTeachingDay(pack, i, teachDays),
+      body: isLowValueContent(body) ? '' : body,
+      ...portionMeta(i),
     }));
   }
 
   const groups: ChapterPortion[] = Array.from({ length: teachDays }, (_, i) => ({
     label: `Part ${i + 1}`,
     body: '',
+    explainPoints: [] as string[],
+    questions: [] as string[],
   }));
 
   const slicesPerDay = Math.max(1, Math.ceil(slices.length / teachDays));
@@ -61,11 +85,19 @@ function buildChapterPortions(
     } else if (!groups[g].label.includes(title)) {
       groups[g].label = groups[g].label === `Part ${g + 1}` ? title : `${groups[g].label} · ${title}`;
     }
-    groups[g].body += (groups[g].body ? '\n\n' : '') + reading;
+    if (!isLowValueContent(reading)) {
+      groups[g].body += (groups[g].body ? '\n\n' : '') + reading;
+    }
     groups[g].sliceKey = slice.sliceKey;
   });
 
-  return groups.filter((g) => g.body.trim().length > 0);
+  return groups
+    .map((g, dayIndex) => ({
+      ...g,
+      label: labelForTeachingDay(pack, dayIndex, teachDays) || g.label,
+      ...portionMeta(dayIndex, g.sliceKey),
+    }))
+    .filter((g) => g.body.trim().length > 0 || g.explainPoints.length > 0);
 }
 
 export type PlannerChapterForDayPlan = {
@@ -81,6 +113,7 @@ export function generateDayPlanFromTeachingPacks(input: {
   chapters: PlannerChapterForDayPlan[];
   packsByChapterId: Map<string, TeachingPackForAnalysis>;
   chapterTextsByLibraryId: Map<string, string>;
+  subjectName: string;
   teachingSlots: TeachingSlot[];
   settings: PlannerSettings;
   timetableSource: ScheduleSummary['timetableSource'];
@@ -106,10 +139,7 @@ export function generateDayPlanFromTeachingPacks(input: {
     return chapterContentWeight(text, pack.summary, pack.readingSlices.length);
   });
 
-  const activityDaysWanted = ordered.filter((ch) => {
-    const pack = input.packsByChapterId.get(ch.libraryBookChapterId!)!;
-    return pack.activities.length > 0;
-  }).length;
+  const activityDaysWanted = ordered.length;
 
   const teachSlotBudget = Math.max(ordered.length, teachingSlotList.length - activityDaysWanted);
   const teachDaysPerChapter = allocateTeachingDaysPerChapter(weights, teachSlotBudget, 0);
@@ -132,13 +162,17 @@ export function generateDayPlanFromTeachingPacks(input: {
 
     portions.forEach((portion, dayInChapter) => {
       globalDay++;
-      const { objectives, teacherNotes } = buildSimpleDayPlan({
+      const { objectives, teacherNotes } = buildExpertTeachingDayPlan({
         chapterTitle,
+        subjectName: input.subjectName,
         dayInChapter: dayInChapter + 1,
         totalDaysInChapter: portions.length,
         portionText: portion.body,
         portionLabel: portion.label,
         isFirstDayOfChapter: dayInChapter === 0,
+        explainPoints: portion.explainPoints,
+        questions: portion.questions,
+        packSummary: pack.summary,
       });
 
       drafts.push({
@@ -169,32 +203,28 @@ export function generateDayPlanFromTeachingPacks(input: {
       });
     });
 
-    if (pack.activities.length > 0) {
-      const act = pack.activities[0];
+    if (portions.length > 0) {
+      const recap = buildChapterRecapActivity({
+        chapterTitle,
+        subjectName: input.subjectName,
+        pack,
+      });
       globalDay++;
       drafts.push({
         lessonKey: keyFactory(),
         chapterKey: chapter.chapterKey,
         sequence: drafts.length,
         kind: PlannerLessonKind.ACTIVITY,
-        title: `Day ${globalDay} — Activity (${chapterTitle})`,
+        title: `Day ${globalDay} — Activity: ${recap.activityTitle}`,
         primaryStage: LessonStage.ACTIVITY,
         stages: [{ stage: LessonStage.ACTIVITY, minutes: periodMinutes }],
-        objectives: [
-          `Class activity for ${chapterTitle}: ${fixLibraryTextEncoding(act.title)}`,
-          'Every student takes part in pairs or groups.',
-        ],
+        objectives: recap.objectives,
         portionKeys: ['activity:0'],
         dependsOnKeys: [],
         plannedMinutes: periodMinutes,
         frozen: false,
         isContinuation: false,
-        notes: [
-          fixLibraryTextEncoding(act.description),
-          '',
-          'Run it this way:',
-          fixLibraryTextEncoding(act.participationTechnique),
-        ].join('\n'),
+        notes: recap.teacherNotes,
       });
     }
   });
@@ -279,6 +309,7 @@ export function rebuildLessonFromPack(input: {
   pack: TeachingPackForAnalysis;
   chapterTitle: string;
   chapterText?: string;
+  subjectName: string;
   portionKeys: string[];
   kind: PlannerLessonKind;
   periodMinutes: number;
@@ -288,26 +319,19 @@ export function rebuildLessonFromPack(input: {
 } {
   const tag = input.portionKeys[0] ?? '';
   if (tag.startsWith('activity:')) {
-    const act = input.pack.activities[0];
-    if (!act) {
-      return {
-        kind: PlannerLessonKind.ACTIVITY,
-        title: `${input.dayLabel} — Activity`,
-        primaryStage: LessonStage.ACTIVITY,
-        stages: [{ stage: LessonStage.ACTIVITY, minutes: input.periodMinutes }],
-        objectives: ['Run a class activity'],
-        plannedMinutes: input.periodMinutes,
-        notes: '',
-      };
-    }
+    const recap = buildChapterRecapActivity({
+      chapterTitle: input.chapterTitle,
+      subjectName: input.subjectName,
+      pack: input.pack,
+    });
     return {
       kind: PlannerLessonKind.ACTIVITY,
-      title: `${input.dayLabel} — Activity: ${fixLibraryTextEncoding(act.title)}`,
+      title: `${input.dayLabel} — Activity: ${recap.activityTitle}`,
       primaryStage: LessonStage.ACTIVITY,
       stages: [{ stage: LessonStage.ACTIVITY, minutes: input.periodMinutes }],
-      objectives: [`Activity: ${fixLibraryTextEncoding(act.title)}`],
+      objectives: recap.objectives,
       plannedMinutes: input.periodMinutes,
-      notes: fixLibraryTextEncoding(act.participationTechnique),
+      notes: recap.teacherNotes,
     };
   }
 
@@ -316,13 +340,18 @@ export function rebuildLessonFromPack(input: {
     const text = input.chapterText ?? input.pack.summary;
     const chunks = splitParagraphsAcrossDays(text, Math.max(dayIdx + 1, 1));
     const body = chunks[dayIdx] ?? chunks[chunks.length - 1] ?? text;
-    const { objectives, teacherNotes } = buildSimpleDayPlan({
+    const teachDays = Math.max(chunks.length, dayIdx + 1);
+    const { objectives, teacherNotes } = buildExpertTeachingDayPlan({
       chapterTitle: input.chapterTitle,
+      subjectName: input.subjectName,
       dayInChapter: dayIdx + 1,
-      totalDaysInChapter: chunks.length,
+      totalDaysInChapter: teachDays,
       portionText: body,
-      portionLabel: dayIdx === 0 ? 'Introduction' : `Part ${dayIdx + 1}`,
+      portionLabel: labelForTeachingDay(input.pack, dayIdx, teachDays),
       isFirstDayOfChapter: dayIdx === 0,
+      explainPoints: explainPointsForDay(input.pack, dayIdx, teachDays),
+      questions: pickCheckQuestions(input.pack, undefined, 4),
+      packSummary: input.pack.summary,
     });
     return {
       kind: PlannerLessonKind.TEACHING,
@@ -342,13 +371,22 @@ export function rebuildLessonFromPack(input: {
   const sliceKey = tag.startsWith('slice:') ? tag.slice(6) : tag.replace(/^p/, 's');
   const slice = input.pack.readingSlices.find((s) => s.sliceKey === sliceKey) ?? input.pack.readingSlices[0];
   const body = slice ? fixLibraryTextEncoding(slice.readingFrom) : input.pack.summary;
-  const { objectives, teacherNotes } = buildSimpleDayPlan({
+  const explainPoints = slice
+    ? (Array.isArray(slice.explainPoints)
+        ? (slice.explainPoints as string[]).filter((x) => typeof x === 'string')
+        : [])
+    : explainPointsForDay(input.pack, 0, 1);
+  const { objectives, teacherNotes } = buildExpertTeachingDayPlan({
     chapterTitle: input.chapterTitle,
+    subjectName: input.subjectName,
     dayInChapter: 1,
     totalDaysInChapter: 1,
     portionText: body,
     portionLabel: slice ? fixLibraryTextEncoding(slice.title) : 'Lesson',
     isFirstDayOfChapter: true,
+    explainPoints,
+    questions: pickCheckQuestions(input.pack, slice?.sliceKey, 4),
+    packSummary: input.pack.summary,
   });
   return {
     kind: PlannerLessonKind.TEACHING,

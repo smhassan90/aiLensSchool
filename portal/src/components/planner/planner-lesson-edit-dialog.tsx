@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -45,15 +46,26 @@ export function PlannerLessonEditDialog({
     setKind(lesson.kind);
   }, [lesson]);
 
-  if (!open || !lesson) return null;
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!lesson) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border bg-card p-5 shadow-lg">
-        <h2 className="text-lg font-semibold">Edit day plan</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{lesson.title}</p>
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent onClose={onClose} className="max-w-lg">
+        <DialogHeader className="pr-8">
+          <DialogTitle>Edit day plan</DialogTitle>
+          <DialogDescription>{lesson.title}</DialogDescription>
+        </DialogHeader>
 
-        <div className="mt-4 space-y-3">
+        <div className="space-y-3">
           <div className="space-y-1">
             <Label htmlFor="lesson-title">Title</Label>
             <Input id="lesson-title" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -124,7 +136,7 @@ export function PlannerLessonEditDialog({
             Cancel
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
