@@ -115,6 +115,19 @@ curl -sS https://hawknexabackend.fynals.com/internal/deploy/health
 
 You should see `ok` (not a JSON 404 from the API). Then re-run the GitHub Actions workflow.
 
+### Backend crash loop (`Restarting`, health 502)
+
+On start, the backend runs `prisma db push` then Node. If schema apply fails, the container exits and the API returns 502.
+
+On the VPS:
+
+```bash
+cd /opt/apps/hawknexa/repo && git pull origin main
+bash deploy/hawknexa/recover-backend-schema.sh
+```
+
+Or inspect: `docker compose -f /opt/apps/hawknexa/deploy/docker-compose.prod.yml logs backend --tail 120`
+
 **Checklist:**
 1. `/opt/apps/hawknexa/deploy/.env` has `DEPLOY_WEBHOOK_SECRET=...` (same as GitHub secret `HAWKNEXA_DEPLOY_WEBHOOK_SECRET`)
 2. `docker compose -f docker-compose.prod.yml ps deploy-webhook` shows **Up** (not restarting)
