@@ -15,6 +15,6 @@ import { DocumentsModule } from '../documents/documents.module';
   imports: [CommonModule, AuditModule, AiModule, ParentsModule, FilesModule, HomeworkModule, DocumentsModule],
   providers: [LessonsService, PageOcrService, OcrUploadProgressService],
   controllers: [LessonsController],
-  exports: [LessonsService],
+  exports: [LessonsService, PageOcrService],
 })
 export class LessonsModule {}
