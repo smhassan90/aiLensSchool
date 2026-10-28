@@ -1,3 +1,27 @@
+import { isPackMetaPoint } from './day-plan-content-quality';
+import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
+
+/** Split chapter summary sentences evenly across teaching days (primary source for day scripts). */
+export function splitSummaryAcrossDays(summary: string, days: number): string[] {
+  const fixed = fixLibraryTextEncoding(summary).replace(/\r/g, '').trim();
+  if (!fixed || days <= 0) return [];
+
+  const sentences = fixed
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((s) => s.replace(/\s+/g, ' ').trim())
+    .filter((s) => s.length >= 15 && !isPackMetaPoint(s));
+
+  if (sentences.length === 0) {
+    return splitParagraphsAcrossDays(fixed, days);
+  }
+
+  const out: string[] = Array.from({ length: days }, () => '');
+  for (let i = 0; i < sentences.length; i++) {
+    out[i % days] += (out[i % days] ? ' ' : '') + sentences[i];
+  }
+  return out.map((s) => s.trim()).filter(Boolean);
+}
+
 /** Split available teaching days across chapters (min 1 day each, weighted by content). */
 export function allocateTeachingDaysPerChapter(
   weights: number[],

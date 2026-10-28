@@ -1,5 +1,13 @@
 import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
 import { TeachingPackForAnalysis } from '../library-books/chapter-teaching-pack-to-analysis';
+import { splitSummaryAcrossDays } from './day-plan-allocate';
+import {
+  displayChapterTitle,
+  isPackMetaPoint,
+  polishTeacherLine,
+  summarySentences,
+  teachablePointsFromText,
+} from './day-plan-content-quality';
 import { detectSubjectProfile } from './subject-profiles';
 
 function asStringArray(value: unknown): string[] {
@@ -43,6 +51,7 @@ export function isLowValueContent(s: string): boolean {
   const lower = s.toLowerCase();
   return (
     isIndexLikeText(s) ||
+    isPackMetaPoint(s) ||
     lower.includes('.pdf') ||
     lower.includes('not in religious') ||
     lower.includes('lesson pages listed') ||
@@ -51,14 +60,27 @@ export function isLowValueContent(s: string): boolean {
   );
 }
 
+function cleanSliceTitles(pack: TeachingPackForAnalysis): string[] {
+  return dedupeLines(
+    pack.readingSlices
+      .map((s) => stripIndexMeta(fixLibraryTextEncoding(s.title)))
+      .map((t) => t.replace(/^chapter opening and\s+/i, '').trim())
+      .filter((t) => t.length > 4 && !isIndexLikeText(t) && !isPackMetaPoint(t)),
+  );
+}
+
 export function collectPackTeachingPoints(pack: TeachingPackForAnalysis): string[] {
+  const fromSummary = summarySentences(pack.summary).map((s) => polishTeacherLine(s, 180));
+  if (fromSummary.length >= 2) return fromSummary.slice(0, 8);
+
   const raw = [
     ...asStringArray(pack.teacherGuide),
-    ...pack.readingSlices.flatMap((s) => asStringArray(s.explainPoints)),
     ...pack.revisionPoints.map((r) => r.point),
-  ].map((p) => stripIndexMeta(fixLibraryTextEncoding(p)));
+  ]
+    .map((p) => polishTeacherLine(stripIndexMeta(fixLibraryTextEncoding(p)), 180))
+    .filter((p) => p.length > 18 && !isLowValueContent(p) && !isPackMetaPoint(p));
 
-  return dedupeLines(raw.filter((p) => p.length > 12 && !isLowValueContent(p)));
+  return dedupeLines(raw).slice(0, 8);
 }
 
 export function pickCheckQuestions(
@@ -68,49 +90,58 @@ export function pickCheckQuestions(
 ): string[] {
   const fromPack = pack.questions
     .filter((q) => !sliceKey || q.sliceKey === sliceKey || q.sliceKey == null)
-    .map((q) => fixLibraryTextEncoding(q.question))
-    .filter((q) => q.length > 12 && !isIndexLikeText(q));
+    .map((q) => polishTeacherLine(fixLibraryTextEncoding(q.question), 200))
+    .filter((q) => q.length > 12 && !isIndexLikeText(q) && !isPackMetaPoint(q));
 
   const picked = dedupeLines(fromPack);
   if (picked.length >= limit) return picked.slice(0, limit);
   return picked;
 }
 
-function questionsFromTeachPoints(points: string[], limit: number): string[] {
+function questionsFromSummary(sentences: string[], limit: number): string[] {
   const out: string[] = [];
-  for (const p of points) {
+  for (const s of sentences) {
     if (out.length >= limit) break;
-    const idea = p.split(/[.!?]/)[0]?.trim() ?? p;
-    if (idea.length < 8) continue;
-    out.push(`Explain in your own words: ${idea.slice(0, 140)}.`);
+    const idea = s.split(/[.!?]/)[0]?.trim() ?? s;
+    if (idea.length < 12 || isPackMetaPoint(idea)) continue;
+    out.push(polishTeacherLine(`What is ${idea.charAt(0).toLowerCase()}${idea.slice(1)}?`, 200));
   }
   return out;
 }
 
-function suggestStoryExample(point: string, subjectName: string): string {
-  const topic = point.slice(0, 160);
-  const profile = detectSubjectProfile(subjectName);
+function extractExampleTopic(summaryPortion: string, focusLabel: string): string {
+  const points = teachablePointsFromText(summaryPortion, 1);
+  if (points[0]) return points[0].replace(/[.!?]$/, '');
+  const label = stripIndexMeta(focusLabel);
+  if (label.length > 8 && !isPackMetaPoint(label)) return label;
+  return 'today’s lesson ideas';
+}
+
+export function suggestExampleFromSummary(
+  summaryPortion: string,
+  focusLabel: string,
+  subjectName: string,
+): string {
+  const topic = extractExampleTopic(summaryPortion, focusLabel);
   const subj = subjectName.toLowerCase();
+  const profile = detectSubjectProfile(subjectName);
+
   if (
     profile === 'LANGUAGE' ||
     subj.includes('religious') ||
     subj.includes('islamiat') ||
     subj.includes('ethics')
   ) {
-    return `Story for class: describe a short situation from school or neighbourhood life where someone shows this idea — “${topic}”. After the story, ask: “Which value did we see? Where in today’s lesson does the book say the same thing?”`;
+    return (
+      `Example for the class (about 2 minutes): Tell a short, realistic story from school or neighbourhood life that shows “${topic.slice(0, 120)}”. ` +
+      `After the story, ask two students: what value or teaching from the textbook did they see in the story?`
+    );
   }
-  return `Example for class: link “${topic}” to something students already know (news, family, sport, or science around them). End by asking one student to restate the link in one sentence.`;
-}
 
-function usablePortionBody(body: string, explainPoints: string[]): string {
-  const cleaned = stripIndexMeta(fixLibraryTextEncoding(body)).trim();
-  if (cleaned.length >= 80 && !isLowValueContent(cleaned)) {
-    return cleaned.length > 500 ? `${cleaned.slice(0, 500)}…` : cleaned;
-  }
-  if (explainPoints.length > 0) {
-    return explainPoints.slice(0, 4).join('\n• ');
-  }
-  return '';
+  return (
+    `Example for the class: Connect “${topic.slice(0, 120)}” to something students already know (local news, sport, science, or family life). ` +
+    `Ask one student to repeat the link in one clear sentence.`
+  );
 }
 
 export function buildExpertTeachingDayPlan(input: {
@@ -125,77 +156,78 @@ export function buildExpertTeachingDayPlan(input: {
   questions: string[];
   packSummary: string;
 }): { objectives: string[]; teacherNotes: string } {
-  const chapter = fixLibraryTextEncoding(input.chapterTitle);
+  const chapter = displayChapterTitle(input.chapterTitle);
   const label = stripIndexMeta(fixLibraryTextEncoding(input.portionLabel));
-  const teachPoints = dedupeLines(
-    input.explainPoints.map((p) => stripIndexMeta(fixLibraryTextEncoding(p))).filter((p) => p.length > 8),
+
+  const summaryPortion = polishTeacherLine(
+    fixLibraryTextEncoding(input.portionText).trim() ||
+      splitSummaryAcrossDays(input.packSummary, input.totalDaysInChapter)[input.dayInChapter - 1] ||
+      '',
+    900,
   );
 
+  let teachPoints = teachablePointsFromText(summaryPortion, 5);
   if (teachPoints.length === 0) {
-    const summaryBits = fixLibraryTextEncoding(input.packSummary)
-      .split(/[.!?]+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 20 && !isLowValueContent(s));
-    teachPoints.push(...summaryBits.slice(0, 3));
+    teachPoints = dedupeLines(
+      input.explainPoints
+        .map((p) => polishTeacherLine(stripIndexMeta(fixLibraryTextEncoding(p)), 200))
+        .filter((p) => !isPackMetaPoint(p) && !isLowValueContent(p)),
+    ).slice(0, 4);
   }
 
   const focusTitle =
-    label && !isLowValueContent(label) ? label : teachPoints[0]?.slice(0, 100) ?? chapter;
+    label && !isLowValueContent(label) && !isPackMetaPoint(label)
+      ? label.replace(/^chapter opening and\s+/i, '').trim()
+      : teachPoints[0]?.replace(/[.!?]$/, '').slice(0, 80) ?? `Day ${input.dayInChapter} of ${chapter}`;
 
   const objectives: string[] = [];
   if (input.isFirstDayOfChapter) {
-    objectives.push(`Open “${chapter}” and set why these ideas matter in daily life.`);
+    objectives.push(`Introduce ${chapter} using the textbook opening.`);
   }
   for (const p of teachPoints.slice(0, 3)) {
-    objectives.push(p.length > 160 ? `${p.slice(0, 157)}…` : p);
+    objectives.push(p);
   }
   if (objectives.length < 2) {
-    objectives.push(`Teach today’s section: ${focusTitle}.`);
+    objectives.push(`Teach: ${polishTeacherLine(focusTitle, 160)}`);
   }
 
+  const summaryForQs = summarySentences(summaryPortion);
   const checkQuestions =
     input.questions.length > 0
       ? input.questions.slice(0, 4)
-      : questionsFromTeachPoints(teachPoints, 3);
-
-  const mainPoint = teachPoints[0] ?? focusTitle;
-  const portionSnippet = usablePortionBody(input.portionText, teachPoints);
+      : questionsFromSummary(summaryForQs.length ? summaryForQs : teachPoints, 3);
 
   const steps: string[] = [];
   if (input.isFirstDayOfChapter) {
-    steps.push(
-      `Start (3 min): Name the chapter “${chapter}”. Ask what students already know about ${focusTitle.split('·')[0]?.trim() || 'this topic'}.`,
-    );
+    steps.push(`Opening (3 min): State today’s topic — ${focusTitle}. Ask what students already know about it.`);
   } else {
-    steps.push(`Start (2 min): Quick recap — ask one volunteer to summarise yesterday’s main idea in ${chapter}.`);
+    steps.push(`Opening (2 min): One-sentence recap of yesterday, then state today’s topic — ${focusTitle}.`);
   }
 
-  steps.push(`Teach (18–22 min) — today’s focus: ${focusTitle}`);
+  steps.push(`Teaching (18–22 min): Work through the textbook for ${focusTitle}.`);
   if (teachPoints.length > 0) {
-    steps.push('Explain these points clearly (use the textbook for exact wording):');
-    for (const p of teachPoints.slice(0, 5)) {
+    steps.push('Make sure students understand:');
+    for (const p of teachPoints) {
       steps.push(`• ${p}`);
     }
-  } else if (portionSnippet) {
-    steps.push(`Use this from the chapter:\n${portionSnippet.startsWith('•') ? portionSnippet : `• ${portionSnippet}`}`);
-  } else {
-    steps.push(`Work through the textbook section for “${focusTitle}”.`);
+  } else if (summaryPortion.length > 30) {
+    steps.push(`• ${summaryPortion}`);
   }
 
-  steps.push(suggestStoryExample(mainPoint, input.subjectName));
+  steps.push(suggestExampleFromSummary(summaryPortion || input.packSummary, focusTitle, input.subjectName));
 
   if (checkQuestions.length > 0) {
-    steps.push('Questions to ask before you finish:');
+    steps.push('Ask before class ends:');
     for (const q of checkQuestions) {
       steps.push(`• ${q}`);
     }
   }
 
-  const hwTopic = teachPoints[0]?.slice(0, 80) || focusTitle;
-  steps.push(`Homework: re-read today’s portion and write 3 lines on “${hwTopic}”.`);
+  const hw = teachPoints[0]?.replace(/[.!?]$/, '').slice(0, 90) || focusTitle;
+  steps.push(`Homework: Re-read today’s pages and write three sentences on ${hw}.`);
 
   return {
-    objectives: dedupeLines(objectives).slice(0, 5),
+    objectives: dedupeLines(objectives).slice(0, 4),
     teacherNotes: steps.join('\n'),
   };
 }
@@ -218,9 +250,16 @@ export function buildSimpleDayPlan(input: {
   });
 }
 
-function isWeakPackActivity(act: { title: string; description: string }): boolean {
-  const blob = `${act.title} ${act.description}`.toLowerCase();
-  return isIndexLikeText(blob) || blob.includes('circle') && blob.includes('page');
+function activityThemesFromPack(pack: TeachingPackForAnalysis): string[] {
+  const fromSummary = collectPackTeachingPoints(pack);
+  if (fromSummary.length >= 2) return fromSummary.slice(0, 6);
+
+  const titles = cleanSliceTitles(pack);
+  if (titles.length >= 2) {
+    return titles.slice(0, 6).map((t) => polishTeacherLine(t, 100));
+  }
+
+  return [polishTeacherLine(fixLibraryTextEncoding(pack.summary).slice(0, 120), 120)];
 }
 
 export function buildChapterRecapActivity(input: {
@@ -228,73 +267,50 @@ export function buildChapterRecapActivity(input: {
   subjectName: string;
   pack: TeachingPackForAnalysis;
 }): { activityTitle: string; objectives: string[]; teacherNotes: string } {
-  const chapter = fixLibraryTextEncoding(input.chapterTitle);
-  const points = collectPackTeachingPoints(input.pack);
-  const sliceTitles = dedupeLines(
-    input.pack.readingSlices
-      .map((s) => stripIndexMeta(fixLibraryTextEncoding(s.title)))
-      .filter((t) => t.length > 4 && !isIndexLikeText(t)),
-  );
+  const chapter = displayChapterTitle(input.chapterTitle);
+  const themes = activityThemesFromPack(input.pack);
+  const sliceTitles = cleanSliceTitles(input.pack);
   const exitQs = [
     ...pickCheckQuestions(input.pack, undefined, 4),
-    ...questionsFromTeachPoints(points, 2),
+    ...questionsFromSummary(themes, 2),
   ].slice(0, 4);
 
-  const packAct = input.pack.activities[0];
-  if (packAct && !isWeakPackActivity(packAct)) {
-    const desc = fixLibraryTextEncoding(packAct.description);
-    const technique = fixLibraryTextEncoding(packAct.participationTechnique);
-    if (desc.length > 40 && !isIndexLikeText(desc)) {
-      return {
-        activityTitle: fixLibraryTextEncoding(packAct.title),
-        objectives: [
-          `Revisit main ideas from “${chapter}” through an active task.`,
-          `Cover these themes: ${(sliceTitles.slice(0, 3).join('; ') || points.slice(0, 2).join('; ')).slice(0, 200)}.`,
-        ],
-        teacherNotes: [desc, '', technique, '', exitQs.length ? `Closing questions:\n${exitQs.map((q) => `• ${q}`).join('\n')}` : ''].join('\n'),
-      };
-    }
-  }
-
-  const headings =
-    points.length >= 3
-      ? points.slice(0, Math.min(6, points.length))
-      : sliceTitles.length >= 2
-        ? sliceTitles.slice(0, 6)
-        : [`Main ideas from ${chapter}`];
-
   const activityTitle =
-    sliceTitles.length > 0
-      ? `Recall game: ${sliceTitles.slice(0, 2).join(' & ')}`
-      : `Recall game: ${chapter}`;
+    sliceTitles.length >= 2
+      ? `Review: ${sliceTitles[0]} & ${sliceTitles[1]}`
+      : `Review: ${chapter}`;
+
+  const themeLines = themes.map((h, i) => `  ${i + 1}. ${polishTeacherLine(h, 160)}`);
 
   const notes: string[] = [
-    `You have finished teaching “${chapter}”. This period is for fun review — every student should speak or write at least once.`,
+    `Students have finished ${chapter}. Use this period to recall and apply what they learned.`,
     '',
     'Setup (5 min):',
-    `• ${headings.length} groups (or stations). Each group gets one theme:`,
-    ...headings.map((h, i) => `  ${i + 1}. ${h.slice(0, 120)}`),
+    `• Form ${Math.min(themes.length, 6)} groups. Each group receives one theme:`,
+    ...themeLines,
     '',
     'Main task (25 min):',
-    '• Each group prepares a 2-minute presentation: one real-life example + one sentence from the textbook that supports it.',
-    '• Optional props: chart paper, sticky notes, or a short role-play (especially for values / religious studies topics).',
-    '• Rotate or present so all major themes are heard.',
+    '• Each group prepares a two-minute presentation: one real-life example plus one sentence from the textbook.',
+    '• Values and religious studies topics: allow a short role-play or poster instead of a speech.',
+    '• Every student must speak at least once in the group.',
     '',
-    'Share & reflect (8 min):',
-    '• After each group, you add one “teacher example” to fill any gap.',
+    'Present (8 min):',
+    '• Groups share in turn. You add one missing detail after each group if needed.',
     ...(exitQs.length
-      ? ['', 'Ask the class:', ...exitQs.map((q) => `• ${q}`)]
-      : ['', 'Ask: “Which theme was hardest to explain? Why?”']),
+      ? ['', 'Closing questions:', ...exitQs.map((q) => `• ${q}`)]
+      : ['', 'Closing question: Which theme was hardest to explain in your own words?']),
     '',
-    'Wrap (2 min): praise effort; remind students these ideas will return in revision and assessments.',
+    'Wrap (2 min): Praise effort and note that these ideas will appear in revision and tests.',
   ];
 
   return {
     activityTitle,
     objectives: [
-      `Students recall the major ideas taught in “${chapter}”.`,
-      `Every learner connects at least one theme to real life.`,
-      headings.length > 1 ? `Themes covered: ${headings.slice(0, 4).join('; ').slice(0, 220)}.` : `Theme: ${headings[0]?.slice(0, 120) ?? chapter}.`,
+      `Students recall the main ideas from ${chapter}.`,
+      `Each group connects one theme to real life.`,
+      themes.length > 1
+        ? `Themes: ${themes.slice(0, 4).map((t) => t.replace(/[.!?]$/, '')).join('; ').slice(0, 200)}.`
+        : polishTeacherLine(themes[0] ?? chapter, 160),
     ],
     teacherNotes: notes.join('\n'),
   };
@@ -313,16 +329,20 @@ export function labelForTeachingDay(
 ): string {
   const slices = pack.readingSlices;
   if (slices.length === 0) {
-    return dayIndex === 0 ? 'Opening of the chapter' : `Next part of the chapter (day ${dayIndex + 1})`;
+    return dayIndex === 0 ? 'Opening section' : `Section ${dayIndex + 1}`;
   }
   const slicesPerDay = Math.max(1, Math.ceil(slices.length / teachDays));
   const start = dayIndex * slicesPerDay;
   const daySlices = slices.slice(start, start + slicesPerDay);
   const titles = daySlices
-    .map((s) => stripIndexMeta(fixLibraryTextEncoding(s.title)))
-    .filter((t) => t.length > 3 && !isIndexLikeText(t));
+    .map((s) =>
+      stripIndexMeta(fixLibraryTextEncoding(s.title))
+        .replace(/^chapter opening and\s+/i, '')
+        .trim(),
+    )
+    .filter((t) => t.length > 3 && !isIndexLikeText(t) && !isPackMetaPoint(t));
   if (titles.length > 0) return titles.join(' · ');
-  return daySlices[0] ? stripIndexMeta(fixLibraryTextEncoding(daySlices[0].title)) : `Section ${dayIndex + 1}`;
+  return `Section ${dayIndex + 1}`;
 }
 
 export function explainPointsForDay(
@@ -330,14 +350,10 @@ export function explainPointsForDay(
   dayIndex: number,
   teachDays: number,
 ): string[] {
-  const slices = pack.readingSlices;
-  if (slices.length === 0) return collectPackTeachingPoints(pack).slice(0, 4);
-  const slicesPerDay = Math.max(1, Math.ceil(slices.length / teachDays));
-  const start = dayIndex * slicesPerDay;
-  const daySlices = slices.slice(start, start + slicesPerDay);
-  const points = daySlices.flatMap((s) => asStringArray(s.explainPoints));
-  const cleaned = dedupeLines(
-    points.map((p) => stripIndexMeta(fixLibraryTextEncoding(p))).filter((p) => p.length > 8 && !isIndexLikeText(p)),
-  );
-  return cleaned.length > 0 ? cleaned : collectPackTeachingPoints(pack).slice(0, 4);
+  const portion =
+    splitSummaryAcrossDays(fixLibraryTextEncoding(pack.summary), teachDays)[dayIndex] ?? '';
+  const fromSummary = teachablePointsFromText(portion, 5);
+  if (fromSummary.length > 0) return fromSummary;
+
+  return collectPackTeachingPoints(pack).slice(0, 4);
 }

@@ -12,19 +12,20 @@ describe('buildExpertTeachingDayPlan', () => {
       subjectName: 'Religious Studies',
       dayInChapter: 2,
       totalDaysInChapter: 5,
-      portionText: 'The lesson pages listed above are not in ReligiousStudiesIX-X.pdf.',
+      portionText:
+        'Allah’s mercy extends to all creation. Students learn how mercy appears in worship and daily conduct.',
       portionLabel: 'Glory of the Lord',
       isFirstDayOfChapter: false,
-      explainPoints: ['Allah’s mercy extends to all creation.', 'Piety means doing good quietly.'],
+      explainPoints: ['The chapter is Chapter 2 and its theme is Social and Moral Values.'],
       questions: ['How does mercy show in daily life?'],
       packSummary: 'Chapter on values.',
     });
 
     expect(objectives.some((o) => o.includes('mercy'))).toBe(true);
-    expect(teacherNotes).toContain('Questions to ask');
+    expect(teacherNotes).toContain('Ask before class ends');
     expect(teacherNotes).toContain('How does mercy show');
-    expect(teacherNotes).not.toContain('Ask 2–3 quick questions before the bell');
     expect(teacherNotes).not.toContain('ReligiousStudiesIX-X.pdf');
+    expect(teacherNotes).not.toContain('theme is Social and Moral Values');
   });
 });
 

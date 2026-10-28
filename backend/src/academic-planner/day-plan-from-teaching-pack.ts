@@ -2,7 +2,12 @@ import { LessonStage, PlannerLessonKind } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
 import { TeachingPackForAnalysis } from '../library-books/chapter-teaching-pack-to-analysis';
-import { allocateTeachingDaysPerChapter, splitParagraphsAcrossDays } from './day-plan-allocate';
+import {
+  allocateTeachingDaysPerChapter,
+  splitParagraphsAcrossDays,
+  splitSummaryAcrossDays,
+} from './day-plan-allocate';
+import { displayChapterTitle } from './day-plan-content-quality';
 import {
   buildChapterRecapActivity,
   buildExpertTeachingDayPlan,
@@ -18,15 +23,6 @@ import {
 } from './schedule-engine';
 import { PlannerSettings, ScheduleLessonDraft, ScheduleSummary, TeachingSlot } from './planner-types';
 
-function packLooksIndexOnly(pack: TeachingPackForAnalysis): boolean {
-  const blob = pack.readingSlices.map((s) => `${s.readingFrom} ${s.title}`).join(' ').toLowerCase();
-  return (
-    blob.includes('index') &&
-    (blob.includes('page') || blob.includes('indexed')) &&
-    pack.readingSlices.every((s) => s.readingFrom.length < 400)
-  );
-}
-
 type ChapterPortion = {
   label: string;
   body: string;
@@ -40,64 +36,61 @@ function buildChapterPortions(
   chapterText: string,
   teachDays: number,
 ): ChapterPortion[] {
+  const summary = fixLibraryTextEncoding(pack.summary).trim();
+  const summaryChunks =
+    summary.length >= 40 ? splitSummaryAcrossDays(summary, teachDays) : [];
+
   const text = fixLibraryTextEncoding(chapterText).trim();
   const textUsable = text.length >= 120 && !isLowValueContent(text);
-  const useText =
-    textUsable && (packLooksIndexOnly(pack) || text.length > pack.summary.length * 1.2);
+  const textChunks =
+    textUsable && summaryChunks.length === 0 ? splitParagraphsAcrossDays(text, teachDays) : [];
 
   const portionMeta = (dayIndex: number, sliceKey?: string): Pick<ChapterPortion, 'explainPoints' | 'questions'> => ({
     explainPoints: explainPointsForDay(pack, dayIndex, teachDays),
     questions: pickCheckQuestions(pack, sliceKey, 4),
   });
 
-  if (useText) {
-    const chunks = splitParagraphsAcrossDays(text, teachDays);
-    return chunks.map((body, i) => ({
+  const portions: ChapterPortion[] = [];
+  for (let i = 0; i < teachDays; i++) {
+    let body = summaryChunks[i] ?? '';
+    if (!body && textChunks[i]) body = textChunks[i]!;
+    if (!body && summaryChunks.length === 1) {
+      body = summaryChunks[0] ?? '';
+    }
+
+    portions.push({
       label: labelForTeachingDay(pack, i, teachDays),
-      body: isLowValueContent(body) ? '' : body,
+      body: isLowValueContent(body) ? summaryChunks[i] ?? '' : body,
       ...portionMeta(i),
-    }));
+    });
   }
+
+  const withContent = portions.filter(
+    (g) => g.body.trim().length > 0 || g.explainPoints.length > 0,
+  );
+  if (withContent.length > 0) return withContent;
 
   const slices = pack.readingSlices;
-  if (slices.length === 0 && textUsable) {
-    return splitParagraphsAcrossDays(text, teachDays).map((body, i) => ({
-      label: labelForTeachingDay(pack, i, teachDays),
-      body: isLowValueContent(body) ? '' : body,
-      ...portionMeta(i),
-    }));
-  }
-
   const groups: ChapterPortion[] = Array.from({ length: teachDays }, (_, i) => ({
-    label: `Part ${i + 1}`,
+    label: labelForTeachingDay(pack, i, teachDays),
     body: '',
     explainPoints: [] as string[],
     questions: [] as string[],
   }));
 
-  const slicesPerDay = Math.max(1, Math.ceil(slices.length / teachDays));
+  const slicesPerDay = Math.max(1, Math.ceil(Math.max(slices.length, 1) / teachDays));
   slices.forEach((slice, i) => {
     const g = Math.min(teachDays - 1, Math.floor(i / slicesPerDay));
-    const title = fixLibraryTextEncoding(slice.title);
     const reading = fixLibraryTextEncoding(slice.readingFrom);
-    if (groups[g].label === `Part ${g + 1}` && i === 0) {
-      groups[g].label = title;
-    } else if (!groups[g].label.includes(title)) {
-      groups[g].label = groups[g].label === `Part ${g + 1}` ? title : `${groups[g].label} · ${title}`;
-    }
     if (!isLowValueContent(reading)) {
       groups[g].body += (groups[g].body ? '\n\n' : '') + reading;
     }
     groups[g].sliceKey = slice.sliceKey;
+    groups[g].questions = pickCheckQuestions(pack, slice.sliceKey, 4);
+    groups[g].explainPoints = explainPointsForDay(pack, g, teachDays);
   });
 
-  return groups
-    .map((g, dayIndex) => ({
-      ...g,
-      label: labelForTeachingDay(pack, dayIndex, teachDays) || g.label,
-      ...portionMeta(dayIndex, g.sliceKey),
-    }))
-    .filter((g) => g.body.trim().length > 0 || g.explainPoints.length > 0);
+  return groups.filter((g) => g.body.trim().length > 0 || g.explainPoints.length > 0);
 }
 
 export type PlannerChapterForDayPlan = {
@@ -155,7 +148,7 @@ export function generateDayPlanFromTeachingPacks(input: {
   ordered.forEach((chapter, chapterIdx) => {
     const libId = chapter.libraryBookChapterId!;
     const pack = input.packsByChapterId.get(libId)!;
-    const chapterTitle = fixLibraryTextEncoding(chapter.titleSnapshot);
+    const chapterTitle = displayChapterTitle(chapter.titleSnapshot);
     const chapterText = input.chapterTextsByLibraryId.get(libId) ?? chapter.chapterText ?? '';
     const teachDays = teachDaysPerChapter[chapterIdx] ?? 1;
     const portions = buildChapterPortions(pack, chapterText, teachDays);
@@ -320,7 +313,7 @@ export function rebuildLessonFromPack(input: {
   const tag = input.portionKeys[0] ?? '';
   if (tag.startsWith('activity:')) {
     const recap = buildChapterRecapActivity({
-      chapterTitle: input.chapterTitle,
+      chapterTitle: displayChapterTitle(input.chapterTitle),
       subjectName: input.subjectName,
       pack: input.pack,
     });
@@ -342,7 +335,7 @@ export function rebuildLessonFromPack(input: {
     const body = chunks[dayIdx] ?? chunks[chunks.length - 1] ?? text;
     const teachDays = Math.max(chunks.length, dayIdx + 1);
     const { objectives, teacherNotes } = buildExpertTeachingDayPlan({
-      chapterTitle: input.chapterTitle,
+      chapterTitle: displayChapterTitle(input.chapterTitle),
       subjectName: input.subjectName,
       dayInChapter: dayIdx + 1,
       totalDaysInChapter: teachDays,
