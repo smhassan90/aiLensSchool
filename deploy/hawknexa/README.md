@@ -139,6 +139,29 @@ Or inspect: `docker compose -f /opt/apps/hawknexa/deploy/docker-compose.prod.yml
 bash /path/to/stage1-2-server-prep.sh
 ```
 
+## FitNix Track on the same VPS (shared Caddy)
+
+FitNix runs under `/opt/apps/fitnixtrack/` with its own Compose stack. **HawkNexa Caddy** terminates TLS for `portal.fitnixtrack.com`, `backend.fitnixtrack.com`, and `fitnixtrack.com` by importing `/opt/apps/fitnixtrack/deploy/Caddyfile.fitnixtrack`.
+
+Requirements in `docker-compose.prod.yml`:
+
+1. Bind-mount `Caddyfile.fitnixtrack` into the Caddy container at `/etc/caddy/includes/fitnixtrack.caddy`.
+2. Attach the Caddy service to the external Docker network **`edge`** (FitNix containers use network aliases `fitnixtrack-portal`, `fitnixtrack-backend`, `fitnixtrack-website` on that network).
+
+The `import` line must stay in `deploy/hawknexa/Caddyfile`. If the mount or `edge` network is missing after a HawkNexa deploy, FitNix HTTPS fails (TLS errors or 502) even when FitNix containers are healthy.
+
+**Every HawkNexa deploy runs `ensure-fitnix-caddy-cohost.sh`** (after rsync and after Caddy is recreated) to re-apply the mount, `edge` network, and Caddy import, then verify `https://portal.fitnixtrack.com/` responds. Do not remove that hook from `deploy.sh`.
+
+Quick check on the VPS:
+
+```bash
+docker exec hawknexa-caddy-1 test -f /etc/caddy/includes/fitnixtrack.caddy && echo ok
+docker exec hawknexa-caddy-1 wget -qO- --timeout=3 http://fitnixtrack-portal:3000/ >/dev/null && echo portal_upstream_ok
+curl -sS -o /dev/null -w '%{http_code}\n' https://portal.fitnixtrack.com/
+```
+
+Ensure `docker network create edge` exists once (FitNix compose declares it as external).
+
 ## Verify
 
 ```bash

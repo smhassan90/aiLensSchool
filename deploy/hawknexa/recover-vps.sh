@@ -40,6 +40,7 @@ if [[ -d "${REPO_DIR}/.git" ]]; then
 fi
 
 cd "${DEPLOY_DIR}"
+bash "${DEPLOY_DIR}/ensure-fitnix-caddy-cohost.sh"
 
 echo "=== Start deploy-webhook + Caddy (no app deps) ==="
 docker compose -f "${COMPOSE_FILE}" build deploy-webhook

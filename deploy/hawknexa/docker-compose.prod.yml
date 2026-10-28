@@ -116,6 +116,7 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /opt/apps/fitnixtrack/deploy/Caddyfile.fitnixtrack:/etc/caddy/includes/fitnixtrack.caddy:ro
       - hawknexa_caddy_data:/data
       - hawknexa_caddy_config:/config
     # Do not depend on backend/portal — Caddy must stay up for /internal/deploy even when app containers fail.
@@ -123,10 +124,14 @@ services:
       - deploy-webhook
     networks:
       - hawknexa_internal
+      - edge
 
 networks:
   hawknexa_internal:
     driver: bridge
+  edge:
+    external: true
+    name: edge
 
 volumes:
   hawknexa_mysql_data:

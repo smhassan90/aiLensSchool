@@ -27,7 +27,7 @@ if [[ -d "${REPO_DIR}/.git" ]]; then
   git reset --hard origin/main
   rsync -a --exclude '.env' "${REPO_DIR}/deploy/hawknexa/" "${DEPLOY_DIR}/"
   sed -i 's/\r$//' "${DEPLOY_DIR}/"*.sh "${DEPLOY_DIR}/"*.py "${DEPLOY_DIR}/"*.yml "${DEPLOY_DIR}/Caddyfile" 2>/dev/null || true
-  chmod +x "${DEPLOY_DIR}/deploy.sh" "${DEPLOY_DIR}/recover-deploy-webhook.sh" "${DEPLOY_DIR}/deploy-webhook.py" 2>/dev/null || true
+  chmod +x "${DEPLOY_DIR}/deploy.sh" "${DEPLOY_DIR}/recover-deploy-webhook.sh" "${DEPLOY_DIR}/deploy-webhook.py" "${DEPLOY_DIR}/ensure-fitnix-caddy-cohost.sh" 2>/dev/null || true
 else
   echo "WARN: ${REPO_DIR} not a git repo — using existing files in ${DEPLOY_DIR}"
 fi
@@ -47,6 +47,8 @@ if command -v ufw >/dev/null 2>&1; then
   ufw allow 443/tcp comment 'HTTPS' >/dev/null 2>&1 || true
   ufw status verbose 2>/dev/null || true
 fi
+
+bash "${DEPLOY_DIR}/ensure-fitnix-caddy-cohost.sh"
 
 echo "=== Build and start deploy-webhook + reload Caddy ==="
 docker compose -f "${COMPOSE_FILE}" build deploy-webhook

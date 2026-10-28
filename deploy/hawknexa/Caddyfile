@@ -34,3 +34,11 @@ srv1984496.hstgr.cloud {
 http://187.53.141.109 {
 	redir https://hawknexa.fynals.com{uri} permanent
 }
+
+mobilopay.fynals.com {
+	encode gzip
+	reverse_proxy 172.18.0.1:4100
+}
+
+# FitNix Track (managed from /opt/apps/fitnixtrack/deploy — do not delete on HawkNexa deploy)
+import /etc/caddy/includes/fitnixtrack.caddy

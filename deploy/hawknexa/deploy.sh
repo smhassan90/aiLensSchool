@@ -110,7 +110,10 @@ echo "=== Sync deploy configs (keep server .env) ==="
 mkdir -p "${DEPLOY_DIR}"
 rsync -a --exclude '.env' "${REPO_DIR}/deploy/hawknexa/" "${DEPLOY_DIR}/"
 sed -i 's/\r$//' "${DEPLOY_DIR}/deploy.sh" "${DEPLOY_DIR}/deploy-webhook.py" "${DEPLOY_DIR}/docker-compose.prod.yml" "${DEPLOY_DIR}/Caddyfile" "${DEPLOY_DIR}/Dockerfile.deploy-webhook" 2>/dev/null || true
-chmod +x "${DEPLOY_DIR}/deploy.sh" "${DEPLOY_DIR}/recover-deploy-webhook.sh" "${DEPLOY_DIR}/deploy-webhook.py" "${DEPLOY_DIR}/import-remote-sms-db.sh" 2>/dev/null || true
+chmod +x "${DEPLOY_DIR}/deploy.sh" "${DEPLOY_DIR}/recover-deploy-webhook.sh" "${DEPLOY_DIR}/deploy-webhook.py" "${DEPLOY_DIR}/import-remote-sms-db.sh" "${DEPLOY_DIR}/ensure-fitnix-caddy-cohost.sh" 2>/dev/null || true
+
+echo "=== FitNix co-host (shared Caddy — do not break client portal) ==="
+bash "${DEPLOY_DIR}/ensure-fitnix-caddy-cohost.sh"
 
 echo "=== Build and start containers ==="
 cd "${DEPLOY_DIR}"
@@ -210,6 +213,9 @@ if ! compose_up 1; then
   clear_stuck_hawknexa_containers
   compose_up 2
 fi
+
+echo "=== FitNix co-host (post Caddy recreate) ==="
+bash "${DEPLOY_DIR}/ensure-fitnix-caddy-cohost.sh"
 
 echo "=== Health check ==="
 for i in $(seq 1 "${HEALTH_ATTEMPTS}"); do
