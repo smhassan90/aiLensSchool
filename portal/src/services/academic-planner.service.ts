@@ -474,7 +474,7 @@ export const academicPlannerService = {
 
         body: JSON.stringify(body),
 
-        timeoutMs: 120_000,
+        timeoutMs: 180_000,
 
       },
 
@@ -496,7 +496,7 @@ export const academicPlannerService = {
 
         body: JSON.stringify({ expectedRevision }),
 
-        timeoutMs: 120_000,
+        timeoutMs: 180_000,
 
       },
 

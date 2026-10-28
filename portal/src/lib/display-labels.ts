@@ -56,7 +56,7 @@ const API_ERROR_MESSAGES: Record<string, string> = {
   TIMETABLE_VERSION_NOT_EDITABLE: "This timetable version cannot be edited.",
   IMPORT_ALREADY_PUBLISHED: "This timetable import was already published.",
   CALENDAR_DAY_EXISTS: "A calendar entry already exists for that date.",
-  CHAPTER_NOT_ANALYZED: "Analyse every chapter before generating lessons.",
+  CHAPTER_NOT_ANALYZED: "Analyze every chapter before generating lessons, or use Generate schedule to analyze remaining chapters automatically.",
   TIMETABLE_REQUIRED: "A published timetable is required for this class.",
   DEPENDENCY_VIOLATION: "This move breaks lesson order. Check prerequisite lessons.",
   SLOT_NOT_AVAILABLE: "That slot is not available on the teaching calendar.",

@@ -102,6 +102,7 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
   const weeks = toCalendarWeeks(data);
   const timeline = toTimeline(data);
   const outline = toOutline(data);
+  const pendingAnalysis = data.chapters.filter((c) => !c.analysisSource);
 
   return (
     <div className="space-y-6">
@@ -130,6 +131,14 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
 
       {!readOnly && data.permissions.canEdit && data.version.origin !== "RECOVERY" && (
         <div className="space-y-2">
+          {pendingAnalysis.length > 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {pendingAnalysis.length} chapter(s) not analyzed yet:{" "}
+              {pendingAnalysis.map((c) => c.title).join(", ")}. Use{" "}
+              <strong>Analyze all chapters</strong>, or{" "}
+              <strong>Generate schedule</strong> to analyze them automatically.
+            </div>
+          )}
           {!data.version.summary && (
             <p className="text-sm text-muted-foreground">
               Analyze all chapters, then generate the schedule. If your school has not published a
