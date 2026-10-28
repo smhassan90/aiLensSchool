@@ -484,6 +484,13 @@ export class AcademicPlannersWorkflowService {
       chapters.map((c) => c.libraryBookChapterId).filter((id): id is string => Boolean(id)),
     );
 
+    const chapterTextsByLibraryId = new Map<string, string>();
+    for (const ch of chapters) {
+      if (!ch.libraryBookChapterId) continue;
+      const loaded = await this.content.loadChapterText(schoolId, ch.libraryBookChapterId);
+      chapterTextsByLibraryId.set(ch.libraryBookChapterId, loaded.text);
+    }
+
     const dayPlan = generateDayPlanFromTeachingPacks({
       chapters: chapters.map((c) => ({
         chapterKey: c.chapterKey,
@@ -493,6 +500,7 @@ export class AcademicPlannersWorkflowService {
         sortOrder: c.sortOrder,
       })),
       packsByChapterId: packsForDayPlan,
+      chapterTextsByLibraryId,
       teachingSlots: slotResult.slots,
       settings,
       timetableSource: slotResult.timetableSource,
@@ -811,9 +819,14 @@ export class AcademicPlannersWorkflowService {
       portionKeysUse = ['activity:0'];
     }
 
+    const loadedText = await this.content.loadChapterText(
+      schoolId,
+      lesson.chapter.libraryBookChapterId,
+    );
     const rebuilt = rebuildLessonFromPack({
       pack,
       chapterTitle: lesson.chapter.titleSnapshot,
+      chapterText: loadedText.text,
       portionKeys: portionKeysUse,
       kind,
       periodMinutes,

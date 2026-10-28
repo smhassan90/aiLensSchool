@@ -59,20 +59,28 @@ export function PlannerDayLessonCard({
           <h3 className="mt-2 text-base font-semibold leading-snug text-foreground">{title}</h3>
 
           {lesson.objectives.length > 0 && (
-            <ul className="mt-3 space-y-1.5 text-sm text-foreground/90">
-              {lesson.objectives.slice(0, 6).map((point) => (
-                <li key={point.slice(0, 40)} className="flex gap-2">
-                  <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" aria-hidden />
-                  <span>{fixDisplayText(point)}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-3 rounded-lg bg-primary/5 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Today you will</p>
+              <ul className="mt-2 space-y-1.5 text-sm text-foreground">
+                {lesson.objectives.slice(0, 4).map((point) => (
+                  <li key={point.slice(0, 48)} className="flex gap-2">
+                    <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/80" aria-hidden />
+                    <span>{fixDisplayText(point)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {lesson.teacherNotes && (
-            <div className="mt-3 rounded-lg border border-border/60 bg-background/70 p-3 text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
-              {fixDisplayText(lesson.teacherNotes).slice(0, 600)}
-              {lesson.teacherNotes.length > 600 ? "…" : ""}
+            <div className="mt-3 rounded-lg border border-border/60 bg-background/80 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Steps in class
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-foreground/90 whitespace-pre-line">
+                {fixDisplayText(lesson.teacherNotes).slice(0, 700)}
+                {lesson.teacherNotes.length > 700 ? "…" : ""}
+              </p>
             </div>
           )}
 
