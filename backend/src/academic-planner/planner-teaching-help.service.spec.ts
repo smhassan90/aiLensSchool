@@ -110,6 +110,7 @@ describe('PlannerTeachingHelpService', () => {
       resolveActor: jest.fn().mockResolvedValue({
         userId: 'user-1',
         teacherProfileId: 'teacher-profile-1',
+        headSectionIds: [],
         isPrincipalOrAdmin: false,
         isHeadTeacher: false,
       }),
@@ -165,6 +166,7 @@ describe('PlannerTeachingHelpService', () => {
     access.resolveActor.mockResolvedValue({
       userId: 'stranger',
       teacherProfileId: 'other-teacher',
+      headSectionIds: [],
       isPrincipalOrAdmin: false,
       isHeadTeacher: false,
     });

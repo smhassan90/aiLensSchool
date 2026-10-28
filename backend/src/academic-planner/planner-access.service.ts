@@ -11,6 +11,7 @@ import { isVersionEditable } from './planner-status';
 import { PrismaService } from '../database/prisma.service';
 import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
+import { resolveHeadTeacherSectionIds } from '../head-teachers/head-teacher-sections';
 
 export type PlannerActor = {
   userId: string;
@@ -19,6 +20,7 @@ export type PlannerActor = {
   isPrincipalOrAdmin: boolean;
   isHeadTeacher: boolean;
   teacherProfileId: string | null;
+  headSectionIds: string[];
 };
 
 @Injectable()
@@ -31,18 +33,22 @@ export class PlannerAccessService {
   async resolveActor(user: AuthUser): Promise<PlannerActor> {
     const schoolId = this.tenant.requireSchoolId(user);
     const roles = user.roles ?? [];
-    const teacher = await this.prisma.teacherProfile.findFirst({
-      where: { userId: user.id, schoolId },
-      select: { id: true, headTeacherAssignment: { select: { id: true } } },
-    });
+    const [teacher, headSectionIds] = await Promise.all([
+      this.prisma.teacherProfile.findFirst({
+        where: { userId: user.id, schoolId },
+        select: { id: true },
+      }),
+      resolveHeadTeacherSectionIds(this.prisma, schoolId, user.id),
+    ]);
     return {
       userId: user.id,
       schoolId,
       isTeacher: roles.includes('TEACHER'),
       isPrincipalOrAdmin:
         roles.includes('PRINCIPAL') || roles.includes('SCHOOL_ADMIN') || roles.includes('SUPER_ADMIN'),
-      isHeadTeacher: Boolean(teacher?.headTeacherAssignment),
+      isHeadTeacher: headSectionIds.length > 0,
       teacherProfileId: teacher?.id ?? null,
+      headSectionIds,
     };
   }
 
@@ -50,17 +56,50 @@ export class PlannerAccessService {
     actor: PlannerActor,
     section: Pick<Section, 'id'>,
     classSubject: Pick<ClassSubject, 'teacherId' | 'assistantTeacherId'>,
-    teacherId: string,
+    plannerTeacherId: string,
+    classTeacherId: string | null,
   ) {
     if (actor.isPrincipalOrAdmin) return;
-    if (actor.teacherProfileId && actor.teacherProfileId === teacherId) return;
-    if (
-      actor.teacherProfileId &&
+
+    const allowedPlannerTeacherIds = [
+      classSubject.teacherId,
+      classSubject.assistantTeacherId,
+      classTeacherId,
+    ].filter((id): id is string => Boolean(id));
+
+    if (actor.headSectionIds.includes(section.id)) {
+      if (!allowedPlannerTeacherIds.includes(plannerTeacherId)) {
+        throw new ForbiddenException({
+          code: 'PLANNER_FORBIDDEN',
+          message: 'Choose the subject teacher, assistant, or class teacher for this planner.',
+        });
+      }
+      return;
+    }
+
+    const isSubjectTeacher =
+      actor.teacherProfileId != null &&
       (classSubject.teacherId === actor.teacherProfileId ||
-        classSubject.assistantTeacherId === actor.teacherProfileId)
+        classSubject.assistantTeacherId === actor.teacherProfileId);
+
+    if (isSubjectTeacher) {
+      if (plannerTeacherId !== actor.teacherProfileId) {
+        throw new ForbiddenException({
+          code: 'PLANNER_FORBIDDEN',
+          message: 'You can only create a planner assigned to yourself for this subject.',
+        });
+      }
+      return;
+    }
+
+    if (
+      actor.teacherProfileId != null &&
+      classTeacherId === actor.teacherProfileId &&
+      plannerTeacherId === actor.teacherProfileId
     ) {
       return;
     }
+
     throw new ForbiddenException({
       code: 'PLANNER_FORBIDDEN',
       message: 'You cannot create a planner for this class and subject.',

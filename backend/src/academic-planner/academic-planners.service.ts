@@ -96,7 +96,7 @@ export class AcademicPlannersService {
       });
     }
 
-    this.access.assertCanCreate(actor, section, classSubject, dto.teacherId);
+    this.access.assertCanCreate(actor, section, classSubject, dto.teacherId, section.classTeacherId);
 
     const settingsRow = await this.prisma.schoolSettings.findFirst({
       where: { schoolId },

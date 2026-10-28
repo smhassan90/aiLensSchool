@@ -107,6 +107,7 @@ export class AcademicPlannersWorkflowService {
 
   async getOptions(user: AuthUser, sectionId: string, subjectId: string) {
     const schoolId = this.tenant.requireSchoolId(user);
+    const actor = await this.access.resolveActor(user);
     const section = await this.prisma.section.findFirst({
       where: { id: sectionId, schoolId },
       include: { grade: true },
@@ -157,6 +158,35 @@ export class AcademicPlannersWorkflowService {
           classSubject.teacher.gender,
         ),
       });
+    }
+    if (section.classTeacherId) {
+      const classTeacher = teachers.find((t) => t.id === section.classTeacherId);
+      if (classTeacher && !eligibleTeachers.some((e) => e.id === classTeacher.id)) {
+        eligibleTeachers.push({
+          id: classTeacher.id,
+          name: teacherDisplayName(
+            classTeacher.user.firstName,
+            classTeacher.user.lastName,
+            classTeacher.gender,
+          ),
+        });
+      }
+    }
+
+    const isSubjectTeacher =
+      actor.teacherProfileId != null &&
+      classSubject != null &&
+      (classSubject.teacherId === actor.teacherProfileId ||
+        classSubject.assistantTeacherId === actor.teacherProfileId);
+    let recommendedPlannerTeacherId: string | null = null;
+    if (isSubjectTeacher && actor.teacherProfileId) {
+      recommendedPlannerTeacherId = actor.teacherProfileId;
+    } else if (actor.teacherProfileId && section.classTeacherId === actor.teacherProfileId) {
+      recommendedPlannerTeacherId = actor.teacherProfileId;
+    } else if (actor.headSectionIds.includes(sectionId) && classSubject?.teacherId) {
+      recommendedPlannerTeacherId = classSubject.teacherId;
+    } else if (eligibleTeachers.length === 1) {
+      recommendedPlannerTeacherId = eligibleTeachers[0].id;
     }
 
     const books = await this.libraryBooks.listGrantedBooksForSchool(schoolId);
@@ -229,6 +259,8 @@ export class AcademicPlannersWorkflowService {
       section: { id: section.id, label: sectionClassLabel(section), gradeHasPeriodTimetable: section.grade.hasPeriodTimetable },
       subject: { id: subject.id, name: subject.name },
       eligibleTeachers,
+      actorTeacherId: actor.teacherProfileId,
+      recommendedPlannerTeacherId,
       grantedBooks,
       examConfigs: examConfigs.map((e) => ({
         id: e.id,

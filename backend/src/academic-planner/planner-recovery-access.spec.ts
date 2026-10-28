@@ -11,6 +11,7 @@ describe('Planner recovery permissions', () => {
     isPrincipalOrAdmin: false,
     isHeadTeacher: false,
     teacherProfileId: 'tp-1',
+    headSectionIds: [],
   };
 
   const planner = { createdById: 'teacher-1', teacherId: 'tp-1', approvedVersionId: 'v-approved' };

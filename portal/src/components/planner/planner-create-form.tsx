@@ -48,6 +48,7 @@ export function PlannerCreateForm() {
       label: `${row.gradeName} ${row.sectionName} — ${row.subjectName}`,
       sectionId: row.sectionId,
       subjectId: row.subjectId,
+      role: row.role,
     }));
   }, [classes.data]);
 
@@ -91,7 +92,17 @@ export function PlannerCreateForm() {
 
   useEffect(() => {
     const teachers = options.data?.eligibleTeachers ?? [];
-    if (teachers.length === 1) {
+    const recommended = options.data?.recommendedPlannerTeacherId;
+    const actorId = options.data?.actorTeacherId;
+    const rowRole = classOptions.find((o) => o.key === classKey)?.role;
+
+    if (recommended) {
+      setValue("teacherId", recommended);
+    } else if (rowRole === "CLASS_TEACHER" && actorId) {
+      setValue("teacherId", actorId);
+    } else if (actorId && teachers.some((t) => t.id === actorId)) {
+      setValue("teacherId", actorId);
+    } else if (teachers.length === 1) {
       setValue("teacherId", teachers[0].id);
     }
     const suggested = options.data?.grantedBooks.find((b) => b.suggested);
@@ -102,7 +113,7 @@ export function PlannerCreateForm() {
     if (exam?.startDate && !watch("examDate")) {
       setValue("examDate", exam.startDate);
     }
-  }, [options.data, setValue, libraryBookId, watch]);
+  }, [options.data, setValue, libraryBookId, watch, classKey, classOptions]);
 
   const timetableNeedsFallback =
     options.data?.section.gradeHasPeriodTimetable &&

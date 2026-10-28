@@ -75,6 +75,7 @@ describe('PlannerApprovalService', () => {
       isTeacher: false,
       isHeadTeacher: false,
       teacherProfileId: null,
+      headSectionIds: [],
     });
     access.assertCanDecide.mockImplementation(() => undefined);
     prismaMock.academicPlanner.findFirst.mockResolvedValue({

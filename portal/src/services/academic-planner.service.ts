@@ -294,6 +294,10 @@ export type PlannerOptions = {
 
   eligibleTeachers: Array<{ id: string; name: string }>;
 
+  actorTeacherId: string | null;
+
+  recommendedPlannerTeacherId: string | null;
+
   grantedBooks: Array<{
 
     id: string;
