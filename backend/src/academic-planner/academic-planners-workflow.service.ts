@@ -36,6 +36,11 @@ import {
   isTimetableRequiredError,
   subjectHasPublishedTimetableSlots,
 } from './planner-timetable-fallback.util';
+import {
+  analysisFromTeachingPack,
+  loadTeachingPacksByChapterIds,
+} from '../library-books/chapter-teaching-pack-analysis.loader';
+import { PlannerChapterAnalysis } from '../ai/schemas/planner-chapter-analysis.schema';
 
 @Injectable()
 export class AcademicPlannersWorkflowService {
@@ -315,7 +320,7 @@ export class AcademicPlannersWorkflowService {
     );
 
     const settings = version.settings as PlannerSettings;
-    const result = await this.analyzeChapterContent(
+    const result = await this.resolveChapterAnalysis(
       schoolId,
       user.id,
       planner,
@@ -562,7 +567,7 @@ export class AcademicPlannersWorkflowService {
     return this.planners.getVersionPayload(user, plannerId, versionId);
   }
 
-  private async analyzeChapterContent(
+  private async resolveChapterAnalysis(
     schoolId: string,
     userId: string,
     planner: {
@@ -572,6 +577,7 @@ export class AcademicPlannersWorkflowService {
     chapter: {
       titleSnapshot: string;
       libraryBookChapterId: string | null;
+      contentHash: string | null;
       contentStatus: PlannerContentStatus;
       activityCount: number;
       activitiesEnabled: boolean;
@@ -580,6 +586,26 @@ export class AcademicPlannersWorkflowService {
     force?: boolean,
   ) {
     const periodMinutes = settings.fallbackPeriodMinutes ?? 40;
+
+    if (!force && chapter.libraryBookChapterId) {
+      const packs = await loadTeachingPacksByChapterIds(this.prisma, [chapter.libraryBookChapterId]);
+      const pack = packs.get(chapter.libraryBookChapterId);
+      if (pack) {
+        const fromPack = analysisFromTeachingPack({
+          pack,
+          chapterTitle: chapter.titleSnapshot,
+          subjectName: planner.subject.name,
+          periodMinutes,
+          activitiesEnabled: chapter.activitiesEnabled,
+          activityCount: chapter.activityCount,
+          contentHash: chapter.contentHash,
+        });
+        if (fromPack) {
+          return fromPack;
+        }
+      }
+    }
+
     const loaded = chapter.libraryBookChapterId
       ? await this.content.loadChapterText(schoolId, chapter.libraryBookChapterId)
       : { title: chapter.titleSnapshot, text: '', wordCount: 0 };
@@ -600,6 +626,50 @@ export class AcademicPlannersWorkflowService {
     });
   }
 
+  private async persistChapterAnalysis(
+    versionId: string,
+    chapter: {
+      id: string;
+      activitiesEnabled: boolean;
+      activityCount: number;
+    },
+    result: {
+      analysis: PlannerChapterAnalysis;
+      source: PlannerAnalysisSource;
+      warnings: Array<{ code: string; message: string }>;
+    },
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.plannerChapter.update({
+        where: { id: chapter.id },
+        data: {
+          analysis: result.analysis as Prisma.InputJsonValue,
+          analysisSource: result.source,
+          analysisWarnings: result.warnings as Prisma.InputJsonValue,
+          analyzedAt: new Date(),
+        },
+      });
+
+      if (chapter.activitiesEnabled && result.analysis.activitySuggestions?.length) {
+        await tx.plannerActivity.deleteMany({ where: { versionId, plannerChapterId: chapter.id } });
+        await tx.plannerActivity.createMany({
+          data: result.analysis.activitySuggestions.slice(0, chapter.activityCount).map((a, i) => ({
+            versionId,
+            plannerChapterId: chapter.id,
+            activityKey: randomUUID(),
+            title: a.title,
+            description: a.description,
+            minutes: a.minutes,
+            afterPortionKey: a.afterPortionKey,
+            optional: true,
+            sortOrder: i,
+            source: result.source,
+          })),
+        });
+      }
+    });
+  }
+
   private async ensureChaptersAnalyzed(
     schoolId: string,
     user: AuthUser,
@@ -613,6 +683,7 @@ export class AcademicPlannersWorkflowService {
       chapterKey: string;
       titleSnapshot: string;
       libraryBookChapterId: string | null;
+      contentHash: string | null;
       contentStatus: PlannerContentStatus;
       activityCount: number;
       activitiesEnabled: boolean;
@@ -620,26 +691,41 @@ export class AcademicPlannersWorkflowService {
     }>,
     settings: PlannerSettings,
   ) {
-    const missing = chapters.filter((c) => !c.analysis);
-    if (!missing.length) {
-      return this.prisma.plannerChapter.findMany({
-        where: { versionId },
-        orderBy: { sortOrder: 'asc' },
-        include: { activities: true },
-      });
-    }
+    const periodMinutes = settings.fallbackPeriodMinutes ?? 40;
+    const libraryIds = chapters.map((c) => c.libraryBookChapterId).filter((id): id is string => Boolean(id));
+    const packs = await loadTeachingPacksByChapterIds(this.prisma, libraryIds);
 
-    for (const chapter of missing) {
-      const result = await this.analyzeChapterContent(schoolId, user.id, planner, chapter, settings);
-      await this.prisma.plannerChapter.update({
-        where: { id: chapter.id },
-        data: {
-          analysis: result.analysis as Prisma.InputJsonValue,
-          analysisSource: result.source,
-          analysisWarnings: result.warnings as Prisma.InputJsonValue,
-          analyzedAt: new Date(),
-        },
-      });
+    for (const chapter of chapters) {
+      const libId = chapter.libraryBookChapterId;
+      const pack = libId ? packs.get(libId) : undefined;
+      const fromPack =
+        pack &&
+        analysisFromTeachingPack({
+          pack,
+          chapterTitle: chapter.titleSnapshot,
+          subjectName: planner.subject.name,
+          periodMinutes,
+          activitiesEnabled: chapter.activitiesEnabled,
+          activityCount: chapter.activityCount,
+          contentHash: chapter.contentHash,
+        });
+
+      if (fromPack) {
+        await this.persistChapterAnalysis(versionId, chapter, fromPack);
+        continue;
+      }
+
+      if (chapter.analysis) continue;
+
+      const result = await this.resolveChapterAnalysis(
+        schoolId,
+        user.id,
+        planner,
+        chapter,
+        settings,
+        false,
+      );
+      await this.persistChapterAnalysis(versionId, chapter, result);
     }
 
     return this.prisma.plannerChapter.findMany({
