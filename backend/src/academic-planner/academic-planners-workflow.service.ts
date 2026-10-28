@@ -31,6 +31,11 @@ import { generateSchedule, ChapterForSegments } from './schedule-engine';
 import { PlannerSettings } from './planner-types';
 import { DEFAULT_SCHOOL_TIMEZONE } from '../teachers/teacher-checkin';
 import { PlannerAccessService } from './planner-access.service';
+import {
+  applyDefaultTimetableFallback,
+  isTimetableRequiredError,
+  subjectHasPublishedTimetableSlots,
+} from './planner-timetable-fallback.util';
 
 @Injectable()
 export class AcademicPlannersWorkflowService {
@@ -156,13 +161,20 @@ export class AcademicPlannersWorkflowService {
 
     const books = await this.libraryBooks.listGrantedBooksForSchool(schoolId);
     const classLabel = gradeClassLabel(section);
-    const grantedBooks = books.map((book) => {
-      const suggested =
+    const subjectLower = subject.name.toLowerCase();
+    const scoredBooks = books.map((book) => {
+      const subjectMatch = book.subjectLabel.toLowerCase().includes(subjectLower);
+      const classMatch =
         book.classLabel.toLowerCase().includes(classLabel.toLowerCase()) ||
-        classLabel.toLowerCase().includes(book.classLabel.toLowerCase()) ||
-        book.subjectLabel.toLowerCase().includes(subject.name.toLowerCase());
-      return { ...book, suggested };
+        classLabel.toLowerCase().includes(book.classLabel.toLowerCase());
+      const score = subjectMatch ? 2 : classMatch ? 1 : 0;
+      return { book, score };
     });
+    const bestScore = scoredBooks.reduce((max, row) => Math.max(max, row.score), 0);
+    const grantedBooks = scoredBooks.map(({ book, score }) => ({
+      ...book,
+      suggested: score > 0 && score === bestScore,
+    }));
 
     const examConfigs = year
       ? await this.prisma.examConfig.findMany({
@@ -377,29 +389,55 @@ export class AcademicPlannersWorkflowService {
       });
     }
 
-    const settings = version.settings as PlannerSettings;
+    let settings = version.settings as PlannerSettings;
     const settingsRow = await this.prisma.schoolSettings.findUnique({ where: { schoolId } });
     const tz = settingsRow?.timezone ?? DEFAULT_SCHOOL_TIMEZONE;
 
-    const slotResult = await buildPlannerTeachingSlots(
-      { resolver: this.resolver, prisma: this.prisma },
-      {
-        schoolId,
-        sectionId: planner.sectionId,
-        academicYearId: planner.academicYearId,
-        gradeHasPeriodTimetable: planner.section.grade.hasPeriodTimetable,
-        subjectId: planner.subjectId,
-        startDate: planner.startDate.toISOString().slice(0, 10),
-        lastTeachingDate: settings.lastTeachingDate,
-        settings,
-        timezone: tz,
-        section: {
-          id: planner.sectionId,
-          gradeId: planner.section.gradeId,
-          branchId: planner.section.branchId,
+    const hasSubjectSlots = await subjectHasPublishedTimetableSlots(this.resolver, {
+      schoolId,
+      sectionId: planner.sectionId,
+      academicYearId: planner.academicYearId,
+      subjectId: planner.subjectId,
+      referenceDateIso: planner.startDate.toISOString().slice(0, 10),
+    });
+    const fallbackApplied = applyDefaultTimetableFallback(settings, {
+      gradeHasPeriodTimetable: planner.section.grade.hasPeriodTimetable,
+      hasSubjectTimetableSlots: hasSubjectSlots,
+    });
+    settings = fallbackApplied.settings;
+
+    let slotResult: Awaited<ReturnType<typeof buildPlannerTeachingSlots>>;
+    try {
+      slotResult = await buildPlannerTeachingSlots(
+        { resolver: this.resolver, prisma: this.prisma },
+        {
+          schoolId,
+          sectionId: planner.sectionId,
+          academicYearId: planner.academicYearId,
+          gradeHasPeriodTimetable: planner.section.grade.hasPeriodTimetable,
+          subjectId: planner.subjectId,
+          startDate: planner.startDate.toISOString().slice(0, 10),
+          lastTeachingDate: settings.lastTeachingDate,
+          settings,
+          timezone: tz,
+          section: {
+            id: planner.sectionId,
+            gradeId: planner.section.gradeId,
+            branchId: planner.section.branchId,
+          },
         },
-      },
-    );
+      );
+    } catch (error) {
+      if (isTimetableRequiredError(error)) {
+        throw new UnprocessableEntityException({
+          code: 'TIMETABLE_REQUIRED',
+          message:
+            'No published timetable periods were found for this class and subject. Publish a timetable or set fallback periods per week when creating the planner.',
+          details: (error as Error & { details?: unknown }).details,
+        });
+      }
+      throw error;
+    }
 
     const chaptersForEngine: ChapterForSegments[] = version.chapters.map((c) => {
       const analysis = c.analysis as ChapterForSegments['analysis'];
@@ -425,6 +463,15 @@ export class AcademicPlannersWorkflowService {
       settings,
       timetableSource: slotResult.timetableSource,
     });
+    if (slotResult.warnings.length) {
+      generated.summary.warnings.push(...slotResult.warnings);
+    }
+    if (fallbackApplied.applied) {
+      generated.summary.warnings.push({
+        code: 'TIMETABLE_ASSUMED',
+        message: 'Using assumed periods per week because no timetable slots exist for this subject.',
+      });
+    }
 
     const examRisk: PlannerExamRisk =
       generated.summary.feasibility === 'INFEASIBLE'
@@ -444,6 +491,7 @@ export class AcademicPlannersWorkflowService {
           revision: { increment: 1 },
           summary: generated.summary as Prisma.InputJsonValue,
           examRisk,
+          ...(fallbackApplied.applied ? { settings: settings as Prisma.InputJsonValue } : {}),
         },
       });
       if (cas.count === 0) {

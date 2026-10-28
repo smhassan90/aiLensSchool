@@ -15,10 +15,15 @@ import { TenantService } from '../common/services/tenant.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import { AuditService } from '../audit/audit.service';
 import { dateFromIso, zonedDateIso, DEFAULT_SCHOOL_TIMEZONE } from '../teachers/teacher-checkin';
+import { TimetableResolverService } from '../timetables/timetable-resolver.service';
 import { PlannerAccessService } from './planner-access.service';
 import { defaultPlannerSettings, PlannerSettings, PlannerVersionPayload } from './planner-types';
 import { CreatePlannerDto } from './dto/planner.dto';
 import { plannerChapterContentHash, plannerChapterContentStatus } from './planner-content.util';
+import {
+  applyDefaultTimetableFallback,
+  subjectHasPublishedTimetableSlots,
+} from './planner-timetable-fallback.util';
 
 @Injectable()
 export class AcademicPlannersService {
@@ -27,6 +32,7 @@ export class AcademicPlannersService {
     private readonly tenant: TenantService,
     private readonly access: PlannerAccessService,
     private readonly audit: AuditService,
+    private readonly resolver: TimetableResolverService,
   ) {}
 
   async archive(user: AuthUser, plannerId: string) {
@@ -51,7 +57,7 @@ export class AcademicPlannersService {
 
     const section = await this.prisma.section.findFirst({
       where: { id: dto.sectionId, schoolId },
-      include: { grade: { select: { id: true, name: true, level: true } } },
+      include: { grade: { select: { id: true, name: true, level: true, hasPeriodTimetable: true } } },
     });
     if (!section) {
       throw new NotFoundException({ code: 'SECTION_NOT_FOUND', message: 'Section not found' });
@@ -165,13 +171,27 @@ export class AcademicPlannersService {
     const orderedChapters = uniqueChapterIds.map((id) => chapterById.get(id)!);
 
     const baseSettings = defaultPlannerSettings(examDateIso);
-    const settings: PlannerSettings = {
+    let settings: PlannerSettings = {
       ...baseSettings,
       revisionSlots: dto.settings?.revisionSlots ?? baseSettings.revisionSlots,
       minChapterStartMinutes: dto.settings?.minChapterStartMinutes ?? baseSettings.minChapterStartMinutes,
       fallbackPeriodsPerWeek: dto.settings?.fallbackPeriodsPerWeek,
       fallbackPeriodMinutes: dto.settings?.fallbackPeriodMinutes,
     };
+
+    const hasSubjectSlots = await subjectHasPublishedTimetableSlots(this.resolver, {
+      schoolId,
+      sectionId: dto.sectionId,
+      academicYearId: year.id,
+      subjectId: dto.subjectId,
+      referenceDateIso: year.startDate.toISOString().slice(0, 10),
+    });
+    ({ settings } = applyDefaultTimetableFallback(settings, {
+      gradeHasPeriodTimetable: section.grade.hasPeriodTimetable ?? false,
+      hasSubjectTimetableSlots: hasSubjectSlots,
+      overridePeriodsPerWeek: dto.settings?.fallbackPeriodsPerWeek,
+      overridePeriodMinutes: dto.settings?.fallbackPeriodMinutes,
+    }));
 
     const title = `${section.grade.name} ${section.name} — ${subject.name}`;
 

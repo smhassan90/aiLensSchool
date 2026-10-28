@@ -129,7 +129,15 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
       )}
 
       {!readOnly && data.permissions.canEdit && data.version.origin !== "RECOVERY" && (
-        <div className="flex flex-wrap gap-2">
+        <div className="space-y-2">
+          {!data.version.summary && (
+            <p className="text-sm text-muted-foreground">
+              Analyze all chapters, then generate the schedule. If your school has not published a
+              timetable for this subject, the planner uses assumed weekly periods (see warnings after
+              generation).
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
@@ -145,6 +153,7 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
           >
             {generate.isPending ? "Generating…" : "Generate schedule"}
           </Button>
+          </div>
         </div>
       )}
 

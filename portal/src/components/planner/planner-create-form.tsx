@@ -26,6 +26,8 @@ const schema = z.object({
   startDate: z.string().optional(),
   libraryBookId: z.string().uuid("Select a library book"),
   chapterIds: z.array(z.string().uuid()).min(1, "Select at least one chapter"),
+  fallbackPeriodsPerWeek: z.coerce.number().int().min(1).max(15).optional(),
+  fallbackPeriodMinutes: z.coerce.number().int().min(20).max(120).optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -65,6 +67,8 @@ export function PlannerCreateForm() {
       chapterIds: [],
       teacherId: "",
       classKey: "",
+      fallbackPeriodsPerWeek: 3,
+      fallbackPeriodMinutes: 40,
     },
   });
 
@@ -100,6 +104,12 @@ export function PlannerCreateForm() {
     }
   }, [options.data, setValue, libraryBookId, watch]);
 
+  const timetableNeedsFallback =
+    options.data?.section.gradeHasPeriodTimetable &&
+    (options.data.timetable?.source === "NONE" ||
+      options.data.timetable?.periodsPerWeek == null ||
+      options.data.timetable.periodsPerWeek === 0);
+
   useEffect(() => {
     setValue("chapterIds", selectedChapters);
   }, [selectedChapters, setValue]);
@@ -117,6 +127,13 @@ export function PlannerCreateForm() {
         startDate: values.startDate || undefined,
         libraryBookId: values.libraryBookId,
         chapterIds: values.chapterIds,
+        settings:
+          values.fallbackPeriodsPerWeek && values.fallbackPeriodMinutes
+            ? {
+                fallbackPeriodsPerWeek: values.fallbackPeriodsPerWeek,
+                fallbackPeriodMinutes: values.fallbackPeriodMinutes,
+              }
+            : undefined,
       });
     },
     onSuccess: (payload) => {
@@ -187,6 +204,12 @@ export function PlannerCreateForm() {
                 : ""}
             </p>
           )}
+          {timetableNeedsFallback && (
+            <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900">
+              No published timetable periods were found for this subject. The planner will assume the
+              weekly periods below until a timetable is published.
+            </p>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="teacherId">Teacher</Label>
@@ -225,6 +248,31 @@ export function PlannerCreateForm() {
           <Input id="startDate" type="date" {...register("startDate")} />
         </div>
       </div>
+
+      {timetableNeedsFallback && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="fallbackPeriodsPerWeek">Periods per week (assumed)</Label>
+            <Input
+              id="fallbackPeriodsPerWeek"
+              type="number"
+              min={1}
+              max={15}
+              {...register("fallbackPeriodsPerWeek")}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="fallbackPeriodMinutes">Minutes per period (assumed)</Label>
+            <Input
+              id="fallbackPeriodMinutes"
+              type="number"
+              min={20}
+              max={120}
+              {...register("fallbackPeriodMinutes")}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="libraryBookId">Library book</Label>
