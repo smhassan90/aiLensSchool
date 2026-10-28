@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -9,6 +10,7 @@ import {
   PlannerContentStatus,
   PlannerExamRisk,
   PlannerStatus,
+  PlannerLessonKind,
   PlannerVersionOrigin,
   PlannerVersionStatus,
   Prisma,
@@ -28,7 +30,7 @@ import { AcademicPlannersService } from './academic-planners.service';
 import { PlannerContentService } from './planner-content.service';
 import { buildPlannerTeachingSlots } from './academic-planners-schedule.helper';
 import { generateSchedule, ChapterForSegments } from './schedule-engine';
-import { PlannerSettings } from './planner-types';
+import { PlannerSettings, ScheduleLessonDraft } from './planner-types';
 import { DEFAULT_SCHOOL_TIMEZONE } from '../teachers/teacher-checkin';
 import { PlannerAccessService } from './planner-access.service';
 import {
@@ -40,6 +42,8 @@ import {
   analysisFromTeachingPack,
   loadTeachingPacksByChapterIds,
 } from '../library-books/chapter-teaching-pack-analysis.loader';
+import { generateDayPlanFromTeachingPacks, rebuildLessonFromPack } from './day-plan-from-teaching-pack';
+import { moveLesson as moveLessonOnSlots } from './schedule-engine';
 import { PlannerChapterAnalysis } from '../ai/schemas/planner-chapter-analysis.schema';
 
 @Injectable()
@@ -475,30 +479,52 @@ export class AcademicPlannersWorkflowService {
       throw error;
     }
 
-    const chaptersForEngine: ChapterForSegments[] = chapters.map((c) => {
-      const analysis = c.analysis as ChapterForSegments['analysis'];
-      return {
-        chapterKey: c.chapterKey,
-        title: c.titleSnapshot,
-        required: c.required,
-        activitiesEnabled: c.activitiesEnabled,
-        analysis,
-        activities: c.activities.map((a) => ({
-          activityKey: a.activityKey,
-          title: a.title,
-          minutes: a.minutes,
-          afterPortionKey: a.afterPortionKey,
-          optional: a.optional,
-        })),
-      };
-    });
+    const packsForDayPlan = await loadTeachingPacksByChapterIds(
+      this.prisma,
+      chapters.map((c) => c.libraryBookChapterId).filter((id): id is string => Boolean(id)),
+    );
 
-    const generated = generateSchedule({
-      chapters: chaptersForEngine,
+    const dayPlan = generateDayPlanFromTeachingPacks({
+      chapters: chapters.map((c) => ({
+        chapterKey: c.chapterKey,
+        titleSnapshot: c.titleSnapshot,
+        libraryBookChapterId: c.libraryBookChapterId,
+        contentHash: c.contentHash,
+        sortOrder: c.sortOrder,
+      })),
+      packsByChapterId: packsForDayPlan,
       teachingSlots: slotResult.slots,
       settings,
       timetableSource: slotResult.timetableSource,
     });
+
+    let generated =
+      dayPlan ??
+      (() => {
+        const chaptersForEngine: ChapterForSegments[] = chapters.map((c) => {
+          const analysis = c.analysis as ChapterForSegments['analysis'];
+          return {
+            chapterKey: c.chapterKey,
+            title: c.titleSnapshot,
+            required: c.required,
+            activitiesEnabled: c.activitiesEnabled,
+            analysis,
+            activities: c.activities.map((a) => ({
+              activityKey: a.activityKey,
+              title: a.title,
+              minutes: a.minutes,
+              afterPortionKey: a.afterPortionKey,
+              optional: a.optional,
+            })),
+          };
+        });
+        return generateSchedule({
+          chapters: chaptersForEngine,
+          teachingSlots: slotResult.slots,
+          settings,
+          timetableSource: slotResult.timetableSource,
+        });
+      })();
     if (slotResult.warnings.length) {
       generated.summary.warnings.push(...slotResult.warnings);
     }
@@ -560,7 +586,266 @@ export class AcademicPlannersWorkflowService {
           slotEndTime: l.slotEndTime,
           frozen: l.frozen,
           isContinuation: l.isContinuation,
+          notes: l.notes ?? null,
         })),
+      });
+    });
+
+    return this.planners.getVersionPayload(user, plannerId, versionId);
+  }
+
+  async updateLesson(
+    user: AuthUser,
+    plannerId: string,
+    versionId: string,
+    lessonKey: string,
+    expectedRevision: number,
+    dto: {
+      title?: string;
+      objectives?: string[];
+      notes?: string;
+      kind?: 'TEACHING' | 'ACTIVITY' | 'REVISION' | 'ASSESSMENT';
+    },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const actor = await this.access.resolveActor(user);
+    const planner = await this.prisma.academicPlanner.findFirst({ where: { id: plannerId, schoolId } });
+    if (!planner) throw new NotFoundException({ code: 'PLANNER_NOT_FOUND', message: 'Planner not found' });
+    const version = await this.prisma.academicPlannerVersion.findFirst({ where: { id: versionId, plannerId } });
+    if (!version) throw new NotFoundException({ code: 'PLANNER_VERSION_NOT_FOUND', message: 'Version not found' });
+    if (!this.access.computePermissions(actor, planner, version).canEdit) {
+      throw new ForbiddenException({ code: 'PLANNER_FORBIDDEN', message: 'You cannot edit this planner' });
+    }
+
+    const lesson = await this.prisma.plannerLesson.findFirst({ where: { versionId, lessonKey } });
+    if (!lesson) throw new NotFoundException({ code: 'LESSON_NOT_FOUND', message: 'Lesson not found' });
+
+    await this.prisma.$transaction(async (tx) => {
+      const cas = await tx.academicPlannerVersion.updateMany({
+        where: {
+          id: versionId,
+          revision: expectedRevision,
+          status: { in: [PlannerVersionStatus.DRAFT, PlannerVersionStatus.CHANGES_REQUESTED] },
+        },
+        data: { revision: { increment: 1 } },
+      });
+      if (cas.count === 0) {
+        throw new ConflictException({
+          error: { code: 'PLANNER_VERSION_CONFLICT', message: 'Planner was updated elsewhere' },
+        });
+      }
+      await tx.plannerLesson.update({
+        where: { id: lesson.id },
+        data: {
+          ...(dto.title != null ? { title: dto.title.slice(0, 255) } : {}),
+          ...(dto.objectives != null ? { objectives: dto.objectives as Prisma.InputJsonValue } : {}),
+          ...(dto.notes != null ? { notes: dto.notes } : {}),
+          ...(dto.kind != null ? { kind: dto.kind } : {}),
+        },
+      });
+    });
+
+    return this.planners.getVersionPayload(user, plannerId, versionId);
+  }
+
+  async moveLessonToSlot(
+    user: AuthUser,
+    plannerId: string,
+    versionId: string,
+    lessonKey: string,
+    expectedRevision: number,
+    target: { date: string; periodNumber: number },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const actor = await this.access.resolveActor(user);
+    const planner = await this.prisma.academicPlanner.findFirst({
+      where: { id: plannerId, schoolId },
+      include: { section: { include: { grade: true } } },
+    });
+    if (!planner) throw new NotFoundException({ code: 'PLANNER_NOT_FOUND', message: 'Planner not found' });
+    const version = await this.prisma.academicPlannerVersion.findFirst({
+      where: { id: versionId, plannerId },
+      include: { lessons: { orderBy: { sequence: 'asc' } } },
+    });
+    if (!version) throw new NotFoundException({ code: 'PLANNER_VERSION_NOT_FOUND', message: 'Version not found' });
+    if (!this.access.computePermissions(actor, planner, version).canEdit) {
+      throw new ForbiddenException({ code: 'PLANNER_FORBIDDEN', message: 'You cannot edit this planner' });
+    }
+
+    const settings = version.settings as PlannerSettings;
+    const settingsRow = await this.prisma.schoolSettings.findUnique({ where: { schoolId } });
+    const tz = settingsRow?.timezone ?? DEFAULT_SCHOOL_TIMEZONE;
+
+    const slotResult = await buildPlannerTeachingSlots(
+      { resolver: this.resolver, prisma: this.prisma },
+      {
+        schoolId,
+        sectionId: planner.sectionId,
+        academicYearId: planner.academicYearId,
+        gradeHasPeriodTimetable: planner.section.grade.hasPeriodTimetable,
+        subjectId: planner.subjectId,
+        startDate: planner.startDate.toISOString().slice(0, 10),
+        lastTeachingDate: settings.lastTeachingDate,
+        settings,
+        timezone: tz,
+        section: {
+          id: planner.sectionId,
+          gradeId: planner.section.gradeId,
+          branchId: planner.section.branchId,
+        },
+      },
+    );
+
+    const drafts = version.lessons.map((l) => ({
+      lessonKey: l.lessonKey,
+      chapterKey: null as string | null,
+      sequence: l.sequence,
+      kind: l.kind,
+      title: l.title,
+      primaryStage: l.primaryStage,
+      stages: l.stages as ScheduleLessonDraft['stages'],
+      objectives: l.objectives as string[],
+      portionKeys: l.portionKeys as string[],
+      dependsOnKeys: l.dependsOnKeys as string[],
+      plannedMinutes: l.plannedMinutes,
+      scheduledDate: l.scheduledDate?.toISOString().slice(0, 10) ?? null,
+      periodNumber: l.periodNumber,
+      slotStartTime: l.slotStartTime,
+      slotEndTime: l.slotEndTime,
+      frozen: l.frozen,
+      isContinuation: l.isContinuation,
+      notes: l.notes,
+    }));
+
+    const { lessons, violations } = moveLessonOnSlots(drafts, slotResult.slots, lessonKey, target, 'SINGLE');
+    if (violations.length) {
+      throw new UnprocessableEntityException({
+        code: 'LESSON_MOVE_BLOCKED',
+        message: 'Cannot move lesson to that slot',
+        details: violations,
+      });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const cas = await tx.academicPlannerVersion.updateMany({
+        where: {
+          id: versionId,
+          revision: expectedRevision,
+          status: { in: [PlannerVersionStatus.DRAFT, PlannerVersionStatus.CHANGES_REQUESTED] },
+        },
+        data: { revision: { increment: 1 } },
+      });
+      if (cas.count === 0) {
+        throw new ConflictException({
+          error: { code: 'PLANNER_VERSION_CONFLICT', message: 'Planner was updated elsewhere' },
+        });
+      }
+      for (const l of lessons) {
+        await tx.plannerLesson.updateMany({
+          where: { versionId, lessonKey: l.lessonKey },
+          data: {
+            scheduledDate: l.scheduledDate ? new Date(`${l.scheduledDate}T00:00:00.000Z`) : null,
+            periodNumber: l.periodNumber,
+            slotStartTime: l.slotStartTime,
+            slotEndTime: l.slotEndTime,
+            sequence: l.sequence,
+          },
+        });
+      }
+    });
+
+    return this.planners.getVersionPayload(user, plannerId, versionId);
+  }
+
+  async regenerateLesson(
+    user: AuthUser,
+    plannerId: string,
+    versionId: string,
+    lessonKey: string,
+    expectedRevision: number,
+    options?: { regenerateActivity?: boolean },
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const actor = await this.access.resolveActor(user);
+    const planner = await this.prisma.academicPlanner.findFirst({
+      where: { id: plannerId, schoolId },
+      include: { subject: true },
+    });
+    if (!planner) throw new NotFoundException({ code: 'PLANNER_NOT_FOUND', message: 'Planner not found' });
+    const version = await this.prisma.academicPlannerVersion.findFirst({ where: { id: versionId, plannerId } });
+    if (!version) throw new NotFoundException({ code: 'PLANNER_VERSION_NOT_FOUND', message: 'Version not found' });
+    if (!this.access.computePermissions(actor, planner, version).canEdit) {
+      throw new ForbiddenException({ code: 'PLANNER_FORBIDDEN', message: 'You cannot edit this planner' });
+    }
+
+    const lesson = await this.prisma.plannerLesson.findFirst({
+      where: { versionId, lessonKey },
+      include: { chapter: true },
+    });
+    if (!lesson?.chapter?.libraryBookChapterId) {
+      throw new UnprocessableEntityException({
+        code: 'LESSON_REGENERATE_UNAVAILABLE',
+        message: 'This lesson is not linked to a library chapter teaching pack.',
+      });
+    }
+
+    const packs = await loadTeachingPacksByChapterIds(this.prisma, [lesson.chapter.libraryBookChapterId]);
+    const pack = packs.get(lesson.chapter.libraryBookChapterId);
+    if (!pack || pack.contentHash !== lesson.chapter.contentHash) {
+      throw new UnprocessableEntityException({
+        code: 'TEACHING_PACK_STALE',
+        message: 'Teaching pack missing or out of date for this chapter.',
+      });
+    }
+
+    const settings = version.settings as PlannerSettings;
+    const periodMinutes = settings.fallbackPeriodMinutes ?? 40;
+    const portionKeys = lesson.portionKeys as string[];
+    const dayMatch = /^Day\s+(\d+)/i.exec(lesson.title);
+    const dayLabel = dayMatch ? `Day ${dayMatch[1]}` : 'Day';
+
+    let kind = lesson.kind;
+    let portionKeysUse = [...portionKeys];
+    if (options?.regenerateActivity) {
+      kind = PlannerLessonKind.ACTIVITY;
+      portionKeysUse = ['activity:0'];
+    }
+
+    const rebuilt = rebuildLessonFromPack({
+      pack,
+      chapterTitle: lesson.chapter.titleSnapshot,
+      portionKeys: portionKeysUse,
+      kind,
+      periodMinutes,
+      dayLabel,
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      const cas = await tx.academicPlannerVersion.updateMany({
+        where: {
+          id: versionId,
+          revision: expectedRevision,
+          status: { in: [PlannerVersionStatus.DRAFT, PlannerVersionStatus.CHANGES_REQUESTED] },
+        },
+        data: { revision: { increment: 1 } },
+      });
+      if (cas.count === 0) {
+        throw new ConflictException({
+          error: { code: 'PLANNER_VERSION_CONFLICT', message: 'Planner was updated elsewhere' },
+        });
+      }
+      await tx.plannerLesson.update({
+        where: { id: lesson.id },
+        data: {
+          title: rebuilt.title.slice(0, 255),
+          kind: rebuilt.kind,
+          primaryStage: rebuilt.primaryStage,
+          stages: rebuilt.stages as Prisma.InputJsonValue,
+          objectives: rebuilt.objectives as Prisma.InputJsonValue,
+          plannedMinutes: rebuilt.plannedMinutes,
+          notes: rebuilt.notes,
+          portionKeys: portionKeysUse as Prisma.InputJsonValue,
+        },
       });
     });
 

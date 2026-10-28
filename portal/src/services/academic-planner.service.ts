@@ -190,11 +190,15 @@ export type PlannerVersionPayload = {
 
     title: string;
 
+    dayNumber: number | null;
+
     primaryStage: string;
 
     stages: StageSegment[];
 
     objectives: string[];
+
+    teacherNotes: string | null;
 
     plannedMinutes: number;
 
@@ -506,6 +510,48 @@ export const academicPlannerService = {
 
     );
 
+  },
+
+  updateLesson(
+    plannerId: string,
+    versionId: string,
+    lessonKey: string,
+    body: {
+      expectedRevision: number;
+      title?: string;
+      objectives?: string[];
+      notes?: string;
+      kind?: string;
+    },
+  ) {
+    return apiClient<PlannerVersionPayload>(
+      `/academic-planners/${plannerId}/v/${versionId}/lessons/${lessonKey}`,
+      { method: "PATCH", body: JSON.stringify(body) },
+    );
+  },
+
+  moveLesson(
+    plannerId: string,
+    versionId: string,
+    lessonKey: string,
+    body: { expectedRevision: number; date: string; periodNumber: number },
+  ) {
+    return apiClient<PlannerVersionPayload>(
+      `/academic-planners/${plannerId}/v/${versionId}/lessons/${lessonKey}/move`,
+      { method: "POST", body: JSON.stringify(body) },
+    );
+  },
+
+  regenerateLesson(
+    plannerId: string,
+    versionId: string,
+    lessonKey: string,
+    body: { expectedRevision: number; regenerateActivity?: boolean },
+  ) {
+    return apiClient<PlannerVersionPayload>(
+      `/academic-planners/${plannerId}/v/${versionId}/lessons/${lessonKey}/regenerate`,
+      { method: "POST", body: JSON.stringify(body) },
+    );
   },
 
 

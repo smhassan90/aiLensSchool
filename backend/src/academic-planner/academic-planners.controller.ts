@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { RoleName } from '@prisma/client';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -12,6 +12,11 @@ import { PlannerTeachingHelpService } from './planner-teaching-help.service';
 import { PlannerRecoveryService } from './planner-recovery.service';
 import { CreatePlannerDto } from './dto/planner.dto';
 import { AnalyzeChapterDto, GenerateScheduleDto } from './dto/planner-edit.dto';
+import {
+  MovePlannerLessonDto,
+  RegeneratePlannerLessonDto,
+  UpdatePlannerLessonDto,
+} from './dto/planner-lesson.dto';
 import { PlannerCommentRequiredDto, PlannerDecisionDto, SubmitPlannerDto } from './dto/planner-approval.dto';
 import { UpsertTeachingRecordDto } from './dto/teaching-record.dto';
 import { CreateRecoveryProposalDto, RegenerateRecoveryProposalDto } from './dto/planner-recovery.dto';
@@ -115,6 +120,45 @@ export class AcademicPlannersController {
     @Body() dto: GenerateScheduleDto,
   ) {
     return this.workflow.generate(user, plannerId, versionId, dto.expectedRevision);
+  }
+
+  @Patch(':id/v/:versionId/lessons/:lessonKey')
+  updateLesson(
+    @CurrentUser() user: AuthUser,
+    @Param('id') plannerId: string,
+    @Param('versionId') versionId: string,
+    @Param('lessonKey') lessonKey: string,
+    @Body() dto: UpdatePlannerLessonDto,
+  ) {
+    const { expectedRevision, ...body } = dto;
+    return this.workflow.updateLesson(user, plannerId, versionId, lessonKey, expectedRevision, body);
+  }
+
+  @Post(':id/v/:versionId/lessons/:lessonKey/move')
+  moveLesson(
+    @CurrentUser() user: AuthUser,
+    @Param('id') plannerId: string,
+    @Param('versionId') versionId: string,
+    @Param('lessonKey') lessonKey: string,
+    @Body() dto: MovePlannerLessonDto,
+  ) {
+    return this.workflow.moveLessonToSlot(user, plannerId, versionId, lessonKey, dto.expectedRevision, {
+      date: dto.date,
+      periodNumber: dto.periodNumber,
+    });
+  }
+
+  @Post(':id/v/:versionId/lessons/:lessonKey/regenerate')
+  regenerateLesson(
+    @CurrentUser() user: AuthUser,
+    @Param('id') plannerId: string,
+    @Param('versionId') versionId: string,
+    @Param('lessonKey') lessonKey: string,
+    @Body() dto: RegeneratePlannerLessonDto,
+  ) {
+    return this.workflow.regenerateLesson(user, plannerId, versionId, lessonKey, dto.expectedRevision, {
+      regenerateActivity: dto.regenerateActivity,
+    });
   }
 
   @Post(':id/v/:versionId/withdraw')

@@ -72,6 +72,7 @@ export type ScheduleLessonDraft = {
   slotEndTime: string | null;
   frozen: boolean;
   isContinuation: boolean;
+  notes?: string | null;
 };
 
 export type PackSegment = {
@@ -142,9 +143,11 @@ export type PlannerVersionPayload = {
     sequence: number;
     kind: string;
     title: string;
+    dayNumber: number | null;
     primaryStage: LessonStage;
     stages: StageSegment[];
     objectives: string[];
+    teacherNotes: string | null;
     plannedMinutes: number;
     dependsOnKeys: string[];
     date: string | null;

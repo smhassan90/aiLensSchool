@@ -18,6 +18,7 @@ import { dateFromIso, zonedDateIso, DEFAULT_SCHOOL_TIMEZONE } from '../teachers/
 import { TimetableResolverService } from '../timetables/timetable-resolver.service';
 import { PlannerAccessService } from './planner-access.service';
 import { defaultPlannerSettings, PlannerSettings, PlannerVersionPayload } from './planner-types';
+import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
 import { CreatePlannerDto } from './dto/planner.dto';
 import { plannerChapterContentHash, plannerChapterContentStatus } from './planner-content.util';
 import {
@@ -371,7 +372,7 @@ export class AcademicPlannersService {
       chapters: version.chapters.map((c) => ({
         chapterKey: c.chapterKey,
         libraryBookChapterId: c.libraryBookChapterId,
-        title: c.titleSnapshot,
+        title: fixLibraryTextEncoding(c.titleSnapshot),
         sortOrder: c.sortOrder,
         required: c.required,
         contentStatus: c.contentStatus,
@@ -391,25 +392,31 @@ export class AcademicPlannersService {
         optional: a.optional,
         source: a.source,
       })),
-      lessons: version.lessons.map((l) => ({
-        lessonKey: l.lessonKey,
-        chapterKey: l.plannerChapterId ? chapterKeyById.get(l.plannerChapterId) ?? null : null,
-        sequence: l.sequence,
-        kind: l.kind,
-        title: l.title,
-        primaryStage: l.primaryStage,
-        stages: l.stages as PlannerVersionPayload['lessons'][0]['stages'],
-        objectives: l.objectives as string[],
-        plannedMinutes: l.plannedMinutes,
-        dependsOnKeys: l.dependsOnKeys as string[],
-        date: l.scheduledDate?.toISOString().slice(0, 10) ?? null,
-        periodNumber: l.periodNumber,
-        startTime: l.slotStartTime,
-        endTime: l.slotEndTime,
-        frozen: l.frozen,
-        isContinuation: l.isContinuation,
-        progress: null,
-      })),
+      lessons: version.lessons.map((l) => {
+        const title = fixLibraryTextEncoding(l.title);
+        const dayMatch = /^Day\s+(\d+)/i.exec(title);
+        return {
+          lessonKey: l.lessonKey,
+          chapterKey: l.plannerChapterId ? chapterKeyById.get(l.plannerChapterId) ?? null : null,
+          sequence: l.sequence,
+          kind: l.kind,
+          title,
+          dayNumber: dayMatch ? Number(dayMatch[1]) : null,
+          primaryStage: l.primaryStage,
+          stages: l.stages as PlannerVersionPayload['lessons'][0]['stages'],
+          objectives: (l.objectives as string[]).map((o) => fixLibraryTextEncoding(o)),
+          teacherNotes: l.notes ? fixLibraryTextEncoding(l.notes) : null,
+          plannedMinutes: l.plannedMinutes,
+          dependsOnKeys: l.dependsOnKeys as string[],
+          date: l.scheduledDate?.toISOString().slice(0, 10) ?? null,
+          periodNumber: l.periodNumber,
+          startTime: l.slotStartTime,
+          endTime: l.slotEndTime,
+          frozen: l.frozen,
+          isContinuation: l.isContinuation,
+          progress: null,
+        };
+      }),
       calendar: {
         from: planner.startDate.toISOString().slice(0, 10),
         to: planner.examDate.toISOString().slice(0, 10),

@@ -15,7 +15,11 @@ import { PlannerStatusBanner } from "@/components/planner/planner-status-banner"
 import { PlannerApprovalActions } from "@/components/planner/planner-approval-actions";
 import { PlannerRecoveryPanel } from "@/components/planner/planner-recovery-panel";
 import { LessonCard } from "@/components/planner/lesson-card";
+import { PlannerDayLessonCard } from "@/components/planner/planner-day-lesson-card";
+import { PlannerLessonEditDialog } from "@/components/planner/planner-lesson-edit-dialog";
 import { TeachingHelpDialog, type TeachingHelpLessonContext } from "@/components/planner/teaching-help-dialog";
+import type { PlannerLesson } from "@/lib/planner-view-model";
+import { fixDisplayText } from "@/lib/fix-display-text";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/providers/toast-provider";
 import { friendlyApiErrorMessage } from "@/lib/display-labels";
@@ -31,6 +35,10 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
   const { toast } = useToast();
   const [helpLesson, setHelpLesson] = useState<TeachingHelpLessonContext | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [editLesson, setEditLesson] = useState<PlannerLesson | null>(null);
+  const [moveLesson, setMoveLesson] = useState<PlannerLesson | null>(null);
+  const [moveDate, setMoveDate] = useState("");
+  const [movePeriod, setMovePeriod] = useState("1");
 
   const openTeachingHelp = (lesson: { lessonKey: string; title: string; chapterTitle?: string | null }) => {
     setHelpLesson({
@@ -60,6 +68,61 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
         description: friendlyApiErrorMessage(err),
         variant: "error",
       });
+    },
+  });
+
+  const saveLesson = useMutation({
+    mutationFn: (body: {
+      lessonKey: string;
+      expectedRevision: number;
+      title?: string;
+      objectives?: string[];
+      notes?: string;
+      kind?: PlannerLesson["kind"];
+    }) => {
+      const { lessonKey, ...rest } = body;
+      return academicPlannerService.updateLesson(plannerId, versionId, lessonKey, rest);
+    },
+    onSuccess: (payload) => {
+      queryClient.setQueryData(["planner-version", plannerId, versionId], payload);
+      setEditLesson(null);
+      toast({ title: "Day updated", variant: "success" });
+    },
+    onError: (err) => {
+      toast({ title: "Could not save", description: friendlyApiErrorMessage(err), variant: "error" });
+    },
+  });
+
+  const regenLesson = useMutation({
+    mutationFn: (input: { lessonKey: string; regenerateActivity?: boolean }) =>
+      academicPlannerService.regenerateLesson(plannerId, versionId, input.lessonKey, {
+        expectedRevision: data!.version.revision,
+        regenerateActivity: input.regenerateActivity,
+      }),
+    onSuccess: (payload) => {
+      queryClient.setQueryData(["planner-version", plannerId, versionId], payload);
+      setEditLesson(null);
+      toast({ title: "Day regenerated from teaching pack", variant: "success" });
+    },
+    onError: (err) => {
+      toast({ title: "Regenerate failed", description: friendlyApiErrorMessage(err), variant: "error" });
+    },
+  });
+
+  const moveLessonMut = useMutation({
+    mutationFn: (input: { lessonKey: string; date: string; periodNumber: number }) =>
+      academicPlannerService.moveLesson(plannerId, versionId, input.lessonKey, {
+        expectedRevision: data!.version.revision,
+        date: input.date,
+        periodNumber: input.periodNumber,
+      }),
+    onSuccess: (payload) => {
+      queryClient.setQueryData(["planner-version", plannerId, versionId], payload);
+      setMoveLesson(null);
+      toast({ title: "Day moved", variant: "success" });
+    },
+    onError: (err) => {
+      toast({ title: "Could not move", description: friendlyApiErrorMessage(err), variant: "error" });
     },
   });
 
@@ -103,6 +166,11 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
   const timeline = toTimeline(data);
   const outline = toOutline(data);
   const pendingAnalysis = data.chapters.filter((c) => !c.analysisSource);
+  const dayPlanLessons = [...data.lessons].sort((a, b) => {
+    const da = a.dayNumber ?? a.sequence;
+    const db = b.dayNumber ?? b.sequence;
+    return da - db;
+  });
 
   return (
     <div className="space-y-6">
@@ -166,12 +234,42 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
         </div>
       )}
 
-      <Tabs defaultValue="outline">
+      <Tabs defaultValue="days">
         <TabsList>
+          <TabsTrigger value="days">Day by day</TabsTrigger>
           <TabsTrigger value="calendar">Calendar</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="outline">Outline</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="days" className="space-y-4 pt-4">
+          {dayPlanLessons.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Generate the schedule to see Day 1, Day 2, … with teaching steps and activity days.
+            </p>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {dayPlanLessons.map((lesson) => (
+                <PlannerDayLessonCard
+                  key={lesson.lessonKey}
+                  lesson={lesson}
+                  readOnly={readOnly}
+                  onEdit={readOnly || !data.permissions.canEdit ? undefined : () => setEditLesson(lesson)}
+                  onMove={
+                    readOnly || !data.permissions.canEdit
+                      ? undefined
+                      : () => {
+                          setMoveLesson(lesson);
+                          setMoveDate(lesson.date ?? data.calendar.from);
+                          setMovePeriod(String(lesson.periodNumber ?? 1));
+                        }
+                  }
+                  onTeachingHelp={readOnly ? undefined : () => openTeachingHelp(lesson)}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
 
         <TabsContent value="calendar" className="space-y-4 pt-4">
           {weeks.length === 0 ? (
@@ -281,6 +379,70 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
       </Tabs>
 
       <TeachingHelpDialog open={helpOpen} onOpenChange={setHelpOpen} lesson={helpLesson} />
+
+      <PlannerLessonEditDialog
+        open={Boolean(editLesson)}
+        lesson={editLesson}
+        revision={data.version.revision}
+        saving={saveLesson.isPending || regenLesson.isPending}
+        onClose={() => setEditLesson(null)}
+        onSave={(body) => {
+          if (!editLesson) return;
+          saveLesson.mutate({ lessonKey: editLesson.lessonKey, ...body });
+        }}
+        onRegenerate={(opts) => {
+          if (!editLesson) return;
+          regenLesson.mutate({ lessonKey: editLesson.lessonKey, ...opts });
+        }}
+      />
+
+      {moveLesson && !readOnly && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl border bg-card p-5 shadow-lg">
+            <h2 className="text-lg font-semibold">Move day</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{fixDisplayText(moveLesson.title)}</p>
+            <div className="mt-4 space-y-3">
+              <label className="block text-sm">
+                Date
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+                  value={moveDate}
+                  onChange={(e) => setMoveDate(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                Period
+                <input
+                  type="number"
+                  min={1}
+                  className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+                  value={movePeriod}
+                  onChange={(e) => setMovePeriod(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <Button
+                type="button"
+                disabled={moveLessonMut.isPending}
+                onClick={() =>
+                  moveLessonMut.mutate({
+                    lessonKey: moveLesson.lessonKey,
+                    date: moveDate,
+                    periodNumber: Number(movePeriod) || 1,
+                  })
+                }
+              >
+                {moveLessonMut.isPending ? "Moving…" : "Move"}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setMoveLesson(null)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
