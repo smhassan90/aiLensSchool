@@ -12,6 +12,9 @@
  *
  * Limit for testing:
  *   ... --limit=5
+ *
+ * Only specific chapters (comma-separated UUIDs):
+ *   ... --force --chapter-ids=uuid1,uuid2
  */
 import { PrismaClient } from '@prisma/client';
 import { joinCompiledChapter } from '../src/ai/schemas/chapter-compile.schema';
@@ -48,9 +51,21 @@ async function main() {
   const listOnly = process.argv.includes('--list');
   const force = process.argv.includes('--force');
   const limit = Number(argValue('limit') ?? '0') || undefined;
+  const chapterIdFilter = new Set(
+    (argValue('chapter-ids') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean),
+  );
 
   const school = await resolveSchoolId();
-  const chapters = await listGrantedChaptersForSchool(prisma, school.id);
+  let chapters = await listGrantedChaptersForSchool(prisma, school.id);
+  if (chapterIdFilter.size > 0) {
+    chapters = chapters.filter((ch) => chapterIdFilter.has(ch.id));
+    if (chapters.length === 0) {
+      throw new Error('No granted chapters matched --chapter-ids');
+    }
+  }
 
   console.log(`School: ${school.name} (${school.code}) — ${chapters.length} granted library chapter(s)\n`);
 
