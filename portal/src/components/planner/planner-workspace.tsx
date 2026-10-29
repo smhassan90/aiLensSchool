@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLoader } from "@/components/layout/page-loader";
@@ -40,21 +40,26 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
   const [moveDate, setMoveDate] = useState("");
   const [movePeriod, setMovePeriod] = useState("1");
 
-  const openTeachingHelp = (lesson: PlannerLesson) => {
-    setHelpLesson({
-      plannerId,
-      versionId,
-      lessonKey: lesson.lessonKey,
-      title: lesson.title,
-      lessonKind: lesson.kind,
-      chapterTitle: lesson.chapterTitle,
-    });
-    setHelpOpen(true);
-  };
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["planner-version", plannerId, versionId],
     queryFn: () => academicPlannerService.getVersion(plannerId, versionId),
   });
+
+  const openTeachingHelp = useCallback(
+    (lesson: PlannerLesson) => {
+      const chapter = data?.chapters.find((c) => String(c.chapterKey) === lesson.chapterKey);
+      setHelpLesson({
+        plannerId,
+        versionId,
+        lessonKey: lesson.lessonKey,
+        title: lesson.title,
+        lessonKind: lesson.kind,
+        chapterTitle: chapter ? String(chapter.title) : null,
+      });
+      setHelpOpen(true);
+    },
+    [data?.chapters, plannerId, versionId],
+  );
 
   const generate = useMutation({
     mutationFn: () =>
