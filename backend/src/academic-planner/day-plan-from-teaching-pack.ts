@@ -2,7 +2,7 @@ import { LessonStage, PlannerLessonKind } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
 import { TeachingPackForAnalysis } from '../library-books/chapter-teaching-pack-to-analysis';
-import { allocateTeachingDaysPerChapter, splitParagraphsAcrossDays } from './day-plan-allocate';
+import { allocateTeachingDaysPerChapter } from './day-plan-allocate';
 import { displayChapterTitle } from './day-plan-content-quality';
 import {
   buildMinimalDayPlan,
@@ -11,12 +11,9 @@ import {
   rolesForChapterDays,
 } from './day-plan-chapter-roles';
 import {
-  buildExpertTeachingDayPlan,
   chapterContentWeight,
-  explainPointsForDay,
   isLowValueContent,
   labelForTeachingDay,
-  pickCheckQuestions,
 } from './day-plan-teacher-script';
 import {
   computeScheduleSummary,
@@ -214,97 +211,30 @@ export function rebuildLessonFromPack(input: {
   notes: string;
 } {
   const tag = input.portionKeys[0] ?? '';
-  const role = parseRoleFromPortionKey(tag);
-  if (role) {
-    const plan = buildMinimalDayPlan({
-      chapterTitle: displayChapterTitle(input.chapterTitle),
-      role,
-    });
-    return {
-      kind: plan.kind,
-      title: `${input.dayLabel} — ${displayChapterTitle(input.chapterTitle)} · ${plan.titleSuffix}`,
-      primaryStage: plan.primaryStage,
-      stages:
-        role === 'ACTIVITY'
-          ? [{ stage: LessonStage.ACTIVITY, minutes: input.periodMinutes }]
-          : role === 'EXERCISE'
-            ? [{ stage: LessonStage.GUIDED_PRACTICE, minutes: input.periodMinutes }]
-            : role === 'INTRO'
-              ? [
-                  { stage: LessonStage.INTRODUCTION, minutes: 8 },
-                  { stage: LessonStage.READING, minutes: Math.max(12, input.periodMinutes - 8) },
-                ]
-              : [{ stage: LessonStage.READING, minutes: input.periodMinutes }],
-      objectives: plan.objectives,
-      plannedMinutes: input.periodMinutes,
-      notes: plan.teacherNotes ?? '',
-    };
-  }
-
-  if (tag.startsWith('chapter-day:')) {
-    const dayIdx = Number(tag.split(':')[1] ?? '0') || 0;
-    const text = input.chapterText ?? input.pack.summary;
-    const chunks = splitParagraphsAcrossDays(text, Math.max(dayIdx + 1, 1));
-    const body = chunks[dayIdx] ?? chunks[chunks.length - 1] ?? text;
-    const teachDays = Math.max(chunks.length, dayIdx + 1);
-    const { objectives, teacherNotes } = buildExpertTeachingDayPlan({
-      chapterTitle: displayChapterTitle(input.chapterTitle),
-      subjectName: input.subjectName,
-      dayInChapter: dayIdx + 1,
-      totalDaysInChapter: teachDays,
-      portionText: body,
-      portionLabel: labelForTeachingDay(input.pack, dayIdx, teachDays),
-      isFirstDayOfChapter: dayIdx === 0,
-      explainPoints: explainPointsForDay(input.pack, dayIdx, teachDays),
-      questions: pickCheckQuestions(input.pack, undefined, 4),
-      packSummary: input.pack.summary,
-    });
-    return {
-      kind: PlannerLessonKind.TEACHING,
-      title: `${input.dayLabel} — ${fixLibraryTextEncoding(input.chapterTitle)}`,
-      primaryStage: dayIdx === 0 ? LessonStage.INTRODUCTION : LessonStage.EXPLANATION,
-      stages: [
-        { stage: LessonStage.INTRODUCTION, minutes: 8 },
-        { stage: LessonStage.READING, minutes: 14 },
-        { stage: LessonStage.EXPLANATION, minutes: Math.max(12, input.periodMinutes - 22) },
-      ],
-      objectives,
-      plannedMinutes: input.periodMinutes,
-      notes: teacherNotes,
-    };
-  }
-
-  const sliceKey = tag.startsWith('slice:') ? tag.slice(6) : tag.replace(/^p/, 's');
-  const slice = input.pack.readingSlices.find((s) => s.sliceKey === sliceKey) ?? input.pack.readingSlices[0];
-  const body = slice ? fixLibraryTextEncoding(slice.readingFrom) : input.pack.summary;
-  const explainPoints = slice
-    ? (Array.isArray(slice.explainPoints)
-        ? (slice.explainPoints as string[]).filter((x) => typeof x === 'string')
-        : [])
-    : explainPointsForDay(input.pack, 0, 1);
-  const { objectives, teacherNotes } = buildExpertTeachingDayPlan({
-    chapterTitle: input.chapterTitle,
-    subjectName: input.subjectName,
-    dayInChapter: 1,
-    totalDaysInChapter: 1,
-    portionText: body,
-    portionLabel: slice ? fixLibraryTextEncoding(slice.title) : 'Lesson',
-    isFirstDayOfChapter: true,
-    explainPoints,
-    questions: pickCheckQuestions(input.pack, slice?.sliceKey, 4),
-    packSummary: input.pack.summary,
+  const role =
+    parseRoleFromPortionKey(tag) ??
+    (input.kind === PlannerLessonKind.ACTIVITY ? 'ACTIVITY' : tag.startsWith('chapter-day:0') ? 'INTRO' : 'READING');
+  const plan = buildMinimalDayPlan({
+    chapterTitle: displayChapterTitle(input.chapterTitle),
+    role,
   });
   return {
-    kind: PlannerLessonKind.TEACHING,
-    title: `${input.dayLabel} — ${slice ? fixLibraryTextEncoding(slice.title) : input.chapterTitle}`,
-    primaryStage: LessonStage.EXPLANATION,
-    stages: [
-      { stage: LessonStage.INTRODUCTION, minutes: 8 },
-      { stage: LessonStage.READING, minutes: 14 },
-      { stage: LessonStage.EXPLANATION, minutes: Math.max(12, input.periodMinutes - 22) },
-    ],
-    objectives,
+    kind: plan.kind,
+    title: `${input.dayLabel} — ${displayChapterTitle(input.chapterTitle)} · ${plan.titleSuffix}`,
+    primaryStage: plan.primaryStage,
+    stages:
+      role === 'ACTIVITY'
+        ? [{ stage: LessonStage.ACTIVITY, minutes: input.periodMinutes }]
+        : role === 'EXERCISE'
+          ? [{ stage: LessonStage.GUIDED_PRACTICE, minutes: input.periodMinutes }]
+          : role === 'INTRO'
+            ? [
+                { stage: LessonStage.INTRODUCTION, minutes: 8 },
+                { stage: LessonStage.READING, minutes: Math.max(12, input.periodMinutes - 8) },
+              ]
+            : [{ stage: LessonStage.READING, minutes: input.periodMinutes }],
+    objectives: plan.objectives,
     plannedMinutes: input.periodMinutes,
-    notes: teacherNotes,
+    notes: '',
   };
 }

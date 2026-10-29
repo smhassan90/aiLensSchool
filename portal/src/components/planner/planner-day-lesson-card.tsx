@@ -6,6 +6,34 @@ import { fixDisplayText } from "@/lib/fix-display-text";
 import type { PlannerLesson } from "@/lib/planner-view-model";
 import { formatDate } from "@/lib/utils";
 
+function shortTodayLine(lesson: PlannerLesson): string {
+  const notes = lesson.teacherNotes ?? "";
+  const blob = `${lesson.title} ${lesson.objectives.join(" ")} ${notes}`.toLowerCase();
+  const storedScriptIsLong =
+    notes.length > 180 ||
+    blob.includes("indexed section") ||
+    blob.includes("example for the class") ||
+    blob.includes("opening (");
+
+  if (lesson.kind === "ACTIVITY" || /\bactivity\b/.test(blob)) {
+    return "Activity day. Use Help me teach for an activity based on the chapter summary.";
+  }
+  if (/\bexercise\b/.test(blob)) {
+    return "Do the textbook exercises for this part of the chapter.";
+  }
+  if (blob.includes("continue reading")) {
+    return "Continue reading from where the class stopped last time.";
+  }
+  if (blob.includes("· intro") || blob.includes("section 1") || /\bintroduce\b/.test(lesson.objectives[0] ?? "")) {
+    if (!storedScriptIsLong && lesson.objectives[0]) return lesson.objectives[0];
+    return "Introduce the chapter with one short example, then start the textbook.";
+  }
+  if (storedScriptIsLong || lesson.objectives.length > 1) {
+    return "Read today’s section with the class.";
+  }
+  return lesson.objectives[0] ?? "Read today’s section with the class.";
+}
+
 const kindStyles: Record<string, string> = {
   TEACHING: "border-l-4 border-l-sky-500 bg-gradient-to-br from-sky-50/80 to-card",
   ACTIVITY: "border-l-4 border-l-violet-500 bg-gradient-to-br from-violet-50/80 to-card",
@@ -58,37 +86,19 @@ export function PlannerDayLessonCard({
           </div>
           <h3 className="mt-2 text-base font-semibold leading-snug text-foreground">{title}</h3>
 
-          {lesson.objectives.length > 0 && (
-            <div className="mt-3 rounded-lg bg-primary/5 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Today you will</p>
-              <ul className="mt-2 space-y-1.5 text-sm text-foreground">
-                {lesson.objectives.slice(0, 4).map((point) => (
-                  <li key={point.slice(0, 48)} className="flex gap-2">
-                    <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/80" aria-hidden />
-                    <span>{fixDisplayText(point)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="mt-3 rounded-lg bg-primary/5 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Today you will</p>
+            <p className="mt-2 flex gap-2 text-sm text-foreground">
+              <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/80" aria-hidden />
+              <span>{fixDisplayText(shortTodayLine(lesson))}</span>
+            </p>
+          </div>
 
-          {lesson.teacherNotes?.trim() ? (
-            <div className="mt-3 rounded-lg border border-border/60 bg-background/80 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Steps in class
-              </p>
-              <p className="mt-2 text-sm leading-relaxed text-foreground/90 whitespace-pre-line">
-                {fixDisplayText(lesson.teacherNotes).slice(0, 700)}
-                {lesson.teacherNotes.length > 700 ? "…" : ""}
-              </p>
-            </div>
-          ) : (
-            onTeachingHelp && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Use <span className="font-medium text-foreground">Help me teach</span> for examples,
-                questions, and activities from the chapter summary.
-              </p>
-            )
+          {onTeachingHelp && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Examples, questions, and activities appear when you click{" "}
+              <span className="font-medium text-foreground">Help me teach</span>.
+            </p>
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
