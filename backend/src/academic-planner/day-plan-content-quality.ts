@@ -23,6 +23,10 @@ export function isPackMetaPoint(s: string): boolean {
     /\(\s*\)/,
     /\bindex presents topics\b/i,
     /\bprinted page numbers\b/i,
+    /\bis organized through five indexed sections\b/i,
+    /\bis titled social and moral values and is organized\b/i,
+    /^chapter \d+ is titled\b/i,
+    /\bthe sections move from glory of the lord to places of worship\b/i,
   ];
 
   if (metaPatterns.some((re) => re.test(t) || re.test(lower))) return true;

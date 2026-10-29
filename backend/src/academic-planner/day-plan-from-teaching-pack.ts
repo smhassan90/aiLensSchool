@@ -2,14 +2,15 @@ import { LessonStage, PlannerLessonKind } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
 import { TeachingPackForAnalysis } from '../library-books/chapter-teaching-pack-to-analysis';
-import {
-  allocateTeachingDaysPerChapter,
-  splitParagraphsAcrossDays,
-  splitSummaryAcrossDays,
-} from './day-plan-allocate';
+import { allocateTeachingDaysPerChapter, splitParagraphsAcrossDays } from './day-plan-allocate';
 import { displayChapterTitle } from './day-plan-content-quality';
 import {
-  buildChapterRecapActivity,
+  buildMinimalDayPlan,
+  parseRoleFromPortionKey,
+  rolePortionKey,
+  rolesForChapterDays,
+} from './day-plan-chapter-roles';
+import {
   buildExpertTeachingDayPlan,
   chapterContentWeight,
   explainPointsForDay,
@@ -22,76 +23,6 @@ import {
   defaultRevisionSlots,
 } from './schedule-engine';
 import { PlannerSettings, ScheduleLessonDraft, ScheduleSummary, TeachingSlot } from './planner-types';
-
-type ChapterPortion = {
-  label: string;
-  body: string;
-  sliceKey?: string;
-  explainPoints: string[];
-  questions: string[];
-};
-
-function buildChapterPortions(
-  pack: TeachingPackForAnalysis,
-  chapterText: string,
-  teachDays: number,
-): ChapterPortion[] {
-  const summary = fixLibraryTextEncoding(pack.summary).trim();
-  const summaryChunks =
-    summary.length >= 40 ? splitSummaryAcrossDays(summary, teachDays) : [];
-
-  const text = fixLibraryTextEncoding(chapterText).trim();
-  const textUsable = text.length >= 120 && !isLowValueContent(text);
-  const textChunks =
-    textUsable && summaryChunks.length === 0 ? splitParagraphsAcrossDays(text, teachDays) : [];
-
-  const portionMeta = (dayIndex: number, sliceKey?: string): Pick<ChapterPortion, 'explainPoints' | 'questions'> => ({
-    explainPoints: explainPointsForDay(pack, dayIndex, teachDays),
-    questions: pickCheckQuestions(pack, sliceKey, 4),
-  });
-
-  const portions: ChapterPortion[] = [];
-  for (let i = 0; i < teachDays; i++) {
-    let body = summaryChunks[i] ?? '';
-    if (!body && textChunks[i]) body = textChunks[i]!;
-    if (!body && summaryChunks.length === 1) {
-      body = summaryChunks[0] ?? '';
-    }
-
-    portions.push({
-      label: labelForTeachingDay(pack, i, teachDays),
-      body: isLowValueContent(body) ? summaryChunks[i] ?? '' : body,
-      ...portionMeta(i),
-    });
-  }
-
-  const withContent = portions.filter(
-    (g) => g.body.trim().length > 0 || g.explainPoints.length > 0,
-  );
-  if (withContent.length > 0) return withContent;
-
-  const slices = pack.readingSlices;
-  const groups: ChapterPortion[] = Array.from({ length: teachDays }, (_, i) => ({
-    label: labelForTeachingDay(pack, i, teachDays),
-    body: '',
-    explainPoints: [] as string[],
-    questions: [] as string[],
-  }));
-
-  const slicesPerDay = Math.max(1, Math.ceil(Math.max(slices.length, 1) / teachDays));
-  slices.forEach((slice, i) => {
-    const g = Math.min(teachDays - 1, Math.floor(i / slicesPerDay));
-    const reading = fixLibraryTextEncoding(slice.readingFrom);
-    if (!isLowValueContent(reading)) {
-      groups[g].body += (groups[g].body ? '\n\n' : '') + reading;
-    }
-    groups[g].sliceKey = slice.sliceKey;
-    groups[g].questions = pickCheckQuestions(pack, slice.sliceKey, 4);
-    groups[g].explainPoints = explainPointsForDay(pack, g, teachDays);
-  });
-
-  return groups.filter((g) => g.body.trim().length > 0 || g.explainPoints.length > 0);
-}
 
 export type PlannerChapterForDayPlan = {
   chapterKey: string;
@@ -132,9 +63,7 @@ export function generateDayPlanFromTeachingPacks(input: {
     return chapterContentWeight(text, pack.summary, pack.readingSlices.length);
   });
 
-  const activityDaysWanted = ordered.length;
-
-  const teachSlotBudget = Math.max(ordered.length, teachingSlotList.length - activityDaysWanted);
+  const teachSlotBudget = Math.max(ordered.length, teachingSlotList.length);
   const teachDaysPerChapter = allocateTeachingDaysPerChapter(weights, teachSlotBudget, 0);
 
   type Draft = Omit<
@@ -149,77 +78,51 @@ export function generateDayPlanFromTeachingPacks(input: {
     const libId = chapter.libraryBookChapterId!;
     const pack = input.packsByChapterId.get(libId)!;
     const chapterTitle = displayChapterTitle(chapter.titleSnapshot);
-    const chapterText = input.chapterTextsByLibraryId.get(libId) ?? chapter.chapterText ?? '';
     const teachDays = teachDaysPerChapter[chapterIdx] ?? 1;
-    const portions = buildChapterPortions(pack, chapterText, teachDays);
+    const roles = rolesForChapterDays(teachDays);
+    let readingPass = 0;
 
-    portions.forEach((portion, dayInChapter) => {
+    roles.forEach((role, roleIdx) => {
       globalDay++;
-      const { objectives, teacherNotes } = buildExpertTeachingDayPlan({
-        chapterTitle,
-        subjectName: input.subjectName,
-        dayInChapter: dayInChapter + 1,
-        totalDaysInChapter: portions.length,
-        portionText: portion.body,
-        portionLabel: portion.label,
-        isFirstDayOfChapter: dayInChapter === 0,
-        explainPoints: portion.explainPoints,
-        questions: portion.questions,
-        packSummary: pack.summary,
-      });
+      let sectionHint: string | undefined;
+      if (role === 'READING' || role === 'CONTINUE_READING') {
+        const hint = labelForTeachingDay(pack, readingPass, Math.max(roles.filter((r) => r === 'READING' || r === 'CONTINUE_READING').length, 1));
+        readingPass++;
+        if (hint && !isLowValueContent(hint) && !/^section \d+$/i.test(hint)) {
+          sectionHint = hint;
+        }
+      }
+
+      const plan = buildMinimalDayPlan({ chapterTitle, role, sectionHint });
+      const stages =
+        role === 'INTRO'
+          ? [
+              { stage: LessonStage.INTRODUCTION, minutes: Math.min(10, periodMinutes) },
+              { stage: LessonStage.READING, minutes: Math.max(10, periodMinutes - 10) },
+            ]
+          : role === 'EXERCISE'
+            ? [{ stage: LessonStage.GUIDED_PRACTICE, minutes: periodMinutes }]
+            : role === 'ACTIVITY'
+              ? [{ stage: LessonStage.ACTIVITY, minutes: periodMinutes }]
+              : [{ stage: LessonStage.READING, minutes: periodMinutes }];
 
       drafts.push({
         lessonKey: keyFactory(),
         chapterKey: chapter.chapterKey,
         sequence: drafts.length,
-        kind: PlannerLessonKind.TEACHING,
-        title:
-          portions.length > 1
-            ? `Day ${globalDay} — ${chapterTitle} · ${portion.label}`
-            : `Day ${globalDay} — ${chapterTitle}`,
-        primaryStage:
-          dayInChapter === 0 ? LessonStage.INTRODUCTION : LessonStage.EXPLANATION,
-        stages: [
-          { stage: LessonStage.INTRODUCTION, minutes: Math.min(8, periodMinutes) },
-          { stage: LessonStage.READING, minutes: Math.min(14, periodMinutes) },
-          { stage: LessonStage.EXPLANATION, minutes: Math.max(12, periodMinutes - 22) },
-        ],
-        objectives,
-        portionKeys: [
-          portion.sliceKey ? `slice:${portion.sliceKey}` : `chapter-day:${dayInChapter}`,
-        ],
+        kind: plan.kind,
+        title: `Day ${globalDay} — ${chapterTitle} · ${plan.titleSuffix}`,
+        primaryStage: plan.primaryStage,
+        stages,
+        objectives: plan.objectives,
+        portionKeys: [rolePortionKey(role, roleIdx)],
         dependsOnKeys: [],
         plannedMinutes: periodMinutes,
         frozen: false,
-        isContinuation: dayInChapter > 0,
-        notes: teacherNotes,
+        isContinuation: roleIdx > 0 && role !== 'INTRO',
+        notes: plan.teacherNotes ?? '',
       });
     });
-
-    if (portions.length > 0) {
-      const recap = buildChapterRecapActivity({
-        chapterTitle,
-        subjectName: input.subjectName,
-        pack,
-      });
-      globalDay++;
-      drafts.push({
-        lessonKey: keyFactory(),
-        chapterKey: chapter.chapterKey,
-        sequence: drafts.length,
-        kind: PlannerLessonKind.ACTIVITY,
-        title: `Day ${globalDay} — Activity: ${recap.activityTitle}`,
-        primaryStage: LessonStage.ACTIVITY,
-        stages: [{ stage: LessonStage.ACTIVITY, minutes: periodMinutes }],
-        objectives: recap.objectives,
-        portionKeys: ['activity:0'],
-        dependsOnKeys: [],
-        plannedMinutes: periodMinutes,
-        frozen: false,
-        isContinuation: false,
-        notes: recap.teacherNotes,
-      });
-    }
   });
 
   const lessons: ScheduleLessonDraft[] = [];
@@ -311,20 +214,30 @@ export function rebuildLessonFromPack(input: {
   notes: string;
 } {
   const tag = input.portionKeys[0] ?? '';
-  if (tag.startsWith('activity:')) {
-    const recap = buildChapterRecapActivity({
+  const role = parseRoleFromPortionKey(tag);
+  if (role) {
+    const plan = buildMinimalDayPlan({
       chapterTitle: displayChapterTitle(input.chapterTitle),
-      subjectName: input.subjectName,
-      pack: input.pack,
+      role,
     });
     return {
-      kind: PlannerLessonKind.ACTIVITY,
-      title: `${input.dayLabel} — Activity: ${recap.activityTitle}`,
-      primaryStage: LessonStage.ACTIVITY,
-      stages: [{ stage: LessonStage.ACTIVITY, minutes: input.periodMinutes }],
-      objectives: recap.objectives,
+      kind: plan.kind,
+      title: `${input.dayLabel} — ${displayChapterTitle(input.chapterTitle)} · ${plan.titleSuffix}`,
+      primaryStage: plan.primaryStage,
+      stages:
+        role === 'ACTIVITY'
+          ? [{ stage: LessonStage.ACTIVITY, minutes: input.periodMinutes }]
+          : role === 'EXERCISE'
+            ? [{ stage: LessonStage.GUIDED_PRACTICE, minutes: input.periodMinutes }]
+            : role === 'INTRO'
+              ? [
+                  { stage: LessonStage.INTRODUCTION, minutes: 8 },
+                  { stage: LessonStage.READING, minutes: Math.max(12, input.periodMinutes - 8) },
+                ]
+              : [{ stage: LessonStage.READING, minutes: input.periodMinutes }],
+      objectives: plan.objectives,
       plannedMinutes: input.periodMinutes,
-      notes: recap.teacherNotes,
+      notes: plan.teacherNotes ?? '',
     };
   }
 

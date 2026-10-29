@@ -11,6 +11,7 @@ export type TeachingHelpContextInput = {
   libraryBookChapterId: string | null;
   analysis: PlannerChapterAnalysis | null;
   chapterText: string | null;
+  packSummary: string | null;
   bookTitle: string | null;
 };
 
@@ -47,14 +48,19 @@ export function resolveTeachingHelpContext(input: TeachingHelpContextInput): Res
   }
 
   let basis: TeachingHelpBasis;
+  const summary = input.packSummary?.trim() ?? '';
   if (chapterExcerpt.trim().length >= MIN_EXCERPT_CHARS) {
     basis = 'CHAPTER_TEXT';
+  } else if (summary.length >= MIN_EXCERPT_CHARS) {
+    basis = 'CHAPTER_TEXT';
+    chapterExcerpt = summary.slice(0, MAX_EXCERPT_CHARS);
+    missingNotes.push('Using chapter teaching summary from the library pack (full textbook text was short or missing).');
   } else if (input.objectives.length > 0) {
     basis = 'OBJECTIVES_ONLY';
-    if (input.chapterText?.trim()) {
+    if (input.chapterText?.trim() || summary) {
       missingNotes.push('Chapter excerpt too short; using lesson objectives only.');
     }
-    chapterExcerpt = '';
+    chapterExcerpt = summary.slice(0, MAX_EXCERPT_CHARS);
   } else {
     basis = 'UNAVAILABLE';
   }

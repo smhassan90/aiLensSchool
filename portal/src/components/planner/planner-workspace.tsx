@@ -40,12 +40,13 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
   const [moveDate, setMoveDate] = useState("");
   const [movePeriod, setMovePeriod] = useState("1");
 
-  const openTeachingHelp = (lesson: { lessonKey: string; title: string; chapterTitle?: string | null }) => {
+  const openTeachingHelp = (lesson: PlannerLesson) => {
     setHelpLesson({
       plannerId,
       versionId,
       lessonKey: lesson.lessonKey,
       title: lesson.title,
+      lessonKind: lesson.kind,
       chapterTitle: lesson.chapterTitle,
     });
     setHelpOpen(true);

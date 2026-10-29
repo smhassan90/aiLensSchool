@@ -19,6 +19,8 @@ import { gradeClassLabel } from '../common/utils/section-class-label';
 import { resolveTeachingHelpContext } from './teaching-help-context';
 import { TeachingHelpUsageService } from './teaching-help-usage';
 import { TeachingHelpGenerationError } from '../ai/teaching-help-errors';
+import { loadTeachingPacksByChapterIds } from '../library-books/chapter-teaching-pack-analysis.loader';
+import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
 
 const ADMIN_CONTENT_MESSAGE =
   'The source lesson content is not available yet. Please ask your school administrator to check the assigned textbook content.';
@@ -94,12 +96,20 @@ export class PlannerTeachingHelpService {
 
     const analysis = lesson.chapter?.analysis as PlannerChapterAnalysis | null;
     let chapterText: string | null = null;
+    let packSummary: string | null = null;
     if (lesson.chapter?.libraryBookChapterId) {
       try {
         const loaded = await this.content.loadChapterText(schoolId, lesson.chapter.libraryBookChapterId);
         chapterText = loaded.text;
       } catch {
         chapterText = null;
+      }
+      const packs = await loadTeachingPacksByChapterIds(this.prisma, [
+        lesson.chapter.libraryBookChapterId,
+      ]);
+      const pack = packs.get(lesson.chapter.libraryBookChapterId);
+      if (pack?.summary?.trim()) {
+        packSummary = fixLibraryTextEncoding(pack.summary);
       }
     }
 
@@ -112,6 +122,7 @@ export class PlannerTeachingHelpService {
       libraryBookChapterId: lesson.chapter?.libraryBookChapterId ?? null,
       analysis,
       chapterText,
+      packSummary,
       bookTitle: planner.libraryBook?.title ?? null,
     });
 

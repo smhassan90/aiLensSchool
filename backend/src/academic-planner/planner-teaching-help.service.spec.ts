@@ -98,6 +98,7 @@ describe('PlannerTeachingHelpService', () => {
     academicPlanner: { findFirst: jest.fn() },
     plannerLesson: { findFirst: jest.fn() },
     headTeacherSection: { findFirst: jest.fn() },
+    libraryChapterTeachingPack: { findMany: jest.fn().mockResolvedValue([]) },
   };
 
   beforeEach(async () => {

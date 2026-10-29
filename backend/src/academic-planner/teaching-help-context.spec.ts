@@ -12,6 +12,7 @@ describe('resolveTeachingHelpContext', () => {
       libraryBookChapterId: 'lib-1',
       analysis: null,
       chapterText: text,
+      packSummary: null,
       bookTitle: 'Book',
     });
     expect(result.basis).toBe('CHAPTER_TEXT');
@@ -28,10 +29,27 @@ describe('resolveTeachingHelpContext', () => {
       libraryBookChapterId: 'lib-1',
       analysis: null,
       chapterText: 'short',
+      packSummary: null,
       bookTitle: null,
     });
     expect(result.basis).toBe('OBJECTIVES_ONLY');
-    expect(result.chapterExcerpt).toBe('');
+  });
+
+  it('uses pack summary when chapter text is short', () => {
+    const result = resolveTeachingHelpContext({
+      lessonTitle: 'L1',
+      objectives: ['Read with class'],
+      portionKeys: ['role:intro'],
+      chapterTitle: 'Ch 1',
+      contentHash: 'h',
+      libraryBookChapterId: 'lib-1',
+      analysis: null,
+      chapterText: 'short',
+      packSummary: 'B'.repeat(200),
+      bookTitle: null,
+    });
+    expect(result.basis).toBe('CHAPTER_TEXT');
+    expect(result.excerptCharCount).toBeGreaterThanOrEqual(80);
   });
 
   it('is UNAVAILABLE without objectives or text', () => {
@@ -44,6 +62,7 @@ describe('resolveTeachingHelpContext', () => {
       libraryBookChapterId: null,
       analysis: null,
       chapterText: null,
+      packSummary: null,
       bookTitle: null,
     });
     expect(result.basis).toBe('UNAVAILABLE');

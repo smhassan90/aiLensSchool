@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,7 @@ export type TeachingHelpLessonContext = {
   versionId?: string;
   lessonKey: string;
   title: string;
+  lessonKind?: string;
   chapterTitle?: string | null;
   bookTitle?: string | null;
   classLabel?: string;
@@ -49,6 +50,20 @@ export function TeachingHelpDialog({ open, onOpenChange, lesson }: TeachingHelpD
   const [payload, setPayload] = useState<TeachingHelpPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !lesson) return;
+    const isActivity =
+      lesson.lessonKind === "ACTIVITY" || /activity|exercise/i.test(lesson.title);
+    setMode(isActivity ? "CLASSROOM_ACTIVITY" : "PREPARE_LESSON");
+    setQuestion(
+      isActivity
+        ? "Suggest a classroom activity that covers the main ideas from this chapter summary."
+        : "",
+    );
+    setPayload(null);
+    setError(null);
+  }, [open, lesson?.lessonKey, lesson?.lessonKind, lesson?.title]);
 
   const resetOnClose = useCallback(
     (next: boolean) => {

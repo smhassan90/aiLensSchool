@@ -72,7 +72,7 @@ export function PlannerDayLessonCard({
             </div>
           )}
 
-          {lesson.teacherNotes && (
+          {lesson.teacherNotes?.trim() ? (
             <div className="mt-3 rounded-lg border border-border/60 bg-background/80 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Steps in class
@@ -82,6 +82,13 @@ export function PlannerDayLessonCard({
                 {lesson.teacherNotes.length > 700 ? "…" : ""}
               </p>
             </div>
+          ) : (
+            onTeachingHelp && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Use <span className="font-medium text-foreground">Help me teach</span> for examples,
+                questions, and activities from the chapter summary.
+              </p>
+            )
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
