@@ -3,21 +3,28 @@ import { displayChapterTitle } from './day-plan-content-quality';
 
 export type ChapterDayRole = 'INTRO' | 'READING' | 'CONTINUE_READING' | 'EXERCISE' | 'ACTIVITY';
 
-/** Maps allocated teaching days for one chapter to intro → reading → exercise → activity. */
+/**
+ * One intro day, one activity day, and the days between split evenly:
+ * half reading, half exercise. An odd leftover day is a reading day.
+ */
 export function rolesForChapterDays(dayCount: number): ChapterDayRole[] {
   const n = Math.max(0, Math.floor(dayCount));
   if (n === 0) return [];
   if (n === 1) return ['INTRO'];
-  if (n === 2) return ['INTRO', 'READING'];
-  if (n === 3) return ['INTRO', 'READING', 'CONTINUE_READING'];
-  if (n === 4) return ['INTRO', 'READING', 'CONTINUE_READING', 'EXERCISE'];
+  if (n === 2) return ['INTRO', 'ACTIVITY'];
+
+  const rest = n - 2;
+  const readingCount = Math.ceil(rest / 2);
+  const exerciseCount = rest - readingCount;
 
   const roles: ChapterDayRole[] = ['INTRO'];
-  const readingSlots = n - 3;
-  for (let i = 0; i < readingSlots; i++) {
+  for (let i = 0; i < readingCount; i++) {
     roles.push(i === 0 ? 'READING' : 'CONTINUE_READING');
   }
-  roles.push('EXERCISE', 'ACTIVITY');
+  for (let i = 0; i < exerciseCount; i++) {
+    roles.push('EXERCISE');
+  }
+  roles.push('ACTIVITY');
   return roles;
 }
 
@@ -33,7 +40,7 @@ export function parseRoleFromPortionKey(tag: string): ChapterDayRole | null {
   if (tag === 'role:intro') return 'INTRO';
   if (tag.startsWith('role:reading')) return 'READING';
   if (tag.startsWith('role:continue')) return 'CONTINUE_READING';
-  if (tag === 'role:exercise') return 'EXERCISE';
+  if (tag === 'role:exercise' || tag.startsWith('role:exercise:')) return 'EXERCISE';
   if (tag === 'role:activity' || tag.startsWith('activity:')) return 'ACTIVITY';
   return null;
 }
@@ -42,7 +49,7 @@ export function rolePortionKey(role: ChapterDayRole, readingIndex: number): stri
   if (role === 'INTRO') return 'role:intro';
   if (role === 'READING') return `role:reading:${readingIndex}`;
   if (role === 'CONTINUE_READING') return `role:continue:${readingIndex}`;
-  if (role === 'EXERCISE') return 'role:exercise';
+  if (role === 'EXERCISE') return `role:exercise:${readingIndex}`;
   return 'role:activity';
 }
 
