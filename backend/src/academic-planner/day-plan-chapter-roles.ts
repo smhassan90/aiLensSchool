@@ -53,10 +53,30 @@ export function rolePortionKey(role: ChapterDayRole, readingIndex: number): stri
   return 'role:activity';
 }
 
+export function activityConductNotes(chapter: string, themes: string[]): string {
+  const named = themes.map((t) => t.replace(/\s+/g, ' ').trim()).filter((t) => t.length > 12).slice(0, 4);
+  const lines = [
+    `How to run this activity for ${chapter}:`,
+    '1. Make groups of 3 or 4. Every student speaks at least once.',
+  ];
+  if (named.length > 0) {
+    lines.push('2. Give each group one idea from this chapter:');
+    named.forEach((theme, index) => lines.push(`   ${index + 1}. ${theme}`));
+    lines.push('3. In about 8 minutes, each group prepares one real-life example for their idea.');
+  } else {
+    lines.push('2. Give each group one main idea you already taught in this chapter.');
+    lines.push('3. In about 8 minutes, each group prepares one real-life example.');
+  }
+  lines.push('4. Each group presents for about 2 minutes.');
+  lines.push('5. After each group, add one point they missed and ask one short question.');
+  return lines.join('\n');
+}
+
 export function buildMinimalDayPlan(input: {
   chapterTitle: string;
   role: ChapterDayRole;
   sectionHint?: string;
+  activityThemes?: string[];
 }): {
   objectives: string[];
   teacherNotes: string | null;
@@ -108,10 +128,8 @@ export function buildMinimalDayPlan(input: {
         titleSuffix: roleLabels.ACTIVITY,
         kind: PlannerLessonKind.ACTIVITY,
         primaryStage: LessonStage.ACTIVITY,
-        objectives: [
-          `Active recap for ${chapter}. Use Help me teach for a custom activity based on the chapter summary.`,
-        ],
-        teacherNotes: null,
+        objectives: [`Class activity: groups recall the main ideas of ${chapter} with a real-life example.`],
+        teacherNotes: activityConductNotes(chapter, input.activityThemes ?? []),
       };
   }
 }

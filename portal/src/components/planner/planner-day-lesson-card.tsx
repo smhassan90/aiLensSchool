@@ -4,7 +4,7 @@ import { Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fixDisplayText } from "@/lib/fix-display-text";
-import { shortTodayLine } from "@/lib/planner-day-line";
+import { activityConductText, shortTodayLine } from "@/lib/planner-day-line";
 import type { PlannerLesson } from "@/lib/planner-view-model";
 import { formatDate } from "@/lib/utils";
 
@@ -43,6 +43,11 @@ export function PlannerDayLessonCard({
             )}
           </div>
           <p className="text-sm leading-relaxed text-foreground">{fixDisplayText(shortTodayLine(lesson))}</p>
+          {activityConductText(lesson) && (
+            <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+              {fixDisplayText(activityConductText(lesson) ?? "")}
+            </p>
+          )}
         </div>
         {!readOnly && (
           <div className="flex shrink-0 flex-wrap gap-2">
