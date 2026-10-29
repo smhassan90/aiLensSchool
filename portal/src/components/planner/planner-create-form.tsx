@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -178,8 +179,10 @@ export function PlannerCreateForm() {
   }
 
   return (
+    <Card className="max-w-3xl">
+    <CardContent className="p-4 sm:p-6">
     <form
-      className="mx-auto max-w-lg space-y-4"
+      className="space-y-4"
       onSubmit={handleSubmit((values) => create.mutate(values))}
     >
       <div className="space-y-2">
@@ -342,9 +345,13 @@ export function PlannerCreateForm() {
         </pre>
       )}
 
-      <Button type="submit" disabled={create.isPending || !match}>
-        {create.isPending ? "Creating…" : "Create planner"}
-      </Button>
+      <div className="flex flex-wrap items-center gap-2 pt-2">
+        <Button type="submit" disabled={create.isPending || !match}>
+          {create.isPending ? "Creating…" : "Create planner"}
+        </Button>
+      </div>
     </form>
+    </CardContent>
+    </Card>
   );
 }

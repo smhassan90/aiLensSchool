@@ -33,7 +33,10 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
         aria-hidden
       />
       {/* No outer scroll — tall dialogs scroll inside DialogContent only (avoids blank space below). */}
-      <div className="relative z-50 flex max-h-full min-h-0 w-full justify-center overflow-hidden">
+      <div
+        className="relative z-50 flex max-h-full min-h-0 w-full justify-center overflow-hidden"
+        onClick={() => onOpenChange(false)}
+      >
         {children}
       </div>
     </div>
@@ -55,6 +58,7 @@ export function DialogContent({
         "relative w-full max-w-lg max-h-[min(92dvh,100%)] overflow-y-auto rounded-t-lg border bg-card p-4 shadow-lg sm:rounded-lg sm:p-6",
         className,
       )}
+      onClick={(e) => e.stopPropagation()}
     >
       {onClose && (
         <Button

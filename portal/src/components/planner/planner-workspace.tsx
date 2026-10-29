@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
@@ -16,6 +17,7 @@ import { PlannerApprovalActions } from "@/components/planner/planner-approval-ac
 import { PlannerRecoveryPanel } from "@/components/planner/planner-recovery-panel";
 import { LessonCard } from "@/components/planner/lesson-card";
 import { PlannerDayLessonCard } from "@/components/planner/planner-day-lesson-card";
+import { PlannerPrintSheet } from "@/components/planner/planner-print-sheet";
 import { PlannerLessonEditDialog } from "@/components/planner/planner-lesson-edit-dialog";
 import { TeachingHelpDialog, type TeachingHelpLessonContext } from "@/components/planner/teaching-help-dialog";
 import type { PlannerLesson } from "@/lib/planner-view-model";
@@ -28,9 +30,10 @@ type PlannerWorkspaceProps = {
   plannerId: string;
   versionId: string;
   readOnly?: boolean;
+  listHref?: string;
 };
 
-export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWorkspaceProps) {
+export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: PlannerWorkspaceProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [helpLesson, setHelpLesson] = useState<TeachingHelpLessonContext | null>(null);
@@ -178,15 +181,41 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
     return da - db;
   });
 
+  const chapterTitle = (chapterKey: string | null) => {
+    if (!chapterKey) return null;
+    const chapter = data.chapters.find((c) => String(c.chapterKey) === chapterKey);
+    return chapter ? String(chapter.title) : null;
+  };
+  const plannerTitle = data.planner.title || `${data.planner.classLabel} — ${data.planner.subject.name}`;
+
   return (
     <div className="space-y-6">
+      <PlannerPrintSheet
+        title={plannerTitle}
+        subtitle={`${data.planner.classLabel} · ${data.planner.subject.name} · Exam ${formatDate(data.planner.examDate)}`}
+        lessons={dayPlanLessons}
+        chapterTitle={chapterTitle}
+      />
+      <div className="print:hidden space-y-6">
       <PageHeader
-        title={data.planner.title || `${data.planner.classLabel} — ${data.planner.subject.name}`}
+        title={plannerTitle}
         description={`${data.planner.teacher.name} · ${formatStatusLabel(data.planner.examType)} · Exam ${formatDate(data.planner.examDate)}${readOnly ? " · View only" : ""}`}
         actions={
-          <Badge variant="secondary">
-            v{data.version.versionNumber} · {formatStatusLabel(data.version.status)}
-          </Badge>
+          <>
+            {listHref && (
+              <Link href={listHref}>
+                <Button type="button" variant="outline" size="sm">
+                  All planners
+                </Button>
+              </Link>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={() => window.print()}>
+              Print
+            </Button>
+            <Badge variant="secondary">
+              v{data.version.versionNumber} · {formatStatusLabel(data.version.status)}
+            </Badge>
+          </>
         }
       />
 
@@ -220,8 +249,9 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
               generation).
             </p>
           )}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
           <Button
+            size="sm"
             type="button"
             variant="outline"
             disabled={analyzeAll.isPending || !data.chapters.length}
@@ -231,6 +261,7 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
           </Button>
           <Button
             type="button"
+            size="sm"
             disabled={generate.isPending}
             onClick={() => generate.mutate()}
           >
@@ -254,7 +285,7 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
               Generate the schedule to see Day 1, Day 2, … with teaching steps and activity days.
             </p>
           ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-3">
               {dayPlanLessons.map((lesson) => (
                 <PlannerDayLessonCard
                   key={lesson.lessonKey}
@@ -449,6 +480,7 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly }: PlannerWork
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

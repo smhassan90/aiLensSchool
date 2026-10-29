@@ -13,6 +13,7 @@ import {
 } from '../schemas/teaching-help.schema';
 import { TEACHING_HELP_PROMPT_VERSION } from '../prompts';
 import { TeachingHelpGenerationError } from '../teaching-help-errors';
+import { heuristicTeachingHelp } from '../../academic-planner/teaching-help-heuristic';
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -177,14 +178,32 @@ export class TeachingHelpService {
       this.cache.set(cacheKey, result, CACHE_TTL_MS);
       return result;
     } catch (err) {
-      if (err instanceof TeachingHelpGenerationError) {
+      if (err instanceof TeachingHelpGenerationError && err.code === 'TEACHING_HELP_UNAVAILABLE') {
         throw err;
       }
       await failRequest(err instanceof Error ? err.message : 'AI failed');
-      throw new TeachingHelpGenerationError(
-        'TEACHING_HELP_PROVIDER_ERROR',
-        'Teaching assistance is temporarily unavailable. Please try again shortly.',
+      const assistance = TeachingHelpOutputSchema.parse(
+        heuristicTeachingHelp({
+          lessonTitle: input.lessonTitle,
+          chapterTitle: input.chapterTitle,
+          classLabel: input.classLabel,
+          subjectName: input.subjectName,
+          objectives: input.objectives,
+          bookTitle: input.bookTitle,
+          mode: input.mode,
+          chapterExcerpt: input.chapterExcerpt,
+        }),
       );
+      return {
+        assistance,
+        basis: input.basis,
+        aiGenerated: false,
+        cached: false,
+        promptVersion: TEACHING_HELP_PROMPT_VERSION,
+        mode: input.mode,
+        provider: 'heuristic-fallback',
+        model: 'heuristic',
+      };
     }
   }
 

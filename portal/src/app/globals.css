@@ -222,3 +222,10 @@
   animation: chapter-page-reading-ring 1.35s ease-in-out infinite;
   border-color: hsl(var(--primary) / 0.45) !important;
 }
+
+@media print {
+  main {
+    overflow: visible !important;
+    height: auto !important;
+  }
+}

@@ -18,7 +18,7 @@ export default function TeacherPlannerListPage() {
   });
 
   return (
-    <div>
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Planners"
         description="All your academic planners. Open one to analyze chapters, generate the schedule, or get teaching help."

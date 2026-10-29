@@ -62,6 +62,7 @@ export function PlannersList({ planners, plannerHref, allowDelete = true }: Plan
 
   return (
     <>
+      <div className="overflow-hidden rounded-lg border bg-card">
       <Table>
         <TableHeader>
           <TableRow>
@@ -107,6 +108,7 @@ export function PlannersList({ planners, plannerHref, allowDelete = true }: Plan
           ))}
         </TableBody>
       </Table>
+      </div>
 
       <Dialog open={pendingDelete != null} onOpenChange={(open) => !open && setPendingDelete(null)}>
         <DialogContent>

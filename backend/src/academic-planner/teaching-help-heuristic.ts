@@ -1,6 +1,16 @@
 import { TeachingHelpOutput } from '../ai/schemas/teaching-help.schema';
 
 /** Dev-only template when no AI provider key is configured — not content-grounded. */
+function ideasFromExcerpt(excerpt: string | undefined): string[] {
+  if (!excerpt?.trim()) return [];
+  return excerpt
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((s) => s.replace(/\s+/g, ' ').trim())
+    .filter((s) => s.length >= 40 && s.length <= 240)
+    .filter((s) => !/indexed section|listed on|is titled .+ and is organized|page hunt/i.test(s))
+    .slice(0, 5);
+}
+
 export function heuristicTeachingHelp(input: {
   lessonTitle: string;
   chapterTitle: string;
@@ -8,21 +18,37 @@ export function heuristicTeachingHelp(input: {
   subjectName: string;
   objectives: string[];
   bookTitle?: string | null;
+  mode?: string;
+  chapterExcerpt?: string;
 }): TeachingHelpOutput {
   const sourceLabel = input.bookTitle
     ? `${input.bookTitle} — ${input.chapterTitle}`
     : input.chapterTitle;
+  const ideas = ideasFromExcerpt(input.chapterExcerpt);
   const objectives =
     input.objectives.length > 0
-      ? input.objectives
-      : [`Understand the main ideas in "${input.lessonTitle}".`];
+      ? input.objectives.slice(0, 4)
+      : ideas.length > 0
+        ? ideas.slice(0, 3)
+        : [`Understand the main ideas in "${input.lessonTitle}".`];
+  const activitySteps =
+    ideas.length > 0
+      ? ideas.map((idea, i) => `Station ${i + 1}: students explain “${idea.slice(0, 140)}” with one real-life example.`)
+      : [
+          'Groups each take one main idea from the chapter.',
+          'Each group gives one real-life example.',
+          'Groups present in two minutes. The teacher fills any gap.',
+        ];
+  const isActivity = input.mode === 'CLASSROOM_ACTIVITY';
 
   return {
     overview: {
       subject: input.subjectName,
       classLabel: input.classLabel,
       lessonTitle: input.lessonTitle,
-      teachingOverview: `This session introduces "${input.lessonTitle}" from ${input.chapterTitle} for ${input.classLabel}. Focus on clear explanations and short checks for understanding. (Template — configure an AI provider for content-grounded suggestions.)`,
+      teachingOverview: isActivity
+        ? `Class activity for ${input.chapterTitle}. Students recall the main ideas and connect each one to real life.`
+        : `Teach "${input.lessonTitle}" from ${input.chapterTitle}. ${ideas[0] ? ideas[0].slice(0, 180) : 'Use the textbook and check understanding with short questions.'}`,
       estimatedDurationMinutes: null,
       durationIsSuggestion: true,
     },
@@ -53,10 +79,10 @@ export function heuristicTeachingHelp(input: {
         'Where might you use this outside class?',
       ],
       activity: {
-        title: 'Pair share',
-        materials: 'Notebook and pencil for each pair.',
-        steps: ['Pairs answer one guided prompt.', 'Share responses with the class.', 'Clarify misconceptions.'],
-        minutes: 10,
+        title: isActivity ? `Recall activity: ${input.chapterTitle}` : 'Pair share',
+        materials: 'Textbook, notebook, and one sheet per group.',
+        steps: isActivity ? activitySteps : activitySteps.slice(0, 3),
+        minutes: isActivity ? 35 : 10,
       },
       recap: 'Summarize the main idea and preview what comes next.',
     },

@@ -30,9 +30,9 @@ export default function SchoolPlannerWorkspacePage() {
 
   if (!versionId) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 p-4 sm:p-6 lg:p-8">
         <Link href="/school/planner">
-          <Button type="button" variant="outline">Back to list</Button>
+          <Button type="button" variant="outline" size="sm">Back to list</Button>
         </Link>
         <EmptyState
           title="Version required"
@@ -43,11 +43,8 @@ export default function SchoolPlannerWorkspacePage() {
   }
 
   return (
-    <div className="space-y-4">
-      <Link href="/school/planner">
-        <Button type="button" variant="outline" size="sm">All planners</Button>
-      </Link>
-      <PlannerWorkspace plannerId={plannerId} versionId={versionId} />
+    <div className="p-4 sm:p-6 lg:p-8">
+      <PlannerWorkspace plannerId={plannerId} versionId={versionId} listHref="/school/planner" />
     </div>
   );
 }

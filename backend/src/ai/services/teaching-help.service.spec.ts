@@ -276,7 +276,7 @@ describe('TeachingHelpService', () => {
 
 
 
-  it('throws on invalid AI output when provider is real', async () => {
+  it('falls back to a usable plan when AI output is invalid', async () => {
 
     ai.generateTeachingHelp.mockResolvedValue({
 
@@ -294,7 +294,11 @@ describe('TeachingHelpService', () => {
 
     });
 
-    await expect(service.generate(baseInput)).rejects.toBeInstanceOf(TeachingHelpGenerationError);
+    const result = await service.generate(baseInput);
+
+    expect(result.aiGenerated).toBe(false);
+
+    expect(result.assistance.classroomDelivery.activity?.steps.length).toBeGreaterThan(0);
 
   });
 

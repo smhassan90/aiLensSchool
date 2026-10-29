@@ -21,7 +21,7 @@ export default function SchoolPlannerListPage() {
   });
 
   return (
-    <div>
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Planners"
         description="All academic planners in your school. Click a row to open the workspace."

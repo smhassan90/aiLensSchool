@@ -7,7 +7,7 @@ import { PlannerCreateForm } from "@/components/planner/planner-create-form";
 
 export default function TeacherPlannerNewPage() {
   return (
-    <div>
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="New academic planner"
         description="Choose class, exam date, and library chapters. Analysis and scheduling come next in the workspace."

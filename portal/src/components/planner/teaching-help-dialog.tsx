@@ -78,6 +78,15 @@ export function TeachingHelpDialog({ open, onOpenChange, lesson }: TeachingHelpD
     [onOpenChange],
   );
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") resetOnClose(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, resetOnClose]);
+
   const generate = async () => {
     if (!lesson || loading) return;
     setLoading(true);
@@ -116,8 +125,8 @@ export function TeachingHelpDialog({ open, onOpenChange, lesson }: TeachingHelpD
 
   return (
     <Dialog open={open} onOpenChange={resetOnClose}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto" onClose={() => resetOnClose(false)}>
+        <DialogHeader className="pr-8">
           <DialogTitle>Help me teach</DialogTitle>
           {lesson && (
             <p className="text-sm text-muted-foreground">
@@ -162,9 +171,14 @@ export function TeachingHelpDialog({ open, onOpenChange, lesson }: TeachingHelpD
                 placeholder="e.g. How can I explain this with a real-life example?"
               />
             </div>
-            <Button type="button" className="w-full" disabled={loading} onClick={() => void generate()}>
-              {loading ? "Generating…" : payload ? "Regenerate" : "Generate"}
-            </Button>
+            <div className="flex gap-2">
+              <Button type="button" className="flex-1" disabled={loading} onClick={() => void generate()}>
+                {loading ? "Generating…" : payload ? "Regenerate" : "Generate"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => resetOnClose(false)}>
+                Close
+              </Button>
+            </div>
           </div>
         )}
 
