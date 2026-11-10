@@ -1064,16 +1064,18 @@ model HeadTeacherSection {
 }
 
 model Subject {
-  id        String   @id @default(uuid())
-  schoolId  String   @map("school_id")
-  gradeId   String?  @map("grade_id")
-  name      String
-  code      String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id              String   @id @default(uuid())
+  schoolId        String   @map("school_id")
+  gradeId         String?  @map("grade_id")
+  libraryBookId   String?  @map("library_book_id")
+  name            String
+  code            String
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   school               School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   grade                Grade?                @relation(fields: [gradeId], references: [id])
+  libraryBook          LibraryBook?          @relation(fields: [libraryBookId], references: [id], onDelete: SetNull)
   teacherSubjects      TeacherSubject[]
   classSubjects        ClassSubject[]
   curricula            Curriculum[]
@@ -1092,6 +1094,7 @@ model Subject {
   @@unique([schoolId, code])
   @@index([schoolId])
   @@index([gradeId])
+  @@index([libraryBookId])
   @@map("subjects")
 }
 
@@ -1285,6 +1288,7 @@ model LibraryBook {
   chapters         LibraryBookChapter[]
   grants           LibraryBookGrant[]
   academicPlanners AcademicPlanner[]
+  subjectAssignments Subject[]
 
   @@index([createdBySchoolId])
   @@map("library_books")

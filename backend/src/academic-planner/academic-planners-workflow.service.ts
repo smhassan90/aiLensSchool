@@ -124,7 +124,10 @@ export class AcademicPlannersWorkflowService {
     if (!section) {
       throw new NotFoundException({ code: 'SECTION_NOT_FOUND', message: 'Section not found' });
     }
-    const subject = await this.prisma.subject.findFirst({ where: { id: subjectId, schoolId } });
+    const subject = await this.prisma.subject.findFirst({
+      where: { id: subjectId, schoolId },
+      select: { id: true, name: true, libraryBookId: true },
+    });
     if (!subject) {
       throw new NotFoundException({ code: 'SUBJECT_NOT_FOUND', message: 'Subject not found' });
     }
@@ -210,10 +213,16 @@ export class AcademicPlannersWorkflowService {
       return { book, score };
     });
     const bestScore = scoredBooks.reduce((max, row) => Math.max(max, row.score), 0);
-    const grantedBooks = scoredBooks.map(({ book, score }) => ({
-      ...book,
-      suggested: score > 0 && score === bestScore,
-    }));
+    const assignedBookId = subject.libraryBookId;
+    const grantedBooks = scoredBooks.map(({ book, score }) => {
+      const schoolPick = assignedBookId != null && book.id === assignedBookId;
+      const heuristicPick =
+        assignedBookId == null && score > 0 && score === bestScore;
+      return {
+        ...book,
+        suggested: schoolPick || heuristicPick,
+      };
+    });
 
     const examConfigs = year
       ? await this.prisma.examConfig.findMany({

@@ -10,6 +10,7 @@ import {
   CreateGradeDto,
   CreateSchoolStageDto,
   CreateSectionDto,
+  AssignSubjectTextbookDto,
   CreateSubjectDto,
   UpdateGradeDto,
   UpdateSchoolStageDto,
@@ -175,6 +176,24 @@ export class AcademicsController {
   @Get('subjects')
   listSubjects(@Query() query: SubjectQueryDto, @CurrentUser() user: AuthUser) {
     return this.academicsService.listSubjects(user, query);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_CLASSES')
+  @Get('grades/:gradeId/textbooks')
+  getGradeTextbooks(@Param('gradeId') gradeId: string, @CurrentUser() user: AuthUser) {
+    return this.academicsService.getGradeTextbookAssignments(gradeId, user);
+  }
+
+  @Roles(RoleName.SCHOOL_ADMIN)
+  @RequirePermission('MANAGE_CLASSES')
+  @Patch('subjects/:id/textbook')
+  assignSubjectTextbook(
+    @Param('id') id: string,
+    @Body() dto: AssignSubjectTextbookDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.academicsService.assignSubjectTextbook(id, dto, user);
   }
 
   @Roles(RoleName.SCHOOL_ADMIN)
@@ -459,8 +478,12 @@ export class AcademicsController {
 
   @Roles(RoleName.SCHOOL_ADMIN, RoleName.TEACHER)
   @Get('timetable')
-  listTimetable(@Query('gradeId') gradeId: string | undefined, @CurrentUser() user: AuthUser) {
-    return this.academicsService.listTimetable(user, gradeId);
+  listTimetable(
+    @Query('gradeId') gradeId: string | undefined,
+    @Query('sectionId') sectionId: string | undefined,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.academicsService.listTimetable(user, gradeId, sectionId);
   }
 }
 

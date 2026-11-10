@@ -92,7 +92,7 @@ export default function SubjectsPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Subjects"
-        description="Subjects and the textbooks used in each class"
+        description="Subjects per class. To choose library books, use Setup → Class textbooks."
         actions={
           <Button onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4" />

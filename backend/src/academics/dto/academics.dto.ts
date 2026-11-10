@@ -189,6 +189,15 @@ export class CreateSectionDto {
   classTeacherId?: string;
 }
 
+export class AssignSubjectTextbookDto {
+  @ApiPropertyOptional({
+    description: 'Shared library book id for this subject, or omit/empty to clear',
+  })
+  @IsOptional()
+  @IsString()
+  libraryBookId?: string;
+}
+
 export class CreateSubjectDto {
   @ApiProperty()
   @IsString()

@@ -11,6 +11,38 @@ import type {
   Subject,
 } from "@/lib/types";
 
+export type GrantedLibraryBookBrief = {
+  id: string;
+  title: string;
+  classLabel: string;
+  subjectLabel: string;
+  language: string;
+};
+
+export type SubjectTextbookRow = {
+  id: string;
+  name: string;
+  code: string;
+  gradeId: string | null;
+  libraryBook: {
+    id: string;
+    title: string;
+    classLabel: string;
+    subjectLabel: string;
+    publisher: string;
+  } | null;
+};
+
+export type GradeTextbookSetup = {
+  grade: { id: string; name: string; level: number };
+  subjects: Array<
+    SubjectTextbookRow & {
+      libraryBookId: string | null;
+    }
+  >;
+  grantedBooks: GrantedLibraryBookBrief[];
+};
+
 export type ExamPaperSubmissionPaper = Quiz & {
   teacherName?: string;
   teacherGender?: string | null;
@@ -213,6 +245,17 @@ export const academicsService = {
     return apiClient<Subject>("/academics/subjects", {
       method: "POST",
       body: JSON.stringify(payload),
+    });
+  },
+
+  getGradeTextbooks(gradeId: string) {
+    return apiClient<GradeTextbookSetup>(`/academics/grades/${gradeId}/textbooks`);
+  },
+
+  assignSubjectTextbook(subjectId: string, libraryBookId: string | null) {
+    return apiClient<SubjectTextbookRow>(`/academics/subjects/${subjectId}/textbook`, {
+      method: "PATCH",
+      body: JSON.stringify({ libraryBookId: libraryBookId ?? "" }),
     });
   },
 
@@ -483,10 +526,14 @@ export const academicsService = {
     );
   },
 
-  listTimetable(gradeId?: string) {
+  listTimetable(gradeId?: string, sectionId?: string) {
     return apiClient<{
       academicYear: { id: string; name: string } | null;
       grades?: Array<{ id: string; name: string }>;
+      sections?: Array<{ id: string; name: string; classLabel?: string }>;
+      sectionId?: string | null;
+      versionId?: string | null;
+      source?: string | null;
       grade: {
         id: string;
         name: string;
@@ -513,7 +560,7 @@ export const academicsService = {
         subject?: { id: string; name: string } | null;
         teacher?: { id: string; user: { firstName: string; lastName: string } } | null;
       }>;
-    }>(`/academics/timetable${buildQuery({ gradeId })}`);
+    }>(`/academics/timetable${buildQuery({ gradeId, sectionId })}`);
   },
 
   listQuizTargets() {

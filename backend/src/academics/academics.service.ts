@@ -19,6 +19,7 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { PaginationDto, pageQuery, paginate } from '../common/dto/pagination.dto';
 import {
   AssignClassSubjectDto,
+  AssignSubjectTextbookDto,
   CreateAcademicYearDto,
   CreateEnrollmentDto,
   CreateGradeDto,
@@ -28,6 +29,7 @@ import {
   UpdateGradeDto,
   UpdateSchoolStageDto,
 } from './dto/academics.dto';
+import { LibraryBooksService } from '../library-books/library-books.service';
 import { examsForPattern, normalizeExamPapers } from './exam-patterns';
 import { positiveAmount, syncClassFeeStructures } from '../fees/class-fees';
 import { EXAM_PAPER_KINDS } from '../quizzes/exam-paper';
@@ -41,6 +43,7 @@ import {
   canAccessExamPaperAssignment,
   resolveHeadTeacherSectionIds,
 } from '../head-teachers/head-teacher-sections';
+import { TimetableResolverService } from '../timetables/timetable-resolver.service';
 
 @Injectable()
 export class AcademicsService {
@@ -48,6 +51,8 @@ export class AcademicsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly tenant: TenantService,
+    private readonly timetableResolver: TimetableResolverService,
+    private readonly libraryBooks: LibraryBooksService,
   ) {}
 
   async createAcademicYear(dto: CreateAcademicYearDto, user: AuthUser) {
@@ -679,6 +684,103 @@ export class AcademicsService {
     return paginate(items, total, page, limit);
   }
 
+  async getGradeTextbookAssignments(gradeId: string, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const grade = await this.prisma.grade.findFirst({
+      where: { id: gradeId, schoolId },
+      select: { id: true, name: true, level: true },
+    });
+    if (!grade) {
+      throw new NotFoundException({ code: 'GRADE_NOT_FOUND', message: 'Class not found' });
+    }
+
+    const year = await this.currentAcademicYear(schoolId);
+    const subjectScope: Prisma.SubjectWhereInput[] = [{ gradeId }];
+    if (year) {
+      subjectScope.push({
+        classSubjects: { some: { section: { gradeId }, academicYearId: year.id } },
+      });
+    }
+    const subjects = await this.prisma.subject.findMany({
+      where: {
+        schoolId,
+        OR: subjectScope,
+      },
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        gradeId: true,
+        libraryBookId: true,
+        libraryBook: {
+          select: { id: true, title: true, classLabel: true, subjectLabel: true, publisher: true },
+        },
+      },
+    });
+
+    const grantedBooks = await this.libraryBooks.listGrantedBooksForSchool(schoolId);
+    const deduped = new Map<string, (typeof subjects)[number]>();
+    for (const row of subjects) {
+      deduped.set(row.id, row);
+    }
+
+    return {
+      grade,
+      subjects: [...deduped.values()],
+      grantedBooks,
+    };
+  }
+
+  async assignSubjectTextbook(subjectId: string, dto: AssignSubjectTextbookDto, user: AuthUser) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const subject = await this.prisma.subject.findFirst({
+      where: { id: subjectId, schoolId },
+      select: { id: true, name: true, gradeId: true, libraryBookId: true },
+    });
+    if (!subject) {
+      throw new NotFoundException({ code: 'SUBJECT_NOT_FOUND', message: 'Subject not found' });
+    }
+
+    const nextId = dto.libraryBookId?.trim() || null;
+    if (nextId) {
+      const grant = await this.prisma.libraryBookGrant.findFirst({
+        where: { schoolId, bookId: nextId, canRead: true },
+        include: { book: { select: { id: true, title: true } } },
+      });
+      if (!grant) {
+        throw new BadRequestException({
+          code: 'BOOK_NOT_GRANTED',
+          message: 'That library book is not shared with your school. Ask the super admin to grant it first.',
+        });
+      }
+    }
+
+    const updated = await this.prisma.subject.update({
+      where: { id: subjectId },
+      data: { libraryBookId: nextId },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        gradeId: true,
+        libraryBook: {
+          select: { id: true, title: true, classLabel: true, subjectLabel: true, publisher: true },
+        },
+      },
+    });
+
+    await this.audit.log({
+      actorUserId: user.id,
+      schoolId,
+      action: nextId ? 'SUBJECT_TEXTBOOK_ASSIGNED' : 'SUBJECT_TEXTBOOK_CLEARED',
+      entityType: 'Subject',
+      entityId: subjectId,
+    });
+
+    return updated;
+  }
+
   async createEnrollment(dto: CreateEnrollmentDto, user: AuthUser) {
     const schoolId = this.tenant.requireSchoolId(user);
     const student = await this.prisma.student.findFirst({
@@ -1267,7 +1369,7 @@ export class AcademicsService {
     });
   }
 
-  async listTimetable(user: AuthUser, gradeId?: string) {
+  async listTimetable(user: AuthUser, gradeId?: string, sectionId?: string) {
     const schoolId = this.tenant.requireSchoolId(user);
     const year = await this.prisma.academicYear.findFirst({
       where: { schoolId, isCurrent: true },
@@ -1292,7 +1394,6 @@ export class AcademicsService {
         stage: { select: { id: true, name: true } },
         sections: {
           orderBy: { name: 'asc' },
-          take: 1,
           include: {
             classTeacher: { select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } } },
             classSubjects: {
@@ -1311,7 +1412,10 @@ export class AcademicsService {
     if (!grade) {
       throw new NotFoundException({ code: 'GRADE_NOT_FOUND', message: 'Class not found' });
     }
-    const section = grade.sections[0];
+
+    const sections = grade.sections.map((s) => ({ id: s.id, name: s.name }));
+    const section =
+      (sectionId ? grade.sections.find((s) => s.id === sectionId) : grade.sections[0]) ?? null;
     if (!section) {
       return {
         academicYear: { id: year.id, name: year.name },
@@ -1322,24 +1426,32 @@ export class AcademicsService {
           stage: grade.stage,
         },
         section: null,
+        sectionId: null,
+        versionId: null,
+        source: 'NONE' as const,
+        sections,
         pattern: grade.hasPeriodTimetable ? 'WEEKLY' : 'CLASS_TEACHER',
         subjects: [],
         slots: [],
       };
     }
 
-    const slots = grade.hasPeriodTimetable
-      ? await this.prisma.timetableSlot.findMany({
-          where: { sectionId: section.id, academicYearId: year.id },
-          orderBy: [{ periodNumber: 'asc' }, { weekday: 'asc' }],
-          include: {
-            subject: { select: { id: true, name: true } },
-            teacher: {
-              select: { id: true, gender: true, user: { select: { firstName: true, lastName: true } } },
-            },
-          },
-        })
-      : [];
+    const asOf = new Date().toISOString().slice(0, 10);
+    let slots: Awaited<ReturnType<TimetableResolverService['weeklyGridSlots']>>['slots'] = [];
+    let source: 'VERSIONED' | 'LEGACY' | 'NONE' = 'NONE';
+    let versionId: string | null = null;
+
+    if (grade.hasPeriodTimetable) {
+      const resolved = await this.timetableResolver.weeklyGridSlots(
+        schoolId,
+        section.id,
+        year.id,
+        asOf,
+      );
+      slots = resolved.slots;
+      source = resolved.source;
+      versionId = resolved.versionId;
+    }
 
     return {
       academicYear: { id: year.id, name: year.name },
@@ -1354,6 +1466,10 @@ export class AcademicsService {
         name: section.name,
         classTeacher: section.classTeacher,
       },
+      sectionId: section.id,
+      versionId,
+      source,
+      sections,
       pattern: grade.hasPeriodTimetable ? 'WEEKLY' : 'CLASS_TEACHER',
       subjects: section.classSubjects.map((row) => ({
         id: row.subject.id,

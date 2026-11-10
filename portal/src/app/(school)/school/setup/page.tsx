@@ -77,6 +77,13 @@ const setupSections: SetupSection[] = [
         permission: "MANAGE_CLASSES",
       },
       {
+        href: "/school/setup/textbooks",
+        title: "Class textbooks",
+        description: "Pick the library book for each subject when several titles exist (e.g. English Book 1 vs Book 2)",
+        icon: BookOpen,
+        permission: "MANAGE_CLASSES",
+      },
+      {
         href: "/school/timetable",
         title: "Timetable",
         description: "Weekly periods and who teaches each class",
