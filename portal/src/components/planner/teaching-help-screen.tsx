@@ -183,6 +183,17 @@ export function TeachingHelpScreen({ lesson, onBack }: TeachingHelpScreenProps) 
             )}
           </section>
 
+          {help.teacherExplanation.examples.length > 0 && (
+            <section className="space-y-2 rounded-lg border bg-muted/30 p-4">
+              <p className="font-medium">Example you can use</p>
+              <ul className="list-disc space-y-1 pl-5">
+                {help.teacherExplanation.examples.map((example, index) => (
+                  <li key={index}>{text(example)}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {help.classroomDelivery.activity && (
             <section className="space-y-2 rounded-lg border p-4">
               <p className="font-medium">
@@ -259,13 +270,6 @@ export function TeachingHelpScreen({ lesson, onBack }: TeachingHelpScreenProps) 
                 <ul className="list-disc pl-5">
                   {help.learningObjectives.map((objective, index) => (
                     <li key={index}>{text(objective)}</li>
-                  ))}
-                </ul>
-              )}
-              {help.teacherExplanation.examples.length > 0 && (
-                <ul className="list-disc pl-5">
-                  {help.teacherExplanation.examples.map((example, index) => (
-                    <li key={index}>{text(example)}</li>
                   ))}
                 </ul>
               )}

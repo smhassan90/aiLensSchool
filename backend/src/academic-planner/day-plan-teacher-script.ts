@@ -287,6 +287,7 @@ export function buildChapterRecapActivity(input: {
     ],
     teacherNotes: [
       style.name,
+      ...style.example(ideas).map((line) => `Example: ${line}`),
       ...style.steps(ideas).map((step, index) => `${index + 1}. ${step}`),
       `Closing question: ${closing}`,
     ].join('\n'),

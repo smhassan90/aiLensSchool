@@ -51,10 +51,10 @@ export function heuristicTeachingHelp(input: {
     },
     learningObjectives: [style.goal],
     teacherExplanation: {
-      simpleExplanation: `Say it once, slowly: ${focus}. Ask one student to repeat it without reading the board.`,
+      simpleExplanation: `Say it once, slowly: ${focus}. Then give the class example so they can hear what it sounds like.`,
       stepByStep: isActivity ? steps : steps.slice(0, 3),
       terminology: [],
-      examples: ideas[1] ? [`Connect it to this as well: ${ideas[1]}.`] : [`Stay with this one idea: ${focus}.`],
+      examples: style.example(ideas),
     },
     classroomDelivery: {
       warmUp: `Ask who has met this before: ${focus}.`,

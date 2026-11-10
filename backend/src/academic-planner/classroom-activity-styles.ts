@@ -6,10 +6,134 @@ export type ActivityStyle = {
   materials: string;
   minutes: number;
   steps: (ideas: string[]) => string[];
+  /** Worked classroom script a teacher can copy: board line + student line. */
+  example: (ideas: string[]) => string[];
 };
 
 function ideaOr(ideas: string[], fallback: string): string {
   return ideas[0] ?? fallback;
+}
+
+function clipExample(text: string, max = 480): string {
+  const compact = text.replace(/\s+/g, ' ').trim();
+  if (compact.length <= max) return compact;
+  const cut = compact.slice(0, max);
+  const lastStop = Math.max(cut.lastIndexOf('.'), cut.lastIndexOf('!'), cut.lastIndexOf('?'));
+  return lastStop > 80 ? cut.slice(0, lastStop + 1) : `${cut.slice(0, max - 1).trimEnd()}.`;
+}
+
+/** Everyday classroom pair (do this / skip this) so the teacher has something to say. */
+export function classroomHook(idea: string): { doThis: string; skipThis: string } {
+  const t = idea.toLowerCase();
+  if (/helmet|seat.?belt|traffic|road accident|over-speed/.test(t)) {
+    return {
+      doThis: 'Put the helmet on before the motorcycle leaves the gate, even for a short ride',
+      skipThis: 'Skip the helmet because the shop is nearby',
+    };
+  }
+  if (/read|narrative|prior knowledge|pre-reading|question/.test(t)) {
+    return {
+      doThis: 'Ask “Have you ever waited for a late van?” then open the story',
+      skipThis: 'Start on line one with a silent class',
+    };
+  }
+  if (/debate|motion|rebuttal/.test(t)) {
+    return {
+      doThis: 'Two sides, a clear motion, and a judge who lets each speaker finish',
+      skipThis: 'Everyone shouts at once with no motion',
+    };
+  }
+  if (/relative pronoun|who, whom|clause/.test(t)) {
+    return {
+      doThis: '“The girl who missed the van waited at the gate.”',
+      skipThis: '“The girl which missed the van.”',
+    };
+  }
+  if (/fraction|numerator|denominator/.test(t)) {
+    return {
+      doThis: 'Share one roti equally among four — each piece is 1/4',
+      skipThis: 'Break it into uneven pieces and still call them equal',
+    };
+  }
+  if (/photosynth|chlorophyll|leaf/.test(t)) {
+    return {
+      doThis: 'A green leaf in sunlight makes food; a leaf in a closed drawer does not',
+      skipThis: 'A plant in a dark cupboard still grows the same',
+    };
+  }
+  return {
+    doThis: `Do what this idea asks: ${idea}`,
+    skipThis: 'Skip it and hope it will be fine',
+  };
+}
+
+export function workedClassroomExamples(ideas: string[], kind: string): string[] {
+  const idea = ideaOr(ideas, 'the idea from today’s lesson');
+  const { doThis, skipThis } = classroomHook(idea);
+  switch (kind) {
+    case 'teach-back':
+      return [
+        clipExample(`You say: “${idea}.” Then model it: ${doThis}.`),
+        clipExample(
+          `Good 60-second teach-back: they restate the idea and use this moment — ${doThis}. Weak: “It is important” or “${skipThis}.” Ask for the example.`,
+        ),
+      ];
+    case 'two-choices':
+      return [
+        clipExample(`Board A (skip): ${skipThis}. Board B (do): ${doThis}. Idea: ${idea}.`),
+        clipExample('Good reason for B names the idea. Weak: “B looks better.” Ask which choice uses the idea.'),
+      ];
+    case 'correct':
+      return [
+        clipExample(`You write (wrong): “${skipThis}.” Correct line you want: “${idea}.”`),
+        clipExample(`Good student fix: “${doThis}.” Weak: “The book is important.” Ask them to name the mistake.`),
+      ];
+    case 'sketch':
+      return [
+        clipExample(`You sketch first: ${doThis}. Label the part that matches: ${idea}.`),
+        clipExample(`Good labels name that moment. Weak: they copy the chapter title. Ask them to label ${doThis}.`),
+      ];
+    case 'scene':
+      return [
+        clipExample(`Scene stops before anyone does this: ${doThis}. Idea they must use: ${idea}.`),
+        clipExample(`Good ending: a character does ${doThis}. Weak ending: they ignore it and ${skipThis}.`),
+      ];
+    case 'sprint':
+      return [
+        clipExample(`Prompt 1 (true): “${idea}.” Sample: ${doThis}.`),
+        clipExample(`Prompt 2 (if we ignore it): ${skipThis}. Weak board line: “Be good students.” No point.`),
+      ];
+    case 'interview':
+      return [
+        clipExample(`Reporter asks: “What should we do, and what happens if we don’t?” Idea: ${idea}.`),
+        clipExample(`Good expert: “${doThis}.” Weak: “The teacher told us.” Ask them to contrast ${skipThis}.`),
+      ];
+    case 'true-false':
+      return [
+        clipExample(`True: ${doThis}. False: ${skipThis}. The idea: ${idea}.`),
+        clipExample(`Correction of the false line uses the idea, not “because teacher said so.”`),
+      ];
+    case 'one-change':
+      return [
+        clipExample(`You model: “After class I will ${doThis}.” Idea: ${idea}.`),
+        clipExample(`Good student names that change. Weak: “I will study more.” Ask them not to choose ${skipThis}.`),
+      ];
+    case 'exchange':
+      return [
+        clipExample(`Claim: ${idea}. For: ${doThis}. Against: ${skipThis}.`),
+        clipExample('Stronger reason uses the idea. Weak: “I like it.”'),
+      ];
+    case 'poster':
+      return [
+        clipExample(`Poster: draw ${doThis}. Warning: do not ${skipThis}. Title: ${idea}.`),
+        clipExample('Weak poster: only the chapter name. Ask them to draw the do-this box.'),
+      ];
+    default:
+      return [
+        clipExample(`You say: “${idea}.” Class example: ${doThis}.`),
+        clipExample(`Good student uses that example. Weak: “${skipThis}.”`),
+      ];
+  }
 }
 
 /** Different classroom moves. Only one of these is a small-group task. */
@@ -22,12 +146,13 @@ export const ACTIVITY_STYLES: ActivityStyle[] = [
     steps: (ideas) => {
       const idea = ideaOr(ideas, 'one idea from today’s lesson');
       return [
-        `Write this idea incorrectly on the board: ${idea}.`,
+        `Write a wrong version of this on the board: ${idea}.`,
         'Students say what is wrong, then write a correct one-line version.',
-        'Ask what would go wrong in real life if someone believed the mistake.',
+        'Ask what would go wrong if someone believed the mistake.',
         'Hear two corrections and fix anything still unclear.',
       ];
     },
+    example: (ideas) => workedClassroomExamples(ideas, 'correct'),
   },
   {
     name: 'Sixty-second teach-back',
@@ -37,12 +162,13 @@ export const ACTIVITY_STYLES: ActivityStyle[] = [
     steps: (ideas) => {
       const idea = ideaOr(ideas, 'the main idea from today’s pages');
       return [
-        `State the idea once, slowly: ${idea}.`,
-        'Pairs: one student teaches it in 60 seconds, the other adds the missing piece.',
-        'Swap roles if there is a second idea.',
-        'Ask two students to teach it to the whole class. Correct one gap.',
+        `Say the idea once: ${idea}. Then give the example below.`,
+        'Pairs: one student teaches it in 60 seconds using that example. The partner adds what was missing.',
+        'Swap roles.',
+        'Two students teach it to the class. Reject a vague line; ask for the example.',
       ];
     },
+    example: (ideas) => workedClassroomExamples(ideas, 'teach-back'),
   },
   {
     name: 'Two choices',
@@ -52,12 +178,13 @@ export const ACTIVITY_STYLES: ActivityStyle[] = [
     steps: (ideas) => {
       const idea = ideaOr(ideas, 'the rule from today’s lesson');
       return [
-        `Put two actions on the board, one that fits this idea and one that does not: ${idea}.`,
-        'Students vote, then a neighbour has to say why in one sentence.',
-        'Reveal the better choice and name the part of the idea that decides it.',
-        'Students write that reason in their notebook.',
+        `Write two actions. One follows this idea, one does not: ${idea}.`,
+        'Students vote, then tell a neighbour why in one sentence.',
+        'Name the part of the idea that decides the better choice.',
+        'Students copy that reason.',
       ];
     },
+    example: (ideas) => workedClassroomExamples(ideas, 'two-choices'),
   },
   {
     name: 'Sketch and label',
@@ -67,12 +194,13 @@ export const ACTIVITY_STYLES: ActivityStyle[] = [
     steps: (ideas) => {
       const idea = ideaOr(ideas, 'the main idea from today’s lesson');
       return [
-        `Give one minute of silence to sketch this: ${idea}.`,
-        'Each student labels two parts of the sketch in their own words.',
-        'Neighbours compare sketches and circle one difference.',
-        'Show one strong sketch and one that missed the point. Fix it together.',
+        `One quiet minute to sketch this: ${idea}.`,
+        'Each student labels two parts in their own words.',
+        'Neighbours compare and circle one difference.',
+        'Show one strong sketch and fix one that missed the point.',
       ];
     },
+    example: (ideas) => workedClassroomExamples(ideas, 'sketch'),
   },
   {
     name: 'Finish the scene',
@@ -82,12 +210,13 @@ export const ACTIVITY_STYLES: ActivityStyle[] = [
     steps: (ideas) => {
       const idea = ideaOr(ideas, 'the idea you just taught');
       return [
-        `Read a three-line scene that stops before anyone uses this idea: ${idea}.`,
+        `Read a three-line scene that stops before anyone uses this: ${idea}.`,
         'Students write the next two lines so the idea changes what a character does.',
         'Two volunteers read their ending.',
         'The class says which ending used the idea more clearly.',
       ];
     },
+    example: (ideas) => workedClassroomExamples(ideas, 'scene'),
   },
   {
     name: 'Board sprint',
@@ -99,11 +228,12 @@ export const ACTIVITY_STYLES: ActivityStyle[] = [
       const second = ideas[1] ?? idea;
       return [
         'Split the class into two lines facing the board.',
-        `Call the first prompt: write one true sentence about ${idea}.`,
-        `Second prompt: write what would go wrong if we ignored ${second}.`,
-        'Award the point only for a correct idea, not for speed alone. Then explain the miss.',
+        `Prompt 1: write one true sentence about this — ${idea}.`,
+        `Prompt 2: write what goes wrong if we ignore this — ${second}.`,
+        'Give the point for a correct idea, not for speed. Then explain any miss.',
       ];
     },
+    example: (ideas) => workedClassroomExamples(ideas, 'sprint'),
   },
   {
     name: 'Reporter interview',
@@ -113,12 +243,13 @@ export const ACTIVITY_STYLES: ActivityStyle[] = [
     steps: (ideas) => {
       const idea = ideaOr(ideas, 'today’s main idea');
       return [
-        `Pairs sit face to face. The topic of the interview is: ${idea}.`,
+        `Pairs sit face to face. The interview topic is: ${idea}.`,
         'The reporter asks three questions a younger student would ask.',
-        'The expert answers in short sentences, without reading notes.',
+        'The expert answers in short sentences, without notes.',
         'Reporters share the clearest answer they heard.',
       ];
     },
+    example: (ideas) => workedClassroomExamples(ideas, 'interview'),
   },
   {
     name: 'True or false sort',
@@ -128,12 +259,13 @@ export const ACTIVITY_STYLES: ActivityStyle[] = [
     steps: (ideas) => {
       const idea = ideaOr(ideas, 'the idea from today’s lesson');
       return [
-        `Read four short statements about this idea. Two are false: ${idea}.`,
-        'Students mark true or false in silence, then compare with a partner.',
-        'For each false statement, the class says the correction in one sentence.',
-        'Leave the corrected lines on the board as the recap.',
+        `Read four short statements. Two are false. The idea: ${idea}.`,
+        'Students mark true or false, then compare with a partner.',
+        'For each false one, the class says the correction in one sentence.',
+        'Leave the corrected lines on the board.',
       ];
     },
+    example: (ideas) => workedClassroomExamples(ideas, 'true-false'),
   },
   {
     name: 'One change',
@@ -143,12 +275,13 @@ export const ACTIVITY_STYLES: ActivityStyle[] = [
     steps: (ideas) => {
       const idea = ideaOr(ideas, 'the idea from today’s lesson');
       return [
-        `Remind the class of the idea in one sentence: ${idea}.`,
-        'Each student writes one thing they would do differently at home or school because of it.',
-        'They add the reason, using the idea, not a slogan.',
-        'Hear four answers and point out which reason actually used the lesson.',
+        `Remind them in one sentence: ${idea}.`,
+        'Each student writes one thing they would do differently at home or school.',
+        'They add a reason that uses the idea, not a slogan.',
+        'Hear four answers and mark which reason used the lesson.',
       ];
     },
+    example: (ideas) => workedClassroomExamples(ideas, 'one-change'),
   },
   {
     name: 'Two-speaker exchange',
@@ -158,12 +291,13 @@ export const ACTIVITY_STYLES: ActivityStyle[] = [
     steps: (ideas) => {
       const idea = ideaOr(ideas, 'one claim from today’s lesson');
       return [
-        `Write one claim from the lesson: ${idea}.`,
-        'One student gives a reason for it, another gives a careful objection. One minute each.',
+        `Write one claim: ${idea}.`,
+        'One student gives a reason, another a careful objection. One minute each.',
         'The class names which reason used the lesson more accurately.',
-        'You add the fact they both missed, in a single sentence.',
+        'You add the fact they both missed, in one sentence.',
       ];
     },
+    example: (ideas) => workedClassroomExamples(ideas, 'exchange'),
   },
   {
     name: 'Three-person poster',
@@ -173,12 +307,13 @@ export const ACTIVITY_STYLES: ActivityStyle[] = [
     steps: (ideas) => {
       const idea = ideaOr(ideas, 'one idea from today’s lesson');
       return [
-        `Threes only. Their poster teaches just this: ${idea}.`,
-        'One student writes the idea, one draws it, one adds a warning about getting it wrong.',
+        `Threes only. The poster teaches just this: ${idea}.`,
+        'One writes the idea, one draws it, one adds a warning about getting it wrong.',
         'Hang two posters. The class says which line teaches the idea best.',
         'You add the missing point before the bell.',
       ];
     },
+    example: (ideas) => workedClassroomExamples(ideas, 'poster'),
   },
 ];
 

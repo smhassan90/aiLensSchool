@@ -57,7 +57,11 @@ export function rolePortionKey(role: ChapterDayRole, readingIndex: number): stri
 export function activityConductNotes(chapter: string, themes: string[]): string {
   const ideas = shortTeachingIdeas(themes, 2);
   const style = pickActivityStyle(chapter);
-  const lines = [style.name, ...style.steps(ideas).map((step, index) => `${index + 1}. ${step}`)];
+  const lines = [
+    style.name,
+    ...style.example(ideas).map((line) => `Example: ${line}`),
+    ...style.steps(ideas).map((step, index) => `${index + 1}. ${step}`),
+  ];
   return lines.join('\n');
 }
 

@@ -61,5 +61,8 @@ describe('heuristicTeachingHelp', () => {
     expect(help.classroomDelivery.activity!.steps.length).toBeLessThanOrEqual(4);
     expect(help.overview.teachingOverview.length).toBeLessThan(280);
     expect(help.teacherExplanation.simpleExplanation.length).toBeLessThan(320);
+    expect(help.teacherExplanation.examples.length).toBeGreaterThan(0);
+    expect(help.teacherExplanation.examples.join(' ')).toMatch(/You say:|Board |You write|You sketch|Scene |Prompt |Reporter |True:|You model:|Claim:|Poster:/i);
+    expect(help.teacherExplanation.examples.join(' ')).toMatch(/helmet|seat belt|late van|do this/i);
   });
 });
