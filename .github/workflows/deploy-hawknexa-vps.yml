@@ -233,7 +233,7 @@ jobs:
           set -euo pipefail
           short_sha="$(echo "${EXPECTED_SHA}" | cut -c1-7)"
           echo "Waiting for VPS deploy (commit ${short_sha})..."
-          for i in $(seq 1 72); do
+          for i in $(seq 1 120); do
             status_body="$(curl -fsS -H "Authorization: Bearer ${DEPLOY_SECRET}" "${STATUS_URL}" 2>/dev/null || true)"
             # Prefer live health over status-file races (webhook recreate can
             # briefly report failed while the stack is already on the new SHA).
@@ -263,10 +263,10 @@ jobs:
               fi
             fi
 
-            echo "Waiting for deploy... (${i}/72)"
+            echo "Waiting for deploy... (${i}/120)"
             sleep 5
           done
-          echo "::error::Deploy did not complete within 6 minutes."
+          echo "::error::Deploy did not complete within 10 minutes. On the VPS run: bash /opt/apps/hawknexa/deploy/recover-backend-schema.sh"
           exit 1
 
       - name: Verify VPS deploy over SSH

@@ -7,7 +7,8 @@ DEPLOY_DIR="/opt/apps/hawknexa/deploy"
 COMPOSE_FILE="${DEPLOY_DIR}/docker-compose.prod.yml"
 BRANCH="${DEPLOY_BRANCH:-main}"
 HEALTH_URL="${DEPLOY_HEALTH_URL:-https://hawknexabackend.fynals.com/api/v1/health}"
-HEALTH_ATTEMPTS="${DEPLOY_HEALTH_ATTEMPTS:-24}"
+HEALTH_ATTEMPTS="${DEPLOY_HEALTH_ATTEMPTS:-48}"
+HEALTH_SLEEP="${DEPLOY_HEALTH_SLEEP:-5}"
 STATUS_FILE="${DEPLOY_DIR}/.last-deploy.json"
 PID_FILE="/tmp/hawknexa-deploy.pid"
 LOCK_DIR="/tmp/hawknexa-deploy.lockdir"
@@ -218,8 +219,24 @@ echo "=== FitNix co-host (post Caddy recreate) ==="
 bash "${DEPLOY_DIR}/ensure-fitnix-caddy-cohost.sh"
 
 echo "=== Health check ==="
+
+api_health_ok() {
+  if curl -fsS --max-time 15 "${HEALTH_URL}" >/dev/null 2>&1; then
+    return 0
+  fi
+  # Caddy can 502 while Nest is still starting (prisma db push). Probe the container directly.
+  if docker compose -f "${COMPOSE_FILE}" exec -T backend node -e "
+    fetch('http://127.0.0.1:3001/api/v1/health')
+      .then((r) => process.exit(r.ok ? 0 : 1))
+      .catch(() => process.exit(1));
+  " >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
 for i in $(seq 1 "${HEALTH_ATTEMPTS}"); do
-  if curl -fsS "${HEALTH_URL}" >/dev/null; then
+  if api_health_ok; then
     echo "OK: ${HEALTH_URL}"
     docker compose -f "${COMPOSE_FILE}" ps
     trap - ERR
@@ -227,11 +244,12 @@ for i in $(seq 1 "${HEALTH_ATTEMPTS}"); do
     chain_pending_deploy
     exit 0
   fi
-  echo "Waiting for API... (${i}/6)"
-  sleep 5
+  echo "Waiting for API... (${i}/${HEALTH_ATTEMPTS})"
+  sleep "${HEALTH_SLEEP}"
 done
 
 echo "ERROR: health check failed: ${HEALTH_URL}" >&2
 docker compose -f "${COMPOSE_FILE}" ps
-docker compose -f "${COMPOSE_FILE}" logs backend --tail 30
+docker compose -f "${COMPOSE_FILE}" logs backend --tail 80
+echo "Tip: bash ${DEPLOY_DIR}/recover-backend-schema.sh" >&2
 exit 1
