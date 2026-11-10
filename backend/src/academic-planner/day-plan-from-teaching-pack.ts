@@ -242,6 +242,6 @@ export function rebuildLessonFromPack(input: {
             : [{ stage: LessonStage.READING, minutes: input.periodMinutes }],
     objectives: plan.objectives,
     plannedMinutes: input.periodMinutes,
-    notes: '',
+    notes: plan.teacherNotes ?? '',
   };
 }

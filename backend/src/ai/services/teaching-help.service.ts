@@ -34,6 +34,7 @@ export type GenerateTeachingHelpInput = {
   chapterExcerpt: string;
   basis: TeachingHelpBasis;
   teacherQuestion?: string;
+  variety?: number;
 };
 
 export type GenerateTeachingHelpResult = {
@@ -106,6 +107,7 @@ export class TeachingHelpService {
         stagesSummary: input.stagesSummary,
         chapterExcerpt: input.chapterExcerpt,
         teacherQuestion: input.teacherQuestion,
+        variety: input.variety,
       });
 
       const aiGenerated =
@@ -140,6 +142,7 @@ export class TeachingHelpService {
           chapterExcerpt: input.chapterExcerpt,
           teacherQuestion: input.teacherQuestion,
           repairInvalidJson: true,
+          variety: input.variety,
         });
         completion = retry;
         try {
@@ -192,6 +195,7 @@ export class TeachingHelpService {
           bookTitle: input.bookTitle,
           mode: input.mode,
           chapterExcerpt: input.chapterExcerpt,
+          variety: input.variety,
         }),
       );
       return {

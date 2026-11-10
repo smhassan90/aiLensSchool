@@ -19,7 +19,7 @@ import { LessonCard } from "@/components/planner/lesson-card";
 import { PlannerDayLessonCard } from "@/components/planner/planner-day-lesson-card";
 import { PlannerPrintSheet } from "@/components/planner/planner-print-sheet";
 import { PlannerLessonEditDialog } from "@/components/planner/planner-lesson-edit-dialog";
-import { TeachingHelpDialog, type TeachingHelpLessonContext } from "@/components/planner/teaching-help-dialog";
+import { TeachingHelpScreen, type TeachingHelpLessonContext } from "@/components/planner/teaching-help-screen";
 import type { PlannerLesson } from "@/lib/planner-view-model";
 import { fixDisplayText } from "@/lib/fix-display-text";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,6 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [helpLesson, setHelpLesson] = useState<TeachingHelpLessonContext | null>(null);
-  const [helpOpen, setHelpOpen] = useState(false);
   const [editLesson, setEditLesson] = useState<PlannerLesson | null>(null);
   const [moveLesson, setMoveLesson] = useState<PlannerLesson | null>(null);
   const [moveDate, setMoveDate] = useState("");
@@ -58,10 +57,11 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
         title: lesson.title,
         lessonKind: lesson.kind,
         chapterTitle: chapter ? String(chapter.title) : null,
+        classLabel: data?.planner.classLabel,
+        subjectName: data?.planner.subject.name,
       });
-      setHelpOpen(true);
     },
-    [data?.chapters, plannerId, versionId],
+    [data?.chapters, data?.planner, plannerId, versionId],
   );
 
   const generate = useMutation({
@@ -187,6 +187,10 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
     return chapter ? String(chapter.title) : null;
   };
   const plannerTitle = data.planner.title || `${data.planner.classLabel} — ${data.planner.subject.name}`;
+
+  if (helpLesson) {
+    return <TeachingHelpScreen lesson={helpLesson} onBack={() => setHelpLesson(null)} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -414,8 +418,6 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
           )}
         </TabsContent>
       </Tabs>
-
-      <TeachingHelpDialog open={helpOpen} onOpenChange={setHelpOpen} lesson={helpLesson} />
 
       <PlannerLessonEditDialog
         open={Boolean(editLesson)}

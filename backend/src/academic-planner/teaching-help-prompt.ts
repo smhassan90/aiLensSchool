@@ -9,7 +9,7 @@ export function modeInstruction(mode: TeachingAssistanceMode): string {
     case 'CREATE_QUESTIONS':
       return 'Mode: CREATE QUESTIONS — emphasize assessment.formativeQuestions (mix of recall, understanding, application) and questionsDuringLesson. Include answer keys.';
     case 'CLASSROOM_ACTIVITY':
-      return 'Mode: CLASSROOM ACTIVITY — emphasize classroomDelivery.activity with ordinary materials, warm-up, and discussion questions.';
+      return 'Mode: CLASSROOM ACTIVITY — the teacher needs one short activity, not a full lesson write-up. Put the useful detail in classroomDelivery.activity (3–4 steps). Keep overview, explanation, and assessment to a few lines. Do not build stations that quote the textbook.';
     case 'DIFFERENTIATE':
       return 'Mode: DIFFERENTIATE — emphasize differentiation.struggling and differentiation.extension; include simplified explanation steps.';
     default:

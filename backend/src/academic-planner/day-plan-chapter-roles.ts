@@ -1,4 +1,5 @@
 import { LessonStage, PlannerLessonKind } from '@prisma/client';
+import { pickActivityStyle, shortTeachingIdeas } from './classroom-activity-styles';
 import { displayChapterTitle } from './day-plan-content-quality';
 
 export type ChapterDayRole = 'INTRO' | 'READING' | 'CONTINUE_READING' | 'EXERCISE' | 'ACTIVITY';
@@ -54,21 +55,9 @@ export function rolePortionKey(role: ChapterDayRole, readingIndex: number): stri
 }
 
 export function activityConductNotes(chapter: string, themes: string[]): string {
-  const named = themes.map((t) => t.replace(/\s+/g, ' ').trim()).filter((t) => t.length > 12).slice(0, 4);
-  const lines = [
-    `How to run this activity for ${chapter}:`,
-    '1. Make groups of 3 or 4. Every student speaks at least once.',
-  ];
-  if (named.length > 0) {
-    lines.push('2. Give each group one idea from this chapter:');
-    named.forEach((theme, index) => lines.push(`   ${index + 1}. ${theme}`));
-    lines.push('3. In about 8 minutes, each group prepares one real-life example for their idea.');
-  } else {
-    lines.push('2. Give each group one main idea you already taught in this chapter.');
-    lines.push('3. In about 8 minutes, each group prepares one real-life example.');
-  }
-  lines.push('4. Each group presents for about 2 minutes.');
-  lines.push('5. After each group, add one point they missed and ask one short question.');
+  const ideas = shortTeachingIdeas(themes, 2);
+  const style = pickActivityStyle(chapter);
+  const lines = [style.name, ...style.steps(ideas).map((step, index) => `${index + 1}. ${step}`)];
   return lines.join('\n');
 }
 
@@ -123,13 +112,15 @@ export function buildMinimalDayPlan(input: {
         objectives: [`Do textbook exercises for this part of ${chapter}.`],
         teacherNotes: null,
       };
-    case 'ACTIVITY':
+    case 'ACTIVITY': {
+      const style = pickActivityStyle(chapter);
       return {
         titleSuffix: roleLabels.ACTIVITY,
         kind: PlannerLessonKind.ACTIVITY,
         primaryStage: LessonStage.ACTIVITY,
-        objectives: [`Class activity: groups recall the main ideas of ${chapter} with a real-life example.`],
+        objectives: [`${style.name}: ${style.goal}`],
         teacherNotes: activityConductNotes(chapter, input.activityThemes ?? []),
       };
+    }
   }
 }

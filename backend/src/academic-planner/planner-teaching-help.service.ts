@@ -18,6 +18,7 @@ import { StageSegment } from './planner-types';
 import { gradeClassLabel } from '../common/utils/section-class-label';
 import { resolveTeachingHelpContext } from './teaching-help-context';
 import { TeachingHelpUsageService } from './teaching-help-usage';
+import { TEACHING_HELP_PROMPT_VERSION } from '../ai/prompts';
 import { TeachingHelpGenerationError } from '../ai/teaching-help-errors';
 import { loadTeachingPacksByChapterIds } from '../library-books/chapter-teaching-pack-analysis.loader';
 import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
@@ -43,10 +44,12 @@ export class PlannerTeachingHelpService {
     versionId?: string,
     modeInput?: TeachingAssistanceMode,
     teacherQuestion?: string,
+    varietyInput?: number,
   ) {
     const schoolId = this.tenant.requireSchoolId(user);
     const mode: TeachingAssistanceMode = modeInput ?? 'PREPARE_LESSON';
     const question = teacherQuestion?.trim().slice(0, 500) || undefined;
+    const variety = Number.isFinite(varietyInput) ? Math.max(0, Math.min(12, Math.floor(varietyInput!))) : 0;
 
     const planner = await this.prisma.academicPlanner.findFirst({
       where: { id: plannerId, schoolId },
@@ -141,6 +144,8 @@ export class PlannerTeachingHelpService {
       objectives.join('|'),
       mode,
       question ?? '',
+      String(variety),
+      TEACHING_HELP_PROMPT_VERSION,
     ]);
 
     const classLabel = gradeClassLabel(planner.section);
@@ -166,6 +171,7 @@ export class PlannerTeachingHelpService {
           chapterExcerpt: resolved.chapterExcerpt,
           basis: resolved.basis,
           teacherQuestion: question,
+          variety,
         }),
       );
     } catch (err) {
@@ -184,13 +190,10 @@ export class PlannerTeachingHelpService {
     }
 
     const disclaimer = generated.aiGenerated
-      ? 'AI teaching suggestions only — not approved curriculum or official records. Verify against your textbook before class.'
-      : 'Template suggestions (AI provider not configured or unavailable). Not grounded in retrieved chapter text.';
-
-    const basisDisclaimer =
-      resolved.basis === 'CHAPTER_TEXT'
-        ? 'Grounded in assigned textbook excerpt and lesson objectives where noted in sourceAndConfidence.'
-        : 'Based on lesson objectives only; chapter text was unavailable or too short.';
+      ? 'AI teaching suggestions only. Verify them against your textbook before class.'
+      : resolved.basis === 'CHAPTER_TEXT'
+        ? 'Draft from the chapter notes. Verify the wording against your textbook before class.'
+        : 'Draft from the lesson objectives. Add one textbook example before class.';
 
     return {
       lessonKey,
@@ -212,7 +215,7 @@ export class PlannerTeachingHelpService {
       cached: generated.cached,
       promptVersion: generated.promptVersion,
       provider: generated.provider ?? null,
-      disclaimer: `${disclaimer} ${basisDisclaimer}`,
+      disclaimer,
       unavailableMessage: null,
     };
   }

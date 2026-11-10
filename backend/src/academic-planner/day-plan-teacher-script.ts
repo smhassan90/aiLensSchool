@@ -8,6 +8,7 @@ import {
   summarySentences,
   teachablePointsFromText,
 } from './day-plan-content-quality';
+import { pickActivityStyle, shortTeachingIdeas } from './classroom-activity-styles';
 import { detectSubjectProfile } from './subject-profiles';
 
 function asStringArray(value: unknown): string[] {
@@ -269,50 +270,26 @@ export function buildChapterRecapActivity(input: {
 }): { activityTitle: string; objectives: string[]; teacherNotes: string } {
   const chapter = displayChapterTitle(input.chapterTitle);
   const themes = activityThemesFromPack(input.pack);
-  const sliceTitles = cleanSliceTitles(input.pack);
   const exitQs = [
     ...pickCheckQuestions(input.pack, undefined, 4),
     ...questionsFromSummary(themes, 2),
   ].slice(0, 4);
 
-  const activityTitle =
-    sliceTitles.length >= 2
-      ? `Review: ${sliceTitles[0]} & ${sliceTitles[1]}`
-      : `Review: ${chapter}`;
-
-  const themeLines = themes.map((h, i) => `  ${i + 1}. ${polishTeacherLine(h, 160)}`);
-
-  const notes: string[] = [
-    `Students have finished ${chapter}. Use this period to recall and apply what they learned.`,
-    '',
-    'Setup (5 min):',
-    `• Form ${Math.min(themes.length, 6)} groups. Each group receives one theme:`,
-    ...themeLines,
-    '',
-    'Main task (25 min):',
-    '• Each group prepares a two-minute presentation: one real-life example plus one sentence from the textbook.',
-    '• Values and religious studies topics: allow a short role-play or poster instead of a speech.',
-    '• Every student must speak at least once in the group.',
-    '',
-    'Present (8 min):',
-    '• Groups share in turn. You add one missing detail after each group if needed.',
-    ...(exitQs.length
-      ? ['', 'Closing questions:', ...exitQs.map((q) => `• ${q}`)]
-      : ['', 'Closing question: Which theme was hardest to explain in your own words?']),
-    '',
-    'Wrap (2 min): Praise effort and note that these ideas will appear in revision and tests.',
-  ];
+  const style = pickActivityStyle(`${chapter}|${input.subjectName}`);
+  const ideas = shortTeachingIdeas(themes, 2);
+  const closing = exitQs[0] ?? 'Which idea was hardest to explain in your own words?';
 
   return {
-    activityTitle,
+    activityTitle: style.name,
     objectives: [
-      `Students recall the main ideas from ${chapter}.`,
-      `Each group connects one theme to real life.`,
-      themes.length > 1
-        ? `Themes: ${themes.slice(0, 4).map((t) => t.replace(/[.!?]$/, '')).join('; ').slice(0, 200)}.`
-        : polishTeacherLine(themes[0] ?? chapter, 160),
+      `Students recall one idea from the chapter and use it in ${style.name.toLowerCase()}.`,
+      style.goal,
     ],
-    teacherNotes: notes.join('\n'),
+    teacherNotes: [
+      style.name,
+      ...style.steps(ideas).map((step, index) => `${index + 1}. ${step}`),
+      `Closing question: ${closing}`,
+    ].join('\n'),
   };
 }
 

@@ -252,6 +252,7 @@ export class AcademicPlannersController {
       body?.versionId,
       body?.mode,
       body?.question,
+      body?.variety,
     );
   }
 

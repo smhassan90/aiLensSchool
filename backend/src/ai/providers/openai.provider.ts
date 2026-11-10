@@ -489,6 +489,9 @@ export class OpenAiProvider implements AiProvider {
             subjectName: input.subjectName,
             objectives: input.objectives,
             bookTitle: input.bookTitle,
+            mode: input.mode,
+            chapterExcerpt: input.chapterExcerpt,
+            variety: input.variety,
           }),
         ),
         provider: 'mock',
@@ -506,7 +509,11 @@ export class OpenAiProvider implements AiProvider {
     const repair = input.repairInvalidJson
       ? '\nYour previous JSON was invalid. Return ONLY corrected JSON matching the schema.'
       : '';
-    const user = `${modeInstruction(input.mode)}\nClass: ${input.classLabel}\nSubject: ${input.subjectName}\nTextbook: ${input.bookTitle ?? '(not specified)'}\nChapter: ${input.chapterTitle}\nLesson: ${input.lessonTitle}\nObjectives:\n${input.objectives.map((o) => `- ${o}`).join('\n') || '(none listed)'}\nLesson stages:\n${input.stagesSummary}\n${excerptBlock}${input.teacherQuestion ? `\nTeacher focus question: ${input.teacherQuestion.slice(0, 500)}` : ''}${repair}`;
+    const variant =
+      input.variety && input.variety > 0
+        ? `\nActivity variant ${input.variety}: choose a different classroom format from variant 0.`
+        : '';
+    const user = `${modeInstruction(input.mode)}\nClass: ${input.classLabel}\nSubject: ${input.subjectName}\nTextbook: ${input.bookTitle ?? '(not specified)'}\nChapter: ${input.chapterTitle}\nLesson: ${input.lessonTitle}\nObjectives:\n${input.objectives.map((o) => `- ${o}`).join('\n') || '(none listed)'}\nLesson stages:\n${input.stagesSummary}\n${excerptBlock}${input.teacherQuestion ? `\nTeacher focus question: ${input.teacherQuestion.slice(0, 500)}` : ''}${variant}${repair}`;
 
     const maxOut = Number(this.config.get('TEACHING_HELP_MAX_OUTPUT_TOKENS') ?? 4096);
     const content = await this.chat(TEACHING_HELP_SYSTEM_PROMPT, user, undefined, maxOut);

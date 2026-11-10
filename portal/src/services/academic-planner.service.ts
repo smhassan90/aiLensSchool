@@ -719,7 +719,7 @@ export const academicPlannerService = {
   teachingHelp(
     plannerId: string,
     lessonKey: string,
-    body?: { versionId?: string; mode?: TeachingAssistanceMode; question?: string },
+    body?: { versionId?: string; mode?: TeachingAssistanceMode; question?: string; variety?: number },
   ) {
     return apiClient<TeachingHelpPayload>(
       `/academic-planners/${plannerId}/lessons/${lessonKey}/teaching-help`,

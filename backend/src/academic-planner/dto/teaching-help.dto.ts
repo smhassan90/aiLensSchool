@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { TeachingAssistanceModeSchema } from '../../ai/schemas/teaching-help.schema';
 
 const TEACHING_MODES = TeachingAssistanceModeSchema.options;
@@ -16,4 +16,11 @@ export class TeachingHelpRequestDto {
   @IsString()
   @MaxLength(500)
   question?: string;
+
+  /** 0 keeps the first activity. Higher numbers ask for a different activity format. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(12)
+  variety?: number;
 }

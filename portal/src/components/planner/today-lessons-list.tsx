@@ -13,7 +13,7 @@ import {
   type MyDayPayload,
   type UpsertTeachingRecordInput,
 } from "@/services/academic-planner.service";
-import { TeachingHelpDialog, type TeachingHelpLessonContext } from "@/components/planner/teaching-help-dialog";
+import { TeachingHelpScreen, type TeachingHelpLessonContext } from "@/components/planner/teaching-help-screen";
 import { formatStatusLabel } from "@/lib/display-labels";
 import { useToast } from "@/providers/toast-provider";
 import { friendlyApiErrorMessage } from "@/lib/display-labels";
@@ -67,7 +67,6 @@ export function TodayLessonsList({ compact, initialDate }: TodayLessonsListProps
   });
 
   const [helpLesson, setHelpLesson] = useState<TeachingHelpLessonContext | null>(null);
-  const [helpOpen, setHelpOpen] = useState(false);
 
   const openTeachingHelp = (lesson: MyDayPayload["lessons"][number]) => {
     if (!lesson.planner || !lesson.plannedLesson) return;
@@ -75,15 +74,19 @@ export function TodayLessonsList({ compact, initialDate }: TodayLessonsListProps
       plannerId: lesson.planner.id,
       lessonKey: lesson.plannedLesson.lessonKey,
       title: lesson.plannedLesson.title,
+      lessonKind: lesson.plannedLesson.primaryStage,
       chapterTitle: lesson.plannedLesson.chapterTitle,
       classLabel: lesson.classLabel,
       subjectName: lesson.subjectName,
     });
-    setHelpOpen(true);
   };
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading lessons…</p>;
   if (isError || !data) return <p className="text-sm text-destructive">Could not load your day.</p>;
+
+  if (helpLesson) {
+    return <TeachingHelpScreen lesson={helpLesson} onBack={() => setHelpLesson(null)} />;
+  }
 
   return (
     <div className="space-y-4">
@@ -150,8 +153,6 @@ export function TodayLessonsList({ compact, initialDate }: TodayLessonsListProps
           </CardContent>
         </Card>
       ))}
-
-      <TeachingHelpDialog open={helpOpen} onOpenChange={setHelpOpen} lesson={helpLesson} />
 
       {recording && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

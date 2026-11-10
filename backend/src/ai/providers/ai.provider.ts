@@ -101,6 +101,7 @@ export interface AiProvider {
     chapterExcerpt: string;
     teacherQuestion?: string;
     repairInvalidJson?: boolean;
+    variety?: number;
   }): Promise<AiCompletionResult<unknown>>;
 }
 
