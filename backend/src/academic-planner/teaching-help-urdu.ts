@@ -25,8 +25,8 @@ function isPartExample(line: string): boolean {
 export function buildUrduTeachingGuide(help: TeachingHelpOutput): TeachingHelpUrduGuide {
   const isRecap = help.classroomDelivery.activity?.title === 'Chapter recap';
   const boardParts = help.sourceAndConfidence.sourceSupportedClaims.slice(0, 5).map((p) => themeShortLabel(p));
-  const opening = help.teacherExplanation.examples.find((line) => !isPartExample(line)) ?? '';
   const partExamples = help.teacherExplanation.examples.filter(isPartExample);
+  const partCount = Math.max(boardParts.length, partExamples.length, 3);
 
   const studentWorkTemplate = isRecap
     ? 'بورڈ پر طلبہ کے لیے یہ خانہ بنائیں (ہر گروپ ایک کاپی): حصے کا نام | آسان مطلب (اپنے الفاظ) | کتاب کی ایک سطر | گھر یا سکول کی ایک مثال'
