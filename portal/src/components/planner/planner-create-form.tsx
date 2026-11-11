@@ -130,7 +130,7 @@ export function PlannerCreateForm() {
     mutationFn: async (values: FormValues) => {
       const row = classOptions.find((o) => o.key === values.classKey);
       if (!row) throw new Error("Select a class");
-      return academicPlannerService.create({
+      const payload = await academicPlannerService.create({
         sectionId: row.sectionId,
         subjectId: row.subjectId,
         teacherId: values.teacherId,
@@ -147,9 +147,14 @@ export function PlannerCreateForm() {
               }
             : undefined,
       });
+      return academicPlannerService.generateSchedule(
+        payload.planner.id,
+        payload.version.id,
+        payload.version.revision,
+      );
     },
     onSuccess: (payload) => {
-      toast({ title: "Planner created", variant: "success" });
+      toast({ title: "Planner ready", description: "Chapters analyzed and schedule built.", variant: "success" });
       router.push(
         `/teacher/planner/${payload.planner.id}?v=${encodeURIComponent(payload.version.id)}`,
       );
@@ -347,8 +352,11 @@ export function PlannerCreateForm() {
 
       <div className="flex flex-wrap items-center gap-2 pt-2">
         <Button type="submit" disabled={create.isPending || !match}>
-          {create.isPending ? "Creating…" : "Create planner"}
+          {create.isPending ? "Analyzing chapters and building schedule…" : "Create & build schedule"}
         </Button>
+        <p className="text-sm text-muted-foreground">
+          One step: we read your chapters, build the day-by-day plan, and open the planner when it is ready.
+        </p>
       </div>
     </form>
     </CardContent>

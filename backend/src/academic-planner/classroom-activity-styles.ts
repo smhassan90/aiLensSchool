@@ -387,6 +387,22 @@ export function ideasFromChapterText(text: string | undefined, limit = 5): strin
 }
 
 /** Whole-chapter activity script: teachers see parts on the board, not one repeated bullet. */
+/** Plain “student says / you add” lines for each board part (chapter recap). */
+export function workedPartExamples(themes: string[]): string[] {
+  const topics = shortTeachingIdeas(themes, 5);
+  if (!topics.length) {
+    return [
+      'Part 1 — Open the textbook headings together. Student might say: “We learned about being good citizens.” You add one real example from the first page they name.',
+    ];
+  }
+  return topics.map((theme, index) => {
+    const label = themeShortLabel(theme);
+    const { doThis, skipThis } = classroomHook(theme);
+    const n = index + 1;
+    return `Part ${n} — ${label}. Student might say: “${doThis}.” You add: “${clipExample(theme, 140)}” If they only repeat the title, ask them to fix: “${skipThis}” is not enough.`;
+  });
+}
+
 export function buildChapterActivityScript(chapterTitle: string, themes: string[]): string {
   const topics = shortTeachingIdeas(themes, 5);
   const chapter = chapterTitle.trim() || 'this chapter';

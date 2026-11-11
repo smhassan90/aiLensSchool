@@ -12,6 +12,7 @@ import {
   academicPlannerService,
   type TeachingAssistanceMode,
   type TeachingHelpPayload,
+  type TeachingHelpUrduGuide,
 } from "@/services/academic-planner.service";
 
 const MODES: { value: TeachingAssistanceMode; label: string }[] = [
@@ -48,6 +49,10 @@ function text(value: string): string {
   return fixDisplayText(value);
 }
 
+function isPartExample(line: string): boolean {
+  return /^Part\s+\d+/i.test(line.trim());
+}
+
 export function TeachingHelpScreen({ lesson, onBack }: TeachingHelpScreenProps) {
   const [mode, setMode] = useState<TeachingAssistanceMode>(() => initialMode(lesson));
   const [draftQuestion, setDraftQuestion] = useState("");
@@ -57,6 +62,9 @@ export function TeachingHelpScreen({ lesson, onBack }: TeachingHelpScreenProps) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
+  const [language, setLanguage] = useState<"en" | "ur">("en");
+  const [urduGuide, setUrduGuide] = useState<TeachingHelpUrduGuide | null>(null);
+  const [urduLoading, setUrduLoading] = useState(false);
 
   useEffect(() => {
     setMode(initialMode(lesson));
@@ -66,6 +74,8 @@ export function TeachingHelpScreen({ lesson, onBack }: TeachingHelpScreenProps) 
     setPayload(null);
     setError(null);
     setShowMore(false);
+    setLanguage("en");
+    setUrduGuide(null);
   }, [lesson.plannerId, lesson.lessonKey]);
 
   useEffect(() => {
@@ -80,10 +90,14 @@ export function TeachingHelpScreen({ lesson, onBack }: TeachingHelpScreenProps) 
           question: committedQuestion.trim() || undefined,
           variety,
         });
-        if (!cancelled) setPayload(result);
+        if (!cancelled) {
+          setPayload(result);
+          setUrduGuide(null);
+        }
       } catch (e) {
         if (!cancelled) {
           setPayload(null);
+          setUrduGuide(null);
           setError(friendlyApiErrorMessage(e));
         }
       } finally {
@@ -96,10 +110,46 @@ export function TeachingHelpScreen({ lesson, onBack }: TeachingHelpScreenProps) 
     };
   }, [lesson.plannerId, lesson.lessonKey, lesson.versionId, mode, committedQuestion, variety]);
 
+  const loadUrdu = async () => {
+    if (urduGuide) {
+      setLanguage("ur");
+      return;
+    }
+    setUrduLoading(true);
+    setError(null);
+    try {
+      const result = await academicPlannerService.teachingHelpUrdu(lesson.plannerId, lesson.lessonKey, {
+        versionId: lesson.versionId,
+        mode,
+        variety,
+      });
+      setUrduGuide(result.urduGuide ?? null);
+      setLanguage("ur");
+    } catch (e) {
+      setError(friendlyApiErrorMessage(e));
+    } finally {
+      setUrduLoading(false);
+    }
+  };
+
   const title = text(lesson.title);
   const chapter = lesson.chapterTitle ? text(lesson.chapterTitle) : "";
   const showChapter = Boolean(chapter) && !title.toLowerCase().includes(chapter.toLowerCase());
   const help = payload?.assistance;
+
+  const isChapterRecap =
+    help?.classroomDelivery.activity?.title === "Chapter recap" &&
+    help.sourceAndConfidence.sourceSupportedClaims.length > 0;
+
+  const openingExample = help?.teacherExplanation.examples.find((line) => !isPartExample(line));
+  const partExamples = help?.teacherExplanation.examples.filter((line) => isPartExample(line)) ?? [];
+  const studentTemplate = help?.sourceAndConfidence.pedagogicalSuggestions.find((line) =>
+    /student work template/i.test(line),
+  );
+
+  const bodyClass = "text-base leading-relaxed text-foreground";
+  const mutedClass = "text-base leading-relaxed text-muted-foreground";
+  const urduClass = "text-lg leading-loose text-foreground";
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -109,23 +159,45 @@ export function TeachingHelpScreen({ lesson, onBack }: TeachingHelpScreenProps) 
           Back
         </Button>
         <div>
-          <h1 className="font-display text-lg font-semibold tracking-tight">Help me teach</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{title}</p>
-          {showChapter && <p className="text-sm text-muted-foreground">{chapter}</p>}
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Help me teach</h1>
+          <p className="mt-1 text-base text-muted-foreground">{title}</p>
+          {showChapter && <p className="text-base text-muted-foreground">{chapter}</p>}
           {(lesson.classLabel || lesson.subjectName) && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {[lesson.classLabel, lesson.subjectName].filter(Boolean).join(" · ")}
             </p>
+          )}
+          {help && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={language === "en" ? "default" : "outline"}
+                disabled={loading || urduLoading}
+                onClick={() => setLanguage("en")}
+              >
+                English
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={language === "ur" ? "default" : "outline"}
+                disabled={loading || urduLoading}
+                onClick={() => void loadUrdu()}
+              >
+                {urduLoading ? "لوڈ ہو رہا ہے…" : "اردو میں دیکھیں"}
+              </Button>
+            </div>
           )}
         </div>
       </div>
 
-      <div className="space-y-3 rounded-lg border bg-card p-4 text-sm">
+      <div className="space-y-3 rounded-lg border bg-card p-4 text-base">
         <div className="space-y-1">
           <Label htmlFor="help-mode">What do you need?</Label>
           <select
             id="help-mode"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className="w-full rounded-md border border-input bg-background px-3 py-2.5 text-base"
             value={mode}
             disabled={loading}
             onChange={(e) => {
@@ -148,6 +220,7 @@ export function TeachingHelpScreen({ lesson, onBack }: TeachingHelpScreenProps) 
             rows={2}
             maxLength={500}
             disabled={loading}
+            className="text-base"
             value={draftQuestion}
             onChange={(e) => setDraftQuestion(e.target.value)}
             placeholder="e.g. A five-minute start for students who missed yesterday"
@@ -165,107 +238,189 @@ export function TeachingHelpScreen({ lesson, onBack }: TeachingHelpScreenProps) 
         </Button>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      {loading && !help && <p className="text-sm text-muted-foreground">Preparing a short plan…</p>}
+      {error && <p className="text-base text-destructive">{error}</p>}
+      {loading && !help && <p className={mutedClass}>Preparing a short plan…</p>}
 
-      {help && !loading && (
-        <div className="space-y-4 text-sm">
+      {help && !loading && language === "ur" && urduGuide && (
+        <div className="space-y-5" dir="rtl" lang="ur">
+          <section className="space-y-2">
+            <p className="text-lg font-semibold">خلاصہ</p>
+            <p className={urduClass}>{text(urduGuide.teachingOverview)}</p>
+          </section>
+          {urduGuide.boardParts.length > 0 && (
+            <section className="space-y-2 rounded-lg border bg-muted/20 p-4">
+              <p className="text-lg font-semibold">بورڈ پر حصے</p>
+              <ol className="list-decimal space-y-2 pr-5 text-lg leading-loose">
+                {urduGuide.boardParts.map((part, index) => (
+                  <li key={index}>{text(part)}</li>
+                ))}
+              </ol>
+            </section>
+          )}
+          <section className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-4">
+            <p className="text-lg font-semibold">آپ کیا کہیں / مثالیں</p>
+            <p className={urduClass}>{text(urduGuide.openingLine)}</p>
+            <ul className="space-y-3">
+              {urduGuide.partExamples.map((example, index) => (
+                <li key={index} className="rounded-md border bg-background p-3 text-lg leading-loose">
+                  {text(example)}
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section className="space-y-2 rounded-lg border p-4">
+            <p className="text-lg font-semibold">طلبہ کے لیے نمونہ (بورڈ پر لکھیں)</p>
+            <p className={urduClass}>{text(urduGuide.studentWorkTemplate)}</p>
+          </section>
+          <section className="space-y-2 rounded-lg border p-4">
+            <p className="text-lg font-semibold">کلاس میں کیسے چلائیں</p>
+            <p className={urduClass}>{text(urduGuide.warmUp)}</p>
+            <ol className="list-decimal space-y-2 pr-5 text-lg leading-loose">
+              {urduGuide.steps.map((step, index) => (
+                <li key={index}>{text(step)}</li>
+              ))}
+            </ol>
+            <p className={urduClass}>{text(urduGuide.recap)}</p>
+          </section>
+          <section className="space-y-2">
+            <p className="text-lg font-semibold">جانچ</p>
+            <p className={urduClass}>{text(urduGuide.checkQuestion)}</p>
+            <p className="text-base text-muted-foreground">دیکھیں: {text(urduGuide.expectedAnswer)}</p>
+            <p className={urduClass}>اختتام: {text(urduGuide.exitTicket)}</p>
+          </section>
+        </div>
+      )}
+
+      {help && !loading && language === "en" && (
+        <div className="space-y-5">
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{payload?.aiGenerated ? "AI" : "Draft"}</Badge>
             {payload?.cached && <Badge variant="outline">Saved</Badge>}
           </div>
 
-          <section className="space-y-1">
-            <p className="font-medium">In short</p>
-            <p className="text-muted-foreground">{text(help.overview.teachingOverview)}</p>
+          <section className="space-y-2">
+            <p className="text-lg font-semibold">In short</p>
+            <p className={mutedClass}>{text(help.overview.teachingOverview)}</p>
             {help.overview.estimatedDurationMinutes != null && (
-              <p className="text-xs text-muted-foreground">About {help.overview.estimatedDurationMinutes} minutes</p>
+              <p className="text-sm text-muted-foreground">About {help.overview.estimatedDurationMinutes} minutes</p>
             )}
           </section>
 
-          {help.classroomDelivery.activity?.title === "Chapter recap" &&
-            help.sourceAndConfidence.sourceSupportedClaims.length > 0 && (
-              <section className="space-y-1">
-                <p className="font-medium">Parts to put on the board</p>
-                <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
-                  {help.sourceAndConfidence.sourceSupportedClaims.slice(0, 5).map((part, index) => (
-                    <li key={index}>{text(part)}</li>
-                  ))}
-                </ol>
-              </section>
-            )}
-
-          {help.teacherExplanation.examples.length > 0 && (
-            <section className="space-y-2 rounded-lg border bg-muted/30 p-4">
-              <p className="font-medium">Example you can use</p>
-              <ul className="list-disc space-y-1 pl-5">
-                {help.teacherExplanation.examples.map((example, index) => (
-                  <li key={index}>{text(example)}</li>
+          {isChapterRecap && (
+            <section className="space-y-2 rounded-lg border bg-muted/20 p-4">
+              <p className="text-lg font-semibold">Parts to put on the board</p>
+              <ol className="list-decimal space-y-2 pl-5 text-base leading-relaxed">
+                {help.sourceAndConfidence.sourceSupportedClaims.slice(0, 5).map((part, index) => (
+                  <li key={index}>{text(part)}</li>
                 ))}
-              </ul>
+              </ol>
+            </section>
+          )}
+
+          {studentTemplate && (
+            <section className="space-y-2 rounded-lg border-2 border-dashed border-primary/40 bg-primary/5 p-4">
+              <p className="text-lg font-semibold">Template for students (put on the board)</p>
+              <p className={bodyClass}>{text(studentTemplate.replace(/^Student work template[^:]*:\s*/i, ""))}</p>
+              <p className="text-sm text-muted-foreground">
+                Students copy this layout for their group part — they follow your examples in “Examples for you”.
+              </p>
+            </section>
+          )}
+
+          {(openingExample || partExamples.length > 0) && (
+            <section className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <p className="text-lg font-semibold">Examples for you</p>
+              {openingExample && <p className={bodyClass}>{text(openingExample)}</p>}
+              {partExamples.length > 0 && (
+                <ul className="space-y-3">
+                  {partExamples.map((example, index) => (
+                    <li
+                      key={index}
+                      className="rounded-md border bg-background p-3 text-base leading-relaxed"
+                    >
+                      {text(example)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {!partExamples.length &&
+                help.teacherExplanation.examples
+                  .filter((line) => line !== openingExample)
+                  .map((example, index) => (
+                    <p key={index} className={bodyClass}>
+                      {text(example)}
+                    </p>
+                  ))}
             </section>
           )}
 
           {help.classroomDelivery.activity && (
-            <section className="space-y-2 rounded-lg border p-4">
-              <p className="font-medium">
+            <section className="space-y-3 rounded-lg border p-4">
+              <p className="text-lg font-semibold">
                 {text(help.classroomDelivery.activity.title)}
                 <span className="font-normal text-muted-foreground">
                   {" "}
                   · {help.classroomDelivery.activity.minutes} min
                 </span>
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 Materials: {text(help.classroomDelivery.activity.materials)}
               </p>
               {mode === "CLASSROOM_ACTIVITY" && (
-                <p className="text-muted-foreground">{text(help.classroomDelivery.warmUp)}</p>
+                <p className={mutedClass}>{text(help.classroomDelivery.warmUp)}</p>
               )}
-              <ol className="list-decimal space-y-1 pl-5">
+              <p className="text-lg font-medium">Steps</p>
+              <ol className="list-decimal space-y-2 pl-5 text-base leading-relaxed">
                 {help.classroomDelivery.activity.steps.map((step, index) => (
                   <li key={index}>{text(step)}</li>
                 ))}
               </ol>
               {mode === "CLASSROOM_ACTIVITY" && (
-                <p className="text-muted-foreground">{text(help.classroomDelivery.recap)}</p>
+                <p className={mutedClass}>{text(help.classroomDelivery.recap)}</p>
               )}
             </section>
           )}
 
           {mode !== "CLASSROOM_ACTIVITY" && (
             <section className="space-y-2">
-              <p className="font-medium">How to run it</p>
-              <p className="text-muted-foreground">{text(help.classroomDelivery.warmUp)}</p>
-              <ol className="list-decimal space-y-1 pl-5">
+              <p className="text-lg font-semibold">How to run it</p>
+              <p className={mutedClass}>{text(help.classroomDelivery.warmUp)}</p>
+              <ol className="list-decimal space-y-2 pl-5 text-base leading-relaxed">
                 {help.classroomDelivery.teachingSteps.slice(0, 4).map((step, index) => (
                   <li key={index}>{text(step)}</li>
                 ))}
               </ol>
-              <p className="text-muted-foreground">{text(help.classroomDelivery.recap)}</p>
+              <p className={mutedClass}>{text(help.classroomDelivery.recap)}</p>
             </section>
           )}
 
-          <section className="space-y-2">
-            <p className="font-medium">Check</p>
+          <section className="space-y-3">
+            <p className="text-lg font-semibold">Check</p>
             {help.assessment.formativeQuestions.slice(0, 2).map((item, index) => (
-              <div key={index}>
-                <p>{text(item.question)}</p>
-                <p className="text-xs text-muted-foreground">Look for: {text(item.expectedAnswer)}</p>
+              <div key={index} className="space-y-1">
+                <p className={bodyClass}>{text(item.question)}</p>
+                <p className="text-sm text-muted-foreground">Look for: {text(item.expectedAnswer)}</p>
               </div>
             ))}
-            <p className="text-muted-foreground">Exit: {text(help.assessment.exitTicket)}</p>
+            <p className={mutedClass}>Exit: {text(help.assessment.exitTicket)}</p>
           </section>
 
           {(help.differentiation.struggling[0] || help.differentiation.extension[0]) && (
-            <section className="space-y-1">
-              <p className="font-medium">If the class splits</p>
+            <section className="space-y-2">
+              <p className="text-lg font-semibold">If the class splits</p>
               {help.differentiation.struggling[0] && (
-                <p className="text-muted-foreground">Support: {text(help.differentiation.struggling[0])}</p>
+                <p className={mutedClass}>Support: {text(help.differentiation.struggling[0])}</p>
               )}
               {help.differentiation.extension[0] && (
-                <p className="text-muted-foreground">Stretch: {text(help.differentiation.extension[0])}</p>
+                <p className={mutedClass}>Stretch: {text(help.differentiation.extension[0])}</p>
               )}
             </section>
+          )}
+
+          {help.sourceAndConfidence.limitations && (
+            <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+              {text(help.sourceAndConfidence.limitations)}
+            </p>
           )}
 
           <Button type="button" variant="ghost" size="sm" onClick={() => setShowMore((open) => !open)}>
@@ -273,30 +428,29 @@ export function TeachingHelpScreen({ lesson, onBack }: TeachingHelpScreenProps) 
           </Button>
 
           {showMore && (
-            <div className="space-y-3 rounded-lg border bg-muted/30 p-4 text-muted-foreground">
+            <div className="space-y-3 rounded-lg border bg-muted/30 p-4 text-base leading-relaxed text-muted-foreground">
               <div>
                 <p className="font-medium text-foreground">What to say</p>
                 <p>{text(help.teacherExplanation.simpleExplanation)}</p>
               </div>
               {help.learningObjectives.length > 0 && (
-                <ul className="list-disc pl-5">
+                <ul className="list-disc space-y-1 pl-5">
                   {help.learningObjectives.map((objective, index) => (
                     <li key={index}>{text(objective)}</li>
                   ))}
                 </ul>
               )}
               {help.classroomDelivery.questionsDuringLesson.length > 0 && (
-                <ul className="list-disc pl-5">
+                <ul className="list-disc space-y-1 pl-5">
                   {help.classroomDelivery.questionsDuringLesson.map((question, index) => (
                     <li key={index}>{text(question)}</li>
                   ))}
                 </ul>
               )}
-              <p>{text(help.sourceAndConfidence.limitations)}</p>
             </div>
           )}
 
-          {payload?.disclaimer && <p className="text-xs text-muted-foreground">{text(payload.disclaimer)}</p>}
+          {payload?.disclaimer && <p className="text-sm text-muted-foreground">{text(payload.disclaimer)}</p>}
         </div>
       )}
     </div>

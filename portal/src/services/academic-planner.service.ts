@@ -727,6 +727,17 @@ export const academicPlannerService = {
     );
   },
 
+  teachingHelpUrdu(
+    plannerId: string,
+    lessonKey: string,
+    body?: { versionId?: string; mode?: TeachingAssistanceMode; variety?: number },
+  ) {
+    return apiClient<TeachingHelpPayload & { urduGuide: TeachingHelpUrduGuide }>(
+      `/academic-planners/${plannerId}/lessons/${lessonKey}/teaching-help/urdu`,
+      { method: "POST", body: JSON.stringify(body ?? {}), timeoutMs: 120_000 },
+    );
+  },
+
 
 
   listRecoveryEligible(plannerId: string) {
@@ -925,6 +936,22 @@ export type TeachingHelpOutput = {
   };
 };
 
+export type TeachingHelpUrduGuide = {
+  teachingOverview: string;
+  boardParts: string[];
+  openingLine: string;
+  partExamples: string[];
+  steps: string[];
+  warmUp: string;
+  recap: string;
+  studentWorkTemplate: string;
+  checkQuestion: string;
+  expectedAnswer: string;
+  exitTicket: string;
+  support?: string;
+  stretch?: string;
+};
+
 export type TeachingHelpPayload = {
   lessonKey: string;
   title: string;
@@ -945,6 +972,7 @@ export type TeachingHelpPayload = {
     missingNotes: string[];
   };
   assistance: TeachingHelpOutput;
+  urduGuide?: TeachingHelpUrduGuide | null;
   aiGenerated: boolean;
   cached: boolean;
   promptVersion: string;

@@ -22,6 +22,7 @@ import { TEACHING_HELP_PROMPT_VERSION } from '../ai/prompts';
 import { TeachingHelpGenerationError } from '../ai/teaching-help-errors';
 import { loadTeachingPacksByChapterIds } from '../library-books/chapter-teaching-pack-analysis.loader';
 import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
+import { buildUrduTeachingGuide } from './teaching-help-urdu';
 
 const ADMIN_CONTENT_MESSAGE =
   'The source lesson content is not available yet. Please ask your school administrator to check the assigned textbook content.';
@@ -211,12 +212,28 @@ export class PlannerTeachingHelpService {
         missingNotes: resolved.missingNotes,
       },
       assistance: generated.assistance,
+      urduGuide: null,
       aiGenerated: generated.aiGenerated,
       cached: generated.cached,
       promptVersion: generated.promptVersion,
       provider: generated.provider ?? null,
       disclaimer,
       unavailableMessage: null,
+    };
+  }
+
+  async teachingHelpUrdu(
+    user: AuthUser,
+    plannerId: string,
+    lessonKey: string,
+    versionId?: string,
+    modeInput?: TeachingAssistanceMode,
+    varietyInput?: number,
+  ) {
+    const english = await this.teachingHelp(user, plannerId, lessonKey, versionId, modeInput, undefined, varietyInput);
+    return {
+      ...english,
+      urduGuide: buildUrduTeachingGuide(english.assistance),
     };
   }
 

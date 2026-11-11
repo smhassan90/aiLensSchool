@@ -256,6 +256,24 @@ export class AcademicPlannersController {
     );
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post(':id/lessons/:lessonKey/teaching-help/urdu')
+  getTeachingHelpUrdu(
+    @CurrentUser() user: AuthUser,
+    @Param('id') plannerId: string,
+    @Param('lessonKey') lessonKey: string,
+    @Body() body: TeachingHelpRequestDto,
+  ) {
+    return this.teachingHelpService.teachingHelpUrdu(
+      user,
+      plannerId,
+      lessonKey,
+      body?.versionId,
+      body?.mode,
+      body?.variety,
+    );
+  }
+
   @Get(':id/recovery-eligible')
   recoveryEligible(@CurrentUser() user: AuthUser, @Param('id') plannerId: string) {
     return this.recovery.listEligible(user, plannerId);

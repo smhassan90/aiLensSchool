@@ -1,10 +1,10 @@
 import { TeachingHelpOutput } from '../ai/schemas/teaching-help.schema';
 import {
-  buildChapterActivityScript,
   ideasFromChapterText,
   pickActivityStyle,
   shortTeachingIdeas,
   themeShortLabel,
+  workedPartExamples,
 } from './classroom-activity-styles';
 
 function usableObjectives(objectives: string[]): string[] {
@@ -34,17 +34,19 @@ function buildChapterActivityHelp(input: {
   variety?: number;
 }): TeachingHelpOutput {
   const labels = input.themes.map(themeShortLabel);
+  const partCount = Math.max(labels.length, 3);
   const sourceLabel = input.bookTitle?.trim() || input.chapterTitle;
   const steps = [
-    'Read the numbered parts from the board once.',
-    'Groups take one part each; write meaning, one textbook line, one real example.',
-    'Groups share for two minutes; you add one missing detail from the book.',
-    'Close: one sentence linking at least two parts to the chapter title.',
+    'Read each numbered part on the board slowly (about one minute).',
+    'Each group takes one part. They write: simple meaning, one line from the book, one real example (school, road, or home).',
+    'Each group shares for about two minutes. You add one fact they missed.',
+    'One student joins two parts in one short sentence.',
   ];
 
+  const partExamples = workedPartExamples(input.themes);
   const examples = [
-    `You say: "Each group owns one part: ${labels.slice(0, 3).join('; ')}.${labels.length > 3 ? ' …' : ''} Explain it so a Class 6 student understands."`,
-    `Good group line: they use their part plus one concrete example (school gate, road, debate in class). Weak: repeating only part 1 or copying one helmet sentence from the book.`,
+    `You say: “Today we close the unit. I numbered ${partCount} parts on the board. Your group explains your part in easy words — not only the first topic in the book.”`,
+    ...partExamples,
   ];
 
   return {
@@ -52,27 +54,27 @@ function buildChapterActivityHelp(input: {
       subject: input.subjectName,
       classLabel: input.classLabel,
       lessonTitle: input.lessonTitle,
-      teachingOverview: `Chapter recap for ${input.chapterTitle}. Students work through ${Math.max(labels.length, 3)} main parts, not one topic only.`,
+      teachingOverview: `Whole-unit recap: students explain ${partCount} main parts in simple words, with a real example for each part.`,
       estimatedDurationMinutes: 40,
       durationIsSuggestion: true,
     },
     learningObjectives: [
-      'Each group can explain one part of the chapter in plain words with one real-life example.',
-      'The class can say how at least two parts fit the chapter title.',
+      'Each group explains one part in plain words and gives one real example.',
+      'The class can name how two different parts fit the unit title.',
     ],
     teacherExplanation: {
       simpleExplanation:
-        'This period is a recap of the whole chapter. Put each main part on the board and let groups own one part each.',
+        'Put the main parts on the board. Groups own one part each. Your job is to listen, then add one missing line from the textbook.',
       stepByStep: steps,
       terminology: [],
       examples,
     },
     classroomDelivery: {
-      warmUp: `Ask: "Name three different things we learned in ${input.chapterTitle} — not the same idea three times."`,
-      teachingSteps: ['Follow the chapter recap script. Keep your talk short; groups do the thinking.'],
+      warmUp: 'Ask: “Name three different things from this unit — not the same thing three times.”',
+      teachingSteps: ['Keep your talk short. Groups do most of the explaining.'],
       questionsDuringLesson: [
-        'Which part was hardest to explain in your own words?',
-        'What example would you use for your part outside school?',
+        'Which part was hardest to say in your own words?',
+        'What example from home or school fits your part?',
       ],
       activity: {
         title: 'Chapter recap',
@@ -80,34 +82,34 @@ function buildChapterActivityHelp(input: {
         steps,
         minutes: 35,
       },
-      recap: 'One student links two board parts in a single sentence using the chapter title.',
+      recap: 'One student links two board parts in one sentence (e.g. road safety and debate rules).',
     },
     assessment: {
       formativeQuestions: [
         {
-          question: `Pick your group's part and explain it without reading the chapter title aloud.`,
-          expectedAnswer: 'Uses the assigned part plus one accurate example from the chapter themes.',
+          question: 'Explain your group’s part in your own words, with one example.',
+          expectedAnswer: 'Names the part clearly and gives one example that matches the textbook idea.',
           kind: 'understanding',
         },
       ],
-      exitTicket: 'Write one thing from your part and one thing from another group’s part.',
+      exitTicket: 'Write one point from your part and one point you heard from another group.',
     },
     differentiation: {
-      struggling: ['Give the group the first sentence of their part from the textbook to finish.'],
-      extension: ['Ask the group to pose one exam-style question about their part for the class.'],
+      struggling: ['Give the group the first sentence of their part from the book to finish in simple words.'],
+      extension: ['Ask the group to write one short exam-style question about their part.'],
     },
     sourceAndConfidence: {
       sourcesUsed: [sourceLabel.slice(0, 180)],
       sourceSupportedClaims: input.themes.slice(0, 5),
-      pedagogicalSuggestions: ['Chapter recap script. Match board parts to your textbook before class.'],
+      pedagogicalSuggestions: [
+        'Student work template (copy on the board): Part name | Simple meaning | One line from the book | One home/school example — each group fills one row set.',
+        'Match board part names to your textbook headings before class.',
+      ],
       missingOrAmbiguous:
         input.themes.length < 2
           ? ['Few teaching points were found; add board parts from the textbook headings.']
           : [],
-      limitations:
-        input.themes.length < 2
-          ? 'Add board parts from textbook headings before class.'
-          : 'Short plan from the chapter notes. Verify against the textbook.',
+      limitations: 'Draft from chapter notes — check names and examples in your textbook before class.',
     },
   };
 }

@@ -50,7 +50,8 @@ describe('heuristicTeachingHelp', () => {
 
     expect(help.classroomDelivery.activity?.title).toBe('Chapter recap');
     expect(help.overview.teachingOverview).toMatch(/main parts/i);
-    expect(help.teacherExplanation.examples.length).toBeGreaterThan(0);
+    expect(help.teacherExplanation.examples.length).toBeGreaterThan(2);
+    expect(help.teacherExplanation.examples.some((line) => /^Part \d+/.test(line))).toBe(true);
     expect(help.sourceAndConfidence.sourceSupportedClaims.length).toBeGreaterThanOrEqual(2);
     const joined = [
       help.overview.teachingOverview,

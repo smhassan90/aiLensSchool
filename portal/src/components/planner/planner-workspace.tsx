@@ -69,7 +69,11 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
       academicPlannerService.generateSchedule(plannerId, versionId, data!.version.revision),
     onSuccess: (payload) => {
       queryClient.setQueryData(["planner-version", plannerId, versionId], payload);
-      toast({ title: "Schedule generated", variant: "success" });
+      toast({
+        title: "Schedule ready",
+        description: "Chapters were analyzed and lessons were placed on the calendar.",
+        variant: "success",
+      });
     },
     onError: (err) => {
       toast({
@@ -135,32 +139,6 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
     },
   });
 
-  const analyzeAll = useMutation({
-    mutationFn: async () => {
-      if (!data) return data;
-      let revision = data.version.revision;
-      for (const chapter of data.chapters) {
-        const key = String(chapter.chapterKey);
-        const payload = await academicPlannerService.analyzeChapter(plannerId, versionId, key, {
-          expectedRevision: revision,
-        });
-        revision = payload.version.revision;
-      }
-      return revision;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["planner-version", plannerId, versionId] });
-      toast({ title: "Chapters analyzed", variant: "success" });
-    },
-    onError: (err) => {
-      toast({
-        title: "Analysis failed",
-        description: friendlyApiErrorMessage(err),
-        variant: "error",
-      });
-    },
-  });
-
   if (isLoading) return <PageLoader />;
   if (isError || !data) {
     return (
@@ -174,7 +152,6 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
   const weeks = toCalendarWeeks(data);
   const timeline = toTimeline(data);
   const outline = toOutline(data);
-  const pendingAnalysis = data.chapters.filter((c) => !c.analysisSource);
   const dayPlanLessons = [...data.lessons].sort((a, b) => {
     const da = a.dayNumber ?? a.sequence;
     const db = b.dayNumber ?? b.sequence;
@@ -238,40 +215,21 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
 
       {!readOnly && data.permissions.canEdit && data.version.origin !== "RECOVERY" && (
         <div className="space-y-2">
-          {pendingAnalysis.length > 0 && (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              {pendingAnalysis.length} chapter(s) not analyzed yet:{" "}
-              {pendingAnalysis.map((c) => c.title).join(", ")}. Use{" "}
-              <strong>Analyze all chapters</strong>, or{" "}
-              <strong>Generate schedule</strong> to analyze them automatically.
-            </div>
-          )}
           {!data.version.summary && (
             <p className="text-sm text-muted-foreground">
-              Analyze all chapters, then generate the schedule. If your school has not published a
-              timetable for this subject, the planner uses assumed weekly periods (see warnings after
-              generation).
+              Build the schedule in one step — we analyze each chapter and place lessons on your dates.
+              Without a published timetable for this subject, assumed weekly periods apply (see warnings after
+              building).
             </p>
           )}
-          <div className="flex flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            type="button"
-            variant="outline"
-            disabled={analyzeAll.isPending || !data.chapters.length}
-            onClick={() => analyzeAll.mutate()}
-          >
-            {analyzeAll.isPending ? "Analyzing…" : "Analyze all chapters"}
-          </Button>
           <Button
             type="button"
             size="sm"
-            disabled={generate.isPending}
+            disabled={generate.isPending || !data.chapters.length}
             onClick={() => generate.mutate()}
           >
-            {generate.isPending ? "Generating…" : "Generate schedule"}
+            {generate.isPending ? "Analyzing chapters & building schedule…" : "Build schedule"}
           </Button>
-          </div>
         </div>
       )}
 
