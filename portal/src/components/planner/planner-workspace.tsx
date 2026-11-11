@@ -25,6 +25,7 @@ import { fixDisplayText } from "@/lib/fix-display-text";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/providers/toast-provider";
 import { friendlyApiErrorMessage } from "@/lib/display-labels";
+import { ChapterTeachingPackDebug } from "@/components/planner/chapter-teaching-pack-debug";
 
 type PlannerWorkspaceProps = {
   plannerId: string;
@@ -358,7 +359,16 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
           {outline.map((chapter) => (
             <div key={chapter.chapterKey}>
               <p className="mb-2 font-medium">{chapter.title}</p>
-              <div className="space-y-2 border-l-2 border-primary/20 pl-3">
+              {data.planner.libraryBook?.id && (
+                <ChapterTeachingPackDebug
+                  mode="planner"
+                  plannerId={plannerId}
+                  versionId={versionId}
+                  chapterKey={chapter.chapterKey}
+                  chapterTitle={chapter.title}
+                />
+              )}
+              <div className="mt-2 space-y-2 border-l-2 border-primary/20 pl-3">
                 {chapter.lessons.map((lesson) => (
                   <LessonCard
                     key={lesson.lessonKey}

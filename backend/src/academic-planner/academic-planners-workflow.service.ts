@@ -26,6 +26,8 @@ import { TimetableResolverService } from '../timetables/timetable-resolver.servi
 import { teacherDisplayName } from '../common/utils/person-name';
 import { gradeClassLabel, sectionClassLabel } from '../common/utils/section-class-label';
 import { joinCompiledChapter } from '../ai/schemas/chapter-compile.schema';
+import { plannerChapterContentHash, plannerChapterContentStatus } from './planner-content.util';
+import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
 import { AcademicPlannersService } from './academic-planners.service';
 import { PlannerContentService } from './planner-content.service';
 import { buildPlannerTeachingSlots } from './academic-planners-schedule.helper';
@@ -314,6 +316,138 @@ export class AcademicPlannersWorkflowService {
         wordCount,
       };
     });
+  }
+
+  /** DEV: inspect library teaching pack columns without loading full chapter OCR text. */
+  async getChapterTeachingPackDebug(user: AuthUser, bookId: string, libraryChapterId: string) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const grant = await this.prisma.libraryBookGrant.findFirst({
+      where: { schoolId, bookId, canRead: true },
+    });
+    if (!grant) {
+      throw new NotFoundException({ code: 'BOOK_NOT_ASSIGNED', message: 'Book is not assigned to this school' });
+    }
+    const chapter = await this.prisma.libraryBookChapter.findFirst({
+      where: { id: libraryChapterId, bookId },
+      select: {
+        id: true,
+        chapterNumber: true,
+        title: true,
+        publishedText: true,
+        exercisesText: true,
+      },
+    });
+    if (!chapter) {
+      throw new NotFoundException({ code: 'CHAPTER_NOT_FOUND', message: 'Chapter not found in this book' });
+    }
+
+    const contentHash = plannerChapterContentHash(chapter.publishedText, chapter.exercisesText);
+    const contentStatus = plannerChapterContentStatus(chapter.publishedText, chapter.exercisesText);
+    const compiled = joinCompiledChapter(chapter.publishedText, chapter.exercisesText).trim();
+
+    const packRow = await this.prisma.libraryChapterTeachingPack.findUnique({
+      where: { libraryBookChapterId: libraryChapterId },
+      include: {
+        readingSlices: { orderBy: { sortOrder: 'asc' } },
+        questions: { orderBy: { sortOrder: 'asc' } },
+        activities: { orderBy: { sortOrder: 'asc' } },
+        revisionPoints: { orderBy: { sortOrder: 'asc' } },
+      },
+    });
+
+    return {
+      chapter: {
+        id: chapter.id,
+        title: fixLibraryTextEncoding(chapter.title),
+        chapterNumber: chapter.chapterNumber,
+        contentHash,
+        contentStatus,
+        compiledCharCount: compiled.length,
+        compiledWordCount: compiled.split(/\s+/).filter(Boolean).length,
+      },
+      pack: packRow
+        ? {
+            id: packRow.id,
+            contentHash: packRow.contentHash,
+            hashMatchesChapter: packRow.contentHash === contentHash,
+            complexity: packRow.complexity,
+            summary: fixLibraryTextEncoding(packRow.summary),
+            teacherGuide: teachingPackStringArray(packRow.teacherGuide),
+            source: packRow.source,
+            promptVersion: packRow.promptVersion,
+            warnings: packRow.warnings,
+            generatedAt: packRow.generatedAt.toISOString(),
+            readingSlices: packRow.readingSlices.map((s) => ({
+              sortOrder: s.sortOrder,
+              sliceKey: s.sliceKey,
+              title: fixLibraryTextEncoding(s.title),
+              readingFrom: fixLibraryTextEncoding(s.readingFrom),
+              readingTo: s.readingTo ? fixLibraryTextEncoding(s.readingTo) : null,
+              explainPoints: teachingPackStringArray(s.explainPoints),
+            })),
+            questions: packRow.questions.map((q) => ({
+              sortOrder: q.sortOrder,
+              sliceKey: q.sliceKey,
+              question: fixLibraryTextEncoding(q.question),
+              expectedAnswer: fixLibraryTextEncoding(q.expectedAnswer),
+              format: q.format,
+            })),
+            activities: packRow.activities.map((a) => ({
+              sortOrder: a.sortOrder,
+              sliceKey: a.sliceKey,
+              title: fixLibraryTextEncoding(a.title),
+              description: fixLibraryTextEncoding(a.description),
+              participationTechnique: fixLibraryTextEncoding(a.participationTechnique),
+              materials: a.materials ? fixLibraryTextEncoding(a.materials) : null,
+            })),
+            revisionPoints: packRow.revisionPoints.map((r) => ({
+              sortOrder: r.sortOrder,
+              sliceKey: r.sliceKey,
+              point: fixLibraryTextEncoding(r.point),
+            })),
+          }
+        : null,
+    };
+  }
+
+  async getPlannerChapterTeachingPackDebug(
+    user: AuthUser,
+    plannerId: string,
+    versionId: string,
+    chapterKey: string,
+  ) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const planner = await this.prisma.academicPlanner.findFirst({
+      where: { id: plannerId, schoolId },
+      select: { libraryBookId: true },
+    });
+    if (!planner?.libraryBookId) {
+      throw new NotFoundException({ code: 'PLANNER_NOT_FOUND', message: 'Planner not found' });
+    }
+    const chapter = await this.prisma.plannerChapter.findFirst({
+      where: { versionId, chapterKey, version: { plannerId, schoolId } },
+    });
+    if (!chapter?.libraryBookChapterId) {
+      throw new NotFoundException({ code: 'PLANNER_CHAPTER_NOT_FOUND', message: 'Planner chapter not found' });
+    }
+    const base = await this.getChapterTeachingPackDebug(user, planner.libraryBookId, chapter.libraryBookChapterId);
+    return {
+      ...base,
+      plannerChapter: {
+        chapterKey: chapter.chapterKey,
+        titleSnapshot: fixLibraryTextEncoding(chapter.titleSnapshot),
+        contentHash: chapter.contentHash,
+        contentStatus: chapter.contentStatus,
+        hashMatchesPack:
+          Boolean(base.pack && chapter.contentHash && base.pack.contentHash === chapter.contentHash),
+        analysisSource: chapter.analysisSource,
+        analysisWarnings: chapter.analysisWarnings,
+        analyzedAt: chapter.analyzedAt?.toISOString() ?? null,
+        analysis: chapter.analysis,
+        activitiesEnabled: chapter.activitiesEnabled,
+        activityCount: chapter.activityCount,
+      },
+    };
   }
 
   async analyzeChapter(
@@ -1078,4 +1212,11 @@ export class AcademicPlannersWorkflowService {
 
     return { planner, version, chapter };
   }
+}
+
+function teachingPackStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+    .map((s) => fixLibraryTextEncoding(s));
 }

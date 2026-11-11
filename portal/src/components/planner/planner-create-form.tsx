@@ -18,6 +18,7 @@ import { ApiClientError } from "@/lib/api-client";
 import { friendlyApiErrorMessage } from "@/lib/display-labels";
 import { PageLoader } from "@/components/layout/page-loader";
 import { EmptyState } from "@/components/layout/empty-state";
+import { ChapterTeachingPackDebug } from "@/components/planner/chapter-teaching-pack-debug";
 
 const schema = z.object({
   classKey: z.string().min(1, "Select a class and subject"),
@@ -319,22 +320,33 @@ export function PlannerCreateForm() {
           {(chapters.data ?? []).map((chapter) => {
             const checked = selectedChapters.includes(chapter.id);
             return (
-              <li key={chapter.id} className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => {
-                    setSelectedChapters((prev) =>
-                      checked ? prev.filter((id) => id !== chapter.id) : [...prev, chapter.id],
-                    );
-                  }}
-                />
-                <span>
-                  {chapter.title}
-                  {!chapter.hasContent && (
-                    <span className="ml-1 text-amber-700">(limited content)</span>
-                  )}
-                </span>
+              <li key={chapter.id} className="text-sm">
+                <div className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    className="mt-1"
+                    onChange={() => {
+                      setSelectedChapters((prev) =>
+                        checked ? prev.filter((id) => id !== chapter.id) : [...prev, chapter.id],
+                      );
+                    }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    {chapter.title}
+                    {!chapter.hasContent && (
+                      <span className="ml-1 text-amber-700">(limited content)</span>
+                    )}
+                    {libraryBookId && (
+                      <ChapterTeachingPackDebug
+                        mode="library"
+                        bookId={libraryBookId}
+                        chapterId={chapter.id}
+                        chapterTitle={chapter.title}
+                      />
+                    )}
+                  </span>
+                </div>
               </li>
             );
           })}

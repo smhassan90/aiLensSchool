@@ -340,6 +340,48 @@ export type PlannerBookChapter = {
 
 };
 
+/** DEV: library teaching pack inspector (no full chapter OCR in API). */
+export type ChapterTeachingPackDebugPayload = {
+  chapter: {
+    id: string;
+    title: string;
+    chapterNumber: number | null;
+    contentHash: string;
+    contentStatus: string;
+    compiledCharCount: number;
+    compiledWordCount: number;
+  };
+  pack: {
+    id: string;
+    contentHash: string;
+    hashMatchesChapter: boolean;
+    complexity: string;
+    summary: string;
+    teacherGuide: string[];
+    source: string;
+    promptVersion: string;
+    warnings: unknown;
+    generatedAt: string;
+    readingSlices: unknown[];
+    questions: unknown[];
+    activities: unknown[];
+    revisionPoints: unknown[];
+  } | null;
+  plannerChapter?: {
+    chapterKey: string;
+    titleSnapshot: string;
+    contentHash: string | null;
+    contentStatus: string;
+    hashMatchesPack: boolean;
+    analysisSource: string | null;
+    analysisWarnings: unknown;
+    analyzedAt: string | null;
+    analysis: unknown;
+    activitiesEnabled: boolean;
+    activityCount: number;
+  };
+};
+
 
 
 export type CreatePlannerInput = {
@@ -424,6 +466,18 @@ export const academicPlannerService = {
 
     return apiClient<PlannerBookChapter[]>(`/academic-planners/books/${bookId}/chapters`);
 
+  },
+
+  getChapterTeachingPackDebug(bookId: string, chapterId: string) {
+    return apiClient<ChapterTeachingPackDebugPayload>(
+      `/academic-planners/books/${bookId}/chapters/${chapterId}/teaching-pack-debug`,
+    );
+  },
+
+  getPlannerChapterTeachingPackDebug(plannerId: string, versionId: string, chapterKey: string) {
+    return apiClient<ChapterTeachingPackDebugPayload>(
+      `/academic-planners/${plannerId}/v/${versionId}/chapters/${chapterKey}/teaching-pack-debug`,
+    );
   },
 
 

@@ -48,6 +48,16 @@ export class AcademicPlannersController {
     return this.workflow.listBookChapters(user, bookId);
   }
 
+  /** DEV: teaching pack column inspector (no full chapter OCR). */
+  @Get('books/:bookId/chapters/:chapterId/teaching-pack-debug')
+  getChapterTeachingPackDebug(
+    @CurrentUser() user: AuthUser,
+    @Param('bookId') bookId: string,
+    @Param('chapterId') chapterId: string,
+  ) {
+    return this.workflow.getChapterTeachingPackDebug(user, bookId, chapterId);
+  }
+
   @Get('approvals')
   listApprovals(@CurrentUser() user: AuthUser) {
     return this.approval.listApprovals(user);
@@ -92,6 +102,17 @@ export class AcademicPlannersController {
     @Param('versionId') versionId: string,
   ) {
     return this.planners.getVersionPayload(user, plannerId, versionId);
+  }
+
+  /** DEV: teaching pack + planner chapter analysis for one chapter. */
+  @Get(':id/v/:versionId/chapters/:chapterKey/teaching-pack-debug')
+  getPlannerChapterTeachingPackDebug(
+    @CurrentUser() user: AuthUser,
+    @Param('id') plannerId: string,
+    @Param('versionId') versionId: string,
+    @Param('chapterKey') chapterKey: string,
+  ) {
+    return this.workflow.getPlannerChapterTeachingPackDebug(user, plannerId, versionId, chapterKey);
   }
 
   @Post(':id/v/:versionId/chapters/:chapterKey/analyze')
