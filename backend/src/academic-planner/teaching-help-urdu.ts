@@ -40,15 +40,15 @@ export function buildUrduTeachingGuide(help: TeachingHelpOutput): TeachingHelpUr
         boardParts.length > 0
           ? boardParts
           : ['بورڈ پر کتاب کے سرخیاں لکھیں (۳ سے ۴)'],
-      openingLine:
-        opening ||
-        'آپ کہیں: “آج ہم یونٹ بند کر رہے ہیں۔ ہر گروپ کو بورڈ پر ایک نمبر ملے گا۔ آسان الفاظ میں سمجھائیں اور ایک مثال دیں۔”',
-      partExamples: partExamples.length
+      openingLine: `آپ کہیں: “آج ہم یونٹ بند کر رہے ہیں۔ بورڈ پر ${partCount} نمبر والے حصے ہیں۔ ہر گروپ اپنا حصہ آسان الفاظ میں سمجھائے اور ایک مثال دے — صرف پہلی سرخی نہیں۔”`,
+      partExamples: (partExamples.length
         ? partExamples.map(urduPartExampleLine)
         : [
             'حصہ ۱ — طالب علم کہے: “ہیلمیٹ لگانا لازم ہے۔” آپ جوڑیں: “سخت حادثے میں سر کی چوٹ کم ہوتی ہے۔”',
             'حصہ ۲ — طالب علم کہے: “بحث میں دو ٹیمیں ہوتی ہیں۔” آپ جوڑیں: “جج فیصلہ کرتا ہے، ہر بولنے والے کی باری مقرر ہوتی ہے۔”',
-          ],
+          ]).map((line) =>
+        line.replace(/Student might say:/gi, 'طالب علم کہے:').replace(/You add:/gi, 'آپ جوڑیں:'),
+      ),
       steps: [
         'بورڈ کے نمبروں والے حصے ایک بار آہستہ پڑھ کر سنائیں (تقریباً ایک منٹ)۔',
         'ہر گروپ ایک حصہ لے۔ معنی، کتاب کی ایک سطر، اور گھر/سکول کی مثال لکھیں۔',

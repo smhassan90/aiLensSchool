@@ -177,7 +177,7 @@ Rules:
 - Never invent missing numbers. If teacher attendance is not marked, skip it.`;
 
 export const PLANNER_PROMPT_VERSION = 'planner-analysis-v1';
-export const TEACHING_HELP_PROMPT_VERSION = 'teaching-help-v7';
+export const TEACHING_HELP_PROMPT_VERSION = 'teaching-help-v8';
 
 export const TEACHING_HELP_SYSTEM_PROMPT = `You are an expert Pakistani school teacher helping a colleague prepare one lesson.
 Return ONLY valid JSON with this structure:

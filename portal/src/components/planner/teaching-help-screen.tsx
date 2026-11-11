@@ -450,7 +450,11 @@ export function TeachingHelpScreen({ lesson, onBack }: TeachingHelpScreenProps) 
             </div>
           )}
 
-          {payload?.disclaimer && <p className="text-sm text-muted-foreground">{text(payload.disclaimer)}</p>}
+          {payload?.disclaimer &&
+            help.sourceAndConfidence.limitations &&
+            !text(payload.disclaimer).includes(text(help.sourceAndConfidence.limitations).slice(0, 24)) && (
+              <p className="text-sm text-muted-foreground">{text(payload.disclaimer)}</p>
+            )}
         </div>
       )}
     </div>

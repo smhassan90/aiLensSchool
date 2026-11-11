@@ -387,6 +387,68 @@ export function ideasFromChapterText(text: string | undefined, limit = 5): strin
 }
 
 /** Whole-chapter activity script: teachers see parts on the board, not one repeated bullet. */
+function recapExampleForTheme(theme: string): { student: string; teacher: string } {
+  const lower = theme.toLowerCase();
+  const shortName = theme.split(/[—–-]/)[0]?.trim() || theme;
+  if (/helmet|seat.?belt|traffic|road accident|over-speed|civic|speeding/.test(lower)) {
+    const { doThis, skipThis } = classroomHook(theme);
+    return {
+      student: doThis,
+      teacher: `Yes — and if we ignore it: ${skipThis}. Say why the book cares about this.`,
+    };
+  }
+  if (/debate|motion|rebuttal/.test(lower)) {
+    return {
+      student: 'Two teams, a clear motion, and a judge.',
+      teacher: 'Add: each side gets a turn; rebuttal comes after both sides speak.',
+    };
+  }
+  if (/relative pronoun|who, whom|clause|grammar/.test(lower)) {
+    return {
+      student: 'The girl who helped her friend waited at the gate.',
+      teacher: 'Fix if they say “which” for a person — who is for people.',
+    };
+  }
+  if (/kant/i.test(lower)) {
+    return {
+      student: 'We should treat people fairly and keep our promises.',
+      teacher: 'Open the book page and read one sentence about his moral teaching.',
+    };
+  }
+  if (/nightingale/i.test(lower)) {
+    return {
+      student: 'She cared for sick soldiers and improved hospitals.',
+      teacher: 'Link it to character: service to others, not only fame.',
+    };
+  }
+  if (/ghazali|imam/i.test(lower)) {
+    return {
+      student: 'He taught Muslims to balance religion with daily life.',
+      teacher: 'Name one habit from the text that students can copy this week.',
+    };
+  }
+  if (/aristotle/i.test(lower)) {
+    return {
+      student: 'Good habits make a good person — not luck alone.',
+      teacher: 'Ask: what is one habit your class already shows?',
+    };
+  }
+  if (/page\s*\d+/i.test(theme) && shortName.length > 4) {
+    return {
+      student: `I learned something important about ${shortName}.`,
+      teacher: `Turn to that page and read one key line aloud. Then put it in your own words.`,
+    };
+  }
+  const { doThis, skipThis } = classroomHook(theme);
+  if (!/idea from today|skip it and hope/i.test(skipThis)) {
+    return { student: doThis, teacher: themeShortLabel(theme) };
+  }
+  return {
+    student: `This part is about ${shortName}.`,
+    teacher: 'Ask the class to find one sentence in the book that proves it.',
+  };
+}
+
 /** Plain “student says / you add” lines for each board part (chapter recap). */
 export function workedPartExamples(themes: string[]): string[] {
   const topics = shortTeachingIdeas(themes, 5);
@@ -397,9 +459,9 @@ export function workedPartExamples(themes: string[]): string[] {
   }
   return topics.map((theme, index) => {
     const label = themeShortLabel(theme);
-    const { doThis, skipThis } = classroomHook(theme);
     const n = index + 1;
-    return `Part ${n} — ${label}. Student might say: “${doThis}.” You add: “${clipExample(theme, 140)}” If they only repeat the title, ask them to fix: “${skipThis}” is not enough.`;
+    const { student, teacher } = recapExampleForTheme(theme);
+    return `Part ${n} — ${label}. Student might say: “${student}.” You add: “${clipExample(teacher, 200)}”`;
   });
 }
 
