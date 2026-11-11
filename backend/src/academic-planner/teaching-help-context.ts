@@ -38,9 +38,18 @@ export function resolveTeachingHelpContext(input: TeachingHelpContextInput): Res
       .map((p) => p.contentAnchor) ?? [];
 
   const missingNotes: string[] = [];
+  const activityLesson =
+    input.portionKeys.some((k) => k === 'role:activity' || k.startsWith('activity:')) ||
+    /\bactivity\b/i.test(input.lessonTitle);
+
   let chapterExcerpt = '';
   if (input.chapterText?.trim()) {
-    chapterExcerpt = excerptAroundAnchors(input.chapterText, anchors, MAX_EXCERPT_CHARS);
+    const full = input.chapterText.trim();
+    chapterExcerpt = activityLesson
+      ? full.length <= MAX_EXCERPT_CHARS
+        ? full
+        : full.slice(0, MAX_EXCERPT_CHARS)
+      : excerptAroundAnchors(full, anchors, MAX_EXCERPT_CHARS);
   } else if (input.libraryBookChapterId) {
     missingNotes.push('Chapter text could not be loaded for the granted library chapter.');
   } else {

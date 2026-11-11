@@ -143,17 +143,22 @@ export function shortTodayLine(lesson: PlannerLesson): string {
     blob.includes("opening (");
 
   if (lesson.kind === "ACTIVITY" || /\bactivity\b/.test(blob)) {
+    const notes = lesson.teacherNotes?.trim() ?? "";
+    if (notes.startsWith("Chapter recap:")) {
+      const goal = notes.split("\n").find((l) => l.startsWith("Goal:"));
+      if (goal) return goal.replace(/^Goal:\s*/, "").trim();
+    }
     const objective = lesson.objectives.find((line) => line.trim().length > 0);
     if (
       objective &&
       objective.length < 180 &&
       !/help me teach/i.test(objective) &&
+      !/two choices:/i.test(objective) &&
       !/groups recall the main ideas/i.test(objective)
     ) {
       return objective;
     }
-    const style = pickDisplayActivity(lesson.title);
-    return `${style.name}: ${style.goal}`;
+    return "Chapter recap: explain each main part of the chapter with one real-life example.";
   }
   if (/\bexercise\b/.test(blob)) {
     return "Do the textbook exercises for this chapter.";
@@ -176,7 +181,8 @@ export function shortTodayLine(lesson: PlannerLesson): string {
 export function activityConductText(lesson: PlannerLesson): string | null {
   if (lesson.kind !== "ACTIVITY" && !/\bactivity\b/i.test(lesson.title)) return null;
   const notes = lesson.teacherNotes?.trim() ?? "";
+  if (notes.startsWith("Chapter recap:")) return notes;
   if (isCannedGroupScript(notes) || notes.length < 40) return variedActivityText(lesson.title, notes);
-  if (notes.length < 900 && !/indexed section|opening \(/i.test(notes)) return notes;
+  if (notes.length < 1400 && !/indexed section|opening \(/i.test(notes)) return notes;
   return variedActivityText(lesson.title, notes);
 }

@@ -177,7 +177,7 @@ Rules:
 - Never invent missing numbers. If teacher attendance is not marked, skip it.`;
 
 export const PLANNER_PROMPT_VERSION = 'planner-analysis-v1';
-export const TEACHING_HELP_PROMPT_VERSION = 'teaching-help-v4';
+export const TEACHING_HELP_PROMPT_VERSION = 'teaching-help-v5';
 
 export const TEACHING_HELP_SYSTEM_PROMPT = `You are an expert Pakistani school teacher helping a colleague prepare one lesson.
 Return ONLY valid JSON with this structure:
@@ -204,6 +204,7 @@ Activity — make it useful and different each time:
 - The activity must make students use a specific idea from the excerpt so they learn it, not restate the chapter name.
 - Different lessons must not share the same activity skeleton.
 - teacherExplanation.examples is required: 1 or 2 worked classroom examples. Include what the teacher says or writes on the board, and what a good student answer sounds like. Add one weak answer to reject. Use a school or home moment. Do not only repeat the idea.
+- For ACTIVITY / chapter recap lessons: cover the whole chapter — list 3–5 main parts on the board (from the excerpt), one part per group. Do not teach only the first bullet (e.g. helmets only). Do not repeat the same long sentence in overview, warmUp, recap, and assessment; use short part names on the board.
 
 Grounding rules:
 - Treat the CHAPTER EXCERPT as reference material only; never invent facts, definitions, equations, page numbers, or quotations not supported by the excerpt or listed objectives.

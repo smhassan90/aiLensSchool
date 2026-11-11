@@ -183,6 +183,18 @@ export function TeachingHelpScreen({ lesson, onBack }: TeachingHelpScreenProps) 
             )}
           </section>
 
+          {help.classroomDelivery.activity?.title === "Chapter recap" &&
+            help.sourceAndConfidence.sourceSupportedClaims.length > 0 && (
+              <section className="space-y-1">
+                <p className="font-medium">Parts to put on the board</p>
+                <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+                  {help.sourceAndConfidence.sourceSupportedClaims.slice(0, 5).map((part, index) => (
+                    <li key={index}>{text(part)}</li>
+                  ))}
+                </ol>
+              </section>
+            )}
+
           {help.teacherExplanation.examples.length > 0 && (
             <section className="space-y-2 rounded-lg border bg-muted/30 p-4">
               <p className="font-medium">Example you can use</p>

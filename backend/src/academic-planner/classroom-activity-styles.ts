@@ -327,6 +327,24 @@ export function pickActivityStyle(seed: string, variety = 0): ActivityStyle {
   return ACTIVITY_STYLES[(hash + shift) % ACTIVITY_STYLES.length];
 }
 
+function trimAtSentence(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const period = Math.max(cut.lastIndexOf('.'), cut.lastIndexOf('!'), cut.lastIndexOf('?'));
+  if (period >= 40) return cut.slice(0, period + 1);
+  const space = cut.lastIndexOf(' ');
+  return space > 30 ? cut.slice(0, space) : cut;
+}
+
+/** Short board label (not the full bullet repeated everywhere). */
+export function themeShortLabel(idea: string): string {
+  const t = idea.replace(/\s+/g, ' ').replace(/[.!?]+$/, '').trim();
+  if (t.length <= 72) return t;
+  const words = t.split(/\s+/);
+  if (words.length <= 12) return `${t.slice(0, 69)}…`;
+  return `${words.slice(0, 9).join(' ')}…`;
+}
+
 export function cleanTeachingIdea(raw: string): string | null {
   let text = fixLibraryTextEncoding(raw)
     .replace(/^#+\s*/, '')
@@ -335,18 +353,11 @@ export function cleanTeachingIdea(raw: string): string | null {
     .replace(/\s+/g, ' ')
     .trim();
   if (text.length < 24) return null;
-  if (/indexed section|page hunt|^key points$|make groups of \d/i.test(text)) return null;
+  if (/indexed section|page hunt|^key points$|make groups of \d|the idea from today/i.test(text)) return null;
 
-  if (text.length > 110) {
-    const clause = text.split(/[;]| — | – | - /)[0]?.trim() ?? text;
-    text = clause.length >= 24 ? clause : text.slice(0, 110);
-    if (text.length > 110) {
-      const space = text.lastIndexOf(' ');
-      text = space > 40 ? text.slice(0, space) : text.slice(0, 110);
-    }
-  }
+  text = trimAtSentence(text, 200);
   text = text.replace(/[.!?,:;]+$/, '').trim();
-  if (text.length < 24 || text.length > 140) return null;
+  if (text.length < 24 || text.length > 200) return null;
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
@@ -365,8 +376,38 @@ export function shortTeachingIdeas(raw: string[], limit = 2): string[] {
   return ideas;
 }
 
-export function ideasFromChapterText(text: string | undefined, limit = 2): string[] {
+export function ideasFromChapterText(text: string | undefined, limit = 5): string[] {
   if (!text?.trim()) return [];
-  const parts = text.split(/\n+|(?<=[.!?])\s+/);
+  const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  const bullets = lines.filter((l) => /^[-*•]/.test(l) || /^\d+[.)]/.test(l) || /^#+\s/.test(l));
+  if (bullets.length >= 2) return shortTeachingIdeas(bullets, limit);
+
+  const parts = text.split(/(?<=[.!?])\s+|\n+/);
   return shortTeachingIdeas(parts, limit);
+}
+
+/** Whole-chapter activity script: teachers see parts on the board, not one repeated bullet. */
+export function buildChapterActivityScript(chapterTitle: string, themes: string[]): string {
+  const topics = shortTeachingIdeas(themes, 5);
+  const chapter = chapterTitle.trim() || 'this chapter';
+  const labels =
+    topics.length > 0
+      ? topics.map(themeShortLabel)
+      : ['Main ideas from the chapter (open the book and list 3–4 headings together)'];
+
+  return [
+    `Chapter recap: ${chapter}`,
+    'Goal: students explain each main part of the chapter — not only the first topic in the book.',
+    '',
+    'Write on the board:',
+    ...labels.map((label, i) => `  ${i + 1}. ${label}`),
+    '',
+    'Example you can say:',
+    `"Today we close ${chapter}. I will give each group one numbered part from the board. You explain it in plain words and give one example from school, the road, or home."`,
+    '',
+    '1. Setup (5 min): Read the numbered parts once. One student restates part 1 without the book.',
+    '2. Groups (18 min): One part per group (split a part if you have more groups than items). Each group writes: what it means, one line from the textbook, one real-life example.',
+    '3. Share (12 min): About two minutes per group. After each group, add one fact they missed from the chapter.',
+    '4. Close (5 min): Ask how the parts fit the chapter title — one sentence that names at least two parts.',
+  ].join('\n');
 }

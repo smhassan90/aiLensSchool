@@ -8,7 +8,7 @@ import {
   summarySentences,
   teachablePointsFromText,
 } from './day-plan-content-quality';
-import { pickActivityStyle, shortTeachingIdeas } from './classroom-activity-styles';
+import { buildChapterActivityScript, shortTeachingIdeas, themeShortLabel } from './classroom-activity-styles';
 import { detectSubjectProfile } from './subject-profiles';
 
 function asStringArray(value: unknown): string[] {
@@ -275,22 +275,18 @@ export function buildChapterRecapActivity(input: {
     ...questionsFromSummary(themes, 2),
   ].slice(0, 4);
 
-  const style = pickActivityStyle(`${chapter}|${input.subjectName}`);
-  const ideas = shortTeachingIdeas(themes, 2);
-  const closing = exitQs[0] ?? 'Which idea was hardest to explain in your own words?';
+  const ideas = shortTeachingIdeas(themes, 5);
+  const closing = exitQs[0] ?? 'Which part of the chapter was hardest to explain in your own words?';
 
   return {
-    activityTitle: style.name,
+    activityTitle: 'Chapter recap',
     objectives: [
-      `Students recall one idea from the chapter and use it in ${style.name.toLowerCase()}.`,
-      style.goal,
+      `Chapter recap: groups explain the main parts of ${chapter} with one real-life example each.`,
+      ideas.length >= 2
+        ? `Parts: ${ideas.slice(0, 4).map(themeShortLabel).join('; ')}.`
+        : `Students connect the main ideas of ${chapter} to real life.`,
     ],
-    teacherNotes: [
-      style.name,
-      ...style.example(ideas).map((line) => `Example: ${line}`),
-      ...style.steps(ideas).map((step, index) => `${index + 1}. ${step}`),
-      `Closing question: ${closing}`,
-    ].join('\n'),
+    teacherNotes: `${buildChapterActivityScript(chapter, themes)}\nClosing question: ${closing}`,
   };
 }
 

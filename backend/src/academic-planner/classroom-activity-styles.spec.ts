@@ -32,7 +32,7 @@ describe('classroom activity variety', () => {
 });
 
 describe('heuristicTeachingHelp', () => {
-  it('stays short and does not repeat the chapter title or quote every key point', () => {
+  it('uses chapter recap for activity lessons and lists multiple themes', () => {
     const chapter = 'Unit 8 — Civic Sense and Civic Activities';
     const help = TeachingHelpOutputSchema.parse(
       heuristicTeachingHelp({
@@ -48,21 +48,31 @@ describe('heuristicTeachingHelp', () => {
       }),
     );
 
-    const body = [
+    expect(help.classroomDelivery.activity?.title).toBe('Chapter recap');
+    expect(help.overview.teachingOverview).toMatch(/main parts/i);
+    expect(help.teacherExplanation.examples.length).toBeGreaterThan(0);
+    expect(help.sourceAndConfidence.sourceSupportedClaims.length).toBeGreaterThanOrEqual(2);
+    const joined = [
       help.overview.teachingOverview,
-      ...help.learningObjectives,
       help.teacherExplanation.simpleExplanation,
       ...help.classroomDelivery.activity!.steps,
     ].join('\n');
+    expect(joined.toLowerCase()).not.toContain('groups of 3 or 4');
+    expect(joined.split(/Wearing helmets/i).length).toBeLessThanOrEqual(3);
+  });
+});
 
-    expect(body.includes(chapter)).toBe(false);
-    expect(body).not.toMatch(/Station \d/);
-    expect(body.toLowerCase()).not.toContain('groups of 3 or 4');
-    expect(help.classroomDelivery.activity!.steps.length).toBeLessThanOrEqual(4);
-    expect(help.overview.teachingOverview.length).toBeLessThan(280);
-    expect(help.teacherExplanation.simpleExplanation.length).toBeLessThan(320);
-    expect(help.teacherExplanation.examples.length).toBeGreaterThan(0);
-    expect(help.teacherExplanation.examples.join(' ')).toMatch(/You say:|Board |You write|You sketch|Scene |Prompt |Reporter |True:|You model:|Claim:|Poster:/i);
-    expect(help.teacherExplanation.examples.join(' ')).toMatch(/helmet|seat belt|late van|do this/i);
+describe('buildChapterActivityScript', () => {
+  it('lists numbered parts for the teacher', () => {
+    const script = activityConductNotes('Unit 8', [
+      'Wearing helmets reduces head injuries in road accidents.',
+      'A debate needs two sides, rebuttal, and a judge.',
+      'Relative pronouns link a noun to a clause.',
+    ]);
+    expect(script).toContain('Chapter recap');
+    expect(script).toContain('Write on the board');
+    expect(script).toMatch(/1\./);
+    expect(script).toMatch(/debate/i);
+    expect(script.toLowerCase()).not.toContain('the idea from today');
   });
 });
