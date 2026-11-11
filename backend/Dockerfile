@@ -45,6 +45,8 @@ COPY tsconfig.json ./
 RUN npx prisma generate \
   && npm install --no-save ts-node typescript
 
+COPY src ./src
+COPY scripts/generate-tps-chapter-teaching-packs.ts ./scripts/
 COPY --from=builder /app/dist ./dist
 COPY ocr ./ocr
 COPY scripts/ocr-pipeline-diagnose.ts scripts/ocr-pipeline-diagnose.cjs scripts/compare-ocr-manifests.ts scripts/ocr-diagnostic-module-path.ts scripts/ocr-diagnostic-module-path.cjs ./scripts/

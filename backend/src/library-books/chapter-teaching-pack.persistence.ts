@@ -92,7 +92,7 @@ export async function listGrantedChaptersForSchool(prisma: PrismaClient, schoolI
   return prisma.libraryBookChapter.findMany({
     where: { bookId: { in: bookIds } },
     include: {
-      book: { select: { title: true, classLabel: true, subjectLabel: true } },
+      book: { select: { id: true, title: true, classLabel: true, subjectLabel: true } },
       teachingPack: { select: { id: true, contentHash: true, generatedAt: true, source: true } },
     },
     orderBy: [{ bookId: 'asc' }, { chapterNumber: 'asc' }, { title: 'asc' }],

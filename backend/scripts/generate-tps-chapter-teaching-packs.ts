@@ -15,6 +15,9 @@
  *
  * Only specific chapters (comma-separated UUIDs):
  *   ... --force --chapter-ids=uuid1,uuid2
+ *
+ * One library book:
+ *   ... --force --book-id=<uuid>
  */
 import { PrismaClient } from '@prisma/client';
 import { joinCompiledChapter } from '../src/ai/schemas/chapter-compile.schema';
@@ -57,9 +60,16 @@ async function main() {
       .map((id) => id.trim())
       .filter(Boolean),
   );
+  const bookId = argValue('book-id')?.trim();
 
   const school = await resolveSchoolId();
   let chapters = await listGrantedChaptersForSchool(prisma, school.id);
+  if (bookId) {
+    chapters = chapters.filter((ch) => ch.book.id === bookId);
+    if (chapters.length === 0) {
+      throw new Error(`No granted chapters matched --book-id=${bookId}`);
+    }
+  }
   if (chapterIdFilter.size > 0) {
     chapters = chapters.filter((ch) => chapterIdFilter.has(ch.id));
     if (chapters.length === 0) {
@@ -117,10 +127,19 @@ async function main() {
       const result = await generateChapterTeachingPack({
         chapterTitle: ch.title,
         chapterText,
+        lessonText: ch.publishedText,
+        exercisesText: ch.exercisesText,
         subjectName: ch.book.subjectLabel,
         classLabel: ch.book.classLabel,
         bookTitle: ch.book.title,
       });
+
+      if (result.source !== 'AI') {
+        failed++;
+        console.error(`  FAILED (source=${result.source}; not saved)`);
+        for (const w of result.warnings) console.error(`  warn: ${w.code}: ${w.message.slice(0, 200)}`);
+        continue;
+      }
 
       await upsertChapterTeachingPack(prisma, {
         libraryBookChapterId: ch.id,

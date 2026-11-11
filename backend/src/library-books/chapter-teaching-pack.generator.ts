@@ -9,6 +9,8 @@ import {
 } from '../ai/prompts';
 import {
   ChapterTeachingPackOutput,
+  ChapterTeachingPackSchema,
+  coerceChapterTeachingPack,
   parseChapterTeachingPackJson,
 } from './schemas/chapter-teaching-pack.schema';
 import { heuristicChapterTeachingPack } from './chapter-teaching-pack.heuristic';
@@ -21,16 +23,28 @@ export type GenerateChapterTeachingPackResult = {
   model: string;
 };
 
+const FULL_TEXT_LIMIT = 25_000;
+
+const QUESTIONS_ONLY_PROMPT = `Extract classroom questions from the textbook exercises below. Return ONLY JSON: {"questions":[{"sliceKey":"s1","question":"...","expectedAnswer":"...","format":"WRITTEN"}]}.
+Rules:
+- 6–20 questions, taken from the exercises (keep the exercise wording; shorten only if very long). Cover every section that has exercises.
+- Mix formats: mostly WRITTEN, plus ORAL for speaking tasks. format is ORAL, WRITTEN, or QUICK_FIRE.
+- expectedAnswer = the correct answer from the text; for open tasks (essay, debate) list what a good answer must include.
+- sliceKey = one of the provided section keys (the section the exercise belongs to). Use null only if it fits no section.
+- Do not invent facts. No markdown.`;
+
 export async function generateChapterTeachingPack(input: {
   chapterTitle: string;
   chapterText: string;
   subjectName: string;
   classLabel: string;
   bookTitle: string;
+  lessonText?: string;
+  exercisesText?: string;
 }): Promise<GenerateChapterTeachingPackResult> {
   const warnings: GenerateChapterTeachingPackResult['warnings'] = [];
-  const trimmed = input.chapterText.trim();
-  if (trimmed.length < 200) {
+  const compiled = input.chapterText.trim();
+  if (compiled.length < 200) {
     warnings.push({ code: 'CHAPTER_CONTENT_SHORT', message: 'Chapter text is short; using provisional pack.' });
     return {
       pack: heuristicChapterTeachingPack(input),
@@ -41,20 +55,134 @@ export async function generateChapterTeachingPack(input: {
     };
   }
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  const model = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
-  const cursorKey = process.env.CURSOR_API_KEY?.trim();
-
-  const user = [
+  const header = [
     `Subject: ${input.subjectName}`,
     `Class: ${input.classLabel}`,
     `Book: ${input.bookTitle}`,
     `Chapter: ${input.chapterTitle}`,
-    '',
-    '--- CHAPTER TEXT ---',
-    trimmed.slice(0, 28000),
-    '--- END CHAPTER TEXT ---',
   ].join('\n');
+
+  try {
+    if (compiled.length <= FULL_TEXT_LIMIT) {
+      const { pack, provider, model } = await requestTeachingPack(
+        CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
+        `${header}\n\n--- CHAPTER TEXT ---\n${compiled}\n--- END CHAPTER TEXT ---`,
+      );
+      return { pack, source: PlannerAnalysisSource.AI, warnings, provider, model };
+    }
+
+    const lessonSource = (input.lessonText ?? '').trim() || compiled;
+    let lessonBody = lessonSource;
+    if (lessonBody.length > FULL_TEXT_LIMIT) {
+      lessonBody = lessonBody.slice(0, FULL_TEXT_LIMIT);
+      warnings.push({
+        code: 'LESSON_TEXT_TRUNCATED',
+        message: 'Lesson text exceeded 25,000 characters; only the first 25,000 were sent.',
+      });
+    }
+
+    const first = await requestTeachingPack(
+      CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
+      `${header}\n\n--- LESSON TEXT ---\n${lessonBody}\n--- END LESSON TEXT ---`,
+    );
+
+    let questions = first.pack.questions;
+    const exercises = (input.exercisesText ?? '').trim();
+    if (exercises) {
+      let exerciseBody = exercises;
+      if (exerciseBody.length > FULL_TEXT_LIMIT) {
+        exerciseBody = exerciseBody.slice(0, FULL_TEXT_LIMIT);
+        warnings.push({
+          code: 'EXERCISES_TEXT_TRUNCATED',
+          message: 'Exercises text exceeded 25,000 characters; only the first 25,000 were sent.',
+        });
+      }
+      const sliceList = first.pack.readingSlices.map((slice) => `${slice.sliceKey}: ${slice.title}`).join('\n');
+      try {
+        const extracted = await requestQuestionList(
+          `${header}\n\nSections:\n${sliceList}\n\n--- EXERCISES ---\n${exerciseBody}\n--- END EXERCISES ---`,
+        );
+        if (extracted.length) questions = extracted.slice(0, 40);
+      } catch (error) {
+        warnings.push({
+          code: 'EXERCISE_QUESTIONS_FAILED',
+          message: error instanceof Error ? error.message : 'Exercise question pass failed',
+        });
+      }
+    }
+
+    const pack = ChapterTeachingPackSchema.parse(
+      coerceChapterTeachingPack({ ...first.pack, questions: questions.slice(0, 40) }),
+    );
+    return {
+      pack,
+      source: PlannerAnalysisSource.AI,
+      warnings,
+      provider: first.provider,
+      model: first.model,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Teaching pack generation failed';
+    throw new Error(message);
+  }
+}
+
+export { CHAPTER_TEACHING_PACK_PROMPT_VERSION };
+
+async function requestTeachingPack(system: string, user: string): Promise<{
+  pack: ChapterTeachingPackOutput;
+  provider: string;
+  model: string;
+}> {
+  const { text, provider, model } = await requestModelText(system, user);
+  return { pack: parseChapterTeachingPackJson(text), provider, model };
+}
+
+async function requestQuestionList(user: string): Promise<ChapterTeachingPackOutput['questions']> {
+  const { text } = await requestModelText(QUESTIONS_ONLY_PROMPT, user);
+  const raw = parseModelJson(text) as { questions?: unknown } | unknown;
+  const questions = Array.isArray(raw) ? raw : (raw as { questions?: unknown })?.questions;
+  const validated = ChapterTeachingPackSchema.parse(
+    coerceChapterTeachingPack({
+      complexity: 'MEDIUM',
+      summary: 'Questions extracted from the unit exercises.',
+      teacherGuide: ['Check each exercise answer against the textbook.'],
+      readingSlices: [
+        {
+          sliceKey: 's1',
+          title: 'Exercises',
+          readingFrom: 'From the exercises',
+          explainPoints: ['Use the textbook answers.'],
+        },
+      ],
+      questions,
+      activities: [
+        {
+          sliceKey: null,
+          title: 'Unit recap',
+          description: 'Groups recap each section of the unit from the board.',
+          participationTechnique: 'Student might say: one fact. You add: the textbook correction.',
+          materials: 'Board',
+        },
+      ],
+      revisionPoints: [{ point: 'Review each section of the unit.' }],
+    }),
+  );
+  return validated.questions;
+}
+
+async function requestModelText(
+  system: string,
+  user: string,
+): Promise<{ text: string; provider: string; model: string }> {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const model = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
+  const cursorKey = process.env.CURSOR_API_KEY?.trim();
+  const errors: string[] = [];
+
+  if (!apiKey && !cursorKey) {
+    throw new Error('No OPENAI_API_KEY or CURSOR_API_KEY');
+  }
 
   if (apiKey) {
     try {
@@ -70,82 +198,38 @@ export async function generateChapterTeachingPack(input: {
           response_format: { type: 'json_object' },
           max_tokens: 8192,
           messages: [
-            { role: 'system', content: CHAPTER_TEACHING_PACK_SYSTEM_PROMPT },
+            { role: 'system', content: system },
             { role: 'user', content: user },
           ],
         }),
       });
-
       if (!response.ok) {
         const errText = await response.text();
         throw new Error(`OpenAI ${response.status}: ${errText.slice(0, 400)}`);
       }
-
       const json = (await response.json()) as {
         choices?: Array<{ message?: { content?: string } }>;
         model?: string;
       };
-      const text = json.choices?.[0]?.message?.content ?? '{}';
-      const pack = parseChapterTeachingPackJson(text);
-      return {
-        pack,
-        source: PlannerAnalysisSource.AI,
-        warnings,
-        provider: 'openai',
-        model: json.model ?? model,
-      };
+      const text = json.choices?.[0]?.message?.content ?? '';
+      if (!text.trim()) throw new Error('OpenAI returned empty teaching pack JSON');
+      return { text, provider: 'openai', model: json.model ?? model };
     } catch (error) {
-      warnings.push({
-        code: 'OPENAI_GENERATION_FAILED',
-        message: error instanceof Error ? error.message : 'OpenAI generation failed',
-      });
+      errors.push(error instanceof Error ? error.message : 'OpenAI generation failed');
     }
-  } else if (!cursorKey) {
-    warnings.push({
-      code: 'AI_NOT_CONFIGURED',
-      message: 'No OPENAI_API_KEY or CURSOR_API_KEY; using provisional pack.',
-    });
-    return {
-      pack: heuristicChapterTeachingPack(input),
-      source: PlannerAnalysisSource.PROVISIONAL,
-      warnings,
-      provider: 'heuristic',
-      model: 'provisional',
-    };
   }
 
   if (cursorKey) {
     try {
-      const { text, model: cursorModel } = await generateTeachingPackViaCursor(
-        CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
-        user,
-      );
-      const pack = parseChapterTeachingPackJson(text);
-      return {
-        pack,
-        source: PlannerAnalysisSource.AI,
-        warnings,
-        provider: 'cursor',
-        model: cursorModel,
-      };
+      const cursor = await generateTeachingPackViaCursor(system, user);
+      return { text: cursor.text, provider: 'cursor', model: cursor.model };
     } catch (error) {
-      warnings.push({
-        code: 'AI_GENERATION_FAILED',
-        message: error instanceof Error ? error.message : 'Cursor generation failed',
-      });
+      errors.push(error instanceof Error ? error.message : 'Cursor generation failed');
     }
   }
 
-  return {
-    pack: heuristicChapterTeachingPack(input),
-    source: PlannerAnalysisSource.PROVISIONAL,
-    warnings,
-    provider: 'heuristic',
-    model: 'fallback',
-  };
+  throw new Error(errors.join(' | ') || 'Teaching pack generation failed');
 }
-
-export { CHAPTER_TEACHING_PACK_PROMPT_VERSION };
 
 async function generateTeachingPackViaCursor(
   system: string,
