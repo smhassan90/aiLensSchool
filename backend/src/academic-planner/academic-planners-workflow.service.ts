@@ -978,7 +978,8 @@ export class AcademicPlannersWorkflowService {
       orderBy: { sortOrder: 'asc' },
     });
     const assigned = assignActivityFormatIndexes(siblings.map((chapter) => chapter.sortOrder));
-    const chapterPos = siblings.findIndex((chapter) => chapter.id === lesson.chapter.id);
+    const lessonChapter = lesson.chapter;
+    const chapterPos = siblings.findIndex((chapter) => chapter.id === lessonChapter.id);
     const rebuilt = rebuildLessonFromPack({
       pack,
       chapterTitle: lesson.chapter.titleSnapshot,
