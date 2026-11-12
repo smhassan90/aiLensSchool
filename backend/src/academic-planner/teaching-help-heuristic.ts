@@ -1,10 +1,10 @@
 import { TeachingHelpOutput } from '../ai/schemas/teaching-help.schema';
 import {
+  ActivitySection,
+  buildActivityDayScript,
   ideasFromChapterText,
   pickActivityStyle,
   shortTeachingIdeas,
-  themeShortLabel,
-  workedPartExamples,
 } from './classroom-activity-styles';
 
 function usableObjectives(objectives: string[]): string[] {
@@ -24,6 +24,16 @@ function isChapterActivityLesson(lessonTitle: string, mode?: string): boolean {
   return /\bactivity\b/i.test(lessonTitle);
 }
 
+function sectionsFromThemes(themes: string[]): ActivitySection[] {
+  return themes
+    .map((theme) => {
+      const text = theme.replace(/\s+/g, ' ').trim();
+      return { title: text.slice(0, 90), fact: text.slice(0, 160) };
+    })
+    .filter((section) => section.title.length >= 8 && section.fact.length >= 8)
+    .slice(0, 12);
+}
+
 function buildChapterActivityHelp(input: {
   lessonTitle: string;
   chapterTitle: string;
@@ -31,85 +41,79 @@ function buildChapterActivityHelp(input: {
   subjectName: string;
   bookTitle?: string | null;
   themes: string[];
-  variety?: number;
+  sections?: ActivitySection[];
+  formatIndex?: number;
 }): TeachingHelpOutput {
-  const labels = input.themes.map(themeShortLabel);
-  const partCount = Math.max(labels.length, 3);
+  const sections = input.sections && input.sections.length > 0 ? input.sections : sectionsFromThemes(input.themes);
+  const script = buildActivityDayScript({
+    chapterTitle: input.chapterTitle,
+    sections,
+    formatIndex: input.formatIndex ?? 0,
+  });
   const sourceLabel = input.bookTitle?.trim() || input.chapterTitle;
-  const steps = [
-    'Read each numbered part on the board slowly (about one minute).',
-    'Each group takes one part. They write: simple meaning, one line from the book, one real example (school, road, or home).',
-    'Each group shares for about two minutes. You add one fact they missed.',
-    'One student joins two parts in one short sentence.',
-  ];
-
-  const partExamples = workedPartExamples(input.themes);
-  const examples = [
-    `You say: “Today we close the unit. I numbered ${partCount} parts on the board. Your group explains your part in easy words — not only the first topic in the book.”`,
-    ...partExamples,
-  ];
+  const fit = (text: string, max: number) => {
+    if (text.length <= max) return text;
+    const cut = text.slice(0, max);
+    const space = cut.lastIndexOf(' ');
+    return (space > 8 ? cut.slice(0, space) : cut).trim();
+  };
+  const steps = script.steps.map((step) => fit(step, 400)).filter((step) => step.length >= 8);
+  const example = fit(script.example, 500);
+  const claims = script.boardLines.map((line) => fit(line, 400)).filter((line) => line.length >= 8).slice(0, 8);
+  const objective = fit(script.objective, 300);
 
   return {
     overview: {
       subject: input.subjectName,
       classLabel: input.classLabel,
-      lessonTitle: input.lessonTitle,
-      teachingOverview: `Whole-unit recap: students explain ${partCount} main parts in simple words, with a real example for each part.`,
+      lessonTitle: input.lessonTitle.slice(0, 200),
+      teachingOverview: fit(script.objective, 1500),
       estimatedDurationMinutes: 40,
       durationIsSuggestion: true,
     },
-    learningObjectives: [
-      'Each group explains one part in plain words and gives one real example.',
-      'The class can name how two different parts fit the unit title.',
-    ],
+    learningObjectives: [objective],
     teacherExplanation: {
-      simpleExplanation:
-        'Put the main parts on the board. Groups own one part each. Your job is to listen, then add one missing line from the textbook.',
-      stepByStep: steps,
+      simpleExplanation: script.youSay.length >= 20 ? script.youSay.slice(0, 3000) : `${script.youSay} Open the textbook and follow the steps.`,
+      stepByStep: steps.slice(0, 10),
       terminology: [],
-      examples,
+      examples: [example],
     },
     classroomDelivery: {
-      warmUp: 'Ask: “Name three different things from this unit — not the same thing three times.”',
-      teachingSteps: ['Keep your talk short. Groups do most of the explaining.'],
+      warmUp: script.youSay.slice(0, 800),
+      teachingSteps: steps.slice(0, 4),
       questionsDuringLesson: [
-        'Which part was hardest to say in your own words?',
-        'What example from home or school fits your part?',
+        fit(`What textbook fact belongs with ${sections[0]?.title ?? 'the first section'}?`, 300),
+        fit(`How does ${sections[1]?.title ?? input.chapterTitle} fit the same activity?`, 300),
       ],
       activity: {
-        title: 'Chapter recap',
-        materials: 'Board, textbook, notebooks.',
-        steps,
-        minutes: 35,
+        title: script.formatName,
+        materials: script.youNeed,
+        steps: steps.slice(0, 6),
+        minutes: 40,
       },
-      recap: 'One student links two board parts in one sentence (e.g. road safety and debate rules).',
+      recap: fit(script.doneWhen, 600),
     },
     assessment: {
       formativeQuestions: [
         {
-          question: 'Explain your group’s part in your own words, with one example.',
-          expectedAnswer: 'Names the part clearly and gives one example that matches the textbook idea.',
+          question: fit(script.doneWhen, 400),
+          expectedAnswer: 'Names two sections and one fact from the textbook.',
           kind: 'understanding',
         },
       ],
-      exitTicket: 'Write one point from your part and one point you heard from another group.',
+      exitTicket: 'Write one fact from your section and one fact you heard from another section.',
     },
     differentiation: {
-      struggling: ['Give the group the first sentence of their part from the book to finish in simple words.'],
-      extension: ['Ask the group to write one short exam-style question about their part.'],
+      struggling: ['Give the student the section name and let them finish the sentence from the book.'],
+      extension: ['Ask for a second example from today that the class has not used yet.'],
     },
     sourceAndConfidence: {
       sourcesUsed: [sourceLabel.slice(0, 180)],
-      sourceSupportedClaims: input.themes.slice(0, 5),
-      pedagogicalSuggestions: [
-        'Student work template (copy on the board): Part name | Simple meaning | One line from the book | One home/school example — each group fills one row set.',
-        'Match board part names to your textbook headings before class.',
-      ],
+      sourceSupportedClaims: claims,
+      pedagogicalSuggestions: [`Activity format: ${script.formatName}.`],
       missingOrAmbiguous:
-        input.themes.length < 2
-          ? ['Few teaching points were found; add board parts from the textbook headings.']
-          : [],
-      limitations: 'Draft from chapter notes — check names and examples in your textbook before class.',
+        sections.length < 2 ? ['Few sections were found; add the missing textbook headings before class.'] : [],
+      limitations: 'Same activity as the planner day. Match the names to the textbook before class.',
     },
   };
 }
@@ -124,6 +128,8 @@ export function heuristicTeachingHelp(input: {
   mode?: string;
   chapterExcerpt?: string;
   variety?: number;
+  sections?: ActivitySection[];
+  formatIndex?: number;
 }): TeachingHelpOutput {
   const fromText = ideasFromChapterText(input.chapterExcerpt, 6);
   const fromObjectives = usableObjectives(input.objectives);
@@ -137,7 +143,8 @@ export function heuristicTeachingHelp(input: {
       subjectName: input.subjectName,
       bookTitle: input.bookTitle,
       themes,
-      variety: input.variety,
+      sections: input.sections,
+      formatIndex: input.formatIndex,
     });
   }
 

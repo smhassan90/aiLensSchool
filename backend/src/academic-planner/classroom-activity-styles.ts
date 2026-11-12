@@ -465,27 +465,319 @@ export function workedPartExamples(themes: string[]): string[] {
   });
 }
 
-export function buildChapterActivityScript(chapterTitle: string, themes: string[]): string {
-  const topics = shortTeachingIdeas(themes, 5);
-  const chapter = chapterTitle.trim() || 'this chapter';
-  const labels =
-    topics.length > 0
-      ? topics.map(themeShortLabel)
-      : ['Main ideas from the chapter (open the book and list 3–4 headings together)'];
+export type ActivitySection = {
+  title: string;
+  fact: string;
+};
 
-  return [
-    `Chapter recap: ${chapter}`,
-    'Goal: students explain each main part of the chapter — not only the first topic in the book.',
+export const ACTIVITY_FORMATS = [
+  { name: 'Finish the line' },
+  { name: 'Groups of 4' },
+  { name: 'Fix the board' },
+  { name: 'Two chairs' },
+  { name: 'Make the short product' },
+  { name: 'Act the last moment' },
+] as const;
+
+export type ActivityDayScript = {
+  formatName: string;
+  formatIndex: number;
+  objective: string;
+  teacherNotes: string;
+  youNeed: string;
+  youSay: string;
+  steps: string[];
+  example: string;
+  doneWhen: string;
+  boardLines: string[];
+};
+
+/** Complete label. Never adds an ellipsis. */
+export function cleanActivityLabel(text: string, max = 110): string {
+  let t = fixLibraryTextEncoding(text)
+    .replace(/\s+/g, ' ')
+    .replace(/[…]+/g, ' ')
+    .replace(/\.{3,}/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  t = t.replace(/[.!?,:;]+$/g, '').trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const space = cut.lastIndexOf(' ');
+  return (space > 24 ? cut.slice(0, space) : cut).trim().replace(/[.!?,:;]+$/g, '').trim();
+}
+
+export function activitySectionsFromSlices(
+  slices: Array<{ title: string; readingFrom?: string | null; explainPoints?: unknown }>,
+): ActivitySection[] {
+  const sections: ActivitySection[] = [];
+  for (const slice of slices) {
+    const title = cleanActivityLabel(slice.title, 90);
+    if (title.length < 3) continue;
+    const points = Array.isArray(slice.explainPoints)
+      ? slice.explainPoints.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      : [];
+    const fact = cleanActivityLabel(points[0] || slice.readingFrom || title, 160);
+    sections.push({ title, fact: fact.length >= 8 ? fact : title });
+  }
+  return sections.slice(0, 12);
+}
+
+/**
+ * formats[sortOrder % 6]. If that format is already used by an earlier chapter
+ * in this same ordered list, take the next free format. Pass chapters in sortOrder.
+ */
+export function assignActivityFormatIndexes(sortOrders: number[]): number[] {
+  const count = ACTIVITY_FORMATS.length;
+  const used = new Set<number>();
+  return sortOrders.map((order) => {
+    const base = ((order % count) + count) % count;
+    let idx = base;
+    if (used.has(idx)) {
+      for (let step = 1; step < count; step++) {
+        const candidate = (base + step) % count;
+        if (!used.has(candidate)) {
+          idx = candidate;
+          break;
+        }
+      }
+    }
+    used.add(idx);
+    return idx;
+  });
+}
+
+export function isCatalogActivityName(title: string | undefined | null): boolean {
+  return ACTIVITY_FORMATS.some((format) => format.name === title);
+}
+
+function unfinishedLine(fact: string): string {
+  const words = cleanActivityLabel(fact, 100).split(' ').filter(Boolean);
+  if (words.length < 6) return `${words.join(' ')} ______`;
+  return `${words.slice(0, words.length - 3).join(' ')} ______`;
+}
+
+function writingSectionIndex(sections: ActivitySection[]): number {
+  const match = sections.findIndex((section) =>
+    /writ|letter|diary|essay|composition/i.test(section.title),
+  );
+  return match >= 0 ? match : Math.max(0, sections.length - 1);
+}
+
+function linkSectionIndex(sections: ActivitySection[], avoid: number): number {
+  const match = sections.findIndex(
+    (section, index) => index !== avoid && /language|grammar|study|modal|pronoun/i.test(section.title),
+  );
+  if (match >= 0) return match;
+  return sections.findIndex((_, index) => index !== avoid) >= 0
+    ? sections.findIndex((_, index) => index !== avoid)
+    : avoid;
+}
+
+export function buildActivityDayScript(input: {
+  chapterTitle: string;
+  sections: ActivitySection[];
+  formatIndex: number;
+}): ActivityDayScript {
+  const count = ACTIVITY_FORMATS.length;
+  const formatIndex = ((input.formatIndex % count) + count) % count;
+  const formatName = ACTIVITY_FORMATS[formatIndex].name;
+  const chapter = cleanActivityLabel(input.chapterTitle, 160) || 'this chapter';
+  const sections =
+    input.sections.length > 0
+      ? input.sections.slice(0, 12)
+      : [{ title: chapter, fact: `Open ${chapter} and use one line from the textbook` }];
+  const first = sections[0];
+  const second = sections[1] ?? { title: chapter, fact: first.fact };
+
+  const boardLines = boardLinesForFormat(formatName, sections);
+  const plan = planForFormat(formatName, chapter, sections, first, second);
+  const steps = plan.steps;
+  const example = `Student might say: "${plan.student}" You add: "${plan.teacher}"`;
+  const objective = plan.objective;
+  const teacherNotes = [
+    formatName,
+    '',
+    `You need: ${plan.youNeed}`,
+    '',
+    `You say: "${plan.youSay}"`,
     '',
     'Write on the board:',
-    ...labels.map((label, i) => `  ${i + 1}. ${label}`),
+    ...boardLines.map((line, index) => `  ${index + 1}. ${line}`),
     '',
-    'Example you can say:',
-    `"Today we close ${chapter}. I will give each group one numbered part from the board. You explain it in plain words and give one example from school, the road, or home."`,
+    ...steps.map((step, index) => `${index + 1}. ${step}`),
     '',
-    '1. Setup (5 min): Read the numbered parts once. One student restates part 1 without the book.',
-    '2. Groups (18 min): One part per group (split a part if you have more groups than items). Each group writes: what it means, one line from the textbook, one real-life example.',
-    '3. Share (12 min): About two minutes per group. After each group, add one fact they missed from the chapter.',
-    '4. Close (5 min): Ask how the parts fit the chapter title — one sentence that names at least two parts.',
+    example,
+    '',
+    'Answers you accept:',
+    ...sections.map((section, index) => `  ${index + 1}. ${section.title}: ${section.fact}`),
+    '',
+    `Done when: ${plan.doneWhen}`,
   ].join('\n');
+
+  return {
+    formatName,
+    formatIndex,
+    objective,
+    teacherNotes,
+    youNeed: plan.youNeed,
+    youSay: plan.youSay,
+    steps,
+    example,
+    doneWhen: plan.doneWhen,
+    boardLines,
+  };
+}
+
+function boardLinesForFormat(formatName: string, sections: ActivitySection[]): string[] {
+  if (formatName === 'Finish the line') {
+    return sections.map((section) => `${section.title} — ${unfinishedLine(section.fact)}`);
+  }
+  if (formatName === 'Fix the board') {
+    return sections.map((section) => `False: ${section.title} is not part of this chapter`);
+  }
+  if (formatName === 'Two chairs') {
+    return sections.map((section) => `Ask one question about ${section.title}`);
+  }
+  if (formatName === 'Make the short product') {
+    const writing = sections[writingSectionIndex(sections)];
+    return [
+      `Short piece: ${writing.title}`,
+      ...sections
+        .filter((section) => section.title !== writing.title)
+        .map((section) => `Mention ${section.title}`),
+    ];
+  }
+  if (formatName === 'Act the last moment') {
+    const last = sections[sections.length - 1];
+    return [
+      `Perform: ${last.title}`,
+      ...sections
+        .filter((section) => section.title !== last.title)
+        .map((section) => `Then connect to ${section.title}`),
+    ];
+  }
+  return sections.map((section) => `${section.title} — one fact required`);
+}
+
+function planForFormat(
+  formatName: string,
+  chapter: string,
+  sections: ActivitySection[],
+  first: ActivitySection,
+  second: ActivitySection,
+): {
+  objective: string;
+  youNeed: string;
+  youSay: string;
+  steps: string[];
+  student: string;
+  teacher: string;
+  doneWhen: string;
+} {
+  const doneWhen = `a student can use ${first.title} and ${second.title} with one textbook fact for each.`;
+
+  if (formatName === 'Groups of 4') {
+    return {
+      objective: `Groups of 4: each student gives one fact from a different section of ${chapter}. If they cannot, the other group may take the point.`,
+      youNeed: 'Board and textbook.',
+      youSay: `Make groups of 4. Each person gives one fact from a different section. The first section is ${first.title}: ${first.fact}`,
+      steps: [
+        `(5 min) Number the groups. Read the checklist. Give each student a different section, starting with ${first.title}.`,
+        `(15 min) Each student says one fact from their own section. If they cannot, they pass.`,
+        `(14 min) The opposing group may say that fact and take the point. Mark the checklist as you go.`,
+        `(6 min) Name the winning group. Ask one student to repeat the fact for ${first.title} and one for ${second.title}.`,
+      ],
+      student: `I cannot think of a fact for ${first.title}.`,
+      teacher: `${first.fact} The other group may take this point.`,
+      doneWhen: `every section has been said once, including ${first.title} and ${second.title}, and you have named a winner.`,
+    };
+  }
+
+  if (formatName === 'Fix the board') {
+    return {
+      objective: `Fix the board: groups correct one false statement for every section of ${chapter}, using a line they can point to in the book.`,
+      youNeed: 'Board and textbook.',
+      youSay: `I wrote one false line for each section of ${chapter}. We will correct ${first.title} first. The book says: ${first.fact}`,
+      steps: [
+        `(6 min) Read the false lines. Correct ${first.title} together and point to the line in the book.`,
+        `(16 min) Each group takes the remaining lines. They write the correction and the book line they will point to.`,
+        `(12 min) Groups read one correction each. Confirm it matches the textbook before you accept it.`,
+        `(6 min) Ask which two corrections name ${first.title} and ${second.title}.`,
+      ],
+      student: `${first.title} is not in our book.`,
+      teacher: `It is. ${first.fact}`,
+      doneWhen,
+    };
+  }
+
+  if (formatName === 'Two chairs') {
+    return {
+      objective: `Two chairs: one student asks and one answers, and the class hears one question from each section of ${chapter}.`,
+      youNeed: 'Two chairs and the textbook.',
+      youSay: `Two students sit at the front. One asks and one answers, using the speaking skill in ${chapter}. First question is about ${first.title}: ${first.fact}`,
+      steps: [
+        `(6 min) Place two chairs at the front. Model one question about ${first.title}.`,
+        `(18 min) Each new pair asks and answers one section that has not been used yet. Continue until every section has been heard.`,
+        `(10 min) After each answer, add one missing fact from the textbook.`,
+        `(6 min) The last pair asks one question about ${first.title} and one about ${second.title}.`,
+      ],
+      student: `What should I ask about ${first.title}?`,
+      teacher: `Ask a question whose answer is: ${first.fact}`,
+      doneWhen: `the class has heard one question about ${first.title} and one about ${second.title}.`,
+    };
+  }
+
+  if (formatName === 'Make the short product') {
+    const writing = sections[writingSectionIndex(sections)];
+    const other = sections[linkSectionIndex(sections, writingSectionIndex(sections))];
+    return {
+      objective: `Make the short product: students write a short piece from ${writing.title} in ${chapter} and say one line that connects it to ${other.title}.`,
+      youNeed: 'Notebooks and the textbook.',
+      youSay: `You will write a short version of ${writing.title}. Keep this fact in it: ${writing.fact}`,
+      steps: [
+        `(6 min) Show the product name on the board. Read aloud: ${writing.fact}`,
+        `(18 min) Each student writes a miniature letter, diary note, or four-line plan, matching ${writing.title}. It must mention ${other.title}.`,
+        `(10 min) Three students read their piece. Add this fact if they miss the link: ${other.fact}`,
+        `(6 min) One student says how ${writing.title} and ${other.title} both belong in ${chapter}.`,
+      ],
+      student: `My piece is only about ${writing.title}.`,
+      teacher: `Add one line from ${other.title}: ${other.fact}`,
+      doneWhen: `the piece names ${writing.title} and ${other.title}.`,
+    };
+  }
+
+  if (formatName === 'Act the last moment') {
+    const last = sections[sections.length - 1];
+    const link = sections[linkSectionIndex(sections, sections.length - 1)];
+    return {
+      objective: `Act the last moment: students perform ${last.title} from ${chapter}, then one student connects it to ${link.title}.`,
+      youNeed: 'Textbook and space to stand.',
+      youSay: `Act the closing part, ${last.title}. Then connect it to ${link.title}. ${last.fact}`,
+      steps: [
+        `(8 min) Groups of 4 prepare a one-minute scene of ${last.title}. Remind them: ${last.fact}`,
+        `(16 min) Two groups perform. After each scene, one student links it to the next section on the board.`,
+        `(10 min) Add the textbook fact for any section they skip, including ${link.fact}`,
+        `(6 min) One student names ${last.title} and ${link.title} in one sentence.`,
+      ],
+      student: `The scene is only about ${last.title}.`,
+      teacher: `Connect it to ${link.title}: ${link.fact}`,
+      doneWhen: `the class has seen the scene for ${last.title} and heard a link to ${link.title}.`,
+    };
+  }
+
+  return {
+    objective: `Finish the line: each pair completes one unfinished sentence from each section of ${chapter} and adds an example from today.`,
+    youNeed: 'Board, textbook, and notebooks.',
+    youSay: `Today each pair finishes one line from every section of ${chapter}. The first line is about ${first.title}: ${first.fact}`,
+    steps: [
+      `(6 min) Read the board lines once. For ${first.title}, tell the class the missing words are in the book: ${first.fact}`,
+      `(16 min) Each pair fills every blank and adds one example from home, school, or the street today.`,
+      `(12 min) Two pairs read one finished line each. Add the textbook fact if they miss it.`,
+      `(6 min) One student reads the finished lines for ${first.title} and ${second.title}.`,
+    ],
+    student: `The blank in ${first.title} means we can skip that section.`,
+    teacher: first.fact,
+    doneWhen,
+  };
 }

@@ -4,6 +4,7 @@ import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encodi
 import { TeachingPackForAnalysis } from '../library-books/chapter-teaching-pack-to-analysis';
 import { allocateTeachingDaysPerChapter } from './day-plan-allocate';
 import { displayChapterTitle } from './day-plan-content-quality';
+import { activitySectionsFromSlices, assignActivityFormatIndexes } from './classroom-activity-styles';
 import {
   buildMinimalDayPlan,
   parseRoleFromPortionKey,
@@ -12,7 +13,6 @@ import {
 } from './day-plan-chapter-roles';
 import {
   chapterContentWeight,
-  collectPackTeachingPoints,
   isLowValueContent,
   labelForTeachingDay,
 } from './day-plan-teacher-script';
@@ -71,6 +71,7 @@ export function generateDayPlanFromTeachingPacks(input: {
 
   const drafts: Draft[] = [];
   let globalDay = 0;
+  const formatIndexes = assignActivityFormatIndexes(ordered.map((chapter) => chapter.sortOrder));
 
   ordered.forEach((chapter, chapterIdx) => {
     const libId = chapter.libraryBookChapterId!;
@@ -95,7 +96,8 @@ export function generateDayPlanFromTeachingPacks(input: {
         chapterTitle,
         role,
         sectionHint,
-        activityThemes: role === 'ACTIVITY' ? collectPackTeachingPoints(pack).slice(0, 4) : undefined,
+        activitySections: role === 'ACTIVITY' ? activitySectionsFromSlices(pack.readingSlices) : undefined,
+        activityFormatIndex: role === 'ACTIVITY' ? formatIndexes[chapterIdx] : undefined,
       });
       const stages =
         role === 'INTRO'
@@ -213,6 +215,7 @@ export function rebuildLessonFromPack(input: {
   kind: PlannerLessonKind;
   periodMinutes: number;
   dayLabel: string;
+  activityFormatIndex?: number;
 }): Pick<ScheduleLessonDraft, 'title' | 'objectives' | 'primaryStage' | 'stages' | 'plannedMinutes' | 'kind'> & {
   notes: string;
 } {
@@ -223,7 +226,8 @@ export function rebuildLessonFromPack(input: {
   const plan = buildMinimalDayPlan({
     chapterTitle: displayChapterTitle(input.chapterTitle),
     role,
-    activityThemes: role === 'ACTIVITY' ? collectPackTeachingPoints(input.pack).slice(0, 4) : undefined,
+    activitySections: role === 'ACTIVITY' ? activitySectionsFromSlices(input.pack.readingSlices) : undefined,
+    activityFormatIndex: role === 'ACTIVITY' ? input.activityFormatIndex ?? 0 : undefined,
   });
   return {
     kind: plan.kind,

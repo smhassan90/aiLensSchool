@@ -1,5 +1,5 @@
 import type { TeachingHelpOutput } from '../ai/schemas/teaching-help.schema';
-import { themeShortLabel } from './classroom-activity-styles';
+import { isCatalogActivityName, themeShortLabel } from './classroom-activity-styles';
 
 export type TeachingHelpUrduGuide = {
   teachingOverview: string;
@@ -23,7 +23,9 @@ function isPartExample(line: string): boolean {
 
 /** Simple Urdu guide for teachers (classroom Urdu, clear steps). */
 export function buildUrduTeachingGuide(help: TeachingHelpOutput): TeachingHelpUrduGuide {
-  const isRecap = help.classroomDelivery.activity?.title === 'Chapter recap';
+  const activityTitle = help.classroomDelivery.activity?.title;
+  const isCatalogActivity = isCatalogActivityName(activityTitle);
+  const isRecap = activityTitle === 'Chapter recap';
   const boardParts = help.sourceAndConfidence.sourceSupportedClaims.slice(0, 5).map((p) => themeShortLabel(p));
   const partExamples = help.teacherExplanation.examples.filter(isPartExample);
   const partCount = Math.max(boardParts.length, partExamples.length, 3);
@@ -31,6 +33,24 @@ export function buildUrduTeachingGuide(help: TeachingHelpOutput): TeachingHelpUr
   const studentWorkTemplate = isRecap
     ? 'بورڈ پر طلبہ کے لیے یہ خانہ بنائیں (ہر گروپ ایک کاپی): حصے کا نام | آسان مطلب (اپنے الفاظ) | کتاب کی ایک سطر | گھر یا سکول کی ایک مثال'
     : 'بورڈ پر لکھیں: آج کا سبق | ایک آسان جملے میں مطلب | ایک مثال جو ہم سب کر سکیں';
+
+  if (isCatalogActivity && help.classroomDelivery.activity) {
+    return {
+      teachingOverview: `آج یونٹ کی سرگرمی ہے: ${help.classroomDelivery.activity.title}. ہر حصے پر ایک بار کام ہوگا۔`,
+      boardParts: help.sourceAndConfidence.sourceSupportedClaims.slice(0, 6),
+      openingLine: help.teacherExplanation.simpleExplanation,
+      partExamples: help.teacherExplanation.examples,
+      steps: help.classroomDelivery.activity.steps,
+      warmUp: help.classroomDelivery.warmUp,
+      recap: help.classroomDelivery.recap,
+      studentWorkTemplate: 'طلبہ بورڈ کی ہر سطر پر کام کریں: حصے کا نام، کتاب کا ایک نکتہ، اور آج کی ایک مثال۔',
+      checkQuestion: help.assessment.formativeQuestions[0]?.question ?? 'دو حصوں کا ایک ایک نکتہ بتائیں۔',
+      expectedAnswer: help.assessment.formativeQuestions[0]?.expectedAnswer ?? 'دو حصے اور کتاب کا ایک نکتہ۔',
+      exitTicket: help.assessment.exitTicket,
+      support: help.differentiation.struggling[0],
+      stretch: help.differentiation.extension[0],
+    };
+  }
 
   if (isRecap) {
     return {

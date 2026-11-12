@@ -8,7 +8,7 @@ import {
   summarySentences,
   teachablePointsFromText,
 } from './day-plan-content-quality';
-import { buildChapterActivityScript, shortTeachingIdeas, themeShortLabel } from './classroom-activity-styles';
+import { activitySectionsFromSlices, buildActivityDayScript } from './classroom-activity-styles';
 import { detectSubjectProfile } from './subject-profiles';
 
 function asStringArray(value: unknown): string[] {
@@ -58,15 +58,6 @@ export function isLowValueContent(s: string): boolean {
     lower.includes('lesson pages listed') ||
     lower.includes('pages listed above') ||
     lower.includes('continue reading — part')
-  );
-}
-
-function cleanSliceTitles(pack: TeachingPackForAnalysis): string[] {
-  return dedupeLines(
-    pack.readingSlices
-      .map((s) => stripIndexMeta(fixLibraryTextEncoding(s.title)))
-      .map((t) => t.replace(/^chapter opening and\s+/i, '').trim())
-      .filter((t) => t.length > 4 && !isIndexLikeText(t) && !isPackMetaPoint(t)),
   );
 }
 
@@ -251,42 +242,23 @@ export function buildSimpleDayPlan(input: {
   });
 }
 
-function activityThemesFromPack(pack: TeachingPackForAnalysis): string[] {
-  const fromSummary = collectPackTeachingPoints(pack);
-  if (fromSummary.length >= 2) return fromSummary.slice(0, 6);
-
-  const titles = cleanSliceTitles(pack);
-  if (titles.length >= 2) {
-    return titles.slice(0, 6).map((t) => polishTeacherLine(t, 100));
-  }
-
-  return [polishTeacherLine(fixLibraryTextEncoding(pack.summary).slice(0, 120), 120)];
-}
-
 export function buildChapterRecapActivity(input: {
   chapterTitle: string;
   subjectName: string;
   pack: TeachingPackForAnalysis;
+  formatIndex?: number;
 }): { activityTitle: string; objectives: string[]; teacherNotes: string } {
   const chapter = displayChapterTitle(input.chapterTitle);
-  const themes = activityThemesFromPack(input.pack);
-  const exitQs = [
-    ...pickCheckQuestions(input.pack, undefined, 4),
-    ...questionsFromSummary(themes, 2),
-  ].slice(0, 4);
-
-  const ideas = shortTeachingIdeas(themes, 5);
-  const closing = exitQs[0] ?? 'Which part of the chapter was hardest to explain in your own words?';
+  const script = buildActivityDayScript({
+    chapterTitle: chapter,
+    sections: activitySectionsFromSlices(input.pack.readingSlices),
+    formatIndex: input.formatIndex ?? 0,
+  });
 
   return {
-    activityTitle: 'Chapter recap',
-    objectives: [
-      `Chapter recap: groups explain the main parts of ${chapter} with one real-life example each.`,
-      ideas.length >= 2
-        ? `Parts: ${ideas.slice(0, 4).map(themeShortLabel).join('; ')}.`
-        : `Students connect the main ideas of ${chapter} to real life.`,
-    ],
-    teacherNotes: `${buildChapterActivityScript(chapter, themes)}\nClosing question: ${closing}`,
+    activityTitle: script.formatName,
+    objectives: [script.objective],
+    teacherNotes: script.teacherNotes,
   };
 }
 

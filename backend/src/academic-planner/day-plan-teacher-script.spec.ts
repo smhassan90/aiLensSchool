@@ -67,6 +67,8 @@ describe('buildChapterRecapActivity', () => {
 
     expect(isIndexLikeText(recap.activityTitle)).toBe(false);
     expect(recap.teacherNotes.toLowerCase()).not.toContain('page hunt');
-    expect(recap.objectives.some((o) => o.includes('recall'))).toBe(true);
+    expect(recap.teacherNotes).not.toMatch(/Chapter recap|not only the first topic/);
+    expect(recap.objectives).toEqual([recap.objectives[0]]);
+    expect(recap.objectives[0]).not.toMatch(/chapter recap/i);
   });
 });

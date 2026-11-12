@@ -44,6 +44,7 @@ import {
   analysisFromTeachingPack,
   loadTeachingPacksByChapterIds,
 } from '../library-books/chapter-teaching-pack-analysis.loader';
+import { assignActivityFormatIndexes } from './classroom-activity-styles';
 import { generateDayPlanFromTeachingPacks, rebuildLessonFromPack } from './day-plan-from-teaching-pack';
 import { moveLesson as moveLessonOnSlots } from './schedule-engine';
 import { PlannerChapterAnalysis } from '../ai/schemas/planner-chapter-analysis.schema';
@@ -971,6 +972,13 @@ export class AcademicPlannersWorkflowService {
       where: { id: plannerId },
       select: { subject: { select: { name: true } } },
     });
+    const siblings = await this.prisma.plannerChapter.findMany({
+      where: { versionId },
+      select: { id: true, sortOrder: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    const assigned = assignActivityFormatIndexes(siblings.map((chapter) => chapter.sortOrder));
+    const chapterPos = siblings.findIndex((chapter) => chapter.id === lesson.chapter.id);
     const rebuilt = rebuildLessonFromPack({
       pack,
       chapterTitle: lesson.chapter.titleSnapshot,
@@ -980,6 +988,7 @@ export class AcademicPlannersWorkflowService {
       kind,
       periodMinutes,
       dayLabel,
+      activityFormatIndex: chapterPos >= 0 ? assigned[chapterPos] : 0,
     });
 
     await this.prisma.$transaction(async (tx) => {

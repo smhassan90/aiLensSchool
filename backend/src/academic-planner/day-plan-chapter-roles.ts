@@ -1,5 +1,5 @@
 import { LessonStage, PlannerLessonKind } from '@prisma/client';
-import { buildChapterActivityScript, shortTeachingIdeas } from './classroom-activity-styles';
+import { ActivitySection, buildActivityDayScript } from './classroom-activity-styles';
 import { displayChapterTitle } from './day-plan-content-quality';
 
 export type ChapterDayRole = 'INTRO' | 'READING' | 'CONTINUE_READING' | 'EXERCISE' | 'ACTIVITY';
@@ -54,15 +54,12 @@ export function rolePortionKey(role: ChapterDayRole, readingIndex: number): stri
   return 'role:activity';
 }
 
-export function activityConductNotes(chapter: string, themes: string[]): string {
-  return buildChapterActivityScript(chapter, themes);
-}
-
 export function buildMinimalDayPlan(input: {
   chapterTitle: string;
   role: ChapterDayRole;
   sectionHint?: string;
-  activityThemes?: string[];
+  activitySections?: ActivitySection[];
+  activityFormatIndex?: number;
 }): {
   objectives: string[];
   teacherNotes: string | null;
@@ -110,17 +107,17 @@ export function buildMinimalDayPlan(input: {
         teacherNotes: null,
       };
     case 'ACTIVITY': {
-      const themes = shortTeachingIdeas(input.activityThemes ?? [], 5);
+      const script = buildActivityDayScript({
+        chapterTitle: chapter,
+        sections: input.activitySections ?? [],
+        formatIndex: input.activityFormatIndex ?? 0,
+      });
       return {
         titleSuffix: roleLabels.ACTIVITY,
         kind: PlannerLessonKind.ACTIVITY,
         primaryStage: LessonStage.ACTIVITY,
-        objectives: [
-          themes.length >= 2
-            ? `Chapter recap: groups explain the main parts of ${chapter} with one real-life example each.`
-            : `Chapter recap: students explain the main ideas of ${chapter} with one real-life example.`,
-        ],
-        teacherNotes: activityConductNotes(chapter, input.activityThemes ?? []),
+        objectives: [script.objective],
+        teacherNotes: script.teacherNotes,
       };
     }
   }

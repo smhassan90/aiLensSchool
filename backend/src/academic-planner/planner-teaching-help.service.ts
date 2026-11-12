@@ -13,7 +13,7 @@ import { PlannerAccessService } from './planner-access.service';
 import { PlannerContentService } from './planner-content.service';
 import { TeachingHelpService } from '../ai/services/teaching-help.service';
 import { PlannerChapterAnalysis } from '../ai/schemas/planner-chapter-analysis.schema';
-import { TeachingAssistanceMode } from '../ai/schemas/teaching-help.schema';
+import { TeachingAssistanceMode, TeachingHelpOutputSchema } from '../ai/schemas/teaching-help.schema';
 import { StageSegment } from './planner-types';
 import { gradeClassLabel } from '../common/utils/section-class-label';
 import { resolveTeachingHelpContext } from './teaching-help-context';
@@ -23,6 +23,8 @@ import { TeachingHelpGenerationError } from '../ai/teaching-help-errors';
 import { loadTeachingPacksByChapterIds } from '../library-books/chapter-teaching-pack-analysis.loader';
 import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
 import { buildUrduTeachingGuide } from './teaching-help-urdu';
+import { activitySectionsFromSlices, assignActivityFormatIndexes } from './classroom-activity-styles';
+import { heuristicTeachingHelp } from './teaching-help-heuristic';
 
 const ADMIN_CONTENT_MESSAGE =
   'The source lesson content is not available yet. Please ask your school administrator to check the assigned textbook content.';
@@ -82,6 +84,7 @@ export class PlannerTeachingHelpService {
             titleSnapshot: true,
             contentHash: true,
             libraryBookChapterId: true,
+            sortOrder: true,
             analysis: true,
           },
         },
@@ -101,6 +104,7 @@ export class PlannerTeachingHelpService {
     const analysis = lesson.chapter?.analysis as PlannerChapterAnalysis | null;
     let chapterText: string | null = null;
     let packSummary: string | null = null;
+    let packSections: ReturnType<typeof activitySectionsFromSlices> = [];
     if (lesson.chapter?.libraryBookChapterId) {
       try {
         const loaded = await this.content.loadChapterText(schoolId, lesson.chapter.libraryBookChapterId);
@@ -115,6 +119,7 @@ export class PlannerTeachingHelpService {
       if (pack?.summary?.trim()) {
         packSummary = fixLibraryTextEncoding(pack.summary);
       }
+      if (pack) packSections = activitySectionsFromSlices(pack.readingSlices);
     }
 
     const resolved = resolveTeachingHelpContext({
@@ -137,6 +142,52 @@ export class PlannerTeachingHelpService {
       });
     }
 
+    const classLabel = gradeClassLabel(planner.section);
+
+    if (/\bactivity\b/i.test(lesson.title)) {
+      const formatIndex = lesson.chapter
+        ? await this.formatIndexForChapter(vid, lesson.chapter.id, lesson.chapter.sortOrder)
+        : 0;
+      const assistance = TeachingHelpOutputSchema.parse(
+        heuristicTeachingHelp({
+          lessonTitle: lesson.title,
+          chapterTitle: resolved.contentSources.chapterTitle,
+          classLabel,
+          subjectName: planner.subject.name,
+          bookTitle: planner.libraryBook?.title ?? null,
+          objectives,
+          mode: 'CLASSROOM_ACTIVITY',
+          chapterExcerpt: resolved.chapterExcerpt,
+          sections: packSections,
+          formatIndex,
+        }),
+      );
+      return {
+        lessonKey,
+        title: lesson.title,
+        chapterTitle: resolved.contentSources.chapterTitle,
+        classLabel,
+        subjectName: planner.subject.name,
+        mode: 'CLASSROOM_ACTIVITY' as const,
+        basis: resolved.basis,
+        contentSources: resolved.contentSources,
+        contentExcerpt: resolved.basis === 'CHAPTER_TEXT' ? resolved.chapterExcerpt.slice(0, 1200) : null,
+        contextMeta: {
+          anchorsUsed: resolved.anchorsUsed,
+          excerptCharCount: resolved.excerptCharCount,
+          missingNotes: resolved.missingNotes,
+        },
+        assistance,
+        urduGuide: null,
+        aiGenerated: false,
+        cached: false,
+        promptVersion: TEACHING_HELP_PROMPT_VERSION,
+        provider: 'activity-script',
+        disclaimer: 'Same activity as this planner day. Match the names to your textbook before class.',
+        unavailableMessage: null,
+      };
+    }
+
     const contentHash = TeachingHelpService.contentHash([
       lesson.chapter?.contentHash ?? 'no-hash',
       lessonKey,
@@ -149,7 +200,6 @@ export class PlannerTeachingHelpService {
       TEACHING_HELP_PROMPT_VERSION,
     ]);
 
-    const classLabel = gradeClassLabel(planner.section);
     const inflightKey = `${schoolId}:${vid}:${lessonKey}:${contentHash}:${mode}`;
 
     let generated;
@@ -235,6 +285,18 @@ export class PlannerTeachingHelpService {
       ...english,
       urduGuide: buildUrduTeachingGuide(english.assistance),
     };
+  }
+
+  private async formatIndexForChapter(versionId: string, chapterId: string, sortOrder: number): Promise<number> {
+    const chapters = await this.prisma.plannerChapter.findMany({
+      where: { versionId },
+      select: { id: true, sortOrder: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    const indexes = assignActivityFormatIndexes(chapters.map((chapter) => chapter.sortOrder));
+    const pos = chapters.findIndex((chapter) => chapter.id === chapterId);
+    if (pos >= 0) return indexes[pos];
+    return ((sortOrder % 6) + 6) % 6;
   }
 
   private async assertTeachingHelpAccess(
