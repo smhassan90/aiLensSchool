@@ -125,9 +125,23 @@ function explainLines(value: unknown): string[] {
 }
 
 function guideForSection(guide: string[], title: string): string[] {
-  const words = title.toLowerCase().split(/\W+/).filter((word) => word.length > 3);
-  const matched = guide.filter((bullet) => words.some((word) => bullet.toLowerCase().includes(word)));
-  return (matched.length ? matched : guide).slice(0, 3);
+  const ignored = new Set([
+    'unit',
+    'section',
+    'reading',
+    'comprehension',
+    'practice',
+    'communication',
+    'language',
+    'study',
+    'skills',
+  ]);
+  const words = title
+    .toLowerCase()
+    .split(/\W+/)
+    .filter((word) => word.length > 3 && !ignored.has(word));
+  if (!words.length) return [];
+  return guide.filter((bullet) => words.some((word) => bullet.toLowerCase().includes(word))).slice(0, 3);
 }
 
 export function introLessonNotes(
