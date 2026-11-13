@@ -688,6 +688,7 @@ export class AcademicPlannersWorkflowService {
           timetableSource: slotResult.timetableSource,
         });
       })();
+    }
     if (slotResult.warnings.length) {
       generated.summary.warnings.push(...slotResult.warnings);
     }
