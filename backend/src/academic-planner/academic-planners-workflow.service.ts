@@ -689,23 +689,30 @@ export class AcademicPlannersWorkflowService {
         });
       })();
     }
+    const plan = generated;
+    if (!plan) {
+      throw new UnprocessableEntityException({
+        code: 'DAY_PLAN_UNAVAILABLE',
+        message: 'The day plan could not be built from the selected chapters.',
+      });
+    }
     if (slotResult.warnings.length) {
-      generated.summary.warnings.push(...slotResult.warnings);
+      plan.summary.warnings.push(...slotResult.warnings);
     }
     if (packRefreshWarnings.length) {
-      generated.summary.warnings.push(...packRefreshWarnings);
+      plan.summary.warnings.push(...packRefreshWarnings);
     }
     if (fallbackApplied.applied) {
-      generated.summary.warnings.push({
+      plan.summary.warnings.push({
         code: 'TIMETABLE_ASSUMED',
         message: 'Using assumed periods per week because no timetable slots exist for this subject.',
       });
     }
 
     const examRisk: PlannerExamRisk =
-      generated.summary.feasibility === 'INFEASIBLE'
+      plan.summary.feasibility === 'INFEASIBLE'
         ? PlannerExamRisk.HIGH
-        : generated.summary.feasibility === 'AT_RISK'
+        : plan.summary.feasibility === 'AT_RISK'
           ? PlannerExamRisk.MEDIUM
           : PlannerExamRisk.LOW;
 
@@ -718,7 +725,7 @@ export class AcademicPlannersWorkflowService {
         },
         data: {
           revision: { increment: 1 },
-          summary: generated.summary as Prisma.InputJsonValue,
+          summary: plan.summary as Prisma.InputJsonValue,
           examRisk,
           ...(fallbackApplied.applied ? { settings: settings as Prisma.InputJsonValue } : {}),
         },
@@ -734,7 +741,7 @@ export class AcademicPlannersWorkflowService {
       await tx.plannerLesson.deleteMany({ where: { versionId, frozen: false } });
       const chapterIdByKey = new Map(chapters.map((c) => [c.chapterKey, c.id]));
       await tx.plannerLesson.createMany({
-        data: generated.lessons.map((l, sequence) => ({
+        data: plan.lessons.map((l, sequence) => ({
           versionId,
           plannerChapterId: l.chapterKey ? chapterIdByKey.get(l.chapterKey) ?? null : null,
           lessonKey: l.lessonKey,
