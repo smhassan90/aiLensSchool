@@ -1,5 +1,3 @@
-import type { SavedActivity } from '../academic-planner/saved-activity-plan';
-
 const STOP = new Set([
   'about',
   'after',
@@ -35,10 +33,21 @@ export type LessonActivityScript = {
   timing: TimedBlock[];
 };
 
-type ActivityLike = SavedActivity & { steps?: unknown };
+type ActivityLike = {
+  sliceKey?: string | null;
+  title: string;
+  description: string;
+  participationTechnique: string;
+  materials?: string | null;
+  learningObjective?: string | null;
+  teacherSteps?: unknown;
+  steps?: unknown;
+  expectedOutcome?: string | null;
+  durationMinutes?: number | null;
+};
 
 /** The stock "each group owns one section" recap. A real chapter task is not this. */
-export function isGenericSectionSummary(activity: Pick<SavedActivity, 'title' | 'description'>): boolean {
+export function isGenericSectionSummary(activity: Pick<ActivityLike, 'title' | 'description'>): boolean {
   const blob = `${activity.title}\n${activity.description}`.toLowerCase();
   if (/\bunit recap\b/.test(blob)) return true;
   if (/each group owns one section/.test(blob)) return true;
@@ -50,7 +59,7 @@ export function isGenericSectionSummary(activity: Pick<SavedActivity, 'title' | 
   );
 }
 
-export function activityFitScore(activity: SavedActivity): number {
+export function activityFitScore(activity: ActivityLike): number {
   if (isGenericSectionSummary(activity)) return 1;
   const text = `${activity.title} ${activity.description}`.toLowerCase();
   let score = activity.sliceKey ? 35 : 20;
