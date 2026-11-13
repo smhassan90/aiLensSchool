@@ -18,9 +18,16 @@ import {
   parseChapterTeachingPackJson,
 } from './schemas/chapter-teaching-pack.schema';
 import { heuristicChapterTeachingPack } from './chapter-teaching-pack.heuristic';
+import {
+  boundedTeachingBrief,
+  parseSectionPlans,
+  teachingPackFromSectionPlans,
+  type SectionPlan,
+} from '../academic-planner/section-teaching-plan';
 
 export type GenerateChapterTeachingPackResult = {
   pack: ChapterTeachingPackOutput;
+  sectionPlans?: SectionPlan[];
   source: PlannerAnalysisSource;
   warnings: Array<{ code: string; message: string }>;
   provider: string;
@@ -59,6 +66,9 @@ export async function generateChapterTeachingPack(input: {
     };
   }
 
+  const fromTextbook = packFromTextbookSections(input.chapterTitle, compiled);
+  if (fromTextbook) return fromTextbook;
+
   const header = buildTeachingPackHeader({
     subjectName: input.subjectName,
     classLabel: input.classLabel,
@@ -77,6 +87,30 @@ export async function generateChapterTeachingPack(input: {
     }
   }
   throw lastError ?? new Error('Teaching pack generation failed');
+}
+
+function packFromTextbookSections(
+  chapterTitle: string,
+  compiled: string,
+): GenerateChapterTeachingPackResult | null {
+  const plans = parseSectionPlans(compiled);
+  if (plans.length < 2) return null;
+  try {
+    const draft = teachingPackFromSectionPlans(plans, chapterTitle);
+    const pack = ChapterTeachingPackSchema.parse(draft);
+    const grounded = groundTeachingPack(pack, compiled);
+    assertActivityQuality(grounded.activities, compiled);
+    return {
+      pack: grounded,
+      sectionPlans: plans,
+      source: PlannerAnalysisSource.MANUAL,
+      warnings: [],
+      provider: 'textbook-sections',
+      model: 'section-plan-v1',
+    };
+  } catch {
+    return null;
+  }
 }
 
 function acceptPack(
@@ -130,13 +164,14 @@ async function requestCompletePack(
       });
     }
 
+    const exercises = (input.exercisesText ?? '').trim();
+    const brief = boundedTeachingBrief(lessonBody, exercises);
     const first = await requestTeachingPack(
       CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
-      `${header}${repair}\n\n--- LESSON TEXT ---\n${lessonBody}\n--- END LESSON TEXT ---`,
+      `${header}${repair}\n\nThe chapter is too long to send in one piece. Use this section-by-section brief. Activities must adapt the printed exercises named below.\n\n${brief}`,
     );
 
     let questions = first.pack.questions;
-    const exercises = (input.exercisesText ?? '').trim();
     if (exercises) {
       let exerciseBody = exercises;
       if (exerciseBody.length > FULL_TEXT_LIMIT) {

@@ -147,8 +147,8 @@ describe('Class 10 English activity quality', () => {
     const titles = chapters.map((chapter) => chosen(chapter.activities).title);
     expect(titles).toEqual([
       'Draft letter to the editor',
-      'Gorakh Hills travel diary',
-      'Helmet-law scenarios',
+      'Persuasive essay on the journey',
+      'Poem performance',
     ]);
     expect(new Set(titles).size).toBe(3);
   });

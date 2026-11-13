@@ -10,10 +10,10 @@ import {
 } from './day-plan-content-quality';
 import { activitySectionsFromSlices, buildActivityDayScript } from './classroom-activity-styles';
 import { detectSubjectProfile } from './subject-profiles';
+import { teacherGuideBullets } from './section-teaching-plan';
 
 function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+  return teacherGuideBullets(value);
 }
 
 function dedupeLines(lines: string[]): string[] {

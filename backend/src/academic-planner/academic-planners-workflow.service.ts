@@ -26,6 +26,7 @@ import { TimetableResolverService } from '../timetables/timetable-resolver.servi
 import { teacherDisplayName } from '../common/utils/person-name';
 import { gradeClassLabel, sectionClassLabel } from '../common/utils/section-class-label';
 import { joinCompiledChapter } from '../ai/schemas/chapter-compile.schema';
+import { teacherGuideBullets } from './section-teaching-plan';
 import { plannerChapterContentHash, plannerChapterContentStatus } from './planner-content.util';
 import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
 import { AcademicPlannersService } from './academic-planners.service';
@@ -1266,8 +1267,5 @@ export class AcademicPlannersWorkflowService {
 }
 
 function teachingPackStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
-    .map((s) => fixLibraryTextEncoding(s));
+  return teacherGuideBullets(value).map((s) => fixLibraryTextEncoding(s));
 }

@@ -1,4 +1,5 @@
-import { activityFitScore, isGenericSectionSummary, lessonActivityScript } from '../library-books/activity-quality';
+import { isGenericSectionSummary, lessonActivityScript } from '../library-books/activity-quality';
+import { teacherGuideBullets } from './section-teaching-plan';
 
 export type SavedActivity = {
   sliceKey: string | null;
@@ -18,8 +19,9 @@ function isRecap(activity: SavedActivity): boolean {
 
 /**
  * Pick one saved activity whose section has already been taught.
- * A closing day still prefers a chapter-specific task. The generic
- * "each group summarises every section" recap is used only when nothing else fits.
+ * A closing day uses the latest taught section that still has an unused activity.
+ * Title words such as oral, debate, or group do not change the choice.
+ * The generic section-summary recap is used only when nothing else fits.
  */
 export function selectSavedActivity(input: {
   activities: SavedActivity[];
@@ -35,29 +37,17 @@ export function selectSavedActivity(input: {
     (activity) => studied(activity) && activity.sliceKey != null && !isGenericSectionSummary(activity),
   );
 
-  if (!input.preferRecap) {
-    return specific[0] ?? null;
+  if (!specific.length) {
+    return unused.find((activity) => isRecap(activity) && studied(activity)) ?? null;
   }
+  if (!input.preferRecap) return specific[0] ?? null;
 
-  if (specific.length) {
-    const ranked = [...specific].sort((left, right) => activityFitScore(right) - activityFitScore(left));
-    const best = ranked[0];
-    if (!best) return null;
-    const bestScore = activityFitScore(best);
-    const writingPlan = /essay|persuasive|argumentative/i.test(`${best.title} ${best.description}`);
-    if (writingPlan) {
-      const interactive = ranked.find(
-        (activity) =>
-          activityFitScore(activity) >= bestScore - 8 &&
-          /debate|presentation|consensus|diary|poem|scenario|speech|role-play|role play/i.test(
-            `${activity.title} ${activity.description}`,
-          ),
-      );
-      if (interactive) return interactive;
-    }
-    return best;
+  for (let index = input.coveredSliceKeys.length - 1; index >= 0; index--) {
+    const sliceKey = input.coveredSliceKeys[index];
+    const match = specific.find((activity) => activity.sliceKey === sliceKey);
+    if (match) return match;
   }
-  return unused.find((activity) => isRecap(activity) && studied(activity)) ?? null;
+  return specific[0] ?? null;
 }
 
 export function formatSavedActivityNotes(
@@ -115,8 +105,7 @@ export function formatUnavailableChapterNotes(chapterTitle: string, reason: stri
 }
 
 function guideLines(teacherGuide: unknown): string[] {
-  if (!Array.isArray(teacherGuide)) return [];
-  return teacherGuide.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  return teacherGuideBullets(teacherGuide);
 }
 
 function explainLines(value: unknown): string[] {

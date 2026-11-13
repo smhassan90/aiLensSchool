@@ -165,7 +165,7 @@ function activityKind(activity: Pick<ActivityLike, 'title' | 'description'>): Ac
   if (/\bpoem\b|\bverse\b/.test(text)) return 'poem';
   if (/essay|persuasive|argumentative/.test(text)) return 'essay';
   if (/modal|grammar|pronoun|conditional|preposition|indirect speech/.test(text)) return 'grammar';
-  if (/consensus|discuss|oral/.test(text)) return 'discussion';
+  if (/consensus|\bagree|\bdisagree/.test(text)) return 'discussion';
   return 'task';
 }
 
@@ -284,6 +284,9 @@ function roleLine(description: string, kind: ActivityKind): string {
   if (/\bgroups\b/i.test(description)) {
     return 'In the group, each student adds one point of their own before the group shares.';
   }
+  if (/\bhalf the class\b/i.test(description)) {
+    return 'The class works in two groups. Each student prepares one point and speaks once before the group answers.';
+  }
   return 'Each student works in their own notebook. There is no group answer.';
 }
 
@@ -338,9 +341,7 @@ export function lessonActivityScript(activity: ActivityLike, periodMinutes: numb
   const kind = activityKind(activity);
   const derivedObjective = objectiveFor(kind, activity.title);
   const objective =
-    storedObjective &&
-    !sameInstructionalPurpose(storedObjective, description) &&
-    !sameInstructionalPurpose(storedObjective, derivedObjective)
+    storedObjective && !sameInstructionalPurpose(storedObjective, description)
       ? storedObjective
       : derivedObjective;
 

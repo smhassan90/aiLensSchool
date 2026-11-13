@@ -227,7 +227,7 @@ Rules:
 - Do not invent exercises or content not present in the text.
 - No markdown.`;
 
-export const CHAPTER_TEACHING_PACK_PROMPT_VERSION = 'chapter-teaching-pack-v4';
+export const CHAPTER_TEACHING_PACK_PROMPT_VERSION = 'chapter-teaching-pack-v5';
 
 export const CHAPTER_TEACHING_PACK_SYSTEM_PROMPT = `You prepare a teaching pack for a Pakistani school teacher from ONE textbook unit. Use ONLY the supplied text. Never invent facts, names, page numbers or quotes. Write in simple classroom English (short sentences, common words). If the user message gives an approximate student age, write activities those students can do. Do not infer an age from any other number.
 
@@ -265,6 +265,7 @@ questions
 activities (exactly 3, 4, or 5 — never fewer, never more)
 - Do NOT give every unit an activity titled "Unit recap". Do NOT use the procedure "write the section names on the board; each group owns one section and writes its meaning, one textbook line, and one real-life example". That procedure is invalid.
 - Choose 3 to 5 different tasks from THIS unit's real sections: the reading, the oral task, a grammar or language point, the writing task, and the study-skill or poem only when the book actually has one. Set sliceKey to that section.
+- Adapt a printed exercise. Name the section and the exercise. Do not replace a printed oral, writing, grammar, or fun task with a debate about the reading story.
 - Pick the format that fits the learning objective (debate, role-play, scenario, grammar challenge, peer response, writing workshop, presentation, reasoned quiz). Do not use the same group-summary for different units.
 - A whole-unit recap is allowed only when it practises something this unit actually teaches, and it must not be activity 1 by default.
 - Fields have different jobs. Do not copy one sentence into another field.

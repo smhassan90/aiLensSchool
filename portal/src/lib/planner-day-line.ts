@@ -1,6 +1,8 @@
 import type { PlannerLesson } from "@/lib/planner-view-model";
 
 export function shortTodayLine(lesson: PlannerLesson): string {
+  const fromNotes = lesson.teacherNotes?.match(/Learning objective:\s*(.+)/)?.[1]?.trim() ?? "";
+  if (fromNotes && fromNotes.length < 220) return fromNotes;
   const objective = lesson.objectives.find((line) => line.trim().length > 0)?.trim() ?? "";
   if (objective && objective.length < 180) return objective;
   if (lesson.kind === "ACTIVITY" || /\bactivity\b/i.test(lesson.title)) {

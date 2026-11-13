@@ -25,6 +25,14 @@ import {
   slicesForReadingDay,
 } from './saved-activity-plan';
 import {
+  allocateSectionDays,
+  parseSectionPlans,
+  readSectionPlans,
+  renderAssignedLesson,
+  validateDisplayedLesson,
+  type ChapterDayAssignment,
+} from './section-teaching-plan';
+import {
   computeScheduleSummary,
   defaultRevisionSlots,
 } from './schedule-engine';
@@ -84,6 +92,30 @@ export function generateDayPlanFromTeachingPacks(input: {
   resolved.forEach(({ chapter, pack, reason }, chapterIdx) => {
     const chapterTitle = displayChapterTitle(chapter.titleSnapshot);
     const teachDays = teachDaysPerChapter[chapterIdx] ?? 1;
+    const chapterText =
+      (chapter.libraryBookChapterId
+        ? input.chapterTextsByLibraryId.get(chapter.libraryBookChapterId)
+        : undefined) ??
+      chapter.chapterText ??
+      '';
+    const sectionPlans = sectionPlansForChapter(chapterText, pack?.teacherGuide);
+    if (sectionPlans.length >= 2) {
+      for (const assignment of allocateSectionDays(teachDays, sectionPlans)) {
+        globalDay++;
+        drafts.push(
+          draftFromSectionAssignment({
+            assignment,
+            chapterTitle,
+            chapterKey: chapter.chapterKey,
+            globalDay,
+            periodMinutes,
+            sequence: drafts.length,
+            lessonKey: keyFactory(),
+          }),
+        );
+      }
+      return;
+    }
     const roles = rolesForChapterDays(teachDays);
     const readingDayCount = roles.filter((role) => role === 'READING' || role === 'CONTINUE_READING').length;
     const exerciseDayCount = roles.filter((role) => role === 'EXERCISE').length;
@@ -106,22 +138,31 @@ export function generateDayPlanFromTeachingPacks(input: {
       }
       if (pack && (role === 'READING' || role === 'CONTINUE_READING')) {
         const window = slicesForReadingDay(pack.readingSlices, readingPass, readingDayCount);
-        const daySlices = window.length
-          ? window
-          : pack.readingSlices.slice(-1);
+        const daySlices = window;
         const hint = labelForTeachingDay(pack, readingPass, Math.max(readingDayCount, 1));
         readingPass++;
         for (const slice of daySlices) {
           if (!coveredSliceKeys.includes(slice.sliceKey)) coveredSliceKeys.push(slice.sliceKey);
         }
         if (hint && !isLowValueContent(hint) && !/^section \d+$/i.test(hint)) sectionHint = hint;
-        teacherNotes = readingLessonNotes(daySlices, pack.teacherGuide);
-        const sectionName = daySlices.map((slice) => slice.title).join(', ') || chapterTitle;
-        objectives = [
-          role === 'CONTINUE_READING'
-            ? `Continue reading ${sectionName}.`
-            : `Read ${sectionName} with the class.`,
-        ];
+        if (!daySlices.length) {
+          teacherNotes = [
+            `Continue practice for ${chapterTitle}.`,
+            '',
+            'What you do: Do not repeat the last section explanation. Use the next unfinished textbook exercise.',
+            'What students do: Complete the next printed item in their own notebooks.',
+            'Check understanding: Accept only an answer the textbook supports.',
+          ].join('\n');
+          objectives = [`Continue the unfinished exercise for ${chapterTitle}.`];
+        } else {
+          teacherNotes = readingLessonNotes(daySlices, pack.teacherGuide);
+          const sectionName = daySlices.map((slice) => slice.title).join(', ') || chapterTitle;
+          objectives = [
+            role === 'CONTINUE_READING'
+              ? `Continue reading ${sectionName}.`
+              : `Read ${sectionName} with the class.`,
+          ];
+        }
       }
       if (pack && role === 'EXERCISE') {
         const pool = pack.questions.filter(
@@ -358,6 +399,57 @@ export function rebuildLessonFromPack(input: {
     objectives: plan.objectives,
     plannedMinutes: input.periodMinutes,
     notes: plan.teacherNotes ?? '',
+  };
+}
+
+function sectionPlansForChapter(chapterText: string, teacherGuide: unknown) {
+  const parsed = parseSectionPlans(chapterText);
+  if (parsed.length >= 2) return parsed;
+  return readSectionPlans(teacherGuide);
+}
+
+function draftFromSectionAssignment(input: {
+  assignment: ChapterDayAssignment;
+  chapterTitle: string;
+  chapterKey: string;
+  globalDay: number;
+  periodMinutes: number;
+  sequence: number;
+  lessonKey: string;
+}): Omit<ScheduleLessonDraft, 'scheduledDate' | 'periodNumber' | 'slotStartTime' | 'slotEndTime'> & { notes: string } {
+  const rendered = renderAssignedLesson(input.assignment, input.periodMinutes);
+  const issues = validateDisplayedLesson(rendered.notes, input.periodMinutes);
+  if (issues.length) {
+    throw new Error(`Lesson for ${input.assignment.section.title} failed checks: ${issues.join('; ')}`);
+  }
+  const notes = rendered.notes;
+  const role = input.assignment.mode === 'activity' ? 'ACTIVITY' : input.assignment.mode === 'teach' ? 'READING' : 'EXERCISE';
+  const plan = buildMinimalDayPlan({
+    chapterTitle: input.chapterTitle,
+    role,
+    teacherNotes: notes,
+    objectives: [rendered.objective],
+    titleSuffix: rendered.titleSuffix,
+  });
+  const exerciseKey = input.assignment.exercise?.key ?? 'none';
+  return {
+    lessonKey: input.lessonKey,
+    chapterKey: input.chapterKey,
+    sequence: input.sequence,
+    kind: rendered.kind === 'ACTIVITY' ? PlannerLessonKind.ACTIVITY : plan.kind,
+    title: `Day ${input.globalDay} — ${input.chapterTitle} · ${plan.titleSuffix}`,
+    primaryStage: input.assignment.mode === 'activity' ? LessonStage.ACTIVITY : plan.primaryStage,
+    stages:
+      input.assignment.mode === 'activity'
+        ? [{ stage: LessonStage.ACTIVITY, minutes: input.periodMinutes }]
+        : [{ stage: LessonStage.EXPLANATION, minutes: input.periodMinutes }],
+    objectives: [rendered.objective],
+    portionKeys: [`section:${input.assignment.section.sliceKey}:${input.assignment.mode}:${exerciseKey}`],
+    dependsOnKeys: [],
+    plannedMinutes: input.periodMinutes,
+    frozen: false,
+    isContinuation: input.assignment.mode !== 'teach',
+    notes,
   };
 }
 

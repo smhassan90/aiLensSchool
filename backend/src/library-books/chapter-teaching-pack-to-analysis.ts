@@ -4,6 +4,7 @@ import {
   PlannerChapterAnalysisSchema,
 } from '../ai/schemas/planner-chapter-analysis.schema';
 import { detectSubjectProfile } from '../academic-planner/subject-profiles';
+import { teacherGuideBullets } from '../academic-planner/section-teaching-plan';
 
 export type TeachingPackForAnalysis = {
   contentHash: string;
@@ -45,8 +46,7 @@ function sliceKeyToPortionKey(sliceKey: string): string {
 }
 
 function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+  return teacherGuideBullets(value);
 }
 
 function stagesForSlice(input: {

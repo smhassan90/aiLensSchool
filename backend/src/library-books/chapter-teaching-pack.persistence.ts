@@ -2,6 +2,7 @@ import { PlannerAnalysisSource, Prisma, PrismaClient } from '@prisma/client';
 import { assertActivityQuality } from './activity-quality';
 import { assertPersistableActivities } from './chapter-teaching-pack.ground';
 import type { ChapterTeachingPackOutput } from './schemas/chapter-teaching-pack.schema';
+import { wrapTeacherGuide, type SectionPlan } from '../academic-planner/section-teaching-plan';
 
 export async function upsertChapterTeachingPack(
   prisma: PrismaClient,
@@ -9,6 +10,7 @@ export async function upsertChapterTeachingPack(
     libraryBookChapterId: string;
     contentHash: string;
     pack: ChapterTeachingPackOutput;
+    sectionPlans?: SectionPlan[];
     source: PlannerAnalysisSource;
     warnings: Prisma.InputJsonValue | null;
     promptVersion: string;
@@ -33,7 +35,9 @@ export async function upsertChapterTeachingPack(
         contentHash: input.contentHash,
         complexity: input.pack.complexity,
         summary: input.pack.summary,
-        teacherGuide: input.pack.teacherGuide as Prisma.InputJsonValue,
+        teacherGuide: (input.sectionPlans?.length
+          ? wrapTeacherGuide(input.pack.teacherGuide, input.sectionPlans)
+          : input.pack.teacherGuide) as Prisma.InputJsonValue,
         source: input.source,
         warnings: input.warnings ?? undefined,
         promptVersion: input.promptVersion,
