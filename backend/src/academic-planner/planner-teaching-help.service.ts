@@ -25,6 +25,7 @@ import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encodi
 import { buildUrduTeachingGuide } from './teaching-help-urdu';
 import { activitySectionsFromSlices, assignActivityFormatIndexes } from './classroom-activity-styles';
 import { heuristicTeachingHelp } from './teaching-help-heuristic';
+import { teachingHelpFromSavedActivityNotes } from './teaching-help-from-saved-activity';
 
 const ADMIN_CONTENT_MESSAGE =
   'The source lesson content is not available yet. Please ask your school administrator to check the assigned textbook content.';
@@ -144,7 +145,45 @@ export class PlannerTeachingHelpService {
 
     const classLabel = gradeClassLabel(planner.section);
 
-    if (/\bactivity\b/i.test(lesson.title)) {
+    const savedActivityNotes = (lesson.notes ?? '').trim();
+    const isActivityLesson = lesson.kind === 'ACTIVITY' || /\bactivity\b/i.test(lesson.title);
+    if (isActivityLesson && savedActivityNotes.length >= 40) {
+      const assistance = TeachingHelpOutputSchema.parse(
+        teachingHelpFromSavedActivityNotes({
+          lessonTitle: lesson.title,
+          chapterTitle: resolved.contentSources.chapterTitle,
+          classLabel,
+          subjectName: planner.subject.name,
+          notes: savedActivityNotes,
+        }),
+      );
+      return {
+        lessonKey,
+        title: lesson.title,
+        chapterTitle: resolved.contentSources.chapterTitle,
+        classLabel,
+        subjectName: planner.subject.name,
+        mode: 'CLASSROOM_ACTIVITY' as const,
+        basis: resolved.basis,
+        contentSources: resolved.contentSources,
+        contentExcerpt: resolved.basis === 'CHAPTER_TEXT' ? resolved.chapterExcerpt.slice(0, 1200) : null,
+        contextMeta: {
+          anchorsUsed: resolved.anchorsUsed,
+          excerptCharCount: resolved.excerptCharCount,
+          missingNotes: resolved.missingNotes,
+        },
+        assistance,
+        urduGuide: null,
+        aiGenerated: false,
+        cached: false,
+        promptVersion: TEACHING_HELP_PROMPT_VERSION,
+        provider: 'saved-activity',
+        disclaimer: 'These are the activity instructions saved on this planner day.',
+        unavailableMessage: null,
+      };
+    }
+
+    if (isActivityLesson) {
       const formatIndex = lesson.chapter
         ? await this.formatIndexForChapter(vid, lesson.chapter.id, lesson.chapter.sortOrder)
         : 0;

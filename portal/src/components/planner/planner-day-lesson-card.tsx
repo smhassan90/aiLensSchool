@@ -43,11 +43,9 @@ export function PlannerDayLessonCard({
             )}
           </div>
           <p className="text-sm leading-relaxed text-foreground">{fixDisplayText(shortTodayLine(lesson))}</p>
-          {activityConductText(lesson) && (
-            <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-              {fixDisplayText(activityConductText(lesson) ?? "")}
-            </p>
-          )}
+          <LessonInstructions
+            text={activityConductText(lesson) || lesson.teacherNotes?.trim() || ""}
+          />
         </div>
         {!readOnly && (
           <div className="flex shrink-0 flex-wrap gap-2">
@@ -71,5 +69,17 @@ export function PlannerDayLessonCard({
         )}
       </div>
     </article>
+  );
+}
+
+function LessonInstructions({ text }: { text: string }) {
+  if (!text) return null;
+  const body = <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{fixDisplayText(text)}</p>;
+  if (text.length <= 700) return body;
+  return (
+    <details className="text-sm text-muted-foreground">
+      <summary className="cursor-pointer">Full lesson instructions</summary>
+      {body}
+    </details>
   );
 }

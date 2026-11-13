@@ -1383,6 +1383,10 @@ model LibraryChapterActivityItem {
   description            String  @db.Text
   participationTechnique String  @map("participation_technique") @db.Text
   materials              String? @db.Text
+  learningObjective      String? @map("learning_objective") @db.Text
+  teacherSteps           Json?   @map("teacher_steps")
+  expectedOutcome        String? @map("expected_outcome") @db.Text
+  durationMinutes        Int?    @map("duration_minutes")
 
   pack LibraryChapterTeachingPack @relation(fields: [packId], references: [id], onDelete: Cascade)
 

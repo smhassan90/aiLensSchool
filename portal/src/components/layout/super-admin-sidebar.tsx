@@ -13,6 +13,7 @@ import {
   Tag,
   Users,
   AlertTriangle,
+  Database,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
@@ -33,6 +34,7 @@ const navItems = [
   { href: "/super-admin/errors", label: "API Errors", icon: AlertTriangle },
   { href: "/super-admin/audit-logs", label: "Audit Logs", icon: FileText },
   { href: "/super-admin/system", label: "System", icon: Settings },
+  { href: "/super-admin/database", label: "Database", icon: Database },
 ];
 
 export function SuperAdminSidebar() {

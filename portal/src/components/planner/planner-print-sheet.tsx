@@ -20,7 +20,7 @@ export function PlannerPrintSheet({ title, subtitle, lessons, chapterTitle }: Pl
           const day = lesson.dayNumber ?? index + 1;
           const chapter = chapterTitle(lesson.chapterKey);
           const task = shortTodayLine(lesson);
-          const conduct = activityConductText(lesson);
+          const conduct = lesson.teacherNotes?.trim() || activityConductText(lesson);
           return (
             <li key={lesson.lessonKey} className="text-sm leading-relaxed">
               <span className="font-semibold">Day {day}</span>

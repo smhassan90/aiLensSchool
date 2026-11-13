@@ -1,5 +1,5 @@
 import { LessonStage, PlannerLessonKind } from '@prisma/client';
-import { ActivitySection, buildActivityDayScript } from './classroom-activity-styles';
+import { buildActivityDayScript, type ActivitySection } from './classroom-activity-styles';
 import { displayChapterTitle } from './day-plan-content-quality';
 
 export type ChapterDayRole = 'INTRO' | 'READING' | 'CONTINUE_READING' | 'EXERCISE' | 'ACTIVITY';
@@ -60,6 +60,9 @@ export function buildMinimalDayPlan(input: {
   sectionHint?: string;
   activitySections?: ActivitySection[];
   activityFormatIndex?: number;
+  teacherNotes?: string | null;
+  objectives?: string[];
+  titleSuffix?: string;
 }): {
   objectives: string[];
   teacherNotes: string | null;
@@ -71,9 +74,17 @@ export function buildMinimalDayPlan(input: {
   const hint =
     input.sectionHint && input.sectionHint.length > 3 ? ` (${input.sectionHint})` : '';
 
+  let plan: {
+    objectives: string[];
+    teacherNotes: string | null;
+    titleSuffix: string;
+    kind: PlannerLessonKind;
+    primaryStage: LessonStage;
+  };
+
   switch (input.role) {
     case 'INTRO':
-      return {
+      plan = {
         titleSuffix: roleLabels.INTRO,
         kind: PlannerLessonKind.TEACHING,
         primaryStage: LessonStage.INTRODUCTION,
@@ -82,43 +93,63 @@ export function buildMinimalDayPlan(input: {
         ],
         teacherNotes: null,
       };
+      break;
     case 'READING':
-      return {
+      plan = {
         titleSuffix: roleLabels.READING,
         kind: PlannerLessonKind.TEACHING,
         primaryStage: LessonStage.READING,
         objectives: [`Read today’s section with the class${hint}.`],
         teacherNotes: null,
       };
+      break;
     case 'CONTINUE_READING':
-      return {
+      plan = {
         titleSuffix: roleLabels.CONTINUE_READING,
         kind: PlannerLessonKind.TEACHING,
         primaryStage: LessonStage.READING,
         objectives: [`Continue reading from where you stopped last time${hint}.`],
         teacherNotes: null,
       };
+      break;
     case 'EXERCISE':
-      return {
+      plan = {
         titleSuffix: roleLabels.EXERCISE,
         kind: PlannerLessonKind.TEACHING,
         primaryStage: LessonStage.GUIDED_PRACTICE,
         objectives: [`Do textbook exercises for this part of ${chapter}.`],
         teacherNotes: null,
       };
+      break;
     case 'ACTIVITY': {
+      if (input.teacherNotes) {
+        plan = {
+          titleSuffix: roleLabels.ACTIVITY,
+          kind: PlannerLessonKind.ACTIVITY,
+          primaryStage: LessonStage.ACTIVITY,
+          objectives: [`Activity for ${chapter}`],
+          teacherNotes: input.teacherNotes,
+        };
+        break;
+      }
       const script = buildActivityDayScript({
         chapterTitle: chapter,
         sections: input.activitySections ?? [],
         formatIndex: input.activityFormatIndex ?? 0,
       });
-      return {
+      plan = {
         titleSuffix: roleLabels.ACTIVITY,
         kind: PlannerLessonKind.ACTIVITY,
         primaryStage: LessonStage.ACTIVITY,
         objectives: [script.objective],
         teacherNotes: script.teacherNotes,
       };
+      break;
     }
   }
+
+  if (input.titleSuffix) plan.titleSuffix = input.titleSuffix;
+  if (input.objectives?.length) plan.objectives = input.objectives;
+  if (input.teacherNotes) plan.teacherNotes = input.teacherNotes;
+  return plan;
 }

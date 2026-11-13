@@ -1,5 +1,5 @@
 import { fixLibraryTextEncoding } from '../library-books/fix-library-text-encoding';
-import { TeachingPackForAnalysis } from '../library-books/chapter-teaching-pack-to-analysis';
+import type { TeachingPackForAnalysis } from '../library-books/chapter-teaching-pack-to-analysis';
 import { splitSummaryAcrossDays } from './day-plan-allocate';
 import {
   displayChapterTitle,

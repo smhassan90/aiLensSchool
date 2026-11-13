@@ -30,6 +30,14 @@ function cueHits(text: string): number {
   return OPENING_POEM_CUES.filter((re) => re.test(text)).length;
 }
 
+function sectionHeadingCount(text: string): number {
+  return (
+    text.match(
+      /(?:^|\n)\s*(?:#{1,6}\s+)?(?:unit\s+)?(?:reading comprehension|oral communication|language practice|writing|study skills|fun)\b/gi,
+    )?.length ?? 0
+  );
+}
+
 /** Light cleanup only — keep poem lines and exercise wording intact. */
 export function lightCleanCompiledText(text: string): string {
   return stripInterleavedWeblinkSidebar(
@@ -127,6 +135,12 @@ export function repairCompiledChapterFromSource(
     countLatinLetters(sourceBody) > countLatinLetters(lessonBody) + 60
   ) {
     // Model returned a short mid-poem fragment; prefer the fuller OCR lesson body.
+    lessonBody = sourceBody;
+  }
+
+  const sourceSections = sectionHeadingCount(sourceBody);
+  const compiledSections = sectionHeadingCount(lessonBody);
+  if (sourceSections >= 3 && compiledSections < sourceSections && sourceBody.length >= 80) {
     lessonBody = sourceBody;
   }
 

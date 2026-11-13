@@ -33,13 +33,17 @@ export const ChapterTeachingPackSchema = z.object({
       z.object({
         sliceKey: z.string().regex(/^s\d{1,2}$/).nullable().optional(),
         title: z.string().min(2).max(160),
+        learningObjective: z.string().min(10).max(400),
         description: z.string().min(10).max(1200),
+        materials: z.string().min(2).max(300),
+        steps: z.array(z.string().min(5).max(400)).min(2).max(8),
         participationTechnique: z.string().min(10).max(800),
-        materials: z.string().max(300).optional().nullable(),
+        expectedOutcome: z.string().min(10).max(400),
+        durationMinutes: z.number().int().min(5).max(40),
       }),
     )
-    .min(1)
-    .max(8),
+    .min(3)
+    .max(5),
   revisionPoints: z
     .array(
       z.object({
@@ -68,6 +72,19 @@ function truncStr(value: unknown, max: number, min = 0): string | unknown {
 function truncStrings(v: unknown, max: number, min = 0): unknown {
   if (!Array.isArray(v)) return v;
   return v.map((item) => truncStr(item, max, min));
+}
+
+/** Keep a whole-unit recap plus section activities. Never pad with invented activities. */
+export function capTeachingPackActivities(activities: unknown): unknown {
+  if (!Array.isArray(activities) || activities.length <= 5) return activities;
+  const recapIndex = activities.findIndex((item) => {
+    if (!item || typeof item !== 'object') return false;
+    const activity = item as Record<string, unknown>;
+    return activity.sliceKey == null || /\brecap\b/i.test(String(activity.title ?? ''));
+  });
+  const recap = recapIndex >= 0 ? activities[recapIndex] : null;
+  const rest = activities.filter((_, index) => index !== recapIndex);
+  return (recap ? [recap, ...rest] : rest).slice(0, 5);
 }
 
 /** Trim AI overflow so Zod validation succeeds without dropping the whole pack. */
@@ -101,17 +118,29 @@ export function coerceChapterTeachingPack(raw: unknown): unknown {
         };
       })
     : questions;
-  const activities = cap(r.activities, 8);
+  const activities = capTeachingPackActivities(r.activities);
   const normalizedActivities = Array.isArray(activities)
     ? activities.map((item) => {
         if (!item || typeof item !== 'object') return item;
         const a = item as Record<string, unknown>;
+        const duration =
+          typeof a.durationMinutes === 'number' && Number.isFinite(a.durationMinutes)
+            ? Math.min(40, Math.max(5, Math.round(a.durationMinutes)))
+            : a.durationMinutes;
         return {
           ...a,
           title: truncStr(a.title, 160, 2),
+          learningObjective:
+            a.learningObjective == null ? a.learningObjective : truncStr(a.learningObjective, 400, 10),
           description: truncStr(a.description, 1200, 10),
           participationTechnique: truncStr(a.participationTechnique, 800, 10),
-          materials: a.materials == null ? a.materials : truncStr(a.materials, 300),
+          materials:
+            a.materials == null || String(a.materials).trim() === ''
+              ? 'Textbook and notebooks'
+              : truncStr(a.materials, 300, 2),
+          expectedOutcome: a.expectedOutcome == null ? a.expectedOutcome : truncStr(a.expectedOutcome, 400, 10),
+          steps: Array.isArray(a.steps) ? truncStrings(a.steps.slice(0, 8), 400, 5) : a.steps,
+          durationMinutes: duration,
         };
       })
     : activities;

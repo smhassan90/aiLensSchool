@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/commo
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ExceptionLogService, API_EXCEPTION_RETENTION_DAYS } from '../exception-logs/exception-log.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -37,6 +37,12 @@ class ExceptionLogQueryDto extends PaginationDto {
 class ClearExceptionLogsDto {
   @IsBoolean()
   confirm!: boolean;
+}
+
+class RunSqlDto {
+  @IsString()
+  @MaxLength(200_000)
+  sql!: string;
 }
 
 class ActivityQueryDto extends PaginationDto {
@@ -86,6 +92,11 @@ export class PlatformController {
   @Post('data-purge')
   purgeData(@Body() dto: PurgePlatformDataDto, @CurrentUser() user: AuthUser) {
     return this.platform.purgeData(dto, user.id);
+  }
+
+  @Post('sql')
+  runSql(@Body() dto: RunSqlDto, @CurrentUser() user: AuthUser) {
+    return this.platform.runSql(dto.sql, user.id);
   }
 
   @Get('exception-logs')

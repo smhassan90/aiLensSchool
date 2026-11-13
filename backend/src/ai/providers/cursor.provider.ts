@@ -924,7 +924,8 @@ export class CursorProvider implements AiProvider {
         estimatedCost: 0,
       };
     }
-    const user = `Class: ${input.classLabel}\nSubject: ${input.subjectName}\nGrade level: ${input.gradeLevel}\nChapter: ${input.chapterTitle}\nPeriod minutes: ${input.periodMinutes}\nActivities enabled: ${input.activitiesEnabled}\nActivity count: ${input.activityCount}\n\n--- CHAPTER TEXT ---\n${input.chapterText}\n--- END ---`;
+    const { classContextLines } = await import('../../library-books/class-age-hint');
+    const user = `${classContextLines(input.classLabel).join('\n')}\nSubject: ${input.subjectName}\nChapter: ${input.chapterTitle}\nPeriod minutes: ${input.periodMinutes}\nActivities enabled: ${input.activitiesEnabled}\nActivity count: ${input.activityCount}\n\n--- CHAPTER TEXT ---\n${input.chapterText}\n--- END ---`;
     const { PLANNER_CHAPTER_ANALYSIS_SYSTEM_PROMPT } = await import('../prompts');
     const content = await this.withTimeout(
       this.complete(PLANNER_CHAPTER_ANALYSIS_SYSTEM_PROMPT, user),
@@ -978,7 +979,8 @@ export class CursorProvider implements AiProvider {
       input.variety && input.variety > 0
         ? `\nActivity variant ${input.variety}: choose a different classroom format from variant 0.`
         : '';
-    const user = `${modeInstruction(input.mode)}\nClass: ${input.classLabel}\nSubject: ${input.subjectName}\nTextbook: ${input.bookTitle ?? '(not specified)'}\nChapter: ${input.chapterTitle}\nLesson: ${input.lessonTitle}\nObjectives:\n${input.objectives.map((o) => `- ${o}`).join('\n') || '(none listed)'}\nLesson stages:\n${input.stagesSummary}\n${excerptBlock}${input.teacherQuestion ? `\nTeacher focus question: ${input.teacherQuestion.slice(0, 500)}` : ''}${variant}${repair}`;
+    const { classContextLines } = await import('../../library-books/class-age-hint');
+    const user = `${modeInstruction(input.mode)}\n${classContextLines(input.classLabel).join('\n')}\nSubject: ${input.subjectName}\nTextbook: ${input.bookTitle ?? '(not specified)'}\nChapter: ${input.chapterTitle}\nLesson: ${input.lessonTitle}\nObjectives:\n${input.objectives.map((o) => `- ${o}`).join('\n') || '(none listed)'}\nLesson stages:\n${input.stagesSummary}\n${excerptBlock}${input.teacherQuestion ? `\nTeacher focus question: ${input.teacherQuestion.slice(0, 500)}` : ''}${variant}${repair}`;
 
     const content = await this.withTimeout(
       this.complete(TEACHING_HELP_SYSTEM_PROMPT, user),

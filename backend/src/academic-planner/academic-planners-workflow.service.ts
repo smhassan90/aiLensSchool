@@ -44,6 +44,7 @@ import {
   analysisFromTeachingPack,
   loadTeachingPacksByChapterIds,
 } from '../library-books/chapter-teaching-pack-analysis.loader';
+import { refreshChapterTeachingPack } from '../library-books/chapter-teaching-pack.refresh';
 import { assignActivityFormatIndexes } from './classroom-activity-styles';
 import { generateDayPlanFromTeachingPacks, rebuildLessonFromPack } from './day-plan-from-teaching-pack';
 import { moveLesson as moveLessonOnSlots } from './schedule-engine';
@@ -506,10 +507,10 @@ export class AcademicPlannersWorkflowService {
         },
       });
 
-      if (chapter.activitiesEnabled && result.analysis.activitySuggestions?.length) {
+      if (chapter.activityCount !== 0 && result.analysis.activitySuggestions?.length) {
         await tx.plannerActivity.deleteMany({ where: { versionId, plannerChapterId: chapter.id } });
         await tx.plannerActivity.createMany({
-          data: result.analysis.activitySuggestions.slice(0, chapter.activityCount).map((a, i) => ({
+          data: result.analysis.activitySuggestions.slice(0, 5).map((a, i) => ({
             versionId,
             plannerChapterId: chapter.id,
             activityKey: randomUUID(),
@@ -553,6 +554,8 @@ export class AcademicPlannersWorkflowService {
         message: 'Use recovery regenerate for recovery proposals',
       });
     }
+
+    const packRefreshWarnings = await this.refreshTeachingPacks(version.chapters);
 
     let settings = version.settings as PlannerSettings;
     let chapters = await this.ensureChaptersAnalyzed(
@@ -651,9 +654,16 @@ export class AcademicPlannersWorkflowService {
       timetableSource: slotResult.timetableSource,
     });
 
-    let generated =
-      dayPlan ??
-      (() => {
+    const hasLibraryChapters = chapters.some((chapter) => chapter.libraryBookChapterId);
+    let generated = dayPlan;
+    if (!generated) {
+      if (hasLibraryChapters) {
+        throw new UnprocessableEntityException({
+          code: 'DAY_PLAN_UNAVAILABLE',
+          message: 'The day plan could not be built from the selected library chapters.',
+        });
+      }
+      generated = (() => {
         const chaptersForEngine: ChapterForSegments[] = chapters.map((c) => {
           const analysis = c.analysis as ChapterForSegments['analysis'];
           return {
@@ -680,6 +690,9 @@ export class AcademicPlannersWorkflowService {
       })();
     if (slotResult.warnings.length) {
       generated.summary.warnings.push(...slotResult.warnings);
+    }
+    if (packRefreshWarnings.length) {
+      generated.summary.warnings.push(...packRefreshWarnings);
     }
     if (fallbackApplied.applied) {
       generated.summary.warnings.push({
@@ -1107,10 +1120,10 @@ export class AcademicPlannersWorkflowService {
         },
       });
 
-      if (chapter.activitiesEnabled && result.analysis.activitySuggestions?.length) {
+      if (chapter.activityCount !== 0 && result.analysis.activitySuggestions?.length) {
         await tx.plannerActivity.deleteMany({ where: { versionId, plannerChapterId: chapter.id } });
         await tx.plannerActivity.createMany({
-          data: result.analysis.activitySuggestions.slice(0, chapter.activityCount).map((a, i) => ({
+          data: result.analysis.activitySuggestions.slice(0, 5).map((a, i) => ({
             versionId,
             plannerChapterId: chapter.id,
             activityKey: randomUUID(),
@@ -1221,6 +1234,26 @@ export class AcademicPlannersWorkflowService {
     if (!chapter) throw new NotFoundException({ code: 'CHAPTER_NOT_FOUND', message: 'Chapter not found' });
 
     return { planner, version, chapter };
+  }
+
+  private async refreshTeachingPacks(
+    chapters: Array<{ libraryBookChapterId: string | null; titleSnapshot: string }>,
+  ): Promise<Array<{ code: string; message: string }>> {
+    const warnings: Array<{ code: string; message: string }> = [];
+    for (const chapter of chapters) {
+      if (!chapter.libraryBookChapterId) continue;
+      try {
+        await refreshChapterTeachingPack(this.prisma, chapter.libraryBookChapterId);
+      } catch (error) {
+        warnings.push({
+          code: 'TEACHING_PACK_UNAVAILABLE',
+          message: `${chapter.titleSnapshot}: ${
+            error instanceof Error ? error.message : 'Teaching pack could not be refreshed.'
+          }`,
+        });
+      }
+    }
+    return warnings;
   }
 }
 

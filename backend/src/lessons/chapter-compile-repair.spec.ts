@@ -52,4 +52,28 @@ And so became quite sad.
     expect(repaired.lessonBody).not.toMatch(/Exercise 5/i);
     expect(repaired.exercises).toMatch(/Exercise 1/i);
   });
+
+  it('restores textbook sections the compiler dropped', () => {
+    const unit = [
+      'Reading Comprehension',
+      'A bad dream woke him before the presentation.',
+      '',
+      'Oral Communication',
+      'Presentation evaluation uses a criterion.',
+      '',
+      'Language Practice',
+      'Modal verbs for requests and advice.',
+      '',
+      'Writing',
+      'Letter to the editor asks for a public reply.',
+      '',
+      'Study Skills',
+      'Maintaining a daily schedule.',
+    ].join('\n');
+    const compiledBody = `Reading Comprehension\nA bad dream woke him before the presentation.\n${'extra '.repeat(400)}`;
+    const repaired = repairCompiledChapterFromSource(unit, compiledBody, '');
+    expect(repaired.lessonBody).toMatch(/Letter to the editor/);
+    expect(repaired.lessonBody).toMatch(/Modal verbs for requests/);
+    expect(repaired.lessonBody).toMatch(/Maintaining a daily schedule/);
+  });
 });

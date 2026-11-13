@@ -2,6 +2,7 @@
 
 import { Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { fixDisplayText } from "@/lib/fix-display-text";
 import type { PlannerLesson } from "@/lib/planner-view-model";
 import { formatStatusLabel } from "@/lib/display-labels";
 
@@ -26,6 +27,12 @@ export function LessonCard({ lesson, compact, onMove, onTeachingHelp }: LessonCa
             <p className="mt-1 text-muted-foreground line-clamp-2">
               {lesson.objectives[0]}
             </p>
+          )}
+          {!compact && lesson.teacherNotes?.trim() && (
+            <details className="mt-2 text-muted-foreground">
+              <summary className="cursor-pointer">Full lesson instructions</summary>
+              <p className="mt-1 whitespace-pre-line">{fixDisplayText(lesson.teacherNotes)}</p>
+            </details>
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">

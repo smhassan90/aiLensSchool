@@ -11,6 +11,36 @@ function splitParagraphs(text: string): string[] {
     .filter((p) => p.length >= 40);
 }
 
+function clip(value: string, max: number): string {
+  const text = value.replace(/\s+/g, ' ').trim();
+  return text.length <= max ? text : text.slice(0, max).trim();
+}
+
+function activityForSlice(
+  slice: ChapterTeachingPackOutput['readingSlices'][number],
+  title: string,
+): ChapterTeachingPackOutput['activities'][number] {
+  const line = clip(slice.readingFrom, 180);
+  return {
+    sliceKey: slice.sliceKey,
+    title: clip(title, 160),
+    learningObjective: clip(`Students can explain one idea from ${slice.title} using the textbook.`, 400),
+    description: clip(`Use this line from ${slice.title}: ${line}`, 1200),
+    materials: 'Textbook and notebooks',
+    steps: [
+      clip(`Read this line with the class: ${line}`, 400),
+      'Ask each student to say what the line means in their own words.',
+      'Correct one answer using the textbook line, not a new example.',
+    ],
+    participationTechnique: clip(
+      `Student might say: "${clip(line, 80)}" You add: "Keep the meaning the textbook gives for ${slice.title}."`,
+      800,
+    ),
+    expectedOutcome: clip(`Each student can say one fact from ${slice.title}.`, 400),
+    durationMinutes: 15,
+  };
+}
+
 export function heuristicChapterTeachingPack(input: {
   chapterTitle: string;
   chapterText: string;
@@ -32,25 +62,25 @@ export function heuristicChapterTeachingPack(input: {
       chunk.push(input.chapterText.slice(0, 400).trim() || input.chapterTitle);
     }
     if (!chunk.length) continue;
-    const sliceKey = `s${i + 1}` as const;
     readingSlices.push({
-      sliceKey,
-      title: chunk.length > 1 ? `${input.chapterTitle} — part ${i + 1}` : input.chapterTitle,
-      readingFrom: chunk[0]!.slice(0, 200),
-      readingTo: chunk[chunk.length - 1]!.slice(-200) || null,
-      explainPoints: chunk.slice(0, 4).map((p) => p.slice(0, 220)),
+      sliceKey: `s${readingSlices.length + 1}`,
+      title: clip(chunk.length > 1 ? `${input.chapterTitle} — part ${i + 1}` : input.chapterTitle, 160),
+      readingFrom: clip(chunk[0]!.slice(0, 200), 800),
+      readingTo: clip(chunk[chunk.length - 1]!.slice(-200), 800) || null,
+      explainPoints: chunk.slice(0, 4).map((p) => clip(p, 220)),
     });
   }
 
   if (!readingSlices.length) {
+    const opening = clip(input.chapterText.slice(0, 200) || input.chapterTitle, 200);
     readingSlices.push({
       sliceKey: 's1',
-      title: input.chapterTitle,
-      readingFrom: input.chapterText.slice(0, 200) || input.chapterTitle,
-      readingTo: input.chapterText.slice(-200) || null,
+      title: clip(input.chapterTitle, 160),
+      readingFrom: opening.length >= 8 ? opening : clip(`${input.chapterTitle} from the textbook.`, 200),
+      readingTo: clip(input.chapterText.slice(-200), 800) || null,
       explainPoints: [
-        `Introduce the main ideas of ${input.chapterTitle}.`,
-        `Walk through key terms in ${input.subjectName} using the textbook.`,
+        clip(`Introduce the main ideas of ${input.chapterTitle}.`, 220),
+        clip(`Walk through key terms in ${input.subjectName} using the textbook.`, 220),
       ],
     });
   }
@@ -58,14 +88,14 @@ export function heuristicChapterTeachingPack(input: {
   const questions: ChapterTeachingPackOutput['questions'] = readingSlices.flatMap((slice, idx) => [
     {
       sliceKey: slice.sliceKey,
-      question: `What are the main points in ${slice.title}?`,
-      expectedAnswer: slice.explainPoints[0] ?? 'See textbook section covered in this slice.',
+      question: clip(`What are the main points in ${slice.title}?`, 600),
+      expectedAnswer: clip(slice.explainPoints[0] ?? 'See the textbook section covered in this slice.', 400),
       format: 'ORAL' as const,
     },
     {
       sliceKey: slice.sliceKey,
-      question: `Answer in writing: summarize ${slice.title} in 3–4 sentences.`,
-      expectedAnswer: slice.explainPoints.join(' ').slice(0, 400),
+      question: clip(`Answer in writing: summarize ${slice.title} in 3–4 sentences.`, 600),
+      expectedAnswer: clip(slice.explainPoints.join(' '), 400),
       format: 'WRITTEN' as const,
     },
     ...(idx === 0
@@ -73,36 +103,68 @@ export function heuristicChapterTeachingPack(input: {
           {
             sliceKey: slice.sliceKey,
             question: 'Quick check: name two ideas from today’s reading.',
-            expectedAnswer: slice.explainPoints.slice(0, 2).join('; ') || 'Teacher accepts accurate student responses.',
+            expectedAnswer: clip(
+              slice.explainPoints.slice(0, 2).join('; ') || 'Teacher accepts an answer that matches the textbook.',
+              400,
+            ),
             format: 'QUICK_FIRE' as const,
           },
         ]
       : []),
   ]);
 
-  const activities: ChapterTeachingPackOutput['activities'] = readingSlices.map((slice) => ({
-    sliceKey: slice.sliceKey,
-    title: `Discuss ${slice.title}`,
-    description: `Students stand in a circle. Each shares one sentence from the reading; teacher corrects gently.`,
-    participationTechnique:
-      'Go round the circle so every student speaks once; use a talking piece so only one voice at a time.',
-    materials: null,
-  }));
+  const first = readingSlices[0]!;
+  const sectionNames = readingSlices.map((slice) => slice.title).join(', ');
+  const activities: ChapterTeachingPackOutput['activities'] = [
+    {
+      sliceKey: null,
+      title: 'Unit recap',
+      learningObjective: clip(`Students can recall each section of ${input.chapterTitle}.`, 400),
+      description: clip(
+        `Write these section names on the board: ${sectionNames}. Each group owns one section and writes its meaning, one textbook line, and one real-life example.`,
+        1200,
+      ),
+      materials: 'Board, textbook, notebooks',
+      steps: [
+        'Write the section names on the board and give each group one section.',
+        'Each group writes the meaning, one textbook line, and one real-life example.',
+        'Groups read their lines. Add one fact they missed from the textbook.',
+      ],
+      participationTechnique: clip(
+        `Student might say: "${clip(first.readingFrom, 80)}" You add: "Use the line the textbook gives for ${first.title}."`,
+        800,
+      ),
+      expectedOutcome: clip(`The class can name every section of ${input.chapterTitle}.`, 400),
+      durationMinutes: 20,
+    },
+    ...readingSlices.slice(0, 4).map((slice) => activityForSlice(slice, slice.title)),
+  ];
+  if (activities.length < 3) {
+    activities.push(activityForSlice(first, `${first.title} check`));
+  }
 
   const revisionPoints: ChapterTeachingPackOutput['revisionPoints'] = readingSlices.flatMap((slice) =>
     slice.explainPoints.slice(0, 2).map((point) => ({
       sliceKey: slice.sliceKey,
-      point: point.slice(0, 300),
+      point: clip(point, 300),
     })),
   );
+  if (!revisionPoints.length) {
+    revisionPoints.push({ sliceKey: 's1', point: clip(`Review the main idea of ${input.chapterTitle}.`, 300) });
+  }
 
   return {
     complexity,
-    summary: `This ${input.classLabel} ${input.subjectName} chapter "${input.chapterTitle}" covers ${readingSlices.length} teaching slice(s). Focus on reading the textbook, explaining key points, checking with questions, and a short whole-class activity each cycle.`,
-    teacherGuide: readingSlices.flatMap((s) => s.explainPoints).slice(0, 12),
+    summary: clip(
+      `This ${input.classLabel} ${input.subjectName} chapter "${input.chapterTitle}" covers ${readingSlices
+        .map((slice) => slice.title)
+        .join(', ')}. Teach each section from the textbook, then use the saved activities.`,
+      4000,
+    ),
+    teacherGuide: readingSlices.flatMap((slice) => slice.explainPoints).slice(0, 12),
     readingSlices,
     questions,
-    activities,
+    activities: activities.slice(0, 5),
     revisionPoints,
   };
 }

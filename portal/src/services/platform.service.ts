@@ -124,6 +124,23 @@ export const platformService = {
     });
   },
 
+  runSql(sql: string) {
+    return apiClient<{
+      results: Array<{
+        sql: string;
+        kind: "rows" | "execute";
+        rowCount: number;
+        elapsedMs: number;
+        columns: string[];
+        rows: Array<Record<string, unknown>>;
+      }>;
+    }>("/platform/sql", {
+      method: "POST",
+      body: JSON.stringify({ sql }),
+      timeoutMs: 120_000,
+    });
+  },
+
   purgeData(payload: { schoolId?: string; from: string; to: string; confirm: boolean }) {
     return apiClient<{ auditDeleted: number; aiDeleted: number; lessonsDeleted: number }>(
       "/platform/data-purge",

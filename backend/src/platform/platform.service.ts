@@ -4,6 +4,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LocalStorageService } from '../files/local-storage.service';
 import { PurgePlatformDataDto } from './dto/purge-platform-data.dto';
+import { isRowReturningSql, splitSqlStatements } from './platform-sql';
 
 function parseDateRange(from: string, to: string) {
   const start = new Date(from);
@@ -351,4 +352,103 @@ export class PlatformService {
       lessonsDeleted: lessonsDeleted.count,
     };
   }
+
+  async runSql(sql: string, actorUserId: string) {
+    const statements = splitSqlStatements(sql);
+    if (!statements.length) {
+      throw new BadRequestException({ code: 'SQL_EMPTY', message: 'Enter a SQL statement' });
+    }
+    if (statements.length > 30) {
+      throw new BadRequestException({
+        code: 'SQL_TOO_MANY',
+        message: 'Run at most 30 statements at a time',
+      });
+    }
+
+    const results: Array<{
+      sql: string;
+      kind: 'rows' | 'execute';
+      rowCount: number;
+      elapsedMs: number;
+      columns: string[];
+      rows: Array<Record<string, unknown>>;
+    }> = [];
+
+    for (const statement of statements) {
+      const started = Date.now();
+      try {
+        if (isRowReturningSql(statement)) {
+          const raw = await this.prisma.$queryRawUnsafe(statement);
+          const rows = (Array.isArray(raw) ? raw : [raw]).slice(0, 500).map(jsonRow);
+          results.push({
+            sql: statement,
+            kind: 'rows',
+            rowCount: Array.isArray(raw) ? raw.length : rows.length,
+            elapsedMs: Date.now() - started,
+            columns: rows[0] ? Object.keys(rows[0]) : [],
+            rows,
+          });
+        } else {
+          const affected = await this.prisma.$executeRawUnsafe(statement);
+          results.push({
+            sql: statement,
+            kind: 'execute',
+            rowCount: typeof affected === 'number' ? affected : 0,
+            elapsedMs: Date.now() - started,
+            columns: [],
+            rows: [],
+          });
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'SQL failed';
+        this.audit.log({
+          actorUserId,
+          action: 'SQL_EXECUTE_FAILED',
+          entityType: 'Database',
+          metadata: {
+            completed: results.length,
+            sqlPreview: statement.slice(0, 500),
+            message: message.slice(0, 500),
+          },
+        });
+        throw new BadRequestException({
+          code: 'SQL_FAILED',
+          message: `Statement ${results.length + 1} failed: ${message}`,
+          details: { completed: results },
+        });
+      }
+    }
+
+    this.audit.log({
+      actorUserId,
+      action: 'SQL_EXECUTED',
+      entityType: 'Database',
+      metadata: {
+        statementCount: results.length,
+        kinds: results.map((result) => result.kind),
+        sqlPreview: sql.slice(0, 500),
+      },
+    });
+
+    return { results };
+  }
+}
+
+function jsonRow(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return { value: jsonSafe(value) };
+  const row: Record<string, unknown> = {};
+  for (const [key, cell] of Object.entries(value)) row[key] = jsonSafe(cell);
+  return row;
+}
+
+function jsonSafe(value: unknown): unknown {
+  if (typeof value === 'bigint') return value.toString();
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(jsonSafe);
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, cell] of Object.entries(value as Record<string, unknown>)) out[key] = jsonSafe(cell);
+    return out;
+  }
+  return value;
 }

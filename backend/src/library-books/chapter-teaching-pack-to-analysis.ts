@@ -23,12 +23,18 @@ export type TeachingPackForAnalysis = {
     sliceKey: string | null;
     question: string;
     format: string;
+    expectedAnswer?: string | null;
   }>;
   activities: Array<{
     sliceKey: string | null;
     title: string;
     description: string;
     participationTechnique: string;
+    materials?: string | null;
+    learningObjective?: string | null;
+    teacherSteps?: unknown;
+    expectedOutcome?: string | null;
+    durationMinutes?: number | null;
   }>;
   revisionPoints: Array<{ sliceKey: string | null; point: string }>;
 };
@@ -90,7 +96,7 @@ export function teachingPackToPlannerAnalysis(input: {
   activitiesEnabled: boolean;
   activityCount: number;
 }): PlannerChapterAnalysis {
-  const { pack, chapterTitle, subjectName, periodMinutes, activitiesEnabled, activityCount } = input;
+  const { pack, chapterTitle, subjectName, periodMinutes, activityCount } = input;
   const profile = detectSubjectProfile(subjectName);
   const guide = asStringArray(pack.teacherGuide);
 
@@ -131,15 +137,16 @@ export function teachingPackToPlannerAnalysis(input: {
   });
 
   const writtenCount = pack.questions.filter((q) => q.format === 'WRITTEN').length;
-  const activitySuggestions =
-    activitiesEnabled && activityCount > 0
-      ? pack.activities.slice(0, activityCount).map((a) => ({
-          title: a.title.slice(0, 160),
-          description: `${a.description.slice(0, 400)} (${a.participationTechnique.slice(0, 200)})`,
-          minutes: Math.min(30, Math.max(10, Math.round(periodMinutes * 0.35))),
-          afterPortionKey: a.sliceKey ? sliceKeyToPortionKey(a.sliceKey) : null,
-        }))
-      : [];
+  // Saved activities stay available when activitiesEnabled is the create() default of false.
+  // A teacher turns the feature off by saving activityCount 0.
+  const activityLimit = activityCount === 0 ? 0 : 5;
+  const activitySuggestions = pack.activities.slice(0, activityLimit).map((a) => ({
+    title: a.title.slice(0, 160),
+    description: `${a.description} ${a.participationTechnique}`.replace(/\s+/g, ' ').trim().slice(0, 600),
+    minutes: Math.min(120, Math.max(5, a.durationMinutes ?? Math.min(30, Math.round(periodMinutes * 0.35)))),
+    afterPortionKey: a.sliceKey ? sliceKeyToPortionKey(a.sliceKey) : null,
+  }));
+  void activitiesEnabled;
 
   const complexity =
     pack.complexity === 'LOW' || pack.complexity === 'MEDIUM' || pack.complexity === 'HIGH'

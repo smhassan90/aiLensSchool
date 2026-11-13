@@ -2,11 +2,14 @@ import { PlannerAnalysisSource } from '@prisma/client';
 import { mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { z } from 'zod';
 import { parseModelJson } from '../ai/parse-model-json';
 import {
   CHAPTER_TEACHING_PACK_PROMPT_VERSION,
   CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
 } from '../ai/prompts';
+import { buildTeachingPackHeader } from './class-age-hint';
+import { groundTeachingPack } from './chapter-teaching-pack.ground';
 import {
   ChapterTeachingPackOutput,
   ChapterTeachingPackSchema,
@@ -55,20 +58,47 @@ export async function generateChapterTeachingPack(input: {
     };
   }
 
-  const header = [
-    `Subject: ${input.subjectName}`,
-    `Class: ${input.classLabel}`,
-    `Book: ${input.bookTitle}`,
-    `Chapter: ${input.chapterTitle}`,
-  ].join('\n');
+  const header = buildTeachingPackHeader({
+    subjectName: input.subjectName,
+    classLabel: input.classLabel,
+    bookTitle: input.bookTitle,
+    chapterTitle: input.chapterTitle,
+  });
 
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await requestCompletePack(input, header, compiled, warnings);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Teaching pack generation failed');
+    }
+  }
+  throw lastError ?? new Error('Teaching pack generation failed');
+}
+
+async function requestCompletePack(
+  input: {
+    chapterTitle: string;
+    lessonText?: string;
+    exercisesText?: string;
+  },
+  header: string,
+  compiled: string,
+  warnings: GenerateChapterTeachingPackResult['warnings'],
+): Promise<GenerateChapterTeachingPackResult> {
   try {
     if (compiled.length <= FULL_TEXT_LIMIT) {
       const { pack, provider, model } = await requestTeachingPack(
         CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
         `${header}\n\n--- CHAPTER TEXT ---\n${compiled}\n--- END CHAPTER TEXT ---`,
       );
-      return { pack, source: PlannerAnalysisSource.AI, warnings, provider, model };
+      return {
+        pack: groundTeachingPack(pack, compiled),
+        source: PlannerAnalysisSource.AI,
+        warnings,
+        provider,
+        model,
+      };
     }
 
     const lessonSource = (input.lessonText ?? '').trim() || compiled;
@@ -115,7 +145,7 @@ export async function generateChapterTeachingPack(input: {
       coerceChapterTeachingPack({ ...first.pack, questions: questions.slice(0, 40) }),
     );
     return {
-      pack,
+      pack: groundTeachingPack(pack, compiled),
       source: PlannerAnalysisSource.AI,
       warnings,
       provider: first.provider,
@@ -138,14 +168,28 @@ async function requestTeachingPack(system: string, user: string): Promise<{
   return { pack: parseChapterTeachingPackJson(text), provider, model };
 }
 
+const ExtractedQuestionsSchema = z.object({
+  questions: z
+    .array(
+      z.object({
+        sliceKey: z.string().regex(/^s\d{1,2}$/).nullable().optional(),
+        question: z.string().min(5).max(600),
+        expectedAnswer: z.string().min(2).max(1200),
+        format: z.enum(['ORAL', 'WRITTEN', 'QUICK_FIRE']),
+      }),
+    )
+    .min(1)
+    .max(40),
+});
+
 async function requestQuestionList(user: string): Promise<ChapterTeachingPackOutput['questions']> {
   const { text } = await requestModelText(QUESTIONS_ONLY_PROMPT, user);
   const raw = parseModelJson(text) as { questions?: unknown } | unknown;
   const questions = Array.isArray(raw) ? raw : (raw as { questions?: unknown })?.questions;
-  const validated = ChapterTeachingPackSchema.parse(
+  const validated = ExtractedQuestionsSchema.parse(
     coerceChapterTeachingPack({
       complexity: 'MEDIUM',
-      summary: 'Questions extracted from the unit exercises.',
+      summary: 'Questions extracted from the unit exercises for validation only.',
       teacherGuide: ['Check each exercise answer against the textbook.'],
       readingSlices: [
         {
@@ -156,15 +200,7 @@ async function requestQuestionList(user: string): Promise<ChapterTeachingPackOut
         },
       ],
       questions,
-      activities: [
-        {
-          sliceKey: null,
-          title: 'Unit recap',
-          description: 'Groups recap each section of the unit from the board.',
-          participationTechnique: 'Student might say: one fact. You add: the textbook correction.',
-          materials: 'Board',
-        },
-      ],
+      activities: [],
       revisionPoints: [{ point: 'Review each section of the unit.' }],
     }),
   );

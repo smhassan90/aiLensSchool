@@ -1,4 +1,5 @@
 import { PlannerAnalysisSource, Prisma, PrismaClient } from '@prisma/client';
+import { assertPersistableActivities } from './chapter-teaching-pack.ground';
 import type { ChapterTeachingPackOutput } from './schemas/chapter-teaching-pack.schema';
 
 export async function upsertChapterTeachingPack(
@@ -12,6 +13,7 @@ export async function upsertChapterTeachingPack(
     promptVersion: string;
   },
 ) {
+  assertPersistableActivities(input.pack);
   const generatedAt = new Date();
 
   return prisma.$transaction(async (tx) => {
@@ -61,6 +63,10 @@ export async function upsertChapterTeachingPack(
             description: a.description,
             participationTechnique: a.participationTechnique,
             materials: a.materials ?? null,
+            learningObjective: a.learningObjective,
+            teacherSteps: a.steps as Prisma.InputJsonValue,
+            expectedOutcome: a.expectedOutcome,
+            durationMinutes: a.durationMinutes,
           })),
         },
         revisionPoints: {

@@ -6,6 +6,7 @@ import {
   repairCompiledChapterFromSource,
   splitSourceLessonAndExercises,
 } from '../lessons/chapter-compile-repair';
+import { refreshChapterTeachingPack } from './chapter-teaching-pack.refresh';
 
 function normalizeLanguage(value?: string) {
   const language = (value ?? '').trim();
@@ -129,7 +130,7 @@ export class LibraryBooksService {
         message: 'This book already has a lecture with that name',
       });
     }
-    return this.prisma.libraryBookChapter.create({
+    const saved = await this.prisma.libraryBookChapter.create({
       data: {
         bookId,
         chapterNumber: numberMatch ? Number(numberMatch[1]) : null,
@@ -141,6 +142,7 @@ export class LibraryBooksService {
         addedBySchoolId: user.schoolId || null,
       },
     });
+    return { ...saved, ...(await this.teachingPackResult(saved.id)) };
   }
 
   async compileLecture(bookId: string, userId: string, sourceText: string) {
@@ -222,7 +224,7 @@ export class LibraryBooksService {
         message: 'Change the chapter name, topic name, or content before saving',
       });
     }
-    return this.prisma.libraryBookChapter.update({
+    const saved = await this.prisma.libraryBookChapter.update({
       where: { id: chapterId },
       data: {
         ...(title ? { title: title.slice(0, 255) } : {}),
@@ -233,6 +235,23 @@ export class LibraryBooksService {
         addedBySchoolId: user.schoolId || null,
       },
     });
+    const contentChanged = Boolean(publishedText) || exercisesText !== undefined;
+    return contentChanged ? { ...saved, ...(await this.teachingPackResult(saved.id)) } : saved;
+  }
+
+  private async teachingPackResult(chapterId: string): Promise<{
+    teachingPackStatus: 'current' | 'regenerated' | 'failed';
+    teachingPackMessage: string | null;
+  }> {
+    try {
+      const status = await refreshChapterTeachingPack(this.prisma, chapterId);
+      return { teachingPackStatus: status, teachingPackMessage: null };
+    } catch (error) {
+      return {
+        teachingPackStatus: 'failed',
+        teachingPackMessage: error instanceof Error ? error.message : 'Teaching pack generation failed',
+      };
+    }
   }
 
   private presentChapter(
