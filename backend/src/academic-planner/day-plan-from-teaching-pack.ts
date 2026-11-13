@@ -148,7 +148,7 @@ export function generateDayPlanFromTeachingPacks(input: {
           : null;
         if (selected && pack) {
           usedActivityTitles.push(selected.title);
-          teacherNotes = formatSavedActivityNotes(selected, chapterTitle, pack.activities);
+          teacherNotes = formatSavedActivityNotes(selected, chapterTitle, pack.activities, periodMinutes);
           objectives = [selected.title];
           titleSuffix = selected.title.slice(0, 80);
         } else if (!teacherNotes) {
@@ -312,7 +312,7 @@ export function rebuildLessonFromPack(input: {
       preferRecap: true,
     });
     if (selected) {
-      teacherNotes = formatSavedActivityNotes(selected, chapterTitle, input.pack.activities);
+      teacherNotes = formatSavedActivityNotes(selected, chapterTitle, input.pack.activities, input.periodMinutes);
       objectives = [selected.title];
       titleSuffix = selected.title.slice(0, 80);
     } else {

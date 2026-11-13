@@ -147,12 +147,16 @@ describe('saved teaching-pack activities in the day plan', () => {
     );
     expect(result).not.toBeNull();
     const activityLesson = result!.lessons.find((lesson) => lesson.kind === PlannerLessonKind.ACTIVITY);
-    expect(activityLesson?.objectives[0]).toBe('Unit recap');
-    expect(activityLesson?.title).toContain('Unit recap');
+    expect(activityLesson?.objectives[0]).toBe('Draft letter to the editor');
+    expect(activityLesson?.title).toContain('Draft letter to the editor');
+    expect(activityLesson?.title).not.toContain('Unit recap');
     expect(activityLesson?.notes).toContain(participation);
     expect(activityLesson?.notes).toContain('Board, textbook, notebooks');
     expect(activityLesson?.notes).toContain('What the teacher does:');
-    expect(activityLesson?.notes?.length).toBeGreaterThan(1400);
+    expect(activityLesson?.notes).toContain('What students do:');
+    expect(activityLesson?.notes).toContain('Duration: 40 minutes');
+    expect(activityLesson?.notes).not.toMatch(/the class period set aside/i);
+    expect(activityLesson?.notes).not.toMatch(/What did this activity ask you to do/i);
     expect(activityLesson?.notes).not.toMatch(/Finish the line/i);
     expect(activityLesson?.notes).toContain('Dream twist discussion');
   });
@@ -176,7 +180,7 @@ describe('saved teaching-pack activities in the day plan', () => {
     const unit6 = result!.lessons.find(
       (lesson) => lesson.chapterKey === 'u6' && lesson.kind === PlannerLessonKind.ACTIVITY,
     );
-    expect(unit5?.notes).toContain('Unit recap');
+    expect(unit5?.notes).toContain('Draft letter to the editor');
     expect(unit5?.notes).not.toMatch(/Finish the line/i);
     expect(unit6?.notes).toContain('FALLBACK — no saved activity');
     expect(unit6?.notes).toContain('out of date');

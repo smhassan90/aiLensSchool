@@ -114,33 +114,14 @@ export function heuristicChapterTeachingPack(input: {
   ]);
 
   const first = readingSlices[0]!;
-  const sectionNames = readingSlices.map((slice) => slice.title).join(', ');
-  const activities: ChapterTeachingPackOutput['activities'] = [
-    {
-      sliceKey: null,
-      title: 'Unit recap',
-      learningObjective: clip(`Students can recall each section of ${input.chapterTitle}.`, 400),
-      description: clip(
-        `Write these section names on the board: ${sectionNames}. Each group owns one section and writes its meaning, one textbook line, and one real-life example.`,
-        1200,
-      ),
-      materials: 'Board, textbook, notebooks',
-      steps: [
-        'Write the section names on the board and give each group one section.',
-        'Each group writes the meaning, one textbook line, and one real-life example.',
-        'Groups read their lines. Add one fact they missed from the textbook.',
-      ],
-      participationTechnique: clip(
-        `Student might say: "${clip(first.readingFrom, 80)}" You add: "Use the line the textbook gives for ${first.title}."`,
-        800,
-      ),
-      expectedOutcome: clip(`The class can name every section of ${input.chapterTitle}.`, 400),
-      durationMinutes: 20,
-    },
-    ...readingSlices.slice(0, 4).map((slice) => activityForSlice(slice, slice.title)),
-  ];
+  const activities: ChapterTeachingPackOutput['activities'] = readingSlices
+    .slice(0, 4)
+    .map((slice) => activityForSlice(slice, slice.title));
   if (activities.length < 3) {
     activities.push(activityForSlice(first, `${first.title} check`));
+  }
+  if (activities.length < 3) {
+    activities.push(activityForSlice(first, `${first.title} response`));
   }
 
   const revisionPoints: ChapterTeachingPackOutput['revisionPoints'] = readingSlices.flatMap((slice) =>

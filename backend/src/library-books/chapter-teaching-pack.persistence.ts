@@ -1,4 +1,5 @@
 import { PlannerAnalysisSource, Prisma, PrismaClient } from '@prisma/client';
+import { assertActivityQuality } from './activity-quality';
 import { assertPersistableActivities } from './chapter-teaching-pack.ground';
 import type { ChapterTeachingPackOutput } from './schemas/chapter-teaching-pack.schema';
 
@@ -14,6 +15,7 @@ export async function upsertChapterTeachingPack(
   },
 ) {
   assertPersistableActivities(input.pack);
+  assertActivityQuality(input.pack.activities);
   const generatedAt = new Date();
 
   return prisma.$transaction(async (tx) => {

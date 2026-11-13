@@ -1,3 +1,5 @@
+import { activityFitScore, isGenericSectionSummary, lessonActivityScript } from '../library-books/activity-quality';
+
 export type SavedActivity = {
   sliceKey: string | null;
   title: string;
@@ -10,19 +12,14 @@ export type SavedActivity = {
   durationMinutes?: number | null;
 };
 
-function linesOf(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter((item) => item.length > 0);
-}
-
 function isRecap(activity: SavedActivity): boolean {
   return activity.sliceKey == null || /\brecap\b/i.test(activity.title);
 }
 
 /**
- * Pick one saved activity for this day.
- * A closing recap day prefers the whole-unit activity.
- * Any other day uses an unused activity whose section has already been taught.
+ * Pick one saved activity whose section has already been taught.
+ * A closing day still prefers a chapter-specific task. The generic
+ * "each group summarises every section" recap is used only when nothing else fits.
  */
 export function selectSavedActivity(input: {
   activities: SavedActivity[];
@@ -34,55 +31,51 @@ export function selectSavedActivity(input: {
   const unused = input.activities.filter((activity) => !used.has(activity.title.trim().toLowerCase()));
   const covered = new Set(input.coveredSliceKeys);
   const studied = (activity: SavedActivity) => activity.sliceKey == null || covered.has(activity.sliceKey);
-
-  if (input.preferRecap) {
-    const recap = unused.find((activity) => isRecap(activity) && studied(activity));
-    if (recap) return recap;
-  }
-  const sectional = unused.find(
-    (activity) => activity.sliceKey != null && covered.has(activity.sliceKey) && !isRecap(activity),
+  const specific = unused.filter(
+    (activity) => studied(activity) && activity.sliceKey != null && !isGenericSectionSummary(activity),
   );
-  if (sectional) return sectional;
-  if (input.preferRecap) {
-    return unused.find(studied) ?? null;
+
+  if (!input.preferRecap) {
+    return specific[0] ?? null;
   }
-  return null;
+
+  if (specific.length) {
+    return [...specific].sort((left, right) => activityFitScore(right) - activityFitScore(left))[0] ?? null;
+  }
+  return unused.find((activity) => isRecap(activity) && studied(activity)) ?? null;
 }
 
 export function formatSavedActivityNotes(
   activity: SavedActivity,
   chapterTitle: string,
   alternatives: SavedActivity[] = [],
+  periodMinutes = 40,
 ): string {
-  const steps = linesOf(activity.teacherSteps);
-  const teacherSteps = steps.length
-    ? steps.map((step, index) => `${index + 1}. ${step}`)
-    : [`1. ${activity.description}`];
-  const objective = activity.learningObjective?.trim() || activity.description;
-  const duration = activity.durationMinutes
-    ? `${activity.durationMinutes} minutes`
-    : 'the class period set aside for this activity';
+  const script = lessonActivityScript(activity, periodMinutes);
+  const minutes = script.timing.reduce((sum, block) => sum + block.minutes, 0);
   const others = alternatives.filter((item) => item.title !== activity.title);
   return [
     activity.title,
     '',
     `Chapter: ${chapterTitle}`,
     `Section: ${activity.sliceKey ?? 'whole chapter'}`,
-    `Learning objective: ${objective}`,
+    `Learning objective: ${script.learningObjective}`,
     `You need: ${activity.materials?.trim() || 'Textbook and notebooks'}`,
-    `Duration: ${duration}`,
+    `Duration: ${minutes} minutes`,
+    ...script.timing.map((block) => `- ${block.label}: ${block.minutes} minutes.`),
     '',
     'What the teacher does:',
-    ...teacherSteps,
+    ...script.teacherSteps.map((step, index) => `${index + 1}. ${step}`),
     '',
     'What students do:',
-    activity.description,
+    script.studentTask,
     '',
     'How every student participates:',
-    activity.participationTechnique,
+    script.participation,
     '',
     'Check understanding:',
-    activity.expectedOutcome?.trim() || 'Ask two students to say what this activity asked them to do.',
+    script.checkUnderstanding,
+    `Expected outcome: ${script.expectedOutcome}`,
     ...(others.length
       ? ['', 'Other saved activities for this chapter:', ...others.map((item) => `- ${item.title}`)]
       : []),

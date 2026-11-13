@@ -74,17 +74,23 @@ function truncStrings(v: unknown, max: number, min = 0): unknown {
   return v.map((item) => truncStr(item, max, min));
 }
 
-/** Keep a whole-unit recap plus section activities. Never pad with invented activities. */
+function genericSectionSummary(item: unknown): boolean {
+  if (!item || typeof item !== 'object') return false;
+  const activity = item as Record<string, unknown>;
+  const blob = `${activity.title ?? ''}\n${activity.description ?? ''}`.toLowerCase();
+  return (
+    /\bunit recap\b/.test(blob) ||
+    /each group owns one section/.test(blob) ||
+    (/section names on the board/.test(blob) && /real-life example/.test(blob))
+  );
+}
+
+/** Keep at most five activities. Drop a generic unit recap before a chapter task. */
 export function capTeachingPackActivities(activities: unknown): unknown {
   if (!Array.isArray(activities) || activities.length <= 5) return activities;
-  const recapIndex = activities.findIndex((item) => {
-    if (!item || typeof item !== 'object') return false;
-    const activity = item as Record<string, unknown>;
-    return activity.sliceKey == null || /\brecap\b/i.test(String(activity.title ?? ''));
-  });
-  const recap = recapIndex >= 0 ? activities[recapIndex] : null;
-  const rest = activities.filter((_, index) => index !== recapIndex);
-  return (recap ? [recap, ...rest] : rest).slice(0, 5);
+  const specific = activities.filter((item) => !genericSectionSummary(item));
+  const source = specific.length >= 3 ? specific : activities;
+  return source.slice(0, 5);
 }
 
 /** Trim AI overflow so Zod validation succeeds without dropping the whole pack. */

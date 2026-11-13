@@ -9,6 +9,7 @@ import {
   CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
 } from '../ai/prompts';
 import { buildTeachingPackHeader } from './class-age-hint';
+import { assertActivityQuality } from './activity-quality';
 import { groundTeachingPack } from './chapter-teaching-pack.ground';
 import {
   ChapterTeachingPackOutput,
@@ -66,14 +67,34 @@ export async function generateChapterTeachingPack(input: {
   });
 
   let lastError: Error | null = null;
+  let correction = '';
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      return await requestCompletePack(input, header, compiled, warnings);
+      return await requestCompletePack(input, header, compiled, warnings, correction);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Teaching pack generation failed');
+      correction = lastError.message;
     }
   }
   throw lastError ?? new Error('Teaching pack generation failed');
+}
+
+function acceptPack(
+  pack: GenerateChapterTeachingPackResult['pack'],
+  compiled: string,
+  warnings: GenerateChapterTeachingPackResult['warnings'],
+  provider: string,
+  model: string,
+  correction: string,
+): GenerateChapterTeachingPackResult {
+  const grounded = groundTeachingPack(pack, compiled);
+  try {
+    assertActivityQuality(grounded.activities, compiled);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Activity quality failed';
+    throw new Error(correction ? `${message}. Previous attempt: ${correction.slice(0, 400)}` : message);
+  }
+  return { pack: grounded, source: PlannerAnalysisSource.AI, warnings, provider, model };
 }
 
 async function requestCompletePack(
@@ -85,20 +106,18 @@ async function requestCompletePack(
   header: string,
   compiled: string,
   warnings: GenerateChapterTeachingPackResult['warnings'],
+  correction: string,
 ): Promise<GenerateChapterTeachingPackResult> {
+  const repair = correction
+    ? `\n\nThe previous activities were rejected. Rewrite only the activities so they pass this check: ${correction.slice(0, 1200)}\nKeep the activities specific to different sections. Do not use a generic unit recap.`
+    : '';
   try {
     if (compiled.length <= FULL_TEXT_LIMIT) {
       const { pack, provider, model } = await requestTeachingPack(
         CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
-        `${header}\n\n--- CHAPTER TEXT ---\n${compiled}\n--- END CHAPTER TEXT ---`,
+        `${header}${repair}\n\n--- CHAPTER TEXT ---\n${compiled}\n--- END CHAPTER TEXT ---`,
       );
-      return {
-        pack: groundTeachingPack(pack, compiled),
-        source: PlannerAnalysisSource.AI,
-        warnings,
-        provider,
-        model,
-      };
+      return acceptPack(pack, compiled, warnings, provider, model, correction);
     }
 
     const lessonSource = (input.lessonText ?? '').trim() || compiled;
@@ -113,7 +132,7 @@ async function requestCompletePack(
 
     const first = await requestTeachingPack(
       CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
-      `${header}\n\n--- LESSON TEXT ---\n${lessonBody}\n--- END LESSON TEXT ---`,
+      `${header}${repair}\n\n--- LESSON TEXT ---\n${lessonBody}\n--- END LESSON TEXT ---`,
     );
 
     let questions = first.pack.questions;
@@ -144,13 +163,7 @@ async function requestCompletePack(
     const pack = ChapterTeachingPackSchema.parse(
       coerceChapterTeachingPack({ ...first.pack, questions: questions.slice(0, 40) }),
     );
-    return {
-      pack: groundTeachingPack(pack, compiled),
-      source: PlannerAnalysisSource.AI,
-      warnings,
-      provider: first.provider,
-      model: first.model,
-    };
+    return acceptPack(pack, compiled, warnings, first.provider, first.model, correction);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Teaching pack generation failed';
     throw new Error(message);
