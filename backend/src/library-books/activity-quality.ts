@@ -143,7 +143,17 @@ function mistakeLine(participation: string): string | null {
   return line && line.length > 8 ? line : null;
 }
 
-type ActivityKind = 'letter' | 'diary' | 'debate' | 'presentation' | 'poem' | 'essay' | 'grammar' | 'discussion' | 'task';
+type ActivityKind =
+  | 'letter'
+  | 'diary'
+  | 'debate'
+  | 'presentation'
+  | 'speech'
+  | 'poem'
+  | 'essay'
+  | 'grammar'
+  | 'discussion'
+  | 'task';
 
 function activityKind(activity: Pick<ActivityLike, 'title' | 'description'>): ActivityKind {
   const text = `${activity.title} ${activity.description}`.toLowerCase();
@@ -151,6 +161,7 @@ function activityKind(activity: Pick<ActivityLike, 'title' | 'description'>): Ac
   if (/\bdiary\b/.test(text)) return 'diary';
   if (/\bdebate\b/.test(text)) return 'debate';
   if (/presentation|feedback/.test(text)) return 'presentation';
+  if (/\bspeech\b|cue card/.test(text)) return 'speech';
   if (/\bpoem\b|\bverse\b/.test(text)) return 'poem';
   if (/essay|persuasive|argumentative/.test(text)) return 'essay';
   if (/modal|grammar|pronoun|conditional|preposition|indirect speech/.test(text)) return 'grammar';
@@ -168,6 +179,8 @@ function objectiveFor(kind: ActivityKind, title: string): string {
       return 'Students can defend one side of the chapter issue and answer the other side without interrupting.';
     case 'presentation':
       return 'Students can judge a short talk against a criterion, not only say that it was good or bad.';
+    case 'speech':
+      return 'Students can give a short talk from key words on cue cards, with a clear opening and ending.';
     case 'poem':
       return 'Students can perform one verse and say what that part of the poem claims.';
     case 'essay':
@@ -191,6 +204,8 @@ function outcomeFor(kind: ActivityKind, title: string): string {
       return 'Every student has spoken one reason for their side, and the leaders have answered the other side.';
     case 'presentation':
       return 'Every listener has written one comment that names the criterion.';
+    case 'speech':
+      return 'Each student has spoken a short talk from three cue cards that contain key words, not full sentences.';
     case 'poem':
       return 'Every student has spoken one verse and one sentence about what that verse claims.';
     case 'essay':
@@ -214,6 +229,8 @@ function openingFor(kind: ActivityKind, title: string): string {
       return 'Write the motion on the board, assign the two sides, and read the debate rules once.';
     case 'presentation':
       return 'Put the criterion on the board and show one respectful comment before the talks start.';
+    case 'speech':
+      return 'Show one cue card with key words, not a full sentence, and say the opening sentence of a model talk.';
     case 'poem':
       return 'Read one verse yourself, then say in one sentence what that speaker thinks.';
     case 'essay':
@@ -237,6 +254,8 @@ function watchFor(kind: ActivityKind, title: string): string {
       return 'Give every speaker one turn. Stop interruptions. Note one textbook point each speaker uses.';
     case 'presentation':
       return 'Put the criterion on the board, time each pair, and collect one written comment from every listener.';
+    case 'speech':
+      return 'Each student writes three cards, then speaks. Send back a card that is a full sentence.';
     case 'poem':
       return 'Give each student one verse. Listen for the meaning, not only for a loud voice.';
     case 'essay':
@@ -250,7 +269,10 @@ function watchFor(kind: ActivityKind, title: string): string {
   }
 }
 
-function roleLine(description: string): string {
+function roleLine(description: string, kind: ActivityKind): string {
+  if (kind === 'speech') {
+    return 'Each student prepares their own cue cards and gives their own talk. Nobody reads another student\'s cards.';
+  }
   if (/\bdebate\b|for and against|split the class/i.test(description)) {
     return 'The class splits into two sides. Each student prepares one point and speaks once. A leader may close, but does not speak instead of the others.';
   }
@@ -281,6 +303,7 @@ function shareFor(kind: ActivityKind, correction: string | null): string {
   if (kind === 'debate') return `The leaders answer the other side.${fix}`;
   if (kind === 'diary') return `Ask two students to read the sentence that shows a feeling.${fix}`;
   if (kind === 'letter') return `Ask two students to read only the opinion sentence.${fix}`;
+  if (kind === 'speech') return `Hear two talks. Look at the cards while the student speaks.${fix}`;
   return `Hear two or three students.${fix}`;
 }
 
@@ -292,6 +315,8 @@ function closeFor(kind: ActivityKind): string {
       return 'A letter with no opinion goes back to the student before the period ends.';
     case 'diary':
       return 'A page with no date, or with no sentence using "I", is not finished.';
+    case 'speech':
+      return 'Call on any student who has not spoken. A card written in full sentences is not ready.';
     default:
       return 'Look at each student\'s own page or turn before you end the lesson.';
   }
@@ -337,14 +362,16 @@ export function lessonActivityScript(activity: ActivityLike, periodMinutes: numb
         return `(${block.minutes} min) ${block.label}. ${step}`;
       })
     : [
-        `(${timing[0]!.minutes} min) ${timing[0]!.label}. ${openingFor(kind, activity.title)} Do not write the students' answers.`,
+        `(${timing[0]!.minutes} min) ${timing[0]!.label}. ${openingFor(kind, activity.title)}${
+          kind === 'debate' || kind === 'speech' ? '' : ' Do not write the students\' answers.'
+        }`,
         `(${timing[1]!.minutes} min) ${timing[1]!.label}. ${watchFor(kind, activity.title)}`,
         `(${timing[2]!.minutes} min) ${timing[2]!.label}. ${shareFor(kind, correction)}`,
         `(${timing[3]!.minutes} min) ${timing[3]!.label}. ${closeFor(kind)}`,
       ];
 
   const participation = [
-    roleLine(description),
+    roleLine(description, kind),
     activity.participationTechnique.trim(),
     'Every student produces an individual result before the class shares. Check each book or voice, not only a spokesperson.',
   ]
