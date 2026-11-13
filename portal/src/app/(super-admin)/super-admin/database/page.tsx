@@ -50,6 +50,7 @@ export default function DatabasePage() {
           value={sql}
           onChange={(event) => setSql(event.target.value)}
           spellCheck={false}
+          autoComplete="off"
           className="min-h-[240px] font-mono text-xs"
           placeholder="ALTER TABLE ..."
         />
