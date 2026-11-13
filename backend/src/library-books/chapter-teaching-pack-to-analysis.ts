@@ -146,7 +146,6 @@ export function teachingPackToPlannerAnalysis(input: {
     minutes: Math.min(120, Math.max(5, a.durationMinutes ?? Math.min(30, Math.round(periodMinutes * 0.35)))),
     afterPortionKey: a.sliceKey ? sliceKeyToPortionKey(a.sliceKey) : null,
   }));
-  void activitiesEnabled;
 
   const complexity =
     pack.complexity === 'LOW' || pack.complexity === 'MEDIUM' || pack.complexity === 'HIGH'
