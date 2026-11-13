@@ -63,8 +63,8 @@ export function activityFitScore(activity: ActivityLike): number {
   if (isGenericSectionSummary(activity)) return 1;
   const text = `${activity.title} ${activity.description}`.toLowerCase();
   let score = activity.sliceKey ? 35 : 20;
-  if (/letter|essay|diary|persuasive|argumentative|\bwrite\b|\bdraft\b/.test(text)) score += 25;
-  else if (/debate|presentation|consensus|oral|role-play|role play|scenario/.test(text)) score += 22;
+  if (/letter|essay|diary|persuasive|argumentative/.test(text)) score += 25;
+  else if (/debate|presentation|consensus|oral|speech|role-play|role play|scenario/.test(text)) score += 22;
   else if (/modal|grammar|pronoun|conditional|indirect speech|preposition/.test(text)) score += 22;
   else if (/poem|helmet|civic/.test(text)) score += 18;
   return score;
@@ -133,8 +133,168 @@ function stepLines(activity: ActivityLike): string[] {
 
 function youAddLine(participation: string): string | null {
   const match = participation.match(/you add:\s*(.+)$/i);
-  const line = match?.[1]?.replace(/\s+/g, ' ').trim();
+  const line = match?.[1]?.replace(/^["“]+|["”]+$/g, '').replace(/\s+/g, ' ').trim();
   return line && line.length > 8 ? line : null;
+}
+
+function mistakeLine(participation: string): string | null {
+  const match = participation.match(/student might say:\s*(.+?)\s+you add:/i);
+  const line = match?.[1]?.replace(/^["“]+|["”]+$/g, '').replace(/\s+/g, ' ').trim();
+  return line && line.length > 8 ? line : null;
+}
+
+type ActivityKind = 'letter' | 'diary' | 'debate' | 'presentation' | 'poem' | 'essay' | 'grammar' | 'discussion' | 'task';
+
+function activityKind(activity: Pick<ActivityLike, 'title' | 'description'>): ActivityKind {
+  const text = `${activity.title} ${activity.description}`.toLowerCase();
+  if (/\bletter\b/.test(text)) return 'letter';
+  if (/\bdiary\b/.test(text)) return 'diary';
+  if (/\bdebate\b/.test(text)) return 'debate';
+  if (/presentation|feedback/.test(text)) return 'presentation';
+  if (/\bpoem\b|\bverse\b/.test(text)) return 'poem';
+  if (/essay|persuasive|argumentative/.test(text)) return 'essay';
+  if (/modal|grammar|pronoun|conditional|preposition|indirect speech/.test(text)) return 'grammar';
+  if (/consensus|discuss|oral/.test(text)) return 'discussion';
+  return 'task';
+}
+
+function objectiveFor(kind: ActivityKind, title: string): string {
+  switch (kind) {
+    case 'letter':
+      return 'Students can organise a letter to the editor so a reader sees one public concern and a clear opinion.';
+    case 'diary':
+      return 'Students can record a personal experience in a diary, in the first person, with the day and date.';
+    case 'debate':
+      return 'Students can defend one side of the chapter issue and answer the other side without interrupting.';
+    case 'presentation':
+      return 'Students can judge a short talk against a criterion, not only say that it was good or bad.';
+    case 'poem':
+      return 'Students can perform one verse and say what that part of the poem claims.';
+    case 'essay':
+      return `Students can plan "${title}" so the writing makes a point and answers the opposite view.`;
+    case 'grammar':
+      return `Students can use the grammar in "${title}" correctly in sentences they write themselves.`;
+    case 'discussion':
+      return 'Students can use the polite phrases from this section to reach an agreement.';
+    default:
+      return `Students can use a fact from "${title}" in work of their own.`;
+  }
+}
+
+function outcomeFor(kind: ActivityKind, title: string): string {
+  switch (kind) {
+    case 'letter':
+      return 'Each notebook has a letter with the date, a salutation, one concern, an opinion, and the student\'s name.';
+    case 'diary':
+      return 'Each notebook has one diary entry with the day, the date, and first-person sentences.';
+    case 'debate':
+      return 'Every student has spoken one reason for their side, and the leaders have answered the other side.';
+    case 'presentation':
+      return 'Every listener has written one comment that names the criterion.';
+    case 'poem':
+      return 'Every student has spoken one verse and one sentence about what that verse claims.';
+    case 'essay':
+      return `Each notebook has a plan for "${title}" with a thesis and one answer to the opposite view.`;
+    case 'grammar':
+      return `Each notebook has the student's own sentences for "${title}", following the textbook pattern.`;
+    case 'discussion':
+      return 'Each student has spoken once, using a phrase from the section, before the group states its agreement.';
+    default:
+      return `Each notebook shows that student's own answer for "${title}".`;
+  }
+}
+
+function openingFor(kind: ActivityKind, title: string): string {
+  switch (kind) {
+    case 'letter':
+      return 'Show a short letter from the textbook. Point to the date, the greeting, the concern, and the opinion.';
+    case 'diary':
+      return 'Read one diary entry from the chapter. Point to the date and a sentence that uses "I".';
+    case 'debate':
+      return 'Write the motion on the board, assign the two sides, and read the debate rules once.';
+    case 'presentation':
+      return 'Put the criterion on the board and show one respectful comment before the talks start.';
+    case 'poem':
+      return 'Read one verse yourself, then say in one sentence what that speaker thinks.';
+    case 'essay':
+      return `Write the paragraph jobs for "${title}" on the board before anyone starts writing.`;
+    case 'grammar':
+      return `Write one correct example for "${title}" and underline the word that carries the pattern.`;
+    case 'discussion':
+      return 'Put two polite phrases from this section on the board before the groups begin.';
+    default:
+      return `Read the textbook instruction for "${title}" once. Tell the class the work is individual.`;
+  }
+}
+
+function watchFor(kind: ActivityKind, title: string): string {
+  switch (kind) {
+    case 'letter':
+      return 'Tick date, salutation, concern, opinion, and name in every notebook. Send back a letter that is only a story.';
+    case 'diary':
+      return 'Check that each entry has a date and uses "I", not a list of place names.';
+    case 'debate':
+      return 'Give every speaker one turn. Stop interruptions. Note one textbook point each speaker uses.';
+    case 'presentation':
+      return 'Put the criterion on the board, time each pair, and collect one written comment from every listener.';
+    case 'poem':
+      return 'Give each student one verse. Listen for the meaning, not only for a loud voice.';
+    case 'essay':
+      return `Name the paragraph jobs for "${title}" on the board. Check each plan for a thesis and one answer to the other view.`;
+    case 'grammar':
+      return `Write one textbook model for "${title}" on the board. Mark the pattern in each student's own sentences.`;
+    case 'discussion':
+      return 'Each person speaks before the group announces an agreement. Do not let one student speak for the others.';
+    default:
+      return 'Check every notebook. Do not accept one answer spoken by a group spokesperson.';
+  }
+}
+
+function roleLine(description: string): string {
+  if (/\bdebate\b|for and against|split the class/i.test(description)) {
+    return 'The class splits into two sides. Each student prepares one point and speaks once. A leader may close, but does not speak instead of the others.';
+  }
+  const sized = description.match(/groups of (\d+)/i);
+  if (sized) return `Groups of ${sized[1]}. Each student adds one point of their own before anyone reports for the group.`;
+  if (/\bpairs\b/i.test(description)) {
+    return 'In pairs, each student writes an answer first, then checks the partner\'s page.';
+  }
+  if (/\bgroups\b/i.test(description)) {
+    return 'In the group, each student adds one point of their own before the group shares.';
+  }
+  return 'Each student works in their own notebook. There is no group answer.';
+}
+
+function studentFacing(kind: ActivityKind, description: string): string {
+  const teacherVoiced = /\b(give \d+ minutes|you act|split the class|assign )\b/i.test(description);
+  if (!teacherVoiced) return description;
+  if (kind === 'debate') {
+    const motion = description.match(/motion that ([^.]+)/i)?.[1]?.trim();
+    const motionText = motion ? `the motion that ${motion}` : 'the motion';
+    return `Take one side of ${motionText}. List points from the textbook, speak once when it is your turn, and do not interrupt. Leaders answer the other side.`;
+  }
+  return description;
+}
+
+function shareFor(kind: ActivityKind, correction: string | null): string {
+  const fix = correction ? ` If someone makes the common mistake, add: ${correction}` : '';
+  if (kind === 'debate') return `The leaders answer the other side.${fix}`;
+  if (kind === 'diary') return `Ask two students to read the sentence that shows a feeling.${fix}`;
+  if (kind === 'letter') return `Ask two students to read only the opinion sentence.${fix}`;
+  return `Hear two or three students.${fix}`;
+}
+
+function closeFor(kind: ActivityKind): string {
+  switch (kind) {
+    case 'debate':
+      return 'Check the list of speakers. Call on any student who has not spoken.';
+    case 'letter':
+      return 'A letter with no opinion goes back to the student before the period ends.';
+    case 'diary':
+      return 'A page with no date, or with no sentence using "I", is not finished.';
+    default:
+      return 'Look at each student\'s own page or turn before you end the lesson.';
+  }
 }
 
 function sentences(value: string): string[] {
@@ -150,16 +310,21 @@ export function lessonActivityScript(activity: ActivityLike, periodMinutes: numb
   const description = activity.description.trim();
   const storedSteps = stepLines(activity);
   const generic = isGenericSectionSummary(activity);
+  const kind = activityKind(activity);
+  const derivedObjective = objectiveFor(kind, activity.title);
   const objective =
-    storedObjective && !sameInstructionalPurpose(storedObjective, description)
+    storedObjective &&
+    !sameInstructionalPurpose(storedObjective, description) &&
+    !sameInstructionalPurpose(storedObjective, derivedObjective)
       ? storedObjective
-      : `Students can complete "${activity.title}" and show a result that matches this chapter's textbook task.`;
+      : derivedObjective;
 
   const studentTask = generic
     ? `Each student completes one specific task from "${activity.title}" in their own notebook. They do not copy a group summary of every section.`
-    : description;
+    : studentFacing(kind, description);
 
   const correction = youAddLine(activity.participationTechnique);
+  const mistake = mistakeLine(activity.participationTechnique);
   const storedAreDistinct =
     storedSteps.length >= 2 &&
     !sameInstructionalPurpose(storedSteps.join(' '), studentTask) &&
@@ -172,15 +337,14 @@ export function lessonActivityScript(activity: ActivityLike, periodMinutes: numb
         return `(${block.minutes} min) ${block.label}. ${step}`;
       })
     : [
-        `(${timing[0].minutes} min) ${timing[0].label}. Name "${activity.title}" and the textbook section. Do not do the students' work for them.`,
-        `(${timing[1].minutes} min) ${timing[1].label}. Move around the room. Every student must produce their own response before anyone speaks for a group.`,
-        `(${timing[2].minutes} min) ${timing[2].label}. Hear a few results. ${
-          correction ? `Correct with the textbook: ${correction}` : 'Correct one point from the textbook, not a new example.'
-        }`,
-        `(${timing[3].minutes} min) ${timing[3].label}. Check the learning objective against each student's own result.`,
+        `(${timing[0]!.minutes} min) ${timing[0]!.label}. ${openingFor(kind, activity.title)} Do not write the students' answers.`,
+        `(${timing[1]!.minutes} min) ${timing[1]!.label}. ${watchFor(kind, activity.title)}`,
+        `(${timing[2]!.minutes} min) ${timing[2]!.label}. ${shareFor(kind, correction)}`,
+        `(${timing[3]!.minutes} min) ${timing[3]!.label}. ${closeFor(kind)}`,
       ];
 
   const participation = [
+    roleLine(description),
     activity.participationTechnique.trim(),
     'Every student produces an individual result before the class shares. Check each book or voice, not only a spokesperson.',
   ]
@@ -188,13 +352,17 @@ export function lessonActivityScript(activity: ActivityLike, periodMinutes: numb
     .join(' ');
 
   const storedOutcome = activity.expectedOutcome?.trim() ?? '';
+  const derivedOutcome = outcomeFor(kind, activity.title);
   const expectedOutcome =
-    storedOutcome && !/what did this activity ask you to do/i.test(storedOutcome)
+    storedOutcome &&
+    !/what did this activity ask you to do/i.test(storedOutcome) &&
+    !sameInstructionalPurpose(storedOutcome, objective) &&
+    !sameInstructionalPurpose(storedOutcome, studentTask)
       ? storedOutcome
-      : `Each student has their own finished response for "${activity.title}" that can be checked against the textbook.`;
-  const checkUnderstanding = sameInstructionalPurpose(expectedOutcome, objective)
-    ? `Look at each student's own work for "${activity.title}". Accept it only when it matches the textbook task.`
-    : `Look at each student's work. A successful result shows: ${expectedOutcome}`;
+      : derivedOutcome;
+  const checkUnderstanding = mistake
+    ? `Ask one student to show their own work, then ask the class: "${mistake}" What does the textbook say instead?`
+    : `Ask two students to point to the part of their own work that shows they can do "${activity.title}".`;
 
   return {
     learningObjective: objective,

@@ -40,7 +40,22 @@ export function selectSavedActivity(input: {
   }
 
   if (specific.length) {
-    return [...specific].sort((left, right) => activityFitScore(right) - activityFitScore(left))[0] ?? null;
+    const ranked = [...specific].sort((left, right) => activityFitScore(right) - activityFitScore(left));
+    const best = ranked[0];
+    if (!best) return null;
+    const bestScore = activityFitScore(best);
+    const writingPlan = /essay|persuasive|argumentative/i.test(`${best.title} ${best.description}`);
+    if (writingPlan) {
+      const interactive = ranked.find(
+        (activity) =>
+          activityFitScore(activity) >= bestScore - 8 &&
+          /debate|presentation|consensus|diary|poem|scenario|speech|role-play|role play/i.test(
+            `${activity.title} ${activity.description}`,
+          ),
+      );
+      if (interactive) return interactive;
+    }
+    return best;
   }
   return unused.find((activity) => isRecap(activity) && studied(activity)) ?? null;
 }
