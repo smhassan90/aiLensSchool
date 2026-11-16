@@ -15,15 +15,19 @@ import {
   type SectionPlan,
 } from './section-teaching-plan';
 
-function unitText(): string {
+function chapterText(fileName: string): string {
   const path = [
-    join(process.cwd(), 'docs/analysis/raw/unit-1-chapter.json'),
-    join(process.cwd(), '../docs/analysis/raw/unit-1-chapter.json'),
-    '/Users/smhassan.tahir/Documents/workspace/aiLensSchool/docs/analysis/raw/unit-1-chapter.json',
+    join(process.cwd(), 'docs/analysis/raw', fileName),
+    join(process.cwd(), '../docs/analysis/raw', fileName),
+    join('/Users/smhassan.tahir/Documents/workspace/aiLensSchool/docs/analysis/raw', fileName),
   ].find((candidate) => existsSync(candidate));
-  if (!path) throw new Error('Unit 1 chapter file is missing');
+  if (!path) throw new Error(`${fileName} is missing`);
   const raw = JSON.parse(readFileSync(path, 'utf8')) as { publishedText: string; exercisesText: string };
   return joinCompiledChapter(raw.publishedText, raw.exercisesText);
+}
+
+function unitText(): string {
+  return chapterText('unit-1-chapter.json');
 }
 
 function lessonFor(plans: SectionPlan[], skill: SectionPlan['skill'], mode: 'teach' | 'practice' | 'activity' = 'teach') {
@@ -238,5 +242,28 @@ describe('Unit 1 section teaching plans', () => {
         40,
       ),
     ).toContain('assessment does not match the learning objective');
+  });
+});
+
+describe('Unit 2 section teaching plans', () => {
+  const plans = parseSectionPlans(chapterText('unit-2-chapter.json'));
+
+  it('finds the sections that are printed only on the exercise pages', () => {
+    expect(plans.map((plan) => plan.skill)).toEqual(['READING', 'ORAL', 'LANGUAGE', 'WRITING', 'STUDY', 'FUN']);
+    expect(plans.find((plan) => plan.skill === 'ORAL')?.exercises[0]?.instruction).toMatch(/advice/i);
+    expect(plans.find((plan) => plan.skill === 'WRITING')?.exercises[0]?.instruction).toMatch(/email/i);
+  });
+
+  it('teaches Dignity of Work without the Unit 1 horse story or health dialogue', () => {
+    for (const skill of ['READING', 'ORAL', 'LANGUAGE', 'WRITING', 'STUDY', 'FUN'] as const) {
+      const notes = lessonFor(plans, skill).lesson.notes;
+      expect(notes).not.toMatch(/\bhorse\b|\bsteeple\b|\bAmina\b|Sindh cluster|Wh-question|ghost story/i);
+      expect(validateDisplayedLesson(notes, 40)).toEqual([]);
+    }
+    expect(lessonFor(plans, 'READING').lesson.notes).toMatch(/Dignity of Work|Akhtar|honest work/i);
+    expect(lessonFor(plans, 'ORAL').lesson.notes).toMatch(/advice/i);
+    expect(lessonFor(plans, 'LANGUAGE').lesson.notes).toMatch(/Present|verb|tense/i);
+    expect(lessonFor(plans, 'WRITING').lesson.notes).toMatch(/email/i);
+    expect(lessonFor(plans, 'FUN').lesson.notes).toMatch(/word/i);
   });
 });
