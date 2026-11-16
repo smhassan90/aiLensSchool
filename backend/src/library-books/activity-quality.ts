@@ -434,7 +434,7 @@ export function collectActivityIssues(
     }
     if (
       description &&
-      !/\b(writ\w*|draft\w*|say\w*|speak\w*|present\w*|debat\w*|list\w*|choos\w*|perform\w*|explain\w*|compar\w*|read\w*|mark\w*|correct\w*|vot\w*|act\w*)\b/i.test(
+      !/\b(writ\w*|draft\w*|say\w*|speak\w*|present\w*|debat\w*|list\w*|choos\w*|perform\w*|explain\w*|compar\w*|read\w*|mark\w*|correct\w*|vot\w*|act\w*|argu\w*|decid\w*|judg\w*|suggest\w*|design\w*|defend\w*|propos\w*|solv\w*|ask\w*|answer\w*|tell\w*|plan\w*)\b/i.test(
         description,
       )
     ) {

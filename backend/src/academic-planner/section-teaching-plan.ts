@@ -619,6 +619,35 @@ function mergeHeadingSections(
   return ordered;
 }
 
+const ACTIVITY_CONTEXT_LIMIT = 48_000;
+
+/** The activity model sees the whole unit, including later sections, not only the opening pages. */
+export function activityChapterContext(chapterText: string): string {
+  const { lessonBody, exercises } = splitCompiledChapter(chapterText);
+  const full = exercises ? `${lessonBody}\n\n## Exercises\n\n${exercises}` : lessonBody;
+  if (full.length <= ACTIVITY_CONTEXT_LIMIT) return full;
+
+  const lessonSections = splitByHeading(lessonBody);
+  const exerciseSections = splitByHeading(exercises);
+  const sections =
+    lessonSections.length >= 2 ? lessonSections : mergeHeadingSections(lessonSections, exerciseSections);
+  const outcome = (lessonBody.split(HEADING)[0] ?? lessonBody).trim().slice(0, 3500);
+  const chunks = [outcome];
+  const source = sections.length >= 2 ? sections : [{ heading: 'CHAPTER', number: '', body: lessonBody }];
+  for (const section of source) {
+    const exercise = exerciseSections.find((item) => item.heading === section.heading)?.body ?? '';
+    const story = section.body.replace(/\s+/g, ' ').trim().slice(0, 3500);
+    const tasks = exercise
+      .split(/\n(?=Exercise\s+\d+\b|Note for teachers:)/i)
+      .slice(0, 8)
+      .map((part) => part.trim().slice(0, 700))
+      .filter(Boolean)
+      .join('\n');
+    chunks.push(`${section.heading} ${section.number}\n${story}\n${tasks}`.trim());
+  }
+  return chunks.join('\n\n').slice(0, ACTIVITY_CONTEXT_LIMIT);
+}
+
 function splitByHeading(text: string): Array<{ heading: string; number: string; body: string }> {
   const matches = [...text.matchAll(HEADING)];
   if (!matches.length) return [];

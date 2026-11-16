@@ -147,8 +147,8 @@ describe('saved teaching-pack activities in the day plan', () => {
     );
     expect(result).not.toBeNull();
     const activityLesson = result!.lessons.find((lesson) => lesson.kind === PlannerLessonKind.ACTIVITY);
-    expect(activityLesson?.objectives[0]).toBe('Draft letter to the editor');
-    expect(activityLesson?.title).toContain('Draft letter to the editor');
+    expect(activityLesson?.objectives[0]).toBe('Dream twist discussion');
+    expect(activityLesson?.title).toContain('Dream twist discussion');
     expect(activityLesson?.title).not.toContain('Unit recap');
     expect(activityLesson?.notes).toContain(participation);
     expect(activityLesson?.notes).toContain('Board, textbook, notebooks');

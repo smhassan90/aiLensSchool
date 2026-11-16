@@ -1,4 +1,9 @@
-import { formatSavedActivityNotes, selectSavedActivity, type SavedActivity } from './saved-activity-plan';
+import {
+  formatSavedActivityNotes,
+  isPreparedClassroomActivity,
+  selectSavedActivity,
+  type SavedActivity,
+} from './saved-activity-plan';
 import { assertActivityQuality, collectActivityIssues, periodBreakdown } from '../library-books/activity-quality';
 
 const participation = (line: string, correction: string) =>
@@ -146,9 +151,9 @@ describe('Class 10 English activity quality', () => {
   it('selects a different chapter task instead of the same unit recap', () => {
     const titles = chapters.map((chapter) => chosen(chapter.activities).title);
     expect(titles).toEqual([
-      'Draft letter to the editor',
-      'Persuasive essay on the journey',
-      'Poem performance',
+      'Dream twist discussion',
+      'Gorakh Hills travel diary',
+      'Helmet-law scenarios',
     ]);
     expect(new Set(titles).size).toBe(3);
   });
@@ -163,13 +168,12 @@ describe('Class 10 English activity quality', () => {
       expect(notes.split(student).length - 1).toBe(1);
       expect(notes).toContain('What the teacher does:');
       expect(notes).toContain('How every student participates:');
-      expect(notes).toContain('Every student produces an individual result');
+      expect(notes).not.toContain('Every student produces an individual result');
+      expect(notes).not.toContain('Introduction and instructions');
       expect(notes).toContain('Duration: 40 minutes');
       expect(notes).not.toMatch(/class period set aside/i);
       expect(notes).not.toMatch(/What did this activity ask you to do/i);
       expect(notes).not.toMatch(/Each group owns one section/);
-      const blocks = [...notes.matchAll(/- (.+): (\d+) minutes\./g)].map((match) => Number(match[2]));
-      expect(blocks.reduce((sum, minutes) => sum + minutes, 0)).toBe(40);
     }
   });
 
@@ -197,6 +201,45 @@ describe('Class 10 English activity quality', () => {
     };
     expect(collectActivityIssues([distinct])).toEqual([]);
     expect(() => assertActivityQuality([distinct])).not.toThrow();
+  });
+
+  it('keeps a prepared chapter activity instead of stamping a timing template on it', () => {
+    const courtroom: SavedActivity = {
+      sliceKey: 's1',
+      title: 'Whose horse is it?',
+      description:
+        'Fictional scenario, inspired by this chapter. A shopkeeper and a traveller both claim a white horse outside a caravanserai. Facts: the horse follows the traveller, but it pulls away when the shopkeeper touches the rein. Group 1 defends the shopkeeper. Group 2 defends the traveller. Group 3 asks questions and gives a judgement. Example argument for the traveller: the horse shows who it trusts, which is the same kind of test the Caliph used. Example question for the judges: what did the horse do, and what does that show?',
+      participationTechnique: 'Every student writes one argument before their group speaks, then one judge asks that student a question.',
+      materials: 'None',
+      learningObjective: 'Students can judge a claim by watching the evidence, as the Caliph did with the horse.',
+      teacherSteps: [
+        '(6 min) Tell the class this case is not in the textbook, then read the Caliph horse test in one minute.',
+        '(8 min) Read the fictional case once and assign the three groups.',
+        '(16 min) Move among the groups. Ask a silent student for their written argument.',
+        '(10 min) The judges give a decision and say which chapter event it resembles.',
+      ],
+      expectedOutcome: 'Each student has one written argument, and the judges name the horse test from the story.',
+      durationMinutes: 40,
+    };
+    const notes = formatSavedActivityNotes(courtroom, 'Unit 1', [], 40);
+    expect(isPreparedClassroomActivity(courtroom)).toBe(true);
+    expect(notes).toMatch(/Fictional scenario/);
+    expect(notes).toMatch(/white horse/);
+    expect(notes).toMatch(/Example question/);
+    expect(notes).toMatch(/Caliph/);
+    expect(notes).not.toContain('Introduction and instructions');
+    expect(notes).not.toContain('Main activity');
+    expect(notes).not.toContain('Every student produces an individual result');
+    expect(notes).not.toContain('You need:');
+    const blocks = [...notes.matchAll(/- (.+): (\d+) minutes\./g)].map((match) => Number(match[2]));
+    expect(blocks.reduce((sum, minutes) => sum + minutes, 0)).toBe(40);
+    const selected = selectSavedActivity({
+      activities: [genericRecap('Unit 1'), courtroom, unit5[4]!],
+      coveredSliceKeys: ['s1', 's4'],
+      usedTitles: [],
+      preferRecap: true,
+    });
+    expect(selected?.title).toBe('Whose horse is it?');
   });
 
   it('builds a 40-minute breakdown that adds up', () => {

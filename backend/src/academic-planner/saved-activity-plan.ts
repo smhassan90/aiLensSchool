@@ -1,4 +1,4 @@
-import { isGenericSectionSummary, lessonActivityScript } from '../library-books/activity-quality';
+import { isGenericSectionSummary } from '../library-books/activity-quality';
 import { teacherGuideBullets } from './section-teaching-plan';
 
 export type SavedActivity = {
@@ -17,11 +17,28 @@ function isRecap(activity: SavedActivity): boolean {
   return activity.sliceKey == null || /\brecap\b/i.test(activity.title);
 }
 
+function storedSteps(activity: SavedActivity): string[] {
+  if (!Array.isArray(activity.teacherSteps)) return [];
+  return activity.teacherSteps
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .map((step) => step.trim());
+}
+
+/** A saved activity the teacher can run because the model wrote the material, not a section template. */
+export function isPreparedClassroomActivity(activity: SavedActivity): boolean {
+  const description = activity.description?.trim() ?? '';
+  const blob = `${activity.title} ${description}`;
+  if (isGenericSectionSummary(activity)) return false;
+  if (/complete the task printed in|write your own answer|correct the language exercise|collect points with wh-questions/i.test(blob)) {
+    return false;
+  }
+  return description.length >= 450 && storedSteps(activity).length >= 3;
+}
+
 /**
- * Pick one saved activity whose section has already been taught.
- * A closing day uses the latest taught section that still has an unused activity.
+ * Use the activity the model prepared for this chapter.
  * Title words such as oral, debate, or group do not change the choice.
- * The generic section-summary recap is used only when nothing else fits.
+ * A section-summary recap is used only when nothing else fits.
  */
 export function selectSavedActivity(input: {
   activities: SavedActivity[];
@@ -40,14 +57,26 @@ export function selectSavedActivity(input: {
   if (!specific.length) {
     return unused.find((activity) => isRecap(activity) && studied(activity)) ?? null;
   }
-  if (!input.preferRecap) return specific[0] ?? null;
-
-  for (let index = input.coveredSliceKeys.length - 1; index >= 0; index--) {
-    const sliceKey = input.coveredSliceKeys[index];
-    const match = specific.find((activity) => activity.sliceKey === sliceKey);
-    if (match) return match;
-  }
+  void input.preferRecap;
+  const prepared = specific.find((activity) => isPreparedClassroomActivity(activity));
+  if (prepared) return prepared;
   return specific[0] ?? null;
+}
+
+function fittedSteps(steps: string[], total: number): Array<{ minutes: number; text: string }> {
+  const parsed = steps.map((step) => {
+    const match = step.match(/^\(?\s*(\d+)\s*min(?:utes)?\)?\s*[.:\-]?\s*/i);
+    const text = (match ? step.slice(match[0].length) : step).trim() || step;
+    return { minutes: match ? Number(match[1]) : 0, text };
+  });
+  const known = parsed.every((step) => step.minutes > 0) ? parsed.reduce((sum, step) => sum + step.minutes, 0) : 0;
+  if (known === total) return parsed;
+  const count = Math.max(1, parsed.length);
+  const base = Math.max(3, Math.floor(total / count));
+  return parsed.map((step, index) => ({
+    minutes: index === count - 1 ? total - base * (count - 1) : base,
+    text: step.text,
+  }));
 }
 
 export function formatSavedActivityNotes(
@@ -56,35 +85,41 @@ export function formatSavedActivityNotes(
   alternatives: SavedActivity[] = [],
   periodMinutes = 40,
 ): string {
-  const script = lessonActivityScript(activity, periodMinutes);
-  const minutes = script.timing.reduce((sum, block) => sum + block.minutes, 0);
-  const others = alternatives.filter((item) => item.title !== activity.title);
-  return [
+  const minutes = Math.max(20, Math.min(80, periodMinutes || activity.durationMinutes || 40));
+  const steps = fittedSteps(storedSteps(activity), minutes);
+  const objective = activity.learningObjective?.trim() || activity.title;
+  const materials = activity.materials?.trim();
+  const participation = activity.participationTechnique.trim();
+  const outcome = activity.expectedOutcome?.trim() || `Students show the idea of ${activity.title} in their own work.`;
+  const others = alternatives.filter((item) => item.title !== activity.title && !isGenericSectionSummary(item));
+  const lines = [
     activity.title,
     '',
     `Chapter: ${chapterTitle}`,
-    `Section: ${activity.sliceKey ?? 'whole chapter'}`,
-    `Learning objective: ${script.learningObjective}`,
-    `You need: ${activity.materials?.trim() || 'Textbook and notebooks'}`,
+    `Learning objective: ${objective}`,
+    ...(materials && !/^none$/i.test(materials) ? [`You need: ${materials}`] : []),
     `Duration: ${minutes} minutes`,
-    ...script.timing.map((block) => `- ${block.label}: ${block.minutes} minutes.`),
-    '',
-    'What the teacher does:',
-    ...script.teacherSteps.map((step, index) => `${index + 1}. ${step}`),
+    ...steps.map((step) => `- ${step.text}: ${step.minutes} minutes.`),
     '',
     'What students do:',
-    script.studentTask,
+    activity.description.trim(),
+    '',
+    'What the teacher does:',
+    ...(steps.length
+      ? steps.map((step, index) => `${index + 1}. (${step.minutes} min) ${step.text}`)
+      : ['1. Use the student task below. Do not replace it with a different activity.']),
     '',
     'How every student participates:',
-    script.participation,
+    participation,
     '',
     'Check understanding:',
-    script.checkUnderstanding,
-    `Expected outcome: ${script.expectedOutcome}`,
+    outcome,
+    `Expected outcome: ${outcome}`,
     ...(others.length
       ? ['', 'Other saved activities for this chapter:', ...others.map((item) => `- ${item.title}`)]
       : []),
-  ].join('\n');
+  ];
+  return lines.join('\n');
 }
 
 export function formatUnavailableChapterNotes(chapterTitle: string, reason: string, role: string): string {

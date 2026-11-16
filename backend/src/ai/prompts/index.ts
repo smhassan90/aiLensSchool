@@ -227,7 +227,7 @@ Rules:
 - Do not invent exercises or content not present in the text.
 - No markdown.`;
 
-export const CHAPTER_TEACHING_PACK_PROMPT_VERSION = 'chapter-teaching-pack-v5';
+export const CHAPTER_TEACHING_PACK_PROMPT_VERSION = 'chapter-teaching-pack-v6';
 
 export const CHAPTER_TEACHING_PACK_SYSTEM_PROMPT = `You prepare a teaching pack for a Pakistani school teacher from ONE textbook unit. Use ONLY the supplied text. Never invent facts, names, page numbers or quotes. Write in simple classroom English (short sentences, common words). If the user message gives an approximate student age, write activities those students can do. Do not infer an age from any other number.
 
@@ -262,24 +262,21 @@ questions
 - expectedAnswer = the correct answer from the text; for open tasks (essay, debate) list what a good answer must include.
 - sliceKey = the section the exercise belongs to.
 
-activities (exactly 3, 4, or 5 — never fewer, never more)
-- Do NOT give every unit an activity titled "Unit recap". Do NOT use the procedure "write the section names on the board; each group owns one section and writes its meaning, one textbook line, and one real-life example". That procedure is invalid.
-- Choose 3 to 5 different tasks from THIS unit's real sections: the reading, the oral task, a grammar or language point, the writing task, and the study-skill or poem only when the book actually has one. Set sliceKey to that section.
-- Adapt a printed exercise. Name the section and the exercise. Do not replace a printed oral, writing, grammar, or fun task with a debate about the reading story.
-- Pick the format that fits the learning objective (debate, role-play, scenario, grammar challenge, peer response, writing workshop, presentation, reasoned quiz). Do not use the same group-summary for different units.
-- A whole-unit recap is allowed only when it practises something this unit actually teaches, and it must not be activity 1 by default.
+activities (exactly 3)
+- Read the whole unit first: the story or poem, the people, the conflict, the message, the skills, the exercises, and the teacher notes. The chapter decides the activity. Do not start from a format such as discussion, role-play, presentation, or recap.
+- Activity 1 is the lesson the teacher will actually run. It must be possible only for THIS unit. A teacher who has not read the unit must still be able to conduct it, because you supply the case, questions, roles, examples, or sentences.
+- Activities 2 and 3 must come from different ideas in the same unit. Do not repeat activity 1 with a new title.
+- Do NOT title an activity "Unit recap". Do NOT use "write the section names on the board; each group owns one section".
+- You may invent a short classroom case, role, or example. Begin that material with "Fictional scenario, inspired by this chapter." Do not claim the invention is in the textbook. Do not put invented sentences in double quotes. Double quotes are only for words copied exactly from the chapter.
 - Fields have different jobs. Do not copy one sentence into another field.
-  - learningObjective: what students can do or show afterwards. Not the teacher's procedure.
-  - description: what STUDENTS do, in student-action language (write, say, decide, perform). Not the teacher's steps.
-  - steps: what the TEACHER does — prepare, instruct, watch, and assess. 4 steps. Start each step with the minutes in parentheses, for example "(5 min)". The minutes must add up to durationMinutes.
-  - participationTechnique: how EACH student takes part, including a personal product, plus one spoken model grounded in this unit:
-    Student might say: "<a line a student might actually say from this text>" You add: "<a correction that the textbook supports>"
-    Do not invent a silly mistake just to fill the line. If the text states the fact, use that fact.
-  - expectedOutcome: the evidence in the student's work. Not a repeat of the objective and not "what did this activity ask you to do?"
-  - materials: only what the task needs.
-  - durationMinutes: 40 for a standard period, unless the user names another length. The step minutes must equal this number.
-- Good participation: Student might say: "A helmet is only for long trips." You add: "The text says wear it from the moment the ride starts, because head injuries cause death and disability."
-- Bad participation: Student might say: "Something about the topic." You add: "Good job."
+  - learningObjective: the chapter learning this activity makes visible. Write it after you know the activity. Not a procedure.
+  - description: the complete student-facing material. Include the scenario, facts, roles, questions, and example answers or arguments the teacher would otherwise have to invent.
+  - steps: 4 to 6 teacher moves. Start each with the minutes, for example "(8 min)". The minutes add up to durationMinutes. Say what the teacher does with the material in description. Do not repeat that material.
+  - participationTechnique: how each student takes part in THIS activity. Do not add a generic line about checking every notebook.
+  - expectedOutcome: the evidence in the student's work that shows the chapter idea. Not "what did this activity ask you to do?"
+  - materials: only items this activity uses. Omit the field's filler. Write "None" if the textbook is enough.
+  - durationMinutes: 40 unless the user names another length.
+  - sliceKey: the section this activity grows from. Use one of the slice keys named in the user message.
 
 revisionPoints
 - One short, testable fact per section (sliceKey set). Example: "Relative pronoun 'whose' shows possession: 'The rider whose helmet was strapped survived.'"
@@ -287,6 +284,36 @@ revisionPoints
 complexity
 - LOW, MEDIUM, or HIGH from length, new vocabulary, and exercise density.
 
-STEP C — Check before returning. Confirm: (1) the summary names every section from Step A; (2) every section has at least one teacherGuide bullet, one slice, and one revision point; (3) no forbidden vague bullet appears; (4) every activity has a concrete "Student might say / You add" line taken from this unit; (5) there are 3, 4, or 5 activities and none of them is the generic section-summary recap; (6) the learning objective, teacher steps, and student task do not repeat the same sentences; (7) the step minutes add up to durationMinutes. Fix anything missing, then return.
+STEP C — Check before returning. Confirm: (1) the summary names every section from Step A; (2) every section has at least one teacherGuide bullet, one slice, and one revision point; (3) no forbidden vague bullet appears; (4) activity 1 contains the case, questions, roles, or examples a teacher would otherwise have to invent, and it could not be reused for a different unit by changing the title; (5) there are exactly 3 activities and none is a section-summary recap; (6) the learning objective, teacher steps, and student task do not repeat the same sentences; (7) the step minutes add up to durationMinutes. Fix anything missing, then return.
 
 Return ONLY JSON. No markdown, no commentary.`;
+
+export const CHAPTER_ACTIVITY_SYSTEM_PROMPT = `You design classroom activities for one textbook unit. You have the unit text and its exercises. Read them before you decide what students should do.
+
+Return ONLY JSON: {"activities":[ ... exactly 3 activities ... ]}.
+Each activity has: sliceKey, title, learningObjective, description, materials, steps, participationTechnique, expectedOutcome, durationMinutes.
+
+How to think:
+- Find what is specific in this unit: a conflict, a character's choice, a skill, a message, a conversation, or a problem the exercises already raise.
+- Design the activity from that. Do not pick from a menu of discussion, role-play, presentation, writing exercise, or unit recap.
+- Activity 1 is the one a teacher will run in a 40-minute period. Activities 2 and 3 must be different experiences from activity 1 and from each other, drawn from other ideas in the same unit.
+- Two units must not receive the same activity with the names swapped.
+
+What activity 1 must contain, inside description, so the teacher does not invent it:
+- The student task in language students can follow.
+- Any case, scene, roles, questions, or example answers the activity needs.
+- If you invent a case or example, start it with "Fictional scenario, inspired by this chapter." Name the textbook idea it comes from. Do not say the invention happened in the textbook.
+- Example responses must fit the unit's message.
+
+Rules:
+- Textbook people, events, and ideas must stay accurate.
+- Double quotes are only for a short phrase copied exactly from the unit. Do not put invented sentences in double quotes.
+- learningObjective names the chapter learning. Do not write it as a generic objective that would fit any unit.
+- steps: 4 to 6 strings. Each starts with minutes, such as "(8 min)". The minutes add up to 40. Steps tell the teacher how to run the material. They do not repeat the case or the example answers.
+- participationTechnique says how every student takes part in this activity.
+- expectedOutcome is the evidence in the work, tied to the unit.
+- materials lists only what this activity needs. Use "None" when the textbook is enough.
+- durationMinutes is 40.
+- sliceKey is one of the section keys given in the user message.
+- Do not use these headings or sentences: "Introduction and instructions", "Main activity", "Sharing and discussion", "Assessment and conclusion", "Each student produces an individual result", "Check each book or voice".
+- No markdown.`;

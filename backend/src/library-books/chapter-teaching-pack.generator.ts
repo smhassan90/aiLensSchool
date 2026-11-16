@@ -5,6 +5,7 @@ import { join } from 'path';
 import { z } from 'zod';
 import { parseModelJson } from '../ai/parse-model-json';
 import {
+  CHAPTER_ACTIVITY_SYSTEM_PROMPT,
   CHAPTER_TEACHING_PACK_PROMPT_VERSION,
   CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
 } from '../ai/prompts';
@@ -19,7 +20,7 @@ import {
 } from './schemas/chapter-teaching-pack.schema';
 import { heuristicChapterTeachingPack } from './chapter-teaching-pack.heuristic';
 import {
-  boundedTeachingBrief,
+  activityChapterContext,
   parseSectionPlans,
   teachingPackFromSectionPlans,
   type SectionPlan,
@@ -34,7 +35,7 @@ export type GenerateChapterTeachingPackResult = {
   model: string;
 };
 
-const FULL_TEXT_LIMIT = 25_000;
+const FULL_TEXT_LIMIT = 48_000;
 
 const QUESTIONS_ONLY_PROMPT = `Extract classroom questions from the textbook exercises below. Return ONLY JSON: {"questions":[{"sliceKey":"s1","question":"...","expectedAnswer":"...","format":"WRITTEN"}]}.
 Rules:
@@ -66,9 +67,6 @@ export async function generateChapterTeachingPack(input: {
     };
   }
 
-  const fromTextbook = packFromTextbookSections(input.chapterTitle, compiled);
-  if (fromTextbook) return fromTextbook;
-
   const header = buildTeachingPackHeader({
     subjectName: input.subjectName,
     classLabel: input.classLabel,
@@ -76,10 +74,14 @@ export async function generateChapterTeachingPack(input: {
     chapterTitle: input.chapterTitle,
   });
 
+  const sectionPlans = parseSectionPlans(compiled);
   let lastError: Error | null = null;
   let correction = '';
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
+      if (sectionPlans.length >= 2) {
+        return await packWithChapterActivities(input.chapterTitle, header, compiled, sectionPlans, correction);
+      }
       return await requestCompletePack(input, header, compiled, warnings, correction);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Teaching pack generation failed');
@@ -90,28 +92,72 @@ export async function generateChapterTeachingPack(input: {
   throw lastError ?? new Error('Teaching pack generation failed');
 }
 
-function packFromTextbookSections(
+function packWithChapterActivities(
   chapterTitle: string,
+  header: string,
   compiled: string,
-): GenerateChapterTeachingPackResult | null {
-  const plans = parseSectionPlans(compiled);
-  if (plans.length < 2) return null;
-  try {
-    const draft = teachingPackFromSectionPlans(plans, chapterTitle);
-    const pack = ChapterTeachingPackSchema.parse(draft);
-    const grounded = groundTeachingPack(pack, compiled);
-    assertActivityQuality(grounded.activities, compiled);
-    return {
-      pack: grounded,
-      sectionPlans: plans,
-      source: PlannerAnalysisSource.MANUAL,
-      warnings: [],
-      provider: 'textbook-sections',
-      model: 'section-plan-v1',
-    };
-  } catch {
-    return null;
+  plans: SectionPlan[],
+  correction: string,
+): Promise<GenerateChapterTeachingPackResult> {
+  return requestChapterActivities(chapterTitle, header, compiled, plans, correction);
+}
+
+async function requestChapterActivities(
+  chapterTitle: string,
+  header: string,
+  compiled: string,
+  plans: SectionPlan[],
+  correction: string,
+): Promise<GenerateChapterTeachingPackResult> {
+  const draft = teachingPackFromSectionPlans(plans, chapterTitle);
+  const keys = draft.readingSlices.map((slice) => `${slice.sliceKey}: ${slice.title}`).join('\n');
+  const repair = correction
+    ? `\n\nThe previous activities were rejected. Rewrite all three. ${correction.slice(0, 900)}`
+    : '';
+  const { text, provider, model } = await requestModelText(
+    CHAPTER_ACTIVITY_SYSTEM_PROMPT,
+    `${header}${repair}\n\nUse only these section keys:\n${keys}\n\n--- CHAPTER ---\n${activityChapterContext(compiled)}\n--- END CHAPTER ---`,
+  );
+  const raw = parseModelJson(text);
+  const returned = Array.isArray(raw) ? raw : (raw as { activities?: unknown }).activities;
+  const coerced = coerceChapterTeachingPack({ ...draft, activities: returned }) as {
+    activities?: ChapterTeachingPackOutput['activities'];
+  };
+  const validKeys = new Set(draft.readingSlices.map((slice) => slice.sliceKey));
+  const fallbackKey = draft.readingSlices[0]?.sliceKey ?? 's1';
+  const activities = (coerced.activities ?? []).map((activity) => ({
+    ...activity,
+    sliceKey: activity.sliceKey && validKeys.has(activity.sliceKey) ? activity.sliceKey : fallbackKey,
+  }));
+  const pack = ChapterTeachingPackSchema.parse({ ...draft, activities });
+  const grounded = groundTeachingPack(pack, compiled);
+  assertActivityQuality(grounded.activities, compiled);
+  assertConductableActivities(grounded.activities);
+  return {
+    pack: grounded,
+    sectionPlans: plans,
+    source: PlannerAnalysisSource.MANUAL,
+    warnings: [],
+    provider,
+    model,
+  };
+}
+
+function assertConductableActivities(activities: ChapterTeachingPackOutput['activities']): void {
+  const first = activities[0];
+  if (!first) throw new Error('No classroom activity was returned');
+  const material = `${first.description}\n${first.steps.join('\n')}`;
+  if (first.description.trim().length < 450) {
+    throw new Error('Activity 1 does not contain the case, questions, or examples the teacher needs');
   }
+  if (!/\b(example|case|role|question|argument|scenario|fictional|sentence)\b/i.test(first.description)) {
+    throw new Error('Activity 1 does not include the material needed to run it');
+  }
+  if (/introduction and instructions|each student produces an individual result|check each book or voice/i.test(material)) {
+    throw new Error('Activity 1 still uses a fixed activity template');
+  }
+  const titles = activities.map((activity) => activity.title.trim().toLowerCase());
+  if (new Set(titles).size < titles.length) throw new Error('The activities repeat one title');
 }
 
 function acceptPack(
@@ -155,21 +201,14 @@ async function requestCompletePack(
       return acceptPack(pack, compiled, warnings, provider, model, correction);
     }
 
-    const lessonSource = (input.lessonText ?? '').trim() || compiled;
-    let lessonBody = lessonSource;
-    if (lessonBody.length > FULL_TEXT_LIMIT) {
-      lessonBody = lessonBody.slice(0, FULL_TEXT_LIMIT);
-      warnings.push({
-        code: 'LESSON_TEXT_TRUNCATED',
-        message: 'Lesson text exceeded 25,000 characters; only the first 25,000 were sent.',
-      });
-    }
-
     const exercises = (input.exercisesText ?? '').trim();
-    const brief = boundedTeachingBrief(lessonBody, exercises);
+    warnings.push({
+      code: 'LESSON_TEXT_TRUNCATED',
+      message: 'The unit was longer than 48,000 characters, so each section was sent with its story and exercises instead of only the opening pages.',
+    });
     const first = await requestTeachingPack(
       CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
-      `${header}${repair}\n\nThe chapter is too long to send in one piece. Use this section-by-section brief. Activities must adapt the printed exercises named below.\n\n${brief}`,
+      `${header}${repair}\n\nThe unit is long. Every section below is included. Design the activities from what is specific in this unit, and include the material the teacher needs.\n\n${activityChapterContext(compiled)}`,
     );
 
     let questions = first.pack.questions;
@@ -179,7 +218,7 @@ async function requestCompletePack(
         exerciseBody = exerciseBody.slice(0, FULL_TEXT_LIMIT);
         warnings.push({
           code: 'EXERCISES_TEXT_TRUNCATED',
-          message: 'Exercises text exceeded 25,000 characters; only the first 25,000 were sent.',
+          message: 'Exercises text exceeded 48,000 characters; only the first 48,000 were sent.',
         });
       }
       const sliceList = first.pack.readingSlices.map((slice) => `${slice.sliceKey}: ${slice.title}`).join('\n');

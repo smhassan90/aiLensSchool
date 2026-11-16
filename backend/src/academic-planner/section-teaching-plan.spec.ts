@@ -4,6 +4,7 @@ import { joinCompiledChapter } from '../ai/schemas/chapter-compile-text';
 import { collectActivityIssues } from '../library-books/activity-quality';
 import { selectSavedActivity, type SavedActivity } from './saved-activity-plan';
 import {
+  activityChapterContext,
   allocateSectionDays,
   packNeedsRefresh,
   parseSectionPlans,
@@ -145,7 +146,7 @@ describe('Unit 1 section teaching plans', () => {
     }
   });
 
-  it('selects an activity by the taught section, not by oral keywords', () => {
+  it('uses the activity prepared for the chapter before a later section task', () => {
     const activities: SavedActivity[] = [
       {
         sliceKey: 's1',
@@ -166,14 +167,14 @@ describe('Unit 1 section teaching plans', () => {
       usedTitles: [],
       preferRecap: true,
     });
-    expect(selected?.title).toBe('Write the paragraph');
+    expect(selected?.title).toBe('Oral debate about the story');
     const repeated = selectSavedActivity({
       activities,
       coveredSliceKeys: ['s1', 's2'],
-      usedTitles: ['Write the paragraph'],
+      usedTitles: ['Oral debate about the story'],
       preferRecap: true,
     });
-    expect(repeated?.title).toBe('Oral debate about the story');
+    expect(repeated?.title).toBe('Write the paragraph');
   });
 
   it('refreshes a pack when the prompt version changes and keeps a current pack', () => {
@@ -265,5 +266,21 @@ describe('Unit 2 section teaching plans', () => {
     expect(lessonFor(plans, 'LANGUAGE').lesson.notes).toMatch(/Present|verb|tense/i);
     expect(lessonFor(plans, 'WRITING').lesson.notes).toMatch(/email/i);
     expect(lessonFor(plans, 'FUN').lesson.notes).toMatch(/word/i);
+  });
+});
+
+describe('activity chapter context', () => {
+  it('keeps the story and the later sections for a long unit', () => {
+    const text = chapterText('unit-1-chapter.json');
+    const context = activityChapterContext(text);
+    expect(context.length).toBeGreaterThan(20000);
+    expect(context).toMatch(/horse/i);
+    expect(context).toMatch(/\bAmina\b/);
+    expect(context).toMatch(/Sindh/);
+    expect(context).toMatch(/ghost/i);
+    const unit2 = activityChapterContext(chapterText('unit-2-chapter.json'));
+    expect(unit2).toMatch(/Dignity of Work/);
+    expect(unit2).toMatch(/formal email/i);
+    expect(unit2).toMatch(/advice/i);
   });
 });

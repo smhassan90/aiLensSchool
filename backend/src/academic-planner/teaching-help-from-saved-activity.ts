@@ -38,6 +38,7 @@ export function teachingHelpFromSavedActivityNotes(input: {
   const duration = Number(notes.match(/Duration:\s*(\d+)/i)?.[1] ?? 20);
   const objective =
     notes.match(/Learning objective:\s*(.+)/i)?.[1]?.trim() || title;
+  const outcome = notes.match(/Expected outcome:\s*(.+)/i)?.[1]?.trim() || objective;
   return {
     overview: {
       subject: fit(input.subjectName || 'Subject', 1, 120),
@@ -68,17 +69,17 @@ export function teachingHelpFromSavedActivityNotes(input: {
         steps: steps.slice(0, 6),
         minutes: Math.min(120, Math.max(5, duration || 20)),
       },
-      recap: 'Ask two students to say what they learned from this activity.',
+      recap: fit(outcome, 8, 800),
     },
     assessment: {
       formativeQuestions: [
         {
-          question: fit(`What did this activity ask you to do in ${input.chapterTitle}?`, 8, 400),
-          expectedAnswer: fit(title, 1, 400),
+          question: fit(`Show the part of your work that proves: ${objective}`, 8, 400),
+          expectedAnswer: fit(outcome, 1, 400),
           kind: 'recall',
         },
       ],
-      exitTicket: fit(`Write one thing you did in ${title}.`, 8, 400),
+      exitTicket: fit(outcome, 8, 400),
     },
     differentiation: { struggling: [], extension: [] },
     sourceAndConfidence: {

@@ -19,6 +19,7 @@ import {
   exerciseLessonNotes,
   formatSavedActivityNotes,
   formatUnavailableChapterNotes,
+  isPreparedClassroomActivity,
   introLessonNotes,
   readingLessonNotes,
   selectSavedActivity,
@@ -100,8 +101,23 @@ export function generateDayPlanFromTeachingPacks(input: {
       '';
     const sectionPlans = sectionPlansForChapter(chapterText, pack?.teacherGuide);
     if (sectionPlans.length >= 2) {
+      const prepared = pack?.activities.find((activity) => isPreparedClassroomActivity(activity)) ?? null;
       for (const assignment of allocateSectionDays(teachDays, sectionPlans)) {
         globalDay++;
+        if (assignment.mode === 'activity' && prepared) {
+          drafts.push(
+            draftFromPreparedActivity({
+              activity: prepared,
+              chapterTitle,
+              chapterKey: chapter.chapterKey,
+              globalDay,
+              periodMinutes,
+              sequence: drafts.length,
+              lessonKey: keyFactory(),
+            }),
+          );
+          continue;
+        }
         drafts.push(
           draftFromSectionAssignment({
             assignment,
@@ -406,6 +422,38 @@ function sectionPlansForChapter(chapterText: string, teacherGuide: unknown) {
   const parsed = parseSectionPlans(chapterText);
   if (parsed.length >= 2) return parsed;
   return readSectionPlans(teacherGuide);
+}
+
+function draftFromPreparedActivity(input: {
+  activity: TeachingPackForAnalysis['activities'][number];
+  chapterTitle: string;
+  chapterKey: string;
+  globalDay: number;
+  periodMinutes: number;
+  sequence: number;
+  lessonKey: string;
+}): Omit<ScheduleLessonDraft, 'scheduledDate' | 'periodNumber' | 'slotStartTime' | 'slotEndTime'> & { notes: string } {
+  const notes = formatSavedActivityNotes(input.activity, input.chapterTitle, [], input.periodMinutes);
+  const objective =
+    input.activity.learningObjective?.trim() ||
+    notes.match(/Learning objective:\s*(.+)/)?.[1] ||
+    input.activity.title;
+  return {
+    lessonKey: input.lessonKey,
+    chapterKey: input.chapterKey,
+    sequence: input.sequence,
+    kind: PlannerLessonKind.ACTIVITY,
+    title: `Day ${input.globalDay} — ${input.chapterTitle} · ${input.activity.title.slice(0, 80)}`,
+    primaryStage: LessonStage.ACTIVITY,
+    stages: [{ stage: LessonStage.ACTIVITY, minutes: input.periodMinutes }],
+    objectives: [objective],
+    portionKeys: [`activity:${input.activity.sliceKey ?? 'chapter'}:${input.activity.title.slice(0, 40)}`],
+    dependsOnKeys: [],
+    plannedMinutes: input.periodMinutes,
+    frozen: false,
+    isContinuation: false,
+    notes,
+  };
 }
 
 function draftFromSectionAssignment(input: {
