@@ -103,6 +103,11 @@ export interface AiProvider {
     repairInvalidJson?: boolean;
     variety?: number;
   }): Promise<AiCompletionResult<unknown>>;
+
+  translateClassroomText(input: {
+    title: string;
+    text: string;
+  }): Promise<AiCompletionResult<{ urdu: string }>>;
 }
 
 export const AI_PROVIDER = Symbol('AI_PROVIDER');

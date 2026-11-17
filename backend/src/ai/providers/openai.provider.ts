@@ -529,4 +529,29 @@ export class OpenAiProvider implements AiProvider {
       estimatedCost: this.estimateCost(content.inputTokens, content.outputTokens),
     };
   }
+
+  async translateClassroomText(
+    input: Parameters<AiProvider['translateClassroomText']>[0],
+  ): Promise<AiCompletionResult<{ urdu: string }>> {
+    if (!this.apiKey) {
+      throw new Error('Urdu translation is not available yet. Ask the school administrator to enable it.');
+    }
+    const content = await this.chat(
+      'Translate this classroom activity into simple Urdu a Pakistani school teacher can read aloud. Keep student names, section titles, numbers, and timings. Use short sentences. Return JSON only: {"urdu":"<translation>"}',
+      `Activity: ${input.title}\n\n${input.text.slice(0, 7000)}`,
+      undefined,
+      2200,
+    );
+    const parsed = parseModelJson(content.text) as { urdu?: unknown };
+    const urdu = typeof parsed.urdu === 'string' ? parsed.urdu.trim() : '';
+    if (!urdu) throw new Error('The translation came back empty. Try again.');
+    return {
+      data: { urdu },
+      provider: 'openai',
+      model: content.model,
+      inputTokens: content.inputTokens,
+      outputTokens: content.outputTokens,
+      estimatedCost: this.estimateCost(content.inputTokens, content.outputTokens),
+    };
+  }
 }

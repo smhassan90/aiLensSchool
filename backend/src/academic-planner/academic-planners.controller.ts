@@ -278,6 +278,17 @@ export class AcademicPlannersController {
   }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post(':id/lessons/:lessonKey/activity-urdu')
+  activityUrdu(
+    @CurrentUser() user: AuthUser,
+    @Param('id') plannerId: string,
+    @Param('lessonKey') lessonKey: string,
+    @Body() body: TeachingHelpRequestDto,
+  ) {
+    return this.teachingHelpService.activityUrdu(user, plannerId, lessonKey, body?.versionId);
+  }
+
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post(':id/lessons/:lessonKey/teaching-help/urdu')
   getTeachingHelpUrdu(
     @CurrentUser() user: AuthUser,

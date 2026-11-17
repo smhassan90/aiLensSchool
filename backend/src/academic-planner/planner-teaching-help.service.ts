@@ -311,6 +311,70 @@ export class PlannerTeachingHelpService {
     };
   }
 
+  async activityUrdu(user: AuthUser, plannerId: string, lessonKey: string, versionId?: string) {
+    const schoolId = this.tenant.requireSchoolId(user);
+    const planner = await this.prisma.academicPlanner.findFirst({
+      where: { id: plannerId, schoolId },
+      select: { id: true, teacherId: true, createdById: true, sectionId: true, approvedVersionId: true },
+    });
+    if (!planner) {
+      throw new NotFoundException({ code: 'PLANNER_NOT_FOUND', message: 'Planner not found' });
+    }
+
+    await this.assertTeachingHelpAccess(user, planner);
+    this.usage.assertWithinRateLimit(user.id, schoolId);
+
+    const vid = versionId ?? planner.approvedVersionId;
+    if (!vid) {
+      throw new UnprocessableEntityException({ code: 'NO_APPROVED_VERSION', message: 'No approved version' });
+    }
+
+    const version = await this.prisma.academicPlannerVersion.findFirst({
+      where: { id: vid, plannerId, schoolId },
+      select: { id: true },
+    });
+    if (!version) {
+      throw new NotFoundException({ code: 'PLANNER_VERSION_NOT_FOUND', message: 'Planner version not found' });
+    }
+
+    const lesson = await this.prisma.plannerLesson.findFirst({
+      where: { versionId: vid, lessonKey },
+      select: { title: true, notes: true, kind: true },
+    });
+    if (!lesson) {
+      throw new NotFoundException({ code: 'LESSON_NOT_FOUND', message: 'Lesson not found' });
+    }
+
+    const isActivity = lesson.kind === 'ACTIVITY' || /\bactivity\b/i.test(lesson.title);
+    if (!isActivity) {
+      throw new UnprocessableEntityException({
+        code: 'NOT_AN_ACTIVITY',
+        message: 'Urdu translation is for the activity day.',
+      });
+    }
+
+    const text = lesson.notes?.trim() ?? '';
+    if (!text) {
+      throw new UnprocessableEntityException({
+        code: 'ACTIVITY_EMPTY',
+        message: 'This activity has no text to translate yet.',
+      });
+    }
+
+    try {
+      return await this.helpEngine.translateActivityText({
+        schoolId,
+        userId: user.id,
+        title: lesson.title,
+        text,
+      });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      const message = error instanceof Error ? error.message : 'Could not translate this activity.';
+      throw new ServiceUnavailableException({ code: 'ACTIVITY_URDU_UNAVAILABLE', message });
+    }
+  }
+
   async teachingHelpUrdu(
     user: AuthUser,
     plannerId: string,

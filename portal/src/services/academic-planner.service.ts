@@ -792,6 +792,13 @@ export const academicPlannerService = {
     );
   },
 
+  activityUrdu(plannerId: string, lessonKey: string, body?: { versionId?: string }) {
+    return apiClient<{ urdu: string; cached: boolean }>(
+      `/academic-planners/${plannerId}/lessons/${lessonKey}/activity-urdu`,
+      { method: "POST", body: JSON.stringify(body ?? {}), timeoutMs: 120_000 },
+    );
+  },
+
 
 
   listRecoveryEligible(plannerId: string) {

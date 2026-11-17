@@ -211,6 +211,59 @@ export class TeachingHelpService {
     }
   }
 
+  async translateActivityText(input: {
+    schoolId: string;
+    userId: string;
+    title: string;
+    text: string;
+  }): Promise<{ urdu: string; cached: boolean }> {
+    const hash = createHash('sha256').update(input.text).digest('hex').slice(0, 24);
+    const cacheKey = `activity-urdu:${hash}`;
+    const cached = this.cache.get<string>(cacheKey);
+    if (cached) return { urdu: cached, cached: true };
+
+    const request = await this.prisma.aIRequest.create({
+      data: {
+        schoolId: input.schoolId,
+        userId: input.userId,
+        type: AIRequestType.TEACHING_ASSISTANCE,
+        provider: 'pending',
+        model: 'pending',
+        status: AIRequestStatus.PROCESSING,
+        metadata: { kind: 'activity-urdu', title: input.title.slice(0, 120) },
+      },
+    });
+
+    try {
+      const completion = await this.ai.translateClassroomText({
+        title: input.title,
+        text: input.text,
+      });
+      const urdu = completion.data.urdu.trim();
+      if (!urdu) throw new Error('The translation came back empty. Try again.');
+      this.cache.set(cacheKey, urdu, CACHE_TTL_MS);
+      await this.prisma.aIRequest.update({
+        where: { id: request.id },
+        data: {
+          status: AIRequestStatus.COMPLETED,
+          provider: completion.provider,
+          model: completion.model,
+          inputTokens: completion.inputTokens,
+          outputTokens: completion.outputTokens,
+          estimatedCost: completion.estimatedCost,
+        },
+      });
+      return { urdu, cached: false };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not translate this activity.';
+      await this.prisma.aIRequest.update({
+        where: { id: request.id },
+        data: { status: AIRequestStatus.FAILED, errorMessage: message.slice(0, 500) },
+      });
+      throw error;
+    }
+  }
+
   static contentHash(parts: string[]): string {
     return createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 24);
   }

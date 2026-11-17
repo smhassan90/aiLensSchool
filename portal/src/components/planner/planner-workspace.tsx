@@ -1,31 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLoader } from "@/components/layout/page-loader";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/layout/empty-state";
 import { academicPlannerService } from "@/services/academic-planner.service";
 import { formatStatusLabel } from "@/lib/display-labels";
 import { formatDate } from "@/lib/utils";
-import { toCalendarWeeks, toOutline, toTimeline } from "@/lib/planner-view-model";
 import { PlannerStatusBanner } from "@/components/planner/planner-status-banner";
 import { PlannerApprovalActions } from "@/components/planner/planner-approval-actions";
 import { PlannerRecoveryPanel } from "@/components/planner/planner-recovery-panel";
-import { LessonCard } from "@/components/planner/lesson-card";
-import { PlannerDayLessonCard } from "@/components/planner/planner-day-lesson-card";
+import { PlannerMonthBoard } from "@/components/planner/planner-month-board";
 import { PlannerPrintSheet } from "@/components/planner/planner-print-sheet";
 import { PlannerLessonEditDialog } from "@/components/planner/planner-lesson-edit-dialog";
-import { TeachingHelpScreen, type TeachingHelpLessonContext } from "@/components/planner/teaching-help-screen";
 import type { PlannerLesson } from "@/lib/planner-view-model";
 import { fixDisplayText } from "@/lib/fix-display-text";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/providers/toast-provider";
 import { friendlyApiErrorMessage } from "@/lib/display-labels";
-import { ChapterTeachingPackDebug } from "@/components/planner/chapter-teaching-pack-debug";
 
 type PlannerWorkspaceProps = {
   plannerId: string;
@@ -37,7 +32,6 @@ type PlannerWorkspaceProps = {
 export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: PlannerWorkspaceProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [helpLesson, setHelpLesson] = useState<TeachingHelpLessonContext | null>(null);
   const [editLesson, setEditLesson] = useState<PlannerLesson | null>(null);
   const [moveLesson, setMoveLesson] = useState<PlannerLesson | null>(null);
   const [moveDate, setMoveDate] = useState("");
@@ -47,23 +41,6 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
     queryKey: ["planner-version", plannerId, versionId],
     queryFn: () => academicPlannerService.getVersion(plannerId, versionId),
   });
-
-  const openTeachingHelp = useCallback(
-    (lesson: PlannerLesson) => {
-      const chapter = data?.chapters.find((c) => String(c.chapterKey) === lesson.chapterKey);
-      setHelpLesson({
-        plannerId,
-        versionId,
-        lessonKey: lesson.lessonKey,
-        title: lesson.title,
-        lessonKind: lesson.kind,
-        chapterTitle: chapter ? String(chapter.title) : null,
-        classLabel: data?.planner.classLabel,
-        subjectName: data?.planner.subject.name,
-      });
-    },
-    [data?.chapters, data?.planner, plannerId, versionId],
-  );
 
   const generate = useMutation({
     mutationFn: () =>
@@ -150,9 +127,6 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
     );
   }
 
-  const weeks = toCalendarWeeks(data);
-  const timeline = toTimeline(data);
-  const outline = toOutline(data);
   const dayPlanLessons = [...data.lessons].sort((a, b) => {
     const da = a.dayNumber ?? a.sequence;
     const db = b.dayNumber ?? b.sequence;
@@ -165,10 +139,6 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
     return chapter ? String(chapter.title) : null;
   };
   const plannerTitle = data.planner.title || `${data.planner.classLabel} — ${data.planner.subject.name}`;
-
-  if (helpLesson) {
-    return <TeachingHelpScreen lesson={helpLesson} onBack={() => setHelpLesson(null)} />;
-  }
 
   return (
     <div className="space-y-6">
@@ -234,158 +204,25 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
         </div>
       )}
 
-      <Tabs defaultValue="days">
-        <TabsList>
-          <TabsTrigger value="days">Day by day</TabsTrigger>
-          <TabsTrigger value="calendar">Calendar</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="outline">Outline</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="days" className="space-y-4 pt-4">
-          {dayPlanLessons.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Generate the schedule to see Day 1, Day 2, … with teaching steps and activity days.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {dayPlanLessons.map((lesson) => (
-                <PlannerDayLessonCard
-                  key={lesson.lessonKey}
-                  lesson={lesson}
-                  readOnly={readOnly}
-                  onEdit={readOnly || !data.permissions.canEdit ? undefined : () => setEditLesson(lesson)}
-                  onMove={
-                    readOnly || !data.permissions.canEdit
-                      ? undefined
-                      : () => {
-                          setMoveLesson(lesson);
-                          setMoveDate(lesson.date ?? data.calendar.from);
-                          setMovePeriod(String(lesson.periodNumber ?? 1));
-                        }
-                  }
-                  onTeachingHelp={readOnly ? undefined : () => openTeachingHelp(lesson)}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="calendar" className="space-y-4 pt-4">
-          {weeks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No calendar days in this plan yet.</p>
-          ) : (
-            weeks.map((week) => (
-              <div key={week.weekStart} className="space-y-2">
-                <p className="text-sm font-medium">Week of {formatDate(week.weekStart)}</p>
-                <div className="grid gap-3 md:grid-cols-5">
-                  {week.days.map((day) => (
-                    <div
-                      key={day.date}
-                      className={`rounded-md border p-2 text-xs ${
-                        day.working ? "border-border" : "border-dashed bg-muted/40 opacity-70"
-                      }`}
-                    >
-                      <p className="font-medium">{formatDate(day.date)}</p>
-                      {!day.working && day.reason && (
-                        <p className="text-muted-foreground">{day.reason}</p>
-                      )}
-                      <div className="mt-2 space-y-2">
-                        {day.slots.map((slot) => {
-                          const lesson = data.lessons.find(
-                            (l) => l.date === day.date && l.periodNumber === slot.periodNumber,
-                          );
-                          return (
-                            <div key={slot.periodNumber} className="rounded border border-border/60 p-1">
-                              <p className="text-[10px] text-muted-foreground">
-                                P{slot.periodNumber}
-                                {slot.reserved === "REVISION" ? " · Revision" : ""}
-                              </p>
-                              {lesson ? (
-                                <LessonCard
-                                  lesson={lesson}
-                                  compact
-                                  onTeachingHelp={
-                                    readOnly ? undefined : () => openTeachingHelp(lesson)
-                                  }
-                                />
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </TabsContent>
-
-        <TabsContent value="timeline" className="space-y-4 pt-4">
-          {timeline.scheduled.map((row) => (
-            <div key={row.date}>
-              <p className="mb-2 text-sm font-medium">{formatDate(row.date)}</p>
-              <div className="space-y-2">
-                {row.lessons.map((lesson) => (
-                  <LessonCard
-                    key={lesson.lessonKey}
-                    lesson={lesson}
-                    onTeachingHelp={readOnly ? undefined : () => openTeachingHelp(lesson)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-          {timeline.unscheduled.length > 0 && (
-            <div className="rounded-md border border-dashed p-4">
-              <p className="mb-2 text-sm font-medium">Unscheduled</p>
-              <div className="space-y-2">
-                {timeline.unscheduled.map((lesson) => (
-                  <LessonCard
-                    key={lesson.lessonKey}
-                    lesson={lesson}
-                    onTeachingHelp={readOnly ? undefined : () => openTeachingHelp(lesson)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="outline" className="space-y-4 pt-4">
-          {outline.map((chapter) => (
-            <div key={chapter.chapterKey}>
-              <p className="mb-2 font-medium">{chapter.title}</p>
-              {data.planner.libraryBook?.id && (
-                <ChapterTeachingPackDebug
-                  mode="planner"
-                  plannerId={plannerId}
-                  versionId={versionId}
-                  chapterKey={chapter.chapterKey}
-                  chapterTitle={chapter.title}
-                />
-              )}
-              <div className="mt-2 space-y-2 border-l-2 border-primary/20 pl-3">
-                {chapter.lessons.map((lesson) => (
-                  <LessonCard
-                    key={lesson.lessonKey}
-                    lesson={lesson}
-                    onTeachingHelp={readOnly ? undefined : () => openTeachingHelp(lesson)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-          {outline.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No lessons yet. Run chapter analysis and generate when those actions are available.
-            </p>
-          )}
-        </TabsContent>
-      </Tabs>
+      <PlannerMonthBoard
+        plannerId={plannerId}
+        versionId={versionId}
+        lessons={dayPlanLessons}
+        calendar={data.calendar}
+        chapterTitle={chapterTitle}
+        readOnly={readOnly}
+        canEdit={data.permissions.canEdit}
+        onEdit={readOnly || !data.permissions.canEdit ? undefined : (lesson) => setEditLesson(lesson)}
+        onMove={
+          readOnly || !data.permissions.canEdit
+            ? undefined
+            : (lesson) => {
+                setMoveLesson(lesson);
+                setMoveDate(lesson.date ?? data.calendar.from);
+                setMovePeriod(String(lesson.periodNumber ?? 1));
+              }
+        }
+      />
 
       <PlannerLessonEditDialog
         open={Boolean(editLesson)}

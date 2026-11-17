@@ -991,6 +991,26 @@ export class CursorProvider implements AiProvider {
     return { data: parsed, ...content.meta };
   }
 
+  async translateClassroomText(
+    input: Parameters<AiProvider['translateClassroomText']>[0],
+  ): Promise<AiCompletionResult<{ urdu: string }>> {
+    if (!this.apiKey) {
+      throw new Error('Urdu translation is not available yet. Ask the school administrator to enable it.');
+    }
+    const content = await this.withTimeout(
+      this.complete(
+        'Translate this classroom activity into simple Urdu a Pakistani school teacher can read aloud. Keep student names, section titles, numbers, and timings. Use short sentences. Return JSON only: {"urdu":"<translation>"}',
+        `Activity: ${input.title}\n\n${input.text.slice(0, 7000)}`,
+      ),
+      this.jsonTimeoutMs,
+      'Activity Urdu',
+    );
+    const parsed = parseModelJson(content.text) as { urdu?: unknown };
+    const urdu = typeof parsed.urdu === 'string' ? parsed.urdu.trim() : '';
+    if (!urdu) throw new Error('The translation came back empty. Try again.');
+    return { data: { urdu }, ...content.meta };
+  }
+
   private extractJson(text: string): string {
     const trimmed = text.trim();
     const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(trimmed);

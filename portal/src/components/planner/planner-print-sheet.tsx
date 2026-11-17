@@ -1,5 +1,5 @@
 import { fixDisplayText } from "@/lib/fix-display-text";
-import { activityConductText, shortTodayLine } from "@/lib/planner-day-line";
+import { plannerDaySummary, plannerDayWord } from "@/lib/planner-day-kind";
 import type { PlannerLesson } from "@/lib/planner-view-model";
 import { formatDate } from "@/lib/utils";
 
@@ -19,14 +19,16 @@ export function PlannerPrintSheet({ title, subtitle, lessons, chapterTitle }: Pl
         {lessons.map((lesson, index) => {
           const day = lesson.dayNumber ?? index + 1;
           const chapter = chapterTitle(lesson.chapterKey);
-          const task = shortTodayLine(lesson);
-          const conduct = lesson.teacherNotes?.trim() || activityConductText(lesson);
+          const word = plannerDayWord(lesson);
+          const summary = plannerDaySummary(lesson, chapter);
+          const conduct = word === "Activity" ? lesson.teacherNotes?.trim() : "";
           return (
             <li key={lesson.lessonKey} className="text-sm leading-relaxed">
               <span className="font-semibold">Day {day}</span>
               {lesson.date ? ` (${formatDate(lesson.date)})` : ""}
               {chapter ? ` — ${fixDisplayText(chapter)}` : ""}
-              {` — ${fixDisplayText(task)}`}
+              {` — ${word}`}
+              {summary && <span className="mt-1 block">{fixDisplayText(summary)}</span>}
               {conduct && (
                 <span className="mt-1 block whitespace-pre-line">{fixDisplayText(conduct)}</span>
               )}
