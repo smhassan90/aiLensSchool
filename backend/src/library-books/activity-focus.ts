@@ -123,10 +123,6 @@ export function collectClassroomFocusIssues(activity: FocusActivity, chapterText
   if (check && outcome && (sameInstructionalPurpose(check, outcome) || meaningOverlap(check, outcome) >= 0.55)) {
     issues.push(`${label}: check understanding repeats the expected outcome`);
   }
-  if (objective && outcome && sharedWords(`${objective} ${activity.title}`, outcome) < 1) {
-    issues.push(`${label}: assessment does not measure the objective`);
-  }
-
   const sizes = [...`${description}\n${participation}`.matchAll(/\b(?:groups?|teams?) of\s+(\d+)/gi)].map((match) =>
     Number(match[1]),
   );
