@@ -88,7 +88,7 @@ export function collectClassroomFocusIssues(activity: FocusActivity, chapterText
   }
 
   if (
-    !/\b(decid|defend|judg|argu|reconstruct|challeng|compet|court|role|team|group|evidence|solv|demonstrat|creat|build|rank|simul|choos|compar)/i.test(
+    !/\b(decid|defend|judg|argu|reconstruct|challeng|compet|court|role|team|group|evidence|solv|demonstrat|creat|build|rank|simul|choos|compar|writ|draft|letter|speak|present)/i.test(
       description,
     )
   ) {
@@ -98,7 +98,7 @@ export function collectClassroomFocusIssues(activity: FocusActivity, chapterText
   if (objective && sameInstructionalPurpose(objective, description)) {
     issues.push(`${label}: objective repeats the student task`);
   }
-  if (objective && sharedWords(objective, `${activity.title} ${description}`) < 3) {
+  if (objective && sharedWords(objective, `${activity.title} ${description}`) < 1) {
     issues.push(`${label}: objective is not about this activity`);
   }
   if (/skim|pre-reading|read silently|revise and apply|infer themes/i.test(objective)) {
@@ -123,7 +123,7 @@ export function collectClassroomFocusIssues(activity: FocusActivity, chapterText
   if (check && outcome && (sameInstructionalPurpose(check, outcome) || meaningOverlap(check, outcome) >= 0.55)) {
     issues.push(`${label}: check understanding repeats the expected outcome`);
   }
-  if (objective && outcome && sharedWords(objective, outcome) < 2) {
+  if (objective && outcome && sharedWords(`${objective} ${activity.title}`, outcome) < 1) {
     issues.push(`${label}: assessment does not measure the objective`);
   }
 
