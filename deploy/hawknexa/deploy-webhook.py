@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -19,6 +20,10 @@ LOG_FILE = "/tmp/hawknexa-deploy.log"
 STATUS_FILE = f"{DEPLOY_DIR}/.last-deploy.json"
 PENDING_TARGETS_FILE = f"{DEPLOY_DIR}/.pending-deploy-targets"
 DEPLOY_CONTAINER = "hawknexa-deploy-run"
+# This image is built from Dockerfile.deploy-webhook and already contains
+# bash, git, curl, rsync, python3, and the Docker CLI. A deploy must not
+# download those packages on every run.
+RUNNER_IMAGE = os.environ.get("DEPLOY_RUNNER_IMAGE", "hawknexa-deploy-webhook")
 
 
 def utc_now() -> str:
@@ -84,6 +89,36 @@ def deploy_running() -> bool:
     return inspect.returncode == 0 and inspect.stdout.strip() == "true"
 
 
+def runner_command() -> list[str]:
+    """Use the webhook image. Fall back to docker:27-cli only if that image is missing."""
+    probe = subprocess.run(
+        ["docker", "image", "inspect", RUNNER_IMAGE],
+        capture_output=True,
+        text=True,
+    )
+    if probe.returncode == 0:
+        return [RUNNER_IMAGE, "bash", DEPLOY_SCRIPT]
+    return [
+        "docker:27-cli",
+        "sh",
+        "-lc",
+        "apk add --no-cache bash git curl rsync python3 >/dev/null " f"&& bash {DEPLOY_SCRIPT}",
+    ]
+
+
+def watch_deploy(proc: subprocess.Popen, started_at: str) -> None:
+    code = proc.wait()
+    if code == 0 or read_status().get("status") == "success":
+        return
+    write_status(
+        {
+            "status": "failed",
+            "startedAt": started_at,
+            "message": f"Deploy runner exited {code}",
+        }
+    )
+
+
 def start_deploy(deploy_targets: str = "") -> subprocess.Popen:
     """Run deploy.sh in a separate container so restarting deploy-webhook does not kill it."""
     subprocess.run(
@@ -92,10 +127,11 @@ def start_deploy(deploy_targets: str = "") -> subprocess.Popen:
         text=True,
     )
 
-    write_status({"status": "running", "startedAt": utc_now()})
+    started_at = utc_now()
+    write_status({"status": "running", "startedAt": started_at})
 
     log = open(LOG_FILE, "a", encoding="utf-8")
-    log.write(f"\n=== Deploy triggered at {utc_now()} ===\n")
+    log.write(f"\n=== Deploy triggered at {started_at} ===\n")
     log.flush()
 
     env_file = f"{DEPLOY_DIR}/.env"
@@ -119,21 +155,17 @@ def start_deploy(deploy_targets: str = "") -> subprocess.Popen:
         "SKIP_WEBHOOK_RESTART=true",
         "-w",
         DEPLOY_DIR,
-        "docker:27-cli",
-        "sh",
-        "-lc",
-        (
-            "apk add --no-cache bash git curl rsync python3 >/dev/null "
-            f"&& bash {DEPLOY_SCRIPT}"
-        ),
+        *runner_command(),
     ]
 
-    return subprocess.Popen(
+    proc = subprocess.Popen(
         cmd,
         stdout=log,
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
+    threading.Thread(target=watch_deploy, args=(proc, started_at), daemon=True).start()
+    return proc
 
 
 class DeployHandler(BaseHTTPRequestHandler):

@@ -90,6 +90,7 @@ services:
       - hawknexa_internal
 
   deploy-webhook:
+    image: hawknexa-deploy-webhook
     build:
       context: .
       dockerfile: Dockerfile.deploy-webhook

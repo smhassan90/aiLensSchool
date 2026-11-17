@@ -164,6 +164,14 @@ else
   echo "Skipping docker build"
 fi
 
+# The webhook image already contains bash, git, curl, rsync, and python3.
+# Rebuild it when those sources change so the next deploy does not apk-install them.
+if echo "${CHANGED}" | grep -qE '^deploy/hawknexa/(deploy-webhook\.py|Dockerfile\.deploy-webhook|docker-compose\.prod\.yml)$'; then
+  echo "=== Refresh deploy webhook ==="
+  docker compose -f "${COMPOSE_FILE}" build deploy-webhook
+  docker compose -f "${COMPOSE_FILE}" up -d --no-deps deploy-webhook
+fi
+
 compose_up() {
   local attempt="$1"
   echo "=== Start app containers (attempt ${attempt}) ==="
