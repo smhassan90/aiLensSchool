@@ -11,6 +11,7 @@ import { HomeworkGenerationService } from './services/homework-generation.servic
 import { StudentAnalysisService } from './services/student-analysis.service';
 import { PlannerChapterAnalysisService } from './services/planner-chapter-analysis.service';
 import { TeachingHelpService } from './services/teaching-help.service';
+import { AiHealthService } from './ai-health.service';
 
 @Module({
   providers: [
@@ -54,6 +55,7 @@ import { TeachingHelpService } from './services/teaching-help.service';
     StudentAnalysisService,
     PlannerChapterAnalysisService,
     TeachingHelpService,
+    AiHealthService,
   ],
   exports: [
     AI_PROVIDER,
@@ -65,6 +67,7 @@ import { TeachingHelpService } from './services/teaching-help.service';
     StudentAnalysisService,
     PlannerChapterAnalysisService,
     TeachingHelpService,
+    AiHealthService,
   ],
 })
 export class AiModule {}
