@@ -10,6 +10,7 @@ import {
   CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
 } from '../ai/prompts';
 import { buildTeachingPackHeader } from './class-age-hint';
+import { activitiesRepeatEachOther, collectClassroomFocusIssues } from './activity-focus';
 import { assertActivityQuality } from './activity-quality';
 import { groundTeachingPack } from './chapter-teaching-pack.ground';
 import {
@@ -132,7 +133,7 @@ async function requestChapterActivities(
   const pack = ChapterTeachingPackSchema.parse({ ...draft, activities });
   const grounded = groundTeachingPack(pack, compiled);
   assertActivityQuality(grounded.activities, compiled);
-  assertConductableActivities(grounded.activities);
+  assertConductableActivities(grounded.activities, compiled);
   return {
     pack: grounded,
     sectionPlans: plans,
@@ -143,21 +144,25 @@ async function requestChapterActivities(
   };
 }
 
-function assertConductableActivities(activities: ChapterTeachingPackOutput['activities']): void {
+function assertConductableActivities(
+  activities: ChapterTeachingPackOutput['activities'],
+  chapterText: string,
+): void {
   const first = activities[0];
   if (!first) throw new Error('No classroom activity was returned');
   const material = `${first.description}\n${first.steps.join('\n')}`;
   if (first.description.trim().length < 450) {
     throw new Error('Activity 1 does not contain the case, questions, or examples the teacher needs');
   }
-  if (!/\b(example|case|role|question|argument|scenario|fictional|sentence)\b/i.test(first.description)) {
-    throw new Error('Activity 1 does not include the material needed to run it');
-  }
   if (/introduction and instructions|each student produces an individual result|check each book or voice/i.test(material)) {
     throw new Error('Activity 1 still uses a fixed activity template');
   }
   const titles = activities.map((activity) => activity.title.trim().toLowerCase());
   if (new Set(titles).size < titles.length) throw new Error('The activities repeat one title');
+  const focus = activities.flatMap((activity) => collectClassroomFocusIssues(activity, chapterText));
+  const repeated = activitiesRepeatEachOther(activities);
+  if (repeated) focus.push(repeated);
+  if (focus.length) throw new Error(focus.slice(0, 8).join('; '));
 }
 
 function acceptPack(

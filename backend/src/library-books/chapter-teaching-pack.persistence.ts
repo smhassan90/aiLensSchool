@@ -1,5 +1,6 @@
 import { PlannerAnalysisSource, Prisma, PrismaClient } from '@prisma/client';
 import { assertActivityQuality } from './activity-quality';
+import { storedExpectedOutcome } from './activity-focus';
 import { assertPersistableActivities } from './chapter-teaching-pack.ground';
 import type { ChapterTeachingPackOutput } from './schemas/chapter-teaching-pack.schema';
 import { wrapTeacherGuide, type SectionPlan } from '../academic-planner/section-teaching-plan';
@@ -71,7 +72,7 @@ export async function upsertChapterTeachingPack(
             materials: a.materials ?? null,
             learningObjective: a.learningObjective,
             teacherSteps: a.steps as Prisma.InputJsonValue,
-            expectedOutcome: a.expectedOutcome,
+            expectedOutcome: storedExpectedOutcome(a),
             durationMinutes: a.durationMinutes,
           })),
         },

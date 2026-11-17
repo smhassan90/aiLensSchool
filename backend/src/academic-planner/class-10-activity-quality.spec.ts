@@ -218,7 +218,8 @@ describe('Class 10 English activity quality', () => {
         '(16 min) Move among the groups. Ask a silent student for their written argument.',
         '(10 min) The judges give a decision and say which chapter event it resembles.',
       ],
-      expectedOutcome: 'Each student has one written argument, and the judges name the horse test from the story.',
+      expectedOutcome:
+        'Each student has one written argument, and the judges name the horse test from the story.\n\nTeacher looks for: The argument uses what the horse did, and the judgement names the Caliph test.',
       durationMinutes: 40,
     };
     const notes = formatSavedActivityNotes(courtroom, 'Unit 1', [], 40);
@@ -231,8 +232,15 @@ describe('Class 10 English activity quality', () => {
     expect(notes).not.toContain('Main activity');
     expect(notes).not.toContain('Every student produces an individual result');
     expect(notes).not.toContain('You need:');
-    const blocks = [...notes.matchAll(/- (.+): (\d+) minutes\./g)].map((match) => Number(match[2]));
-    expect(blocks.reduce((sum, minutes) => sum + minutes, 0)).toBe(40);
+    expect(notes).not.toMatch(/- .+: \d+ minutes\./);
+    expect(notes.match(/What the teacher does:/g)?.length).toBe(1);
+    expect(notes).toContain('Check understanding:');
+    expect(notes).toContain('Expected outcome:');
+    expect(notes.indexOf('Check understanding:')).toBeLessThan(notes.indexOf('Expected outcome:'));
+    const outcome = 'Each student has one written argument, and the judges name the horse test from the story.';
+    expect(notes.split(outcome).length - 1).toBe(1);
+    const blocks = [...notes.matchAll(/\((\d+) min\)/g)].map((match) => Number(match[1]));
+    expect(blocks).toEqual([6, 8, 16, 10]);
     const selected = selectSavedActivity({
       activities: [genericRecap('Unit 1'), courtroom, unit5[4]!],
       coveredSliceKeys: ['s1', 's4'],

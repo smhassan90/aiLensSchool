@@ -1,3 +1,4 @@
+import { splitStoredOutcome } from '../library-books/activity-focus';
 import { isGenericSectionSummary } from '../library-books/activity-quality';
 import { teacherGuideBullets } from './section-teaching-plan';
 
@@ -90,7 +91,11 @@ export function formatSavedActivityNotes(
   const objective = activity.learningObjective?.trim() || activity.title;
   const materials = activity.materials?.trim();
   const participation = activity.participationTechnique.trim();
-  const outcome = activity.expectedOutcome?.trim() || `Students show the idea of ${activity.title} in their own work.`;
+  const stored = splitStoredOutcome(
+    activity.expectedOutcome?.trim() || `Students show the idea of ${activity.title} in their own work.`,
+  );
+  const outcome = stored.outcome;
+  const check = stored.check;
   const others = alternatives.filter((item) => item.title !== activity.title && !isGenericSectionSummary(item));
   const lines = [
     activity.title,
@@ -99,7 +104,6 @@ export function formatSavedActivityNotes(
     `Learning objective: ${objective}`,
     ...(materials && !/^none$/i.test(materials) ? [`You need: ${materials}`] : []),
     `Duration: ${minutes} minutes`,
-    ...steps.map((step) => `- ${step.text}: ${step.minutes} minutes.`),
     '',
     'What students do:',
     activity.description.trim(),
@@ -111,9 +115,8 @@ export function formatSavedActivityNotes(
     '',
     'How every student participates:',
     participation,
+    ...(check ? ['', 'Check understanding:', check] : []),
     '',
-    'Check understanding:',
-    outcome,
     `Expected outcome: ${outcome}`,
     ...(others.length
       ? ['', 'Other saved activities for this chapter:', ...others.map((item) => `- ${item.title}`)]

@@ -39,6 +39,7 @@ export const ChapterTeachingPackSchema = z.object({
         steps: z.array(z.string().min(5).max(900)).min(2).max(8),
         participationTechnique: z.string().min(10).max(1500),
         expectedOutcome: z.string().min(10).max(800),
+        checkUnderstanding: z.string().min(10).max(500).optional(),
         durationMinutes: z.number().int().min(5).max(40),
       }),
     )
@@ -145,6 +146,10 @@ export function coerceChapterTeachingPack(raw: unknown): unknown {
               ? 'None'
               : truncStr(a.materials, 300, 2),
           expectedOutcome: a.expectedOutcome == null ? a.expectedOutcome : truncStr(a.expectedOutcome, 800, 10),
+          checkUnderstanding:
+            a.checkUnderstanding == null || String(a.checkUnderstanding).trim() === ''
+              ? undefined
+              : truncStr(a.checkUnderstanding, 500, 10),
           steps: Array.isArray(a.steps) ? truncStrings(a.steps.slice(0, 8), 900, 5) : a.steps,
           durationMinutes: duration,
         };
