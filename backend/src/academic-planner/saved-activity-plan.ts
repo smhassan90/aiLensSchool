@@ -1,4 +1,8 @@
-import { collectActivityCardIssues, splitStoredOutcome } from '../library-books/activity-focus';
+import {
+  activityMismatchesSkill,
+  collectActivityCardIssues,
+  splitStoredOutcome,
+} from '../library-books/activity-focus';
 import { isGenericSectionSummary } from '../library-books/activity-quality';
 import { teacherGuideBullets } from './section-teaching-plan';
 
@@ -33,6 +37,7 @@ export function isPreparedClassroomActivity(activity: SavedActivity): boolean {
   if (/complete the task printed in|write your own answer|correct the language exercise|collect points with wh-questions/i.test(blob)) {
     return false;
   }
+  if (/students can use what\b/i.test(activity.learningObjective ?? '')) return false;
   return collectActivityCardIssues({ ...activity, steps: storedSteps(activity) }).length === 0;
 }
 
@@ -46,6 +51,7 @@ export function selectSavedActivity(input: {
   coveredSliceKeys: string[];
   usedTitles: string[];
   preferRecap: boolean;
+  preferredSliceKeys?: string[];
 }): SavedActivity | null {
   const used = new Set(input.usedTitles.map((title) => title.trim().toLowerCase()));
   const unused = input.activities.filter((activity) => !used.has(activity.title.trim().toLowerCase()));
@@ -59,9 +65,57 @@ export function selectSavedActivity(input: {
     return unused.find((activity) => isRecap(activity) && studied(activity)) ?? null;
   }
   void input.preferRecap;
-  const prepared = specific.find((activity) => isPreparedClassroomActivity(activity));
-  if (prepared) return prepared;
+  const preferred = new Set(input.preferredSliceKeys ?? []);
+  const prepared = specific.filter((activity) => isPreparedClassroomActivity(activity));
+  const onMain = prepared.find((activity) => activity.sliceKey != null && preferred.has(activity.sliceKey));
+  if (onMain) return onMain;
+  if (prepared[0]) return prepared[0];
   return specific[0] ?? null;
+}
+
+/**
+ * Notes for an Activity day. A prepared chapter activity is used.
+ * A failed activity becomes a short missing-activity note, never a leftover exercise.
+ */
+export function activityDayNotes(input: {
+  chapterTitle: string;
+  activities: SavedActivity[];
+  preferredSliceKeys?: string[];
+  periodMinutes?: number;
+  chapterText?: string;
+  missingReason?: string;
+}): { notes: string; title: string; objective: string } {
+  const sliceKeys = input.activities
+    .map((activity) => activity.sliceKey)
+    .filter((key): key is string => Boolean(key));
+  const covered = [...new Set([...sliceKeys, ...(input.preferredSliceKeys ?? [])])];
+  const ranked = (covered.length
+    ? input.activities.filter((activity) => activity.sliceKey == null || covered.includes(activity.sliceKey))
+    : input.activities
+  ).filter((activity) => !isGenericSectionSummary(activity) && !isRecap(activity));
+  const usable = (activity: SavedActivity) =>
+    isPreparedClassroomActivity(activity) && !activityMismatchesSkill(activity, input.chapterText);
+  const preferredReady = ranked.find(
+    (activity) => activity.sliceKey != null && (input.preferredSliceKeys ?? []).includes(activity.sliceKey) && usable(activity),
+  );
+  const selected = preferredReady ?? ranked.find(usable) ?? null;
+  if (selected) {
+    return {
+      notes: formatSavedActivityNotes(selected, input.chapterTitle, input.activities, input.periodMinutes ?? 40),
+      title: selected.title,
+      objective: selected.learningObjective?.trim() || selected.title,
+    };
+  }
+  return {
+    notes: formatUnavailableChapterNotes(
+      input.chapterTitle,
+      input.missingReason ??
+        'The chapter activity is missing or not ready to teach. Teach the chapter’s main application from the textbook in one task. Do not invent a generic game.',
+      'ACTIVITY',
+    ),
+    title: 'Chapter activity',
+    objective: `Apply the main idea of ${input.chapterTitle}.`,
+  };
 }
 
 function fittedSteps(steps: string[], total: number): Array<{ minutes: number; text: string }> {
@@ -110,9 +164,7 @@ export function formatSavedActivityNotes(
     ...(steps.length
       ? steps.map((step, index) => `${index + 1}. (${step.minutes} min) ${step.text}`)
       : ['1. Use the student task below. Do not replace it with a different activity.']),
-    '',
-    'How every student participates:',
-    participation,
+    ...(participation ? ['', 'How every student participates:', participation] : []),
     ...(check ? ['', 'Check understanding:', check] : []),
     '',
     `Expected outcome: ${outcome}`,
@@ -127,14 +179,17 @@ export function formatUnavailableChapterNotes(chapterTitle: string, reason: stri
   const activity = role === 'ACTIVITY';
   return [
     activity
-      ? `FALLBACK — no saved activity for ${chapterTitle}`
+      ? `The chapter activity for ${chapterTitle} is not ready to teach.`
       : `Teaching pack unavailable for ${chapterTitle}`,
     reason,
     '',
-    `What you do: Teach the next printed section of ${chapterTitle} from the textbook.`,
-    'What students do: Read that section and answer one question printed in the book.',
-    'Check understanding: Ask two students to point to the sentence they used.',
-    activity ? `This fallback is only for ${chapterTitle}. Do not replace it with a generic game.` : '',
+    activity
+      ? `What you do: Teach one application of ${chapterTitle} from the textbook. Do not invent a generic game.`
+      : `What you do: Teach the next printed section of ${chapterTitle} from the textbook.`,
+    activity
+      ? 'What students do: Complete that one application in the textbook. Do not switch to a different exercise.'
+      : 'What students do: Read that section and answer one question printed in the book.',
+    'Check understanding: Accept only an answer the textbook supports.',
   ]
     .filter(Boolean)
     .join('\n');

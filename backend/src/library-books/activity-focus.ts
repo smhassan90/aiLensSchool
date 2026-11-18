@@ -82,11 +82,27 @@ function namedRoleCount(text: string): number | null {
 
 const RESTAGE =
   /\breplay the\b|\breconstruction of\b|\bact out the court\b|\bact out the textbook\b|\breconstruct the\b|\bstopping before\b/i;
-const HARD_CARD_WORD =
-  /\b(prudence|prudent|reconstruction|testimony|moderated|injudicious|mitigat\w*)\b/i;
 const EXTRA_TASK = /\bwrite a motto\b|\bcollect slips\b|\bread tomorrow\b|\b1\s*[-–to]+\s*9\b/i;
-const EXAMPLE_ANSWER = /\bexample\s+(answer|argument|verdict|question|decision)\b|\bexample\s*:/i;
-const STUDENT_ACTION = /\b(decid\w*|defend\w*|advis\w*|keep|limit|stop|writ\w*|perform\w*|judg\w*)\b/i;
+const EXAMPLE_ANSWER =
+  /\bexample\s+(answer|argument|verdict|question|decision|working)\b|\bworked example\b|\bexample\s*:/i;
+const STUDENT_ACTION =
+  /\b(decid\w*|defend\w*|advis\w*|keep|limit|stop|writ\w*|perform\w*|judg\w*|solv\w*|calculat\w*|measur\w*|classif\w*|predict\w*|construct\w*|experiment\w*|locat\w*|build\w*|draw\w*|compar\w*|count\w*|observ\w*|test\w*)\b/i;
+const BROKEN_PHRASE = /\bkeep moderated\b|…|\.{3}/i;
+const LECTURE_STAMP = /\bteacher explanation\b|\bguided practice\b|\bstudent practice\b|\bintroduction and instructions\b/i;
+
+/** A skill chapter asks students to calculate or measure. A court or a vote with no numbers is the wrong job. */
+export function activityMismatchesSkill(activity: FocusActivity, chapterText?: string): boolean {
+  const chapter = chapterText ?? '';
+  const skillChapter =
+    /\b(calculate|equation|formula|perimeter|missing length|solve for)\b/i.test(chapter) &&
+    (chapter.match(/\d/g)?.length ?? 0) >= 3;
+  if (!skillChapter) return false;
+  const description = activity.description ?? '';
+  const voteOrCourt = /\b(courtroom|verdict|\bcourt\b|keep,\s*limit,\s*or\s*stop|keep \/ limit \/ stop)\b/i.test(
+    description,
+  );
+  return voteOrCourt && !/\d/.test(description);
+}
 
 /** A card a teacher can run: one finished case, not a padded chapter summary. */
 export function collectActivityCardIssues(activity: FocusActivity): string[] {
@@ -100,8 +116,11 @@ export function collectActivityCardIssues(activity: FocusActivity): string[] {
   if (length < 180 || length > 900) {
     issues.push(`${label}: description must be a short complete case, about 180 to 900 characters`);
   }
+  if (!activity.participationTechnique?.trim()) {
+    issues.push(`${label}: say how every student takes part`);
+  }
   if (!STUDENT_ACTION.test(description)) {
-    issues.push(`${label}: students are not asked to decide, defend, advise, or write`);
+    issues.push(`${label}: students are not asked to decide, solve, measure, write, or perform`);
   }
   if (!EXAMPLE_ANSWER.test(description)) {
     issues.push(`${label}: missing an example answer`);
@@ -112,7 +131,7 @@ export function collectActivityCardIssues(activity: FocusActivity): string[] {
   if (RESTAGE.test(card)) {
     issues.push(`${label}: do not replay or reconstruct the textbook scene`);
   }
-  if (HARD_CARD_WORD.test(`${activity.title}\n${description}`) || /\bkeep moderated\b/i.test(description)) {
+  if (BROKEN_PHRASE.test(description) || LECTURE_STAMP.test(steps.join('\n'))) {
     issues.push(`${label}: use simple classroom words and finish every sentence`);
   }
   if (!/[.!?]/.test(description.slice(-80)) || !/[.!?]"?\s*$/.test(description)) {
@@ -143,6 +162,9 @@ export function collectClassroomFocusIssues(activity: FocusActivity, chapterText
   const teacherText = steps.join('\n');
 
   issues.push(...collectActivityCardIssues(activity));
+  if (activityMismatchesSkill(activity, chapterText)) {
+    issues.push(`${label}: students must do the skill from this chapter, not a court or a vote`);
+  }
 
   const parts = description.match(/\b(?:Part|Task)\s+(?:[A-E]|[1-5])\b/gi) ?? [];
   if (new Set(parts.map((part) => part.toLowerCase())).size >= 3) {

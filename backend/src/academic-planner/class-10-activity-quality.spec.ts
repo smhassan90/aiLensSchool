@@ -1,10 +1,11 @@
 import {
+  activityDayNotes,
   formatSavedActivityNotes,
   isPreparedClassroomActivity,
   selectSavedActivity,
   type SavedActivity,
 } from './saved-activity-plan';
-import { collectActivityCardIssues } from '../library-books/activity-focus';
+import { collectActivityCardIssues, collectClassroomFocusIssues } from '../library-books/activity-focus';
 import { assertActivityQuality, collectActivityIssues, periodBreakdown } from '../library-books/activity-quality';
 
 const participation = (line: string, correction: string) =>
@@ -368,6 +369,67 @@ describe('Class 10 English activity quality', () => {
     expect(recap.description.length).toBeLessThanOrEqual(900);
     expect(isPreparedClassroomActivity(recap)).toBe(false);
     expect(collectActivityCardIssues(withSteps(recap)).join(' ')).toMatch(/example answer/);
+  });
+
+  it('accepts a skill problem and rejects a court with no numbers for that chapter', () => {
+    const skill = runnable(
+      'Solve the missing length',
+      'Solve the missing length of a garden bed. The long side is 8 cm and the short side is 3 cm. Each student works alone. What is the perimeter? What is the area? Example answer: the perimeter is 22 cm because 8 + 3 + 8 + 3 = 22, and the area is 24 square cm.',
+      'Each student calculates the perimeter and the area, then writes both answers.',
+    );
+    expect(skill.description.length).toBeGreaterThanOrEqual(180);
+    expect(skill.description.length).toBeLessThan(450);
+    expect(isPreparedClassroomActivity(skill)).toBe(true);
+
+    const court = runnable(
+      'Hold a courtroom',
+      'Fictional scenario, inspired by this chapter. A courtroom hears a new dispute. Groups of four. Roles: judge, clerk, witness, guard. Should the class keep, limit, or stop the old rule? Example answer: the judge keeps the old rule because the witness agrees.',
+    );
+    const mathsChapter = 'Calculate the perimeter with the formula P = 2(l + w). Solve for the missing length. The sides are 4 cm and 6 cm.';
+    expect(isPreparedClassroomActivity(court)).toBe(true);
+    expect(collectClassroomFocusIssues(withSteps(court), mathsChapter).join(' ')).toMatch(/skill from this chapter/);
+  });
+
+  it('rejects an empty participation line', () => {
+    const silent = runnable(
+      'Solve the missing length',
+      'Solve the missing length of a garden bed. The long side is 8 cm and the short side is 3 cm. Each student works alone. What is the perimeter? What is the area? Example answer: the perimeter is 22 cm because 8 + 3 + 8 + 3 = 22, and the area is 24 square cm.',
+      '',
+    );
+    expect(isPreparedClassroomActivity(silent)).toBe(false);
+    expect(collectActivityCardIssues(withSteps(silent)).join(' ')).toMatch(/takes part/);
+  });
+
+  it('uses a prepared chapter activity on the activity day and a missing note when none is ready', () => {
+    const skill = runnable(
+      'Solve the missing length',
+      'Solve the missing length of a garden bed. The long side is 8 cm and the short side is 3 cm. Each student works alone. What is the perimeter? What is the area? Example answer: the perimeter is 22 cm because 8 + 3 + 8 + 3 = 22, and the area is 24 square cm.',
+      'Each student calculates the perimeter and the area, then writes both answers.',
+    );
+    const ready = activityDayNotes({
+      chapterTitle: 'Perimeter',
+      activities: [skill],
+      preferredSliceKeys: ['s1'],
+    });
+    expect(ready.title).toBe('Solve the missing length');
+    expect(ready.notes).toContain('8 cm');
+    expect(ready.notes).not.toContain('Introduction: 5 minutes');
+    expect(ready.notes).not.toContain('Students can use what');
+
+    const missing = activityDayNotes({
+      chapterTitle: 'Perimeter',
+      activities: [
+        runnable(
+          'Write your own paragraph',
+          'Write your own answer. Exercise 2 Read the following sentences and write cause and effect. As he fell fro',
+        ),
+      ],
+    });
+    expect(missing.notes).toMatch(/not ready to teach/);
+    expect(missing.notes).toMatch(/Do not invent a generic game/);
+    expect(missing.notes).not.toContain('Introduction: 5 minutes');
+    expect(missing.notes).not.toContain('Write your own paragraph');
+    expect(missing.notes).not.toMatch(/\w{3}…/);
   });
 
   it('builds a 40-minute breakdown that adds up', () => {

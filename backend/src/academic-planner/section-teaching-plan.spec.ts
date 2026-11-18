@@ -80,28 +80,28 @@ describe('Unit 1 section teaching plans', () => {
     expect(writing).toMatch(/paragraph/i);
     expect(study).toMatch(/Wh-question/i);
     expect(fun).toMatch(/groups of five/i);
-    expect(fun).toMatch(/English/);
+    expect(fun).toMatch(/language/i);
 
     for (const notes of [reading, oral, language, writing, study, fun]) {
       expect(validateDisplayedLesson(notes, 40)).toEqual([]);
     }
   });
 
-  it('uses a printed exercise for the activity instead of a horse debate', () => {
+  it('keeps a printed exercise on a practice day and does not turn the activity day into that exercise', () => {
     const days = allocateSectionDays(16, plans);
-    const oralPractice = days.find((day) => day.section.skill === 'ORAL' && day.exercise?.number === '2');
+    const oralPractice = days.find((day) => day.section.skill === 'ORAL' && day.mode === 'practice');
+    expect(oralPractice?.exercise?.instruction).toMatch(/Amina/);
     const oralNotes = renderAssignedLesson(oralPractice!, 40).notes;
     expect(oralNotes).toMatch(/Amina/);
-    expect(oralNotes).toMatch(/three sequences|Mariam/);
+    expect(oralNotes).not.toMatch(/\w{3}…/);
     const activity = days.find((day) => day.mode === 'activity');
-    expect(activity?.section.skill).toBe('WRITING');
+    expect(activity).toBeTruthy();
     const lesson = renderAssignedLesson(activity!, 40);
-    expect(lesson.notes).toMatch(/paragraph/);
-    expect(lesson.notes).not.toMatch(/half the class/i);
-    expect(lesson.notes).not.toMatch(/rich man/i);
-    const teacher = lesson.notes.split('What the teacher does:')[1]?.split('What students do:')[0] ?? '';
-    const students = lesson.notes.split('What students do:\n')[1]?.split('\n\n')[0] ?? '';
-    expect(teacher.trim().toLowerCase()).not.toBe(students.trim().toLowerCase());
+    expect(lesson.kind).toBe('ACTIVITY');
+    expect(lesson.notes).not.toMatch(/Introduction: 5 minutes/);
+    expect(lesson.notes).not.toMatch(/Students can use what/);
+    expect(lesson.notes).not.toMatch(/Write your own paragraph/);
+    expect(lesson.notes).not.toMatch(/\w{3}…/);
     expect(validateDisplayedLesson(lesson.notes, 40)).toEqual([]);
   });
 
@@ -239,7 +239,7 @@ describe('Unit 1 section teaching plans', () => {
     ).toContain('group work contradicts individual work');
     expect(
       validateDisplayedLesson(
-        'Learning objective: Students can express agreement.\n(40 min) Check.\nCheck understanding:\nAsk who got the horse.',
+        'Learning objective: Students can finish Exercise 1.\n(40 min) Check.\nCheck understanding:\nCheck the class against Exercise 2.',
         40,
       ),
     ).toContain('assessment does not match the learning objective');

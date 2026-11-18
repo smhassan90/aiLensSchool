@@ -17,9 +17,9 @@ import {
 } from './day-plan-teacher-script';
 import {
   exerciseLessonNotes,
+  activityDayNotes,
   formatSavedActivityNotes,
   formatUnavailableChapterNotes,
-  isPreparedClassroomActivity,
   introLessonNotes,
   readingLessonNotes,
   selectSavedActivity,
@@ -101,19 +101,25 @@ export function generateDayPlanFromTeachingPacks(input: {
       '';
     const sectionPlans = sectionPlansForChapter(chapterText, pack?.teacherGuide);
     if (sectionPlans.length >= 2) {
-      const prepared = pack?.activities.find((activity) => isPreparedClassroomActivity(activity)) ?? null;
+      const preferredSliceKeys = sectionPlans
+        .filter((section) => section.skill === 'READING')
+        .map((section) => section.sliceKey);
+      if (!preferredSliceKeys.length && sectionPlans[0]) preferredSliceKeys.push(sectionPlans[0].sliceKey);
       for (const assignment of allocateSectionDays(teachDays, sectionPlans)) {
         globalDay++;
-        if (assignment.mode === 'activity' && prepared) {
+        if (assignment.mode === 'activity') {
           drafts.push(
-            draftFromPreparedActivity({
-              activity: prepared,
+            draftFromActivityDay({
               chapterTitle,
               chapterKey: chapter.chapterKey,
               globalDay,
               periodMinutes,
               sequence: drafts.length,
               lessonKey: keyFactory(),
+              activities: pack?.activities ?? [],
+              preferredSliceKeys,
+              chapterText,
+              missingReason: reason,
             }),
           );
           continue;
@@ -424,30 +430,41 @@ function sectionPlansForChapter(chapterText: string, teacherGuide: unknown) {
   return readSectionPlans(teacherGuide);
 }
 
-function draftFromPreparedActivity(input: {
-  activity: TeachingPackForAnalysis['activities'][number];
+function draftFromActivityDay(input: {
   chapterTitle: string;
   chapterKey: string;
   globalDay: number;
   periodMinutes: number;
   sequence: number;
   lessonKey: string;
+  activities: TeachingPackForAnalysis['activities'];
+  preferredSliceKeys: string[];
+  chapterText: string;
+  missingReason: string | null;
 }): Omit<ScheduleLessonDraft, 'scheduledDate' | 'periodNumber' | 'slotStartTime' | 'slotEndTime'> & { notes: string } {
-  const notes = formatSavedActivityNotes(input.activity, input.chapterTitle, [], input.periodMinutes);
-  const objective =
-    input.activity.learningObjective?.trim() ||
-    notes.match(/Learning objective:\s*(.+)/)?.[1] ||
-    input.activity.title;
+  const day = activityDayNotes({
+    chapterTitle: input.chapterTitle,
+    activities: input.activities,
+    preferredSliceKeys: input.preferredSliceKeys,
+    periodMinutes: input.periodMinutes,
+    chapterText: input.chapterText,
+    missingReason:
+      input.missingReason ??
+      'The chapter activity is missing or not ready to teach. Teach the chapter’s main application from the textbook in one task. Do not invent a generic game.',
+  });
+  const notes = day.notes;
+  const titleSuffix = day.title.slice(0, 80);
+  const objective = day.objective;
   return {
     lessonKey: input.lessonKey,
     chapterKey: input.chapterKey,
     sequence: input.sequence,
     kind: PlannerLessonKind.ACTIVITY,
-    title: `Day ${input.globalDay} — ${input.chapterTitle} · ${input.activity.title.slice(0, 80)}`,
+    title: `Day ${input.globalDay} — ${input.chapterTitle} · ${titleSuffix}`,
     primaryStage: LessonStage.ACTIVITY,
     stages: [{ stage: LessonStage.ACTIVITY, minutes: input.periodMinutes }],
     objectives: [objective],
-    portionKeys: [`activity:${input.activity.sliceKey ?? 'chapter'}:${input.activity.title.slice(0, 40)}`],
+    portionKeys: [`activity:chapter:${titleSuffix.slice(0, 40)}`],
     dependsOnKeys: [],
     plannedMinutes: input.periodMinutes,
     frozen: false,

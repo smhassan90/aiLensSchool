@@ -78,21 +78,15 @@ export function parseSectionPlans(chapterText: string): SectionPlan[] {
       exerciseSections.find((item) => item.heading === section.heading)?.body ??
       (index === 0 ? exercises.split(HEADING)[0] || section.body : section.body);
     const exercisesForSection = parseExercises(exerciseChunk, `s${index + 1}`);
-    if (skill === 'ORAL' && /\b(?:amina|hina|mariam)\b/i.test(exerciseChunk)) {
-      for (const exercise of exercisesForSection) {
-        exercise.grouping = 'groups';
-        exercise.groupSize = 3;
-      }
-    }
     const objective =
       outcomes[skill] ||
-      `Students can use what ${section.heading} ${section.number} teaches.`;
+      `Students complete the printed work for ${section.heading} ${section.number}.`;
     return {
       sliceKey: `s${index + 1}`,
       title: `${titleCase(section.heading)} ${section.number}`,
       skill,
       learningObjective: clip(objective, 240),
-      contentPoints: contentPoints(section.body, skill),
+      contentPoints: contentPoints(section.body),
       anchor: anchorFrom(section.body, section.heading),
       exercises: exercisesForSection,
     };
@@ -178,9 +172,6 @@ export function validateDisplayedLesson(notes: string, periodMinutes: number): s
   const groupWork = /\bgroups of\b|\bin groups\b|\bin pairs\b|\bhalf the class\b/i.test(conduct);
   const soloBan = /no group answer|work individually with no group/i.test(conduct);
   if (groupWork && soloBan) issues.push('group work contradicts individual work');
-  const oral = /agreement|disagreement|\b(?:amina|hina|mariam)\b/i.test(notes);
-  const horseDebate = /rich man/i.test(notes) && /beggar/i.test(notes) && /half the class/i.test(notes);
-  if (oral && horseDebate) issues.push('oral task is replaced by the horse dispute');
   const teacher = notes.split('What the teacher does:')[1]?.split('What students do:')[0] ?? '';
   const students = notes.split('What students do:\n')[1]?.split('\n\n')[0] ?? '';
   if (teacher && students && collapse(teacher) === collapse(students)) {
@@ -188,7 +179,9 @@ export function validateDisplayedLesson(notes: string, periodMinutes: number): s
   }
   const objective = notes.match(/Learning objective:\s*(.+)/)?.[1] ?? '';
   const check = notes.split('Check understanding:\n')[1]?.split('\nExpected outcome:')[0] ?? '';
-  if (/agreement|disagree/i.test(objective) && /horse|capital|paragraph|prefix/i.test(check) && !/agree|disagree|phrase/i.test(check)) {
+  const objectiveExercise = objective.match(/exercise\s+(\d+)/i)?.[1];
+  const checkExercise = check.match(/exercise\s+(\d+)/i)?.[1];
+  if (objectiveExercise && checkExercise && objectiveExercise !== checkExercise) {
     issues.push('assessment does not match the learning objective');
   }
   if (/students will understand the topic|learn about the section/i.test(notes)) issues.push('vague outcome');
@@ -230,8 +223,6 @@ function renderLecture(
     ? `Do the first item of Exercise ${exercise.number} with the class: ${clip(exercise.items[0] || exercise.instruction, 180)}`
     : `Show one example from ${section.title} on the board.`;
   const notes = [
-    section.title,
-    '',
     `Learning objective: ${objective}`,
     'Duration: ' + blocks.reduce((sum, block) => sum + block.minutes, 0) + ' minutes',
     ...blocks.map((block) => `- ${block.label}: ${block.minutes} minutes.`),
@@ -272,43 +263,27 @@ function renderActivity(
   assignment: ChapterDayAssignment,
   blocks: Timed[],
 ): { objective: string; notes: string; titleSuffix: string; kind: 'ACTIVITY' } {
-  const { section, exercise } = assignment;
-  const title = activityTitle(section, exercise);
+  const { section } = assignment;
+  const total = blocks.reduce((sum, block) => sum + block.minutes, 0);
   const objective = section.learningObjective;
-  const students = exercise
-    ? studentPractice(section, exercise)
-    : `Use ${section.title} in your own work.`;
-  const teacher = exercise
-    ? teacherLeads(section, exercise)
-    : `Set up ${section.title}. Watch every student produce their own result.`;
-  const check = assessmentFor(section, exercise);
   const notes = [
-    title,
-    '',
-    `Chapter section: ${section.title}`,
     `Learning objective: ${objective}`,
-    'You need: Textbook and notebooks',
-    'Duration: ' + blocks.reduce((sum, block) => sum + block.minutes, 0) + ' minutes',
-    ...blocks.map((block) => `- ${block.label}: ${block.minutes} minutes.`),
+    `Duration: ${total} minutes`,
     '',
     'What the teacher does:',
-    `1. (${blocks[0]!.minutes} min) ${blocks[0]!.label}. ${teacher}`,
-    `2. (${blocks[1]!.minutes} min) ${blocks[1]!.label}. Start the task. ${participationFor(exercise)}`,
-    `3. (${blocks[2]!.minutes} min) ${blocks[2]!.label}. Move around. ${clip(students, 220)}`,
-    `4. (${blocks[3]!.minutes} min) ${blocks[3]!.label}. Hear two or three results. Correct only from the textbook.`,
-    `5. (${blocks[4]!.minutes} min) ${blocks[4]!.label}. ${check}`,
+    `1. (${total} min) Teach one application of ${section.title} from the textbook. Do not replace it with a different exercise.`,
     '',
     'What students do:',
-    students,
+    `Complete that one application from ${section.title}.`,
     '',
     'How every student participates:',
-    participationFor(exercise),
+    'Each student finishes their own part of that application.',
     '',
     'Check understanding:',
-    check,
-    `Expected outcome: ${outcomeFor(section, exercise)}`,
+    'Accept only an answer the textbook supports.',
+    `Expected outcome: Each student has finished one application from ${section.title}.`,
   ].join('\n');
-  return { objective, notes, titleSuffix: title, kind: 'ACTIVITY' };
+  return { objective, notes, titleSuffix: section.title, kind: 'ACTIVITY' };
 }
 
 function practiceOrder(section: SectionPlan): SectionExercise[] {
@@ -322,224 +297,77 @@ function practiceOrder(section: SectionPlan): SectionExercise[] {
 }
 
 function chooseActivity(sections: SectionPlan[], used: Set<string>): ChapterDayAssignment {
-  const preference: SectionSkill[] = ['ORAL', 'WRITING', 'FUN', 'LANGUAGE', 'STUDY', 'READING'];
-  const pool = sections.flatMap((section) =>
-    section.exercises.map((exercise) => ({ section, exercise })),
-  );
-  for (const skill of preference) {
-    const unused = pool.find((item) => item.section.skill === skill && !used.has(item.exercise.key));
-    if (unused) return { mode: 'activity', section: unused.section, exercise: unused.exercise };
-  }
-  for (const skill of preference) {
-    const match = pool.find((item) => item.section.skill === skill);
-    if (match) return { mode: 'activity', section: match.section, exercise: match.exercise };
+  for (const section of sections) {
+    const exercise = section.exercises.find((item) => !used.has(item.key));
+    if (exercise) return { mode: 'activity', section, exercise };
   }
   const section = sections[0]!;
   return { mode: 'activity', section, exercise: section.exercises[0] ?? null };
 }
 
-function studentPractice(section: SectionPlan, exercise: SectionExercise): string {
-  const blob = `${exercise.instruction} ${exercise.items.join(' ')} ${exercise.teacherNote ?? ''}`;
-  if (section.skill === 'ORAL' && /\b(?:amina|hina|mariam)\b/i.test(blob)) {
-    if (exercise.number === '2') {
-      return 'Take one role. Speak the health dialogue in all three sequences: Amina then Hina then Mariam, then rotate so each student plays each speaker. Use the agreement and disagreement phrases from the table.';
-    }
-    if (exercise.number === '3') {
-      return 'In your group of three, prepare two or three lines each on the topic the teacher assigns. Speak both an agreement and a disagreement from the phrase table, then role-play the dialogue.';
-    }
-    return 'In groups of three, assign each mixed health line to Amina, Hina, or Mariam and write the dialogue in your notebooks.';
+function groupingLead(exercise: SectionExercise): string {
+  if (/groups?\s+of|\bin groups\b|\bin pairs\b|\bwork individually\b|\byour own notebook\b/i.test(exercise.instruction)) {
+    return '';
   }
-  if (section.skill === 'READING') {
-    const asked = `${exercise.instruction} ${exercise.items.join(' ')}`;
-    if (/steeple|poem/i.test(asked) && !/horse/i.test(asked)) {
-      return 'Answer the poem questions in your notebook: why the speaker climbed the steeple, why God told him to go down, and the message of the poem.';
-    }
-    if (/horse|caliph/i.test(asked)) {
-      return 'Answer the story questions in your notebook, including who got the horse and what the horse did when each man touched it.';
-    }
-  }
-  if (section.skill === 'FUN' && /ghost|story/i.test(blob)) {
-    return 'In groups of five, answer the ghost-story questions and say your ending to the class in English.';
-  }
-  if (section.skill === 'STUDY' && /wh-/i.test(blob)) {
-    return 'Write one row of the Wh-question table for a problem in the textbook, then write a second row for a problem in your own area.';
-  }
-  if (section.skill === 'LANGUAGE') {
-    if (/prefix|suffix/i.test(blob)) {
-      return 'Write the new word with the prefix or suffix the exercise asks for. Check the spelling when the root ends in e.';
-    }
-    if (/comma|full stop|apostrophe|quotation/i.test(blob)) {
-      return 'Add the missing commas, full stops, apostrophes, or quotation marks in your notebook. Then compare the sentence with your partner.';
-    }
-    if (/capital/i.test(blob)) {
-      return 'Correct the printed sentences in your notebook. Capitalize names, places, and the start of each sentence.';
-    }
-  }
-  if (section.skill === 'WRITING' && /cluster|paragraph|sindh/i.test(blob)) {
-    if (exercise.number === '4') {
-      return 'Choose one area your group discussed and write your own paragraph on it. Keep a topic sentence, details that match it, and a concluding sentence.';
-    }
-    if (exercise.number === '2' || /write a paragraph/i.test(blob)) {
-      return 'Write one paragraph from the cluster. Keep a topic sentence, details that match it, and a concluding sentence.';
-    }
-    if (/sindh/i.test(blob)) {
-      return 'Add two items to the Sindh cluster, or build a new cluster for the topic the teacher names.';
-    }
-  }
-  const grouping =
-    exercise.grouping === 'groups'
-      ? `Work in groups of ${exercise.groupSize ?? 3}. `
-      : exercise.grouping === 'pairs'
-        ? 'Work in pairs. '
-        : 'Write in your own notebook. ';
-  const verb = section.skill === 'ORAL' || section.skill === 'FUN' ? 'Say' : 'Write';
-  const firstItem = exercise.items[0] ?? '';
-  const alreadyIncluded = firstItem.length > 12 && exercise.instruction.includes(firstItem.slice(0, 40));
-  const item = firstItem && !alreadyIncluded ? ` Start with: ${clip(firstItem, 140)}` : '';
-  return `${grouping}${verb} your own answer. ${clip(exercise.instruction, 180)}${item}`;
+  if (exercise.grouping === 'groups') return `Work in groups of ${exercise.groupSize ?? 3}. `;
+  if (exercise.grouping === 'pairs') return 'Work in pairs. ';
+  return 'Work on your own. ';
 }
 
-function teacherLeads(section: SectionPlan, exercise: SectionExercise): string {
-  const blob = `${exercise.instruction} ${exercise.teacherNote ?? ''}`;
-  if (section.skill === 'ORAL' && /\b(?:amina|hina|mariam)\b/i.test(blob)) {
-    if (exercise.number === '3') {
-      return 'Number the groups from 1 to 6 and assign each number one printed topic. Tell them to use both agreement and disagreement expressions.';
-    }
-    if (exercise.number === '2') {
-      return 'Keep the groups of three. Call the three role sequences one at a time and listen for the printed phrases.';
-    }
-    return 'Write the agreement and disagreement columns on the board. Divide the class into groups of three and assign Amina, Hina, and Mariam.';
-  }
-  if (
-    section.skill === 'LANGUAGE' &&
-    /capital|prefix|suffix|comma|punctuation|apostrophe|quotation/i.test(blob)
-  ) {
-    return 'Correct the first printed sentence on the board. Then set the class to finish the exercise.';
-  }
-  if (section.skill === 'WRITING' && /cluster|paragraph/i.test(blob)) {
-    if (/sindh/i.test(`${blob} ${section.contentPoints.join(' ')}`)) {
-      return 'Draw the Sindh cluster, or write Education on the board and build a cluster with the class, before students write.';
-    }
-    return 'Build a cluster on the board with the class before students write.';
-  }
-  if (section.skill === 'FUN' && /ghost|story/i.test(blob)) {
-    return 'Put students in groups of five. Tell them they will finish the ghost story and say it in English.';
-  }
-  if (section.skill === 'STUDY' && /wh-/i.test(`${blob} ${section.contentPoints.join(' ')}`)) {
-    return 'Copy one problem row from the textbook table. Fill why, where, and when with the class, then set the next row.';
-  }
-  return `Read the instruction for Exercise ${exercise.number}. Complete the first item with the class.`;
+function studentPractice(_section: SectionPlan, exercise: SectionExercise): string {
+  const instruction = clip(exercise.instruction.replace(/^(?:Exercise\s+\d+|B\.\s*Exercise)\s*/i, ''), 420);
+  const first = exercise.items[0] ?? '';
+  const already = first.length > 12 && exercise.instruction.includes(first.slice(0, 24));
+  const item = first && !already ? ` Start with: ${clip(first, 140)}` : '';
+  const note = exercise.teacherNote ? ` ${clip(exercise.teacherNote, 180)}` : '';
+  return `${groupingLead(exercise)}${instruction}${item}${note}`.replace(/\s+/g, ' ').trim();
+}
+
+function teacherLeads(_section: SectionPlan, exercise: SectionExercise): string {
+  const first = exercise.items[0] ? ` The first item is: ${clip(exercise.items[0], 120)}` : '';
+  return `Read the instruction for Exercise ${exercise.number}. Complete the first item with the class.${first}`;
 }
 
 function openingFor(section: SectionPlan): string {
   if (section.skill === 'READING') {
-    if (/steeple|caliph|horse|poem/i.test(section.contentPoints.join(' '))) {
-      return 'Ask what makes a person good or bad, then open the poem or the story. Do not ask students to read the heading aloud as the lesson.';
-    }
     return 'Ask one question students can answer from their own experience, then open the text. Do not ask students to read the heading aloud as the lesson.';
   }
-  if (section.skill === 'ORAL' && /agree|disagree/i.test(section.contentPoints.join(' '))) {
-    return 'Ask two students to agree and disagree with a simple classroom statement, then show the phrase table.';
-  }
   if (section.skill === 'LANGUAGE') {
-    return 'Write one incorrect sentence from the exercise and ask what is wrong, before stating the rule.';
-  }
-  if (section.skill === 'WRITING' && /cluster|paragraph/i.test(`${section.contentPoints.join(' ')} ${section.anchor}`)) {
-    return 'Write one topic in a circle and ask the class for ideas around it.';
+    return 'Write one item from the exercise and ask what is wrong, before stating the rule.';
   }
   if (section.skill === 'WRITING') {
     return 'Read the model in the textbook once, then name the exercise the class will write.';
   }
-  if (section.skill === 'STUDY' && /wh-/i.test(section.contentPoints.join(' '))) {
-    return 'Name one school problem. Ask why, where, and when it happens.';
-  }
   if (section.skill === 'FUN') {
-    return 'Read the fun task once. Tell students the work is in English.';
+    return 'Read the task once, then tell students how they will share the result.';
   }
   return 'Ask one question students can answer from their own experience, then open this section. Do not ask students to read the heading aloud as the lesson.';
 }
 
+function statedProduct(text: string): 'essay' | 'rubric' | 'experiment' | null {
+  if (/\bessay\b/i.test(text)) return 'essay';
+  if (/\brubric\b/i.test(text)) return 'rubric';
+  if (/\bexperiment\b/i.test(text)) return 'experiment';
+  return null;
+}
+
 function assessmentFor(section: SectionPlan, exercise: SectionExercise | null): string {
-  if (section.skill === 'ORAL' && /agree|disagree|\bamina\b/i.test(`${exercise?.instruction ?? ''} ${section.contentPoints.join(' ')}`)) {
-    return 'Point to one line a student spoke. Ask: does this agree or disagree, and which printed phrase shows it?';
-  }
-  if (section.skill === 'READING') {
-    const blob = `${exercise?.instruction ?? ''} ${(exercise?.items ?? []).join(' ')} ${section.contentPoints.join(' ')}`;
-    if (/steeple|poem|message of this poem/i.test(blob) && !/horse/i.test(blob)) {
-      return 'Ask why the speaker climbed the steeple and what God told him. Accept the idea that God dwells among the people.';
-    }
-    if (/horse|caliph/i.test(blob)) {
-      return 'Ask who received the horse and what the horse did when each man touched it. Accept only the touch test from the story.';
-    }
-  }
-  if (section.skill === 'LANGUAGE') {
-    const blob = `${exercise?.instruction ?? ''} ${(exercise?.items ?? []).join(' ')}`;
-    if (/prefix|suffix/i.test(blob)) {
-      return 'Check two new words. Accept a word only when the prefix or suffix asked for is spelled correctly.';
-    }
-    if (/comma|full stop|apostrophe|quotation/i.test(blob)) {
-      return 'Look at two sentences. Accept them only when the missing commas, stops, apostrophes, or quotation marks are in the right place.';
-    }
-    if (/capital/i.test(blob)) {
-      return 'Look at two corrected sentences. Accept the work only when names, places, and sentence openings are capitalized.';
-    }
-  }
-  if (section.skill === 'WRITING' && /cluster|paragraph|sindh/i.test(`${exercise?.instruction ?? ''} ${(exercise?.items ?? []).join(' ')}`)) {
-    if (exercise?.number === '1' && /cluster|sindh/i.test(exercise.instruction) && !/paragraph/i.test(exercise.instruction)) {
-      return 'Look at the cluster. Accept the two new items only when they belong to the topic in the centre.';
-    }
-    return 'Read one paragraph. Accept it only when the details match the topic sentence and a concluding sentence is present.';
-  }
-  if (section.skill === 'STUDY' && /wh-/i.test(`${exercise?.instruction ?? ''} ${section.contentPoints.join(' ')}`)) {
-    return 'Check one row of the table. Accept it only when the why, where, and when answers belong to that problem.';
-  }
-  if (section.skill === 'FUN' && /ghost|story/i.test(`${exercise?.instruction ?? ''} ${section.contentPoints.join(' ')}`)) {
-    return 'Listen to the ending. Accept it only if the group tells it in English and answers what happened inside the house.';
-  }
+  const blob = `${exercise?.instruction ?? ''} ${(exercise?.items ?? []).join(' ')}`;
+  const product = statedProduct(blob);
+  if (product === 'essay') return 'Read one essay plan. Accept it when it has a claim, reasons, and an answer to the other side.';
+  if (product === 'rubric') return 'Check one row of the rubric. Accept a mark only when the student can say why.';
+  if (product === 'experiment') return 'Check the recorded result. Accept it when it follows the printed steps.';
   return exercise
     ? `Check the class against Exercise ${exercise.number}. Accept answers the textbook supports.`
     : `Check the work against ${section.title}.`;
 }
 
 function outcomeFor(section: SectionPlan, exercise: SectionExercise | null): string {
-  if (section.skill === 'ORAL' && /\bamina\b|agree|disagree/i.test(`${exercise?.instruction ?? ''} ${section.contentPoints.join(' ')}`)) {
-    if (exercise?.number === '2') {
-      return 'Every student has spoken once as Amina, once as Hina, and once as Mariam, using both an agreement and a disagreement.';
-    }
-    if (exercise?.number === '3') {
-      return 'Every student has spoken an agreement and a disagreement on the assigned topic, using phrases from the table.';
-    }
-    return 'Each group has written the health dialogue, with every mixed line given to Amina, Hina, or Mariam.';
-  }
-  if (section.skill === 'READING') {
-    const blob = `${exercise?.instruction ?? ''} ${(exercise?.items ?? []).join(' ')} ${section.contentPoints.join(' ')}`;
-    if (/steeple|poem|message of this poem/i.test(blob) && !/horse/i.test(blob)) {
-      return 'Each student can say the message of the poem: God dwells among the people.';
-    }
-    if (/horse|caliph/i.test(blob)) {
-      return 'Each student can say who the horse belonged to and how the Caliph knew.';
-    }
-  }
-  if (
-    section.skill === 'LANGUAGE' &&
-    /capital|prefix|suffix|comma|punctuation|apostrophe|quotation/i.test(
-      `${exercise?.instruction ?? ''} ${(exercise?.items ?? []).join(' ')}`,
-    )
-  ) {
-    return 'Each notebook has the corrected sentences or the new words from this exercise.';
-  }
-  if (section.skill === 'WRITING' && /cluster|paragraph|sindh/i.test(`${exercise?.instruction ?? ''} ${section.contentPoints.join(' ')}`)) {
-    if (exercise?.number === '1' && /sindh/i.test(exercise.instruction)) {
-      return 'Each notebook has the Sindh cluster with two added items that belong to Sindh.';
-    }
-    return 'Each notebook has a paragraph with a topic sentence, matching details, and a concluding sentence.';
-  }
-  if (section.skill === 'STUDY' && /wh-/i.test(`${exercise?.instruction ?? ''} ${section.contentPoints.join(' ')}`)) {
-    return 'Each group has a completed Wh-question row for a real problem.';
-  }
-  if (section.skill === 'FUN' && /ghost|story/i.test(`${exercise?.instruction ?? ''} ${section.contentPoints.join(' ')}`)) {
-    return 'Each group has told a ghost-story ending in English.';
-  }
+  const blob = `${exercise?.instruction ?? ''} ${(exercise?.items ?? []).join(' ')}`;
+  const product = statedProduct(blob);
+  if (product === 'essay') return 'Each student has a claim, reasons, and a response to the other side.';
+  if (product === 'rubric') return 'Each student has marked the rubric and can explain one mark.';
+  if (product === 'experiment') return 'Each student has the experiment result the instructions ask for.';
   return exercise
     ? `Each student has finished Exercise ${exercise.number} in ${section.title}.`
     : `Each student has completed the task for ${section.title}.`;
@@ -557,22 +385,14 @@ function participationFor(exercise: SectionExercise | null): string {
 }
 
 function activityTitle(section: SectionPlan, exercise: SectionExercise | null): string {
-  if (section.skill === 'ORAL' && /\b(?:amina|hina|mariam)\b/i.test(exercise?.instruction ?? '')) {
-    if (exercise?.number === '3') return 'Agree and disagree on a new topic';
-    return 'Agree and disagree: the health dialogue';
-  }
-  if (section.skill === 'WRITING' && /cluster|paragraph/i.test(`${exercise?.instruction ?? ''} ${section.contentPoints.join(' ')}`)) {
-    if (exercise?.number === '2' || exercise?.number === '4') return 'Write your own paragraph';
-    return 'Cluster and write a paragraph';
-  }
-  if (section.skill === 'FUN' && /ghost|story/i.test(`${exercise?.instruction ?? ''} ${section.contentPoints.join(' ')}`)) {
-    return 'Finish the ghost story';
-  }
-  if (section.skill === 'LANGUAGE') return 'Correct the language exercise';
-  if (section.skill === 'STUDY' && /wh-/i.test(`${exercise?.instruction ?? ''} ${section.contentPoints.join(' ')}`)) {
-    return 'Collect points with Wh-questions';
-  }
-  return exercise ? `${section.title} exercise ${exercise.number}` : section.title;
+  if (!exercise) return section.title;
+  const sentence = exercise.instruction
+    .replace(/^(?:Exercise\s+\d+|B\.\s*Exercise)\s*/i, '')
+    .split(/(?<=[.!?])\s+/)[0]
+    ?.trim() ?? '';
+  const action = sentence.replace(/^\d+[.)]\s*/, '').trim();
+  if (action.length >= 12) return clip(action, 80).replace(/[.!?]$/, '');
+  return `${section.title} exercise ${exercise.number}`;
 }
 
 type Timed = { label: string; minutes: number };
@@ -726,57 +546,25 @@ function groupingOf(text: string): { grouping: ExerciseGrouping; groupSize: numb
   return { grouping: 'individual', groupSize: null };
 }
 
-function contentPoints(body: string, skill: SectionSkill): string[] {
-  if (skill === 'READING') {
-    const points: string[] = [];
-    if (/voice of god|steeple/i.test(body)) {
-      points.push(
-        'The speaker climbs a steeple to hear God.',
-        'God tells him to go back down, because God dwells among the people.',
-      );
-    }
-    if (/wise caliph|horse/i.test(body)) {
-      points.push(
-        'Caliph Haroon-ur-Rashid walked Baghdad in disguise to learn the people’s problems, and he was known for justice.',
-        'The rich man and the beggar each claim the white horse. The horse winces at the beggar and neighs for the rich man, so the Caliph gives the horse to the rich man.',
-      );
-    }
-    if (points.length) return points.slice(0, 4);
+function contentPoints(body: string): string[] {
+  const chunks = body
+    .split(/\n+/)
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter((line) => line.length >= 20 && line.length <= 240);
+  const source = chunks.length
+    ? chunks
+    : body
+        .replace(/\s+/g, ' ')
+        .split(/(?<=[.!?])\s+/)
+        .map((sentence) => sentence.trim())
+        .filter((sentence) => sentence.length >= 40 && sentence.length <= 240);
+  if (!source.length) return [];
+  const picks = [source[0]!];
+  for (const index of [Math.floor(source.length * 0.45), Math.floor(source.length * 0.75)]) {
+    const chunk = source[index];
+    if (chunk && !picks.includes(chunk)) picks.push(chunk);
   }
-  if (skill === 'ORAL' && /agree|disagree/i.test(body)) {
-    return [
-      'Agreement phrases include “I agree”, “that makes sense”, and “that’s right”.',
-      'Disagreement phrases include “I don’t agree”, “this doesn’t make sense”, and “that’s not right”.',
-    ];
-  }
-  if (skill === 'LANGUAGE' && /capital|prefix|suffix|punctuation/i.test(body)) {
-    return [
-      'Capital letters and punctuation marks make the sentence clear.',
-      'A prefix is added at the start of a word and a suffix at the end. Drop the final e before many suffixes.',
-    ];
-  }
-  if (skill === 'WRITING' && /cluster|paragraph/i.test(body)) {
-    const points = [
-      'Clustering puts the topic in a circle and the related ideas around it.',
-      'A paragraph has a topic sentence, details that stay on that idea, and a concluding sentence.',
-    ];
-    if (/sindh/i.test(body)) {
-      points.push('The textbook example is the economy of Sindh: agriculture, tourism, and Karachi’s port.');
-    }
-    return points;
-  }
-  if (skill === 'STUDY' && /wh-/i.test(body)) {
-    return ['Collect points for a talk or a piece of writing by answering Wh-questions: why, where, when, and how.'];
-  }
-  if (skill === 'FUN' && /ghost|story/i.test(body)) {
-    return ['Groups of five finish the ghost story from the language exercise and tell it to the class.'];
-  }
-  const sentences = body
-    .replace(/\s+/g, ' ')
-    .split(/(?<=[.!?])\s+/)
-    .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence.length > 40 && sentence.length < 220);
-  return sentences.slice(0, 3).map((sentence) => clip(sentence, 200));
+  return picks.slice(0, 3).map((chunk) => clip(chunk, 200));
 }
 
 function anchorFrom(body: string, heading: string): string {
@@ -820,7 +608,12 @@ function collapse(value: string): string {
 function clip(value: string, max: number): string {
   const clean = value.replace(/\s+/g, ' ').trim();
   if (clean.length <= max) return clean;
-  return `${clean.slice(0, max - 1).trimEnd()}…`;
+  const window = clean.slice(0, max);
+  const sentenceAt = window.search(/[.!?](?=\s|$)/);
+  if (sentenceAt >= 40) return window.slice(0, sentenceAt + 1).trim();
+  const words = window.replace(/\s+\S*$/, '').trim();
+  const cut = words.length >= 20 ? words : window.trim();
+  return /[.!?]$/.test(cut) ? cut : `${cut}.`;
 }
 
 export type SectionTeachingPackDraft = {
@@ -923,18 +716,8 @@ export function boundedTeachingBrief(lesson: string, exercises: string): string 
 }
 
 function packActivities(plans: SectionPlan[]): SectionTeachingPackDraft['activities'] {
-  const preference: SectionSkill[] = ['ORAL', 'WRITING', 'LANGUAGE', 'FUN', 'STUDY', 'READING'];
-  const chosen: SectionPlan[] = [];
-  for (const skill of preference) {
-    const section = plans.find((plan) => plan.skill === skill);
-    if (section && !chosen.includes(section)) chosen.push(section);
-    if (chosen.length === 5) break;
-  }
-  for (const section of plans) {
-    if (chosen.length >= 3) break;
-    if (!chosen.includes(section)) chosen.push(section);
-  }
-  return chosen.slice(0, 5).map((section) => {
+  const chosen = plans.slice(0, 5);
+  return chosen.map((section) => {
     const exercise =
       section.exercises.find((item) => item.number === '2') ?? section.exercises[0] ?? null;
     const students = exercise

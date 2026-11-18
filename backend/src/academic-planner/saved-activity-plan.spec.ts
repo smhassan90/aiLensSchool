@@ -182,7 +182,7 @@ describe('saved teaching-pack activities in the day plan', () => {
     );
     expect(unit5?.notes).toContain('Draft letter to the editor');
     expect(unit5?.notes).not.toMatch(/Finish the line/i);
-    expect(unit6?.notes).toContain('FALLBACK — no saved activity');
+    expect(unit6?.notes).toContain('is not ready to teach');
     expect(unit6?.notes).toContain('out of date');
     expect(unit6?.notes).not.toContain('Unit recap');
     expect(result!.summary.warnings.some((warning) => warning.code === 'TEACHING_PACK_UNAVAILABLE')).toBe(true);
