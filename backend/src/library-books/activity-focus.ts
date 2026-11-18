@@ -81,12 +81,12 @@ function namedRoleCount(text: string): number | null {
 }
 
 const RESTAGE =
-  /\breplay the\b|\breconstruction of\b|\bact out the court\b|\bact out the textbook\b|\breconstruct the\b|\bstopping before\b/i;
+  /\breplay the\b|\breconstruction of\b|\bact out the court\b|\bact out the textbook\b|\breconstruct the\b/i;
 const EXTRA_TASK = /\bwrite a motto\b|\bcollect slips\b|\bread tomorrow\b|\b1\s*[-–to]+\s*9\b/i;
 const EXAMPLE_ANSWER =
-  /\bexample\s+(answer|argument|verdict|question|decision|working)\b|\bworked example\b|\bexample\s*:/i;
+  /\bexample\s+(answer|argument|verdict|question|decision|working)\b|\bworked example\b|\bfor example\b|\bsample\s*:|\bexample\s*:/i;
 const STUDENT_ACTION =
-  /\b(decid\w*|defend\w*|advis\w*|keep|limit|stop|writ\w*|perform\w*|judg\w*|solv\w*|calculat\w*|measur\w*|classif\w*|predict\w*|construct\w*|experiment\w*|locat\w*|build\w*|draw\w*|compar\w*|count\w*|observ\w*|test\w*)\b/i;
+  /\b(decid\w*|defend\w*|advis\w*|keep|limit|stop|writ\w*|perform\w*|judg\w*|solv\w*|calculat\w*|measur\w*|classif\w*|predict\w*|construct\w*|experiment\w*|locat\w*|build\w*|draw\w*|compar\w*|count\w*|observ\w*|test\w*|speak\w*|argu\w*|debat\w*|answer\w*)\b/i;
 const BROKEN_PHRASE = /\bkeep moderated\b|…|\.{3}/i;
 const LECTURE_STAMP = /\bteacher explanation\b|\bguided practice\b|\bstudent practice\b|\bintroduction and instructions\b/i;
 
@@ -113,8 +113,8 @@ export function collectActivityCardIssues(activity: FocusActivity): string[] {
   const card = `${activity.title}\n${description}\n${steps.join('\n')}\n${activity.participationTechnique ?? ''}`;
   const length = description.length;
 
-  if (length < 180 || length > 900) {
-    issues.push(`${label}: description must be a short complete case, about 180 to 900 characters`);
+  if (length < 180 || length > 1200) {
+    issues.push(`${label}: description must be a short complete case, about 180 to 1200 characters`);
   }
   if (!activity.participationTechnique?.trim()) {
     issues.push(`${label}: say how every student takes part`);
@@ -125,8 +125,8 @@ export function collectActivityCardIssues(activity: FocusActivity): string[] {
   if (!EXAMPLE_ANSWER.test(description)) {
     issues.push(`${label}: missing an example answer`);
   }
-  if (steps.length < 3 || steps.length > 4) {
-    issues.push(`${label}: use 3 or 4 teacher steps for this period`);
+  if (steps.length < 3 || steps.length > 5) {
+    issues.push(`${label}: use 3 to 5 teacher steps for this period`);
   }
   if (RESTAGE.test(card)) {
     issues.push(`${label}: do not replay or reconstruct the textbook scene`);
@@ -224,7 +224,7 @@ export function collectClassroomFocusIssues(activity: FocusActivity, chapterText
   const sizes = [...`${description}\n${participation}`.matchAll(/\b(?:groups?|teams?) of\s+(\d+)/gi)].map((match) =>
     Number(match[1]),
   );
-  if (sizes.some((size) => size < 2 || size > 6)) {
+  if (sizes.some((size) => size < 2 || size > 12)) {
     issues.push(`${label}: group size does not fit a 40-minute class`);
   }
 

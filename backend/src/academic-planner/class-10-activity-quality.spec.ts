@@ -1,4 +1,9 @@
 import {
+  CHAPTER_ACTIVITY_SYSTEM_PROMPT,
+  CHAPTER_TEACHING_PACK_PROMPT_VERSION,
+  CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
+} from '../ai/prompts/index';
+import {
   activityDayNotes,
   formatSavedActivityNotes,
   isPreparedClassroomActivity,
@@ -366,7 +371,7 @@ describe('Class 10 English activity quality', () => {
       'This activity retells the whole horse story from the first claim to the last line. The beggar arrives and the rich man arrives. The Caliph listens while the horse moves across the court. The class hears those same events again in order. Students only listen to the plot and do not make a new decision. The teacher reads the chapter summary aloud until the period ends and the known ending is finished for the class.',
     );
     expect(recap.description.length).toBeGreaterThanOrEqual(180);
-    expect(recap.description.length).toBeLessThanOrEqual(900);
+    expect(recap.description.length).toBeLessThanOrEqual(1200);
     expect(isPreparedClassroomActivity(recap)).toBe(false);
     expect(collectActivityCardIssues(withSteps(recap)).join(' ')).toMatch(/example answer/);
   });
@@ -400,6 +405,66 @@ describe('Class 10 English activity quality', () => {
     expect(collectActivityCardIssues(withSteps(silent)).join(' ')).toMatch(/takes part/);
   });
 
+  it('accepts a turning point that waits for the ending and a for-example line', () => {
+    const freeze = runnable(
+      'Advise before the ending',
+      'Do not read the last paragraph yet. The class stops at the turning point and advises the main character. What should happen next? What evidence from the chapter supports that advice? For example: tell the character to try once more, then compare that advice with the real ending after the groups have spoken.',
+    );
+    expect(isPreparedClassroomActivity(freeze)).toBe(true);
+    expect(collectActivityCardIssues(withSteps(freeze)).join(' ')).not.toMatch(/replay or reconstruct/);
+
+    const sample = runnable(
+      'Solve the missing length',
+      'Solve the missing length of a garden bed. The long side is 8 cm and the short side is 3 cm. Each student works alone. What is the perimeter? What is the area? For example: the perimeter is 22 cm because 8 + 3 + 8 + 3 = 22, and the area is 24 square cm.',
+      'Each student calculates the perimeter and the area, then writes both answers.',
+    );
+    expect(sample.description).not.toMatch(/example answer/i);
+    expect(isPreparedClassroomActivity(sample)).toBe(true);
+  });
+
+  it('accepts a textbook debate in groups of eight', () => {
+    const debate = runnable(
+      'Hold the printed debate',
+      'Use the debate printed in this unit. Groups of 8. Each side decides one reason, the other side answers it, and a chair keeps the turn. What rule from the text supports your point? For example: the chair lets each speaker finish one reason before the other side replies.',
+      'Groups of 8. Each student speaks once, then the chair writes the decision.',
+    );
+    expect(isPreparedClassroomActivity(debate)).toBe(true);
+    expect(collectActivityCardIssues(withSteps(debate)).join(' ')).not.toMatch(/group size/);
+  });
+
+  it('shows a long chapter activity and uses the empty note only when the pack has none', () => {
+    const longCase = `${'The class solves a new garden bed whose long side is 8 cm and whose short side is 3 cm. '.repeat(16)}What is the perimeter? For example: the perimeter is 22 cm.`;
+    expect(longCase.length).toBeGreaterThan(1200);
+    const long = runnable(
+      'Solve the garden bed',
+      longCase,
+      'Each student calculates the perimeter, then writes the answer.',
+    );
+    expect(isPreparedClassroomActivity(long)).toBe(false);
+    const shown = activityDayNotes({ chapterTitle: 'Perimeter', activities: [long] });
+    expect(shown.title).toBe('Solve the garden bed');
+    expect(shown.notes).toContain('garden bed');
+    expect(shown.notes).not.toMatch(/not ready to teach/i);
+    expect(shown.notes).not.toContain('Introduction: 5 minutes');
+    expect(shown.notes).not.toContain('Other saved activities');
+
+    const empty = activityDayNotes({ chapterTitle: 'Perimeter', activities: [] });
+    expect(empty.notes).toMatch(/Teach the next printed application/);
+    expect(empty.notes).not.toMatch(/not ready to teach/i);
+    expect(empty.notes).not.toContain('Introduction: 5 minutes');
+    expect(empty.notes).not.toContain('Write your own paragraph');
+    expect(empty.notes.match(/Teach the next printed application/g)?.length).toBe(1);
+  });
+
+  it('asks the model to read the unit instead of picking from a format menu', () => {
+    expect(CHAPTER_TEACHING_PACK_PROMPT_VERSION).toBe('chapter-teaching-pack-v10');
+    const prompts = `${CHAPTER_TEACHING_PACK_SYSTEM_PROMPT}\n${CHAPTER_ACTIVITY_SYSTEM_PROMPT}`;
+    expect(prompts).toMatch(/Read the whole supplied unit/i);
+    expect(prompts).not.toMatch(/\n\s*\d+\.\s+Narrative/i);
+    expect(prompts).not.toMatch(/keep \/ change \/ stop/i);
+    expect(prompts).not.toMatch(/freeze before the resolution/i);
+  });
+
   it('uses a prepared chapter activity on the activity day and a missing note when none is ready', () => {
     const skill = runnable(
       'Solve the missing length',
@@ -416,20 +481,20 @@ describe('Class 10 English activity quality', () => {
     expect(ready.notes).not.toContain('Introduction: 5 minutes');
     expect(ready.notes).not.toContain('Students can use what');
 
-    const missing = activityDayNotes({
+    const saved = activityDayNotes({
       chapterTitle: 'Perimeter',
       activities: [
         runnable(
           'Write your own paragraph',
-          'Write your own answer. Exercise 2 Read the following sentences and write cause and effect. As he fell fro',
+          'Write your own answer. Exercise 2 Read the following sentences and write cause and effect in the two columns. Start with the first printed sentence and finish every row the textbook gives. For example: the fall is the cause and the wound is the effect.',
         ),
       ],
     });
-    expect(missing.notes).toMatch(/not ready to teach/);
-    expect(missing.notes).toMatch(/Do not invent a generic game/);
-    expect(missing.notes).not.toContain('Introduction: 5 minutes');
-    expect(missing.notes).not.toContain('Write your own paragraph');
-    expect(missing.notes).not.toMatch(/\w{3}…/);
+    expect(saved.title).toBe('Write your own paragraph');
+    expect(saved.notes).toContain('cause and effect');
+    expect(saved.notes).not.toMatch(/not ready to teach/i);
+    expect(saved.notes).not.toContain('Introduction: 5 minutes');
+    expect(saved.notes).not.toMatch(/\w{3}…/);
   });
 
   it('builds a 40-minute breakdown that adds up', () => {

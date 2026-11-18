@@ -73,9 +73,14 @@ export function selectSavedActivity(input: {
   return specific[0] ?? null;
 }
 
+function showableChapterActivity(activity: SavedActivity): boolean {
+  return Boolean(activity.title?.trim()) && Boolean(activity.description?.trim()) && storedSteps(activity).length >= 2;
+}
+
 /**
- * Notes for an Activity day. A prepared chapter activity is used.
- * A failed activity becomes a short missing-activity note, never a leftover exercise.
+ * Notes for an Activity day.
+ * A prepared activity is preferred. Any saved chapter activity is still shown.
+ * The empty note is only for a pack that has no activities.
  */
 export function activityDayNotes(input: {
   chapterTitle: string;
@@ -98,10 +103,18 @@ export function activityDayNotes(input: {
   const preferredReady = ranked.find(
     (activity) => activity.sliceKey != null && (input.preferredSliceKeys ?? []).includes(activity.sliceKey) && usable(activity),
   );
-  const selected = preferredReady ?? ranked.find(usable) ?? null;
+  const showable = (activity: SavedActivity) =>
+    showableChapterActivity(activity) && !activityMismatchesSkill(activity, input.chapterText);
+  const selected =
+    preferredReady ??
+    ranked.find(usable) ??
+    ranked.find(showable) ??
+    ranked.find(showableChapterActivity) ??
+    input.activities.find((activity) => activity.title?.trim() && activity.description?.trim()) ??
+    null;
   if (selected) {
     return {
-      notes: formatSavedActivityNotes(selected, input.chapterTitle, input.activities, input.periodMinutes ?? 40),
+      notes: formatSavedActivityNotes(selected, input.chapterTitle, [], input.periodMinutes ?? 40),
       title: selected.title,
       objective: selected.learningObjective?.trim() || selected.title,
     };
@@ -109,8 +122,7 @@ export function activityDayNotes(input: {
   return {
     notes: formatUnavailableChapterNotes(
       input.chapterTitle,
-      input.missingReason ??
-        'The chapter activity is missing or not ready to teach. Teach the chapter’s main application from the textbook in one task. Do not invent a generic game.',
+      input.missingReason ?? `No saved activity for ${input.chapterTitle}.`,
       'ACTIVITY',
     ),
     title: 'Chapter activity',
@@ -150,7 +162,7 @@ export function formatSavedActivityNotes(
   );
   const outcome = stored.outcome;
   const check = stored.check;
-  const others = alternatives.filter((item) => item.title !== activity.title && !isGenericSectionSummary(item));
+  void alternatives;
   const lines = [
     `Chapter: ${chapterTitle}`,
     `Learning objective: ${objective}`,
@@ -168,27 +180,23 @@ export function formatSavedActivityNotes(
     ...(check ? ['', 'Check understanding:', check] : []),
     '',
     `Expected outcome: ${outcome}`,
-    ...(others.length
-      ? ['', 'Other saved activities for this chapter:', ...others.map((item) => `- ${item.title}`)]
-      : []),
   ];
   return lines.join('\n');
 }
 
 export function formatUnavailableChapterNotes(chapterTitle: string, reason: string, role: string): string {
-  const activity = role === 'ACTIVITY';
+  if (role === 'ACTIVITY') {
+    const why = reason?.trim();
+    return why
+      ? `${why} Teach the next printed application in ${chapterTitle} from the textbook.`
+      : `Teach the next printed application in ${chapterTitle} from the textbook.`;
+  }
   return [
-    activity
-      ? `The chapter activity for ${chapterTitle} is not ready to teach.`
-      : `Teaching pack unavailable for ${chapterTitle}`,
+    `Teaching pack unavailable for ${chapterTitle}`,
     reason,
     '',
-    activity
-      ? `What you do: Teach one application of ${chapterTitle} from the textbook. Do not invent a generic game.`
-      : `What you do: Teach the next printed section of ${chapterTitle} from the textbook.`,
-    activity
-      ? 'What students do: Complete that one application in the textbook. Do not switch to a different exercise.'
-      : 'What students do: Read that section and answer one question printed in the book.',
+    `What you do: Teach the next printed section of ${chapterTitle} from the textbook.`,
+    'What students do: Read that section and answer one question printed in the book.',
     'Check understanding: Accept only an answer the textbook supports.',
   ]
     .filter(Boolean)

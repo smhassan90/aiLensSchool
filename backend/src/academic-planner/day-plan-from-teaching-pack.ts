@@ -450,7 +450,7 @@ function draftFromActivityDay(input: {
     chapterText: input.chapterText,
     missingReason:
       input.missingReason ??
-      'The chapter activity is missing or not ready to teach. Teach the chapter’s main application from the textbook in one task. Do not invent a generic game.',
+      `No saved activity for ${input.chapterTitle}.`,
   });
   const notes = day.notes;
   const titleSuffix = day.title.slice(0, 80);

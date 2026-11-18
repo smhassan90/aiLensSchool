@@ -173,6 +173,7 @@ function acceptPack(
   const grounded = groundTeachingPack(pack, compiled);
   try {
     assertActivityQuality(grounded.activities, compiled);
+    assertConductableActivities(grounded.activities, compiled);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Activity quality failed';
     throw new Error(correction ? `${message}. Previous attempt: ${correction.slice(0, 400)}` : message);
