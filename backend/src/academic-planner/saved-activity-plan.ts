@@ -1,4 +1,4 @@
-import { splitStoredOutcome } from '../library-books/activity-focus';
+import { collectActivityCardIssues, splitStoredOutcome } from '../library-books/activity-focus';
 import { isGenericSectionSummary } from '../library-books/activity-quality';
 import { teacherGuideBullets } from './section-teaching-plan';
 
@@ -33,7 +33,7 @@ export function isPreparedClassroomActivity(activity: SavedActivity): boolean {
   if (/complete the task printed in|write your own answer|correct the language exercise|collect points with wh-questions/i.test(blob)) {
     return false;
   }
-  return description.length >= 450 && storedSteps(activity).length >= 3;
+  return collectActivityCardIssues({ ...activity, steps: storedSteps(activity) }).length === 0;
 }
 
 /**
@@ -98,8 +98,6 @@ export function formatSavedActivityNotes(
   const check = stored.check;
   const others = alternatives.filter((item) => item.title !== activity.title && !isGenericSectionSummary(item));
   const lines = [
-    activity.title,
-    '',
     `Chapter: ${chapterTitle}`,
     `Learning objective: ${objective}`,
     ...(materials && !/^none$/i.test(materials) ? [`You need: ${materials}`] : []),

@@ -44,6 +44,91 @@ function stepMinutes(step: string): number {
   return match ? Number(match[1]) : 0;
 }
 
+const NUMBER_WORDS: Record<string, number> = {
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+};
+
+function wordToCount(token: string | undefined): number | null {
+  if (!token) return null;
+  if (/^\d+$/.test(token)) return Number(token);
+  return NUMBER_WORDS[token.toLowerCase()] ?? null;
+}
+
+function groupSizeBounds(text: string): { min: number; max: number } | null {
+  const match = text.match(
+    /\b(?:groups?|teams?) of\s+(\d+|[a-z]+)(?:\s+(?:or|to)\s+(\d+|[a-z]+))?/i,
+  );
+  if (!match) return null;
+  const first = wordToCount(match[1]);
+  const second = wordToCount(match[2]);
+  if (first == null) return null;
+  const values = [first, second].filter((value): value is number => value != null && value > 0);
+  return { min: Math.min(...values), max: Math.max(...values) };
+}
+
+function namedRoleCount(text: string): number | null {
+  const match = text.match(/\broles?\s*:\s*([^.\n]+)/i);
+  if (!match) return null;
+  const parts = match[1]
+    .split(/,|\band\b/i)
+    .map((part) => part.replace(/\([^)]*\)/g, '').trim())
+    .filter((part) => part.length > 1);
+  return parts.length >= 2 ? parts.length : null;
+}
+
+const RESTAGE =
+  /\breplay the\b|\breconstruction of\b|\bact out the court\b|\bact out the textbook\b|\breconstruct the\b|\bstopping before\b/i;
+const HARD_CARD_WORD =
+  /\b(prudence|prudent|reconstruction|testimony|moderated|injudicious|mitigat\w*)\b/i;
+const EXTRA_TASK = /\bwrite a motto\b|\bcollect slips\b|\bread tomorrow\b|\b1\s*[-–to]+\s*9\b/i;
+const EXAMPLE_ANSWER = /\bexample\s+(answer|argument|verdict|question|decision)\b|\bexample\s*:/i;
+const STUDENT_ACTION = /\b(decid\w*|defend\w*|advis\w*|keep|limit|stop|writ\w*|perform\w*|judg\w*)\b/i;
+
+/** A card a teacher can run: one finished case, not a padded chapter summary. */
+export function collectActivityCardIssues(activity: FocusActivity): string[] {
+  const issues: string[] = [];
+  const label = activity.title || 'Activity';
+  const description = activity.description?.trim() ?? '';
+  const steps = stepLines(activity);
+  const card = `${activity.title}\n${description}\n${steps.join('\n')}\n${activity.participationTechnique ?? ''}`;
+  const length = description.length;
+
+  if (length < 180 || length > 900) {
+    issues.push(`${label}: description must be a short complete case, about 180 to 900 characters`);
+  }
+  if (!STUDENT_ACTION.test(description)) {
+    issues.push(`${label}: students are not asked to decide, defend, advise, or write`);
+  }
+  if (!EXAMPLE_ANSWER.test(description)) {
+    issues.push(`${label}: missing an example answer`);
+  }
+  if (steps.length < 3 || steps.length > 4) {
+    issues.push(`${label}: use 3 or 4 teacher steps for this period`);
+  }
+  if (RESTAGE.test(card)) {
+    issues.push(`${label}: do not replay or reconstruct the textbook scene`);
+  }
+  if (HARD_CARD_WORD.test(`${activity.title}\n${description}`) || /\bkeep moderated\b/i.test(description)) {
+    issues.push(`${label}: use simple classroom words and finish every sentence`);
+  }
+  if (!/[.!?]/.test(description.slice(-80)) || !/[.!?]"?\s*$/.test(description)) {
+    issues.push(`${label}: the description ends in an unfinished sentence`);
+  }
+  if (EXTRA_TASK.test(card)) {
+    issues.push(`${label}: do not add a motto, a worksheet, or slips for tomorrow`);
+  }
+  const roles = namedRoleCount(`${description}\n${activity.participationTechnique ?? ''}`);
+  const size = groupSizeBounds(`${description}\n${activity.participationTechnique ?? ''}`);
+  if (roles != null && size && (roles < size.min || roles > size.max)) {
+    issues.push(`${label}: named roles do not match the group size`);
+  }
+  return issues;
+}
+
 /** One classroom experience, sized to the period, with fields that do different jobs. */
 export function collectClassroomFocusIssues(activity: FocusActivity, chapterText?: string): string[] {
   const issues: string[] = [];
@@ -56,6 +141,8 @@ export function collectClassroomFocusIssues(activity: FocusActivity, chapterText
   const check = activity.checkUnderstanding?.trim() ?? '';
   const duration = activity.durationMinutes || 40;
   const teacherText = steps.join('\n');
+
+  issues.push(...collectActivityCardIssues(activity));
 
   const parts = description.match(/\b(?:Part|Task)\s+(?:[A-E]|[1-5])\b/gi) ?? [];
   if (new Set(parts.map((part) => part.toLowerCase())).size >= 3) {
@@ -77,22 +164,11 @@ export function collectClassroomFocusIssues(activity: FocusActivity, chapterText
   ].filter((pattern) => pattern.test(description));
   if (sideTasks.length >= 2) issues.push(`${label}: several unrelated exercises are packed into one activity`);
 
-  if (steps.length < 3 || steps.length > 5) {
-    issues.push(`${label}: use 3 to 5 teacher steps for this period`);
-  }
   const minutes = steps.map(stepMinutes);
   if (minutes.some((minute) => minute <= 0)) {
     issues.push(`${label}: every step needs its minutes`);
   } else if (minutes.reduce((sum, minute) => sum + minute, 0) !== duration) {
     issues.push(`${label}: step minutes do not add up to ${duration}`);
-  }
-
-  if (
-    !/\b(decid|defend|judg|argu|reconstruct|challeng|compet|court|role|team|group|evidence|solv|demonstrat|creat|build|rank|simul|choos|compar|writ|draft|letter|speak|present)/i.test(
-      description,
-    )
-  ) {
-    issues.push(`${label}: students are not asked to decide, create, defend, or solve something`);
   }
 
   if (objective && sameInstructionalPurpose(objective, description)) {

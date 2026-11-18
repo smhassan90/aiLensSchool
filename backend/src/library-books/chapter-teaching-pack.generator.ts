@@ -151,9 +151,6 @@ function assertConductableActivities(
   const first = activities[0];
   if (!first) throw new Error('No classroom activity was returned');
   const material = `${first.description}\n${first.steps.join('\n')}`;
-  if (first.description.trim().length < 450) {
-    throw new Error('Activity 1 does not contain the case, questions, or examples the teacher needs');
-  }
   if (/introduction and instructions|each student produces an individual result|check each book or voice/i.test(material)) {
     throw new Error('Activity 1 still uses a fixed activity template');
   }

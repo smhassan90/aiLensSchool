@@ -51,6 +51,15 @@ describe('classroom focus', () => {
     expect(collectClassroomFocusIssues(copied, chapter).join(' ')).toMatch(/repeats the expected outcome/);
   });
 
+  it('rejects a role list that does not match the group size', () => {
+    const crowded = {
+      ...focused(),
+      description:
+        'Fictional scenario, inspired by this chapter. Six people argue over one horse. Groups of four or five. Roles: judge, clerk, beggar, rich man, guard, witness. Who should keep the horse? Example answer: the rich man keeps it if the horse walks to him.',
+    };
+    expect(collectClassroomFocusIssues(crowded, chapter).join(' ')).toMatch(/group size/);
+  });
+
   it('rejects two activities that are the same experience', () => {
     const first = focused();
     const second = { ...focused(), title: 'Horse court again' };

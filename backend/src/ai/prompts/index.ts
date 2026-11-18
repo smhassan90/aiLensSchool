@@ -227,7 +227,7 @@ Rules:
 - Do not invent exercises or content not present in the text.
 - No markdown.`;
 
-export const CHAPTER_TEACHING_PACK_PROMPT_VERSION = 'chapter-teaching-pack-v7';
+export const CHAPTER_TEACHING_PACK_PROMPT_VERSION = 'chapter-teaching-pack-v8';
 
 export const CHAPTER_TEACHING_PACK_SYSTEM_PROMPT = `You prepare a teaching pack for a Pakistani school teacher from ONE textbook unit. Use ONLY the supplied text. Never invent facts, names, page numbers or quotes. Write in simple classroom English (short sentences, common words). If the user message gives an approximate student age, write activities those students can do. Do not infer an age from any other number.
 
@@ -263,18 +263,18 @@ questions
 - sliceKey = the section the exercise belongs to.
 
 activities (exactly 3)
-- Read the whole unit first. Choose the one conflict, decision, or turning point that is most worth a class period. Activity 1 is that one classroom experience. Do not attach vocabulary, true/false, grammar, or other textbook exercises to it. Those stay on exercise days.
-- A 40-minute period holds one challenge: students prepare, do the challenge, and the class hears the result. It does not hold three products.
-- Do not start from a fixed format. A court, a team reconstruction, a decision, or a challenge is allowed only when this unit calls for it. Do not reuse one format for every unit.
-- Write for the class in the header. Class 10 students are about 15–16. The language should sound like a teacher talking to them.
+- Read the whole unit first. Activity 1 applies the chapter idea to a NEW decision. Do not replay, reconstruct, or act out the textbook scene up to the known ending. Do not attach vocabulary, true/false, grammar, or a motto or worksheet. Those stay on language and exercise days.
+- A 40-minute period holds one challenge. It does not hold three products.
+- Do not reuse one format for the three activities or for every unit. Choose a job that fits THIS unit: a new dispute clearly marked fictional; freeze at a turning point, advise, then reveal the real ending; a keep / limit / stop choice on a new case; a school-now challenge that uses one textbook example as the reason; debate, writing, or a game only when that section needs it.
+- Write in simple classroom English: short sentences, common words. Class 10 students are about 15–16. Title must tell the teacher the action, such as "Who Does the Horse Trust?" or "Help Zara Decide". Do not use these words in the title or in student/teacher instructions unless you are copying a textbook line the students must say: reconstruction, testimony, prudence, panel, moderated, injudicious, mitigate.
 - Activities 2 and 3 are different single experiences from other ideas in the unit. They must not be activity 1 with new names.
 - Do NOT title an activity "Unit recap". Do not label the task Part A, Part B, and Part C. Do not name Exercise 2 or Exercise 3.
 - You may invent a short case. Begin it with "Fictional scenario, inspired by this chapter." Do not claim it is in the textbook. Do not put invented sentences in double quotes.
 - Fields have different jobs. Do not copy one sentence into another field.
   - learningObjective: one sentence about what this experience makes students understand. Not a copied syllabus line such as "skim the text" or "use pre-reading strategies".
-  - description: the student-facing challenge only. Include the case, facts, roles, questions, and one example answer so the teacher does not invent them.
-  - steps: 3 to 5 teacher moves. Each starts with minutes, such as "(8 min)". The minutes add up to 40. Say what the teacher sets up, how students move to the next phase, and how the teacher responds. Do not repeat the case.
-  - participationTechnique: how every student contributes, and the group size (2 to 5) if groups are used. Do not repeat the challenge.
+  - description: the student challenge only. Hard cap about 900 characters (aim 80–150 words). It must contain the challenge in 2–4 short sentences, roles that match the stated group size, 2–3 questions or decision boxes, and one complete example answer. If invented, start with "Fictional scenario, inspired by this chapter." Do not retell the plot. Do not say "replay", "reconstruct", or "act out the textbook scene". Every sentence ends with . ? or !.
+  - steps: 3 or 4 teacher moves. Each starts with minutes, such as "(8 min)". The minutes add up to 40. Do not retell the case. Do not add a leftover task such as "write a motto" or "collect slips to read tomorrow".
+  - participationTechnique: group size and how each student speaks or writes. Do not repeat the challenge. If you name roles, the number of names must equal the group size.
   - expectedOutcome: the product or decision students leave with.
   - checkUnderstanding: what the teacher looks at to see the objective. Different words from expectedOutcome.
   - materials: only items this activity uses. Write "None" if the textbook is enough.
@@ -287,7 +287,7 @@ revisionPoints
 complexity
 - LOW, MEDIUM, or HIGH from length, new vocabulary, and exercise density.
 
-STEP C — Check before returning. Confirm: (1) the summary names every section from Step A; (2) every section has at least one teacherGuide bullet, one slice, and one revision point; (3) no forbidden vague bullet appears; (4) activity 1 is one classroom experience, with the case or challenge written out, and it could not be reused for a different unit by changing the title; (5) there are exactly 3 activities, each is one experience, and none is a section-summary recap or a stack of exercises; (6) the objective, student task, teacher steps, participation, outcome, and check do not repeat the same sentences; (7) the step minutes add up to 40. Fix anything missing, then return.
+STEP C — Check before returning. Confirm: (1) the summary names every section from Step A; (2) every section has at least one teacherGuide bullet, one slice, and one revision point; (3) no forbidden vague bullet appears; (4) activity 1 applies the chapter idea to a new decision, names the case, questions, and one example answer, and does not replay the textbook ending; (5) there are exactly 3 activities, each uses a different job, and none is a section-summary recap or a stack of exercises; (6) the objective, student task, teacher steps, participation, outcome, and check do not repeat the same sentences; (7) each activity has 3 or 4 steps whose minutes add up to 40, and the description is under 900 characters with every sentence finished. Fix anything missing, then return.
 
 Return ONLY JSON. No markdown, no commentary.`;
 
@@ -296,26 +296,26 @@ export const CHAPTER_ACTIVITY_SYSTEM_PROMPT = `You design three classroom activi
 Return ONLY JSON: {"activities":[ ... exactly 3 activities ... ]}.
 Each activity has: sliceKey, title, learningObjective, description, materials, steps, participationTechnique, expectedOutcome, checkUnderstanding, durationMinutes.
 
-Activity 1 is the lesson a teacher will run. It is ONE classroom experience built around the most interesting decision, conflict, or turning point in the unit. A 40-minute period can hold that experience. It cannot also hold a vocabulary drill, a true/false exercise, a grammar task, and a personal essay. Leave those for other lessons.
+Activity 1 applies the chapter idea to a NEW decision. Restaging the book is invalid: do not replay the scene, reconstruct the court, or stop just before the known ending. A 40-minute period holds that one challenge. It cannot also hold a vocabulary drill, a true/false exercise, a grammar task, a motto, or slips to read tomorrow. Leave those for other lessons.
 
-Choose the shape from the unit. A court, a team reconstruction, a decision, a challenge, or a game is useful only when this story or idea needs it. Do not give every unit the same shape. Activities 2 and 3 are different single experiences from other ideas in the same unit.
+Do not reuse one format for the three activities. Choose from this unit: a new dispute clearly marked fictional; freeze at a turning point and advise, then reveal the real ending; a keep / limit / stop choice on a new case; a school-now challenge that uses one textbook example as the reason; debate, writing, or a game only when that section needs it. Activities 2 and 3 must be different jobs from activity 1.
 
-Write for students of about 15–16 if the header says Class 10. Use plain classroom English.
+Write in simple classroom English: short sentences, common words. For Class 10, students are about 15–16. The title must tell the teacher the action, such as "Who Does the Horse Trust?" or "Help Zara Decide". Do not use these words in the title or in instructions unless you copy a textbook line the students must say: reconstruction, testimony, prudence, panel, moderated, injudicious, mitigate.
 
-The description is what students receive. It includes the challenge and any case, facts, roles, questions, and one example answer. If you invent a case, start it with "Fictional scenario, inspired by this chapter." Do not say the invention is in the textbook. Do not put invented sentences in double quotes. Double quotes are only for a short phrase copied from the unit.
+The description is the student challenge only. Keep it under 900 characters. Include the challenge in 2–4 short sentences, roles that match the group size, 2–3 questions or decision boxes, and one complete example answer. If you invent a case, start it with "Fictional scenario, inspired by this chapter." Do not retell the plot. Do not say the invention is in the textbook. Do not put invented sentences in double quotes. Double quotes are only for a short phrase copied from the unit. Every sentence ends with . ? or !.
 
 Do not label the task Part A, Part B, and Part C. Do not name Exercise 2 or Exercise 3.
 
 The other fields do different jobs. Do not copy a sentence from one field into another.
 - learningObjective: one sentence about what this experience makes students understand. Not a syllabus line such as "skim the text".
-- steps: 3 to 5 strings. Each starts with minutes, such as "(8 min)". The minutes add up to 40. These tell the teacher what to set up, how students move from one phase to the next, and how to respond. They do not retell the case.
-- participationTechnique: how every student takes part. If you use groups, say the size, from 2 to 5.
+- steps: 3 or 4 strings. Each starts with minutes, such as "(8 min)". The minutes add up to 40. These tell the teacher what to set up and how to respond. They do not retell the case. Do not add a fifth leftover task.
+- participationTechnique: group size and how each student speaks or writes. If you name roles, the number of names must equal the group size. Do not repeat the challenge.
 - expectedOutcome: the product or decision students leave with.
 - checkUnderstanding: what the teacher looks at to see the objective. Use different words from expectedOutcome.
 - materials: only what this activity needs. "None" if the textbook is enough.
 - durationMinutes: 40.
 - sliceKey: one section key from the user message.
 
-Textbook people and events must stay accurate.
+Textbook people and events must stay accurate when you refer to them. Do not dump hard textbook vocabulary into the teacher card.
 Do not use these sentences: "Introduction and instructions", "Main activity", "Sharing and discussion", "Assessment and conclusion", "Each student produces an individual result", "Check each book or voice".
 No markdown.`;

@@ -4,6 +4,7 @@ import {
   selectSavedActivity,
   type SavedActivity,
 } from './saved-activity-plan';
+import { collectActivityCardIssues } from '../library-books/activity-focus';
 import { assertActivityQuality, collectActivityIssues, periodBreakdown } from '../library-books/activity-quality';
 
 const participation = (line: string, correction: string) =>
@@ -130,6 +131,32 @@ const unit8: SavedActivity[] = [
   ),
 ];
 
+const teacherMoves = [
+  '(5 min) Read the task once.',
+  '(10 min) Put students in groups and give each student a job.',
+  '(15 min) Walk around and ask a quiet student to speak.',
+  '(10 min) Hear each group decision and compare it with the example.',
+];
+
+function runnable(title: string, description: string, participation = 'Each student writes one sentence, then says it.'): SavedActivity {
+  return {
+    sliceKey: 's1',
+    title,
+    description,
+    participationTechnique: participation,
+    materials: 'None',
+    learningObjective: 'Students can apply the chapter idea to a new decision.',
+    teacherSteps: teacherMoves,
+    expectedOutcome: 'Each group leaves with one written decision.',
+    durationMinutes: 40,
+  };
+}
+
+function withSteps(activity: SavedActivity) {
+  const steps = Array.isArray(activity.teacherSteps) ? activity.teacherSteps.filter((step) => typeof step === 'string') : [];
+  return { ...activity, steps };
+}
+
 function chosen(activities: SavedActivity[]): SavedActivity {
   const selected = selectSavedActivity({
     activities,
@@ -234,11 +261,20 @@ describe('Class 10 English activity quality', () => {
     expect(notes).not.toContain('You need:');
     expect(notes).not.toMatch(/- .+: \d+ minutes\./);
     expect(notes.match(/What the teacher does:/g)?.length).toBe(1);
+    expect(notes.split('\n')[0]).toBe('Chapter: Unit 1');
+    expect(notes.startsWith(courtroom.title)).toBe(false);
     expect(notes).toContain('Check understanding:');
     expect(notes).toContain('Expected outcome:');
     expect(notes.indexOf('Check understanding:')).toBeLessThan(notes.indexOf('Expected outcome:'));
     const outcome = 'Each student has one written argument, and the judges name the horse test from the story.';
     expect(notes.split(outcome).length - 1).toBe(1);
+    const shorter = {
+      ...courtroom,
+      description: courtroom.description.replace(' outside a caravanserai', ''),
+    };
+    expect(shorter.description.length).toBeGreaterThanOrEqual(180);
+    expect(shorter.description.length).toBeLessThan(courtroom.description.length);
+    expect(isPreparedClassroomActivity(shorter)).toBe(true);
     const blocks = [...notes.matchAll(/\((\d+) min\)/g)].map((match) => Number(match[1]));
     expect(blocks).toEqual([6, 8, 16, 10]);
     const selected = selectSavedActivity({
@@ -248,6 +284,90 @@ describe('Class 10 English activity quality', () => {
       preferRecap: true,
     });
     expect(selected?.title).toBe('Whose horse is it?');
+  });
+
+  it('rejects a textbook replay and accepts a short fictional horse case', () => {
+    const restage = runnable(
+      'Act the horse court',
+      'The class does a reconstruction of the court scene. The beggar speaks first, then the rich man. Replay the known verdict from the story. Stop when the horse chooses the rich man, which is the ending already printed in the textbook. Example answer: the horse goes to the rich man.',
+    );
+    expect(isPreparedClassroomActivity(restage)).toBe(false);
+    expect(collectActivityCardIssues(withSteps(restage)).join(' ')).toMatch(/replay or reconstruct/);
+
+    const fresh = runnable(
+      'Who Does the Horse Trust?',
+      'Fictional scenario, inspired by this chapter. A shopkeeper and a traveller both claim one bicycle. Groups of four. Roles: shopkeeper, traveller, witness, judge. The bicycle follows the traveller and pulls away from the shopkeeper. Who does the bicycle trust? What does that show? Example answer: the traveller keeps it, because the bicycle shows trust the way the horse did.',
+    );
+    expect(fresh.description.length).toBeLessThan(450);
+    expect(isPreparedClassroomActivity(fresh)).toBe(true);
+  });
+
+  it('rejects a dignity-of-work replay and accepts a school decision', () => {
+    const replay = runnable(
+      'The lunch table again',
+      'Replay the lunch table scene, stopping before Akhtar\'s final apology. Students act the same seats and the same words from the story. Example answer: Akhtar will say sorry, as the book already shows.',
+    );
+    expect(isPreparedClassroomActivity(replay)).toBe(false);
+    expect(collectActivityCardIssues(withSteps(replay)).join(' ')).toMatch(/replay or reconstruct/);
+
+    const school = runnable(
+      'Who Sits Together?',
+      'Fictional scenario, inspired by this chapter. A student at your school will not sit with the cleaner at lunch. Groups of four. Roles: speaker, listener, note-taker, judge. Should the class sit together? Which person from the unit would agree? Example answer: Sit together, because Uncle Inayat showed that every job deserves respect.',
+    );
+    expect(isPreparedClassroomActivity(school)).toBe(true);
+  });
+
+  it('accepts a freeze-and-advise task and rejects a leftover worksheet', () => {
+    const advise = runnable(
+      'Advise King Bruce',
+      'Freeze the story before the spider\'s last try and advise King Bruce. Groups of three. Roles: king, adviser, scribe. What should Bruce do next? What does the spider show? Example answer: Try once more, because the spider kept going.',
+      'Groups of three. Each student writes one piece of advice, then says it.',
+    );
+    expect(isPreparedClassroomActivity(advise)).toBe(true);
+
+    const extra = runnable(
+      'Advise King Bruce',
+      'Freeze the story before the spider\'s last try and advise King Bruce. Groups of three. Roles: king, adviser, scribe. What should Bruce do next? Example answer: Try once more, because the spider kept going. Then complete a 1-9 attempt worksheet, write a motto, and collect slips to read tomorrow.',
+      'Groups of three. Each student writes one piece of advice, then says it.',
+    );
+    expect(isPreparedClassroomActivity(extra)).toBe(false);
+    expect(collectActivityCardIssues(withSteps(extra)).join(' ')).toMatch(/motto/);
+  });
+
+  it('rejects a hard-word title and a broken sentence, and accepts a finished choice', () => {
+    const broken = runnable(
+      'The Prudence Panel',
+      'Zara should keep moderated when she posts a photo of a classmate. The group talks about her choice for the whole period and then stops. Example answer: Zara should keep moderated.',
+    );
+    expect(isPreparedClassroomActivity(broken)).toBe(false);
+    expect(collectActivityCardIssues(withSteps(broken)).join(' ')).toMatch(/simple classroom words/);
+
+    const choice = runnable(
+      'Help Zara Decide',
+      'Fictional scenario, inspired by this chapter. Zara wants to post a classmate\'s photo. Groups of three. Roles: Zara, friend, adviser. Should she keep it, limit it, or stop it? Who did not agree? Example answer: LIMIT the post, because the classmate did not agree.',
+      'Groups of three. Each student writes KEEP, LIMIT, or STOP, then says why.',
+    );
+    expect(isPreparedClassroomActivity(choice)).toBe(true);
+  });
+
+  it('rejects six named roles in a group of four or five', () => {
+    const crowded = runnable(
+      'Who Keeps the Horse?',
+      'Fictional scenario, inspired by this chapter. Six people argue over one horse. Groups of four or five. Roles: judge, clerk, beggar, rich man, guard, witness. Who should keep the horse? Example answer: the rich man keeps it if the horse walks to him.',
+    );
+    expect(isPreparedClassroomActivity(crowded)).toBe(false);
+    expect(collectActivityCardIssues(withSteps(crowded)).join(' ')).toMatch(/group size/);
+  });
+
+  it('rejects a plot recap that has no example answer', () => {
+    const recap = runnable(
+      'Tell the horse story',
+      'This activity retells the whole horse story from the first claim to the last line. The beggar arrives and the rich man arrives. The Caliph listens while the horse moves across the court. The class hears those same events again in order. Students only listen to the plot and do not make a new decision. The teacher reads the chapter summary aloud until the period ends and the known ending is finished for the class.',
+    );
+    expect(recap.description.length).toBeGreaterThanOrEqual(180);
+    expect(recap.description.length).toBeLessThanOrEqual(900);
+    expect(isPreparedClassroomActivity(recap)).toBe(false);
+    expect(collectActivityCardIssues(withSteps(recap)).join(' ')).toMatch(/example answer/);
   });
 
   it('builds a 40-minute breakdown that adds up', () => {

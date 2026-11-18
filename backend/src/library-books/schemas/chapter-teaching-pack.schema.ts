@@ -34,7 +34,7 @@ export const ChapterTeachingPackSchema = z.object({
         sliceKey: z.string().regex(/^s\d{1,2}$/).nullable().optional(),
         title: z.string().min(2).max(160),
         learningObjective: z.string().min(10).max(500),
-        description: z.string().min(10).max(4500),
+        description: z.string().min(10).max(1200),
         materials: z.string().min(2).max(300),
         steps: z.array(z.string().min(5).max(900)).min(2).max(8),
         participationTechnique: z.string().min(10).max(1500),
@@ -139,7 +139,7 @@ export function coerceChapterTeachingPack(raw: unknown): unknown {
           title: truncStr(a.title, 160, 2),
           learningObjective:
             a.learningObjective == null ? a.learningObjective : truncStr(a.learningObjective, 500, 10),
-          description: truncStr(a.description, 4500, 10),
+          description: truncStr(a.description, 1200, 10),
           participationTechnique: truncStr(a.participationTechnique, 1500, 10),
           materials:
             a.materials == null || String(a.materials).trim() === ''
