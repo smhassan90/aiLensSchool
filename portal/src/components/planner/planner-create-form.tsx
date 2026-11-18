@@ -17,6 +17,7 @@ import { useToast } from "@/providers/toast-provider";
 import { ApiClientError } from "@/lib/api-client";
 import { friendlyApiErrorMessage } from "@/lib/display-labels";
 import { PageLoader } from "@/components/layout/page-loader";
+import { AiWait } from "@/components/layout/ai-wait";
 import { EmptyState } from "@/components/layout/empty-state";
 import { ChapterTeachingPackDebug } from "@/components/planner/chapter-teaching-pack-debug";
 
@@ -33,6 +34,12 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
+
+function overlapPlannerId(details: unknown): string | null {
+  if (!details || typeof details !== "object") return null;
+  const plannerId = (details as { plannerId?: unknown }).plannerId;
+  return typeof plannerId === "string" && plannerId.length > 0 ? plannerId : null;
+}
 
 export function PlannerCreateForm() {
   const router = useRouter();
@@ -131,7 +138,7 @@ export function PlannerCreateForm() {
     mutationFn: async (values: FormValues) => {
       const row = classOptions.find((o) => o.key === values.classKey);
       if (!row) throw new Error("Select a class");
-      const payload = await academicPlannerService.create({
+      return academicPlannerService.create({
         sectionId: row.sectionId,
         subjectId: row.subjectId,
         teacherId: values.teacherId,
@@ -148,19 +155,26 @@ export function PlannerCreateForm() {
               }
             : undefined,
       });
-      return academicPlannerService.generateSchedule(
-        payload.planner.id,
-        payload.version.id,
-        payload.version.revision,
-      );
     },
     onSuccess: (payload) => {
-      toast({ title: "Planner ready", description: "Chapters analyzed and schedule built.", variant: "success" });
       router.push(
-        `/teacher/planner/${payload.planner.id}?v=${encodeURIComponent(payload.version.id)}`,
+        `/teacher/planner/${payload.planner.id}?v=${encodeURIComponent(payload.version.id)}&build=1`,
       );
     },
     onError: (err) => {
+      const plannerId =
+        err instanceof ApiClientError && err.code === "PLANNER_OVERLAP"
+          ? overlapPlannerId(err.details)
+          : null;
+      if (plannerId) {
+        toast({
+          title: "This planner is already created",
+          description: "Opening the one already saved for this class.",
+          variant: "success",
+        });
+        router.push(`/teacher/planner/${plannerId}`);
+        return;
+      }
       toast({
         title: "Could not create planner",
         description: friendlyApiErrorMessage(err),
@@ -181,6 +195,16 @@ export function PlannerCreateForm() {
           </Button>
         }
       />
+    );
+  }
+
+  if (create.isPending) {
+    return (
+      <Card className="max-w-3xl">
+        <CardContent className="p-4 sm:p-6">
+          <AiWait kind="planner" />
+        </CardContent>
+      </Card>
     );
   }
 
@@ -367,7 +391,7 @@ export function PlannerCreateForm() {
           {create.isPending ? "Analyzing chapters and building schedule…" : "Create & build schedule"}
         </Button>
         <p className="text-sm text-muted-foreground">
-          One step: we read your chapters, build the day-by-day plan, and open the planner when it is ready.
+          The calendar opens next and stays on screen while the days are built. That can take a few minutes.
         </p>
       </div>
     </form>

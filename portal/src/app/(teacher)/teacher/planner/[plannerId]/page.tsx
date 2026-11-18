@@ -44,7 +44,12 @@ export default function TeacherPlannerWorkspacePage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <PlannerWorkspace plannerId={plannerId} versionId={versionId} listHref="/teacher/planner" />
+      <PlannerWorkspace
+        plannerId={plannerId}
+        versionId={versionId}
+        listHref="/teacher/planner"
+        autoBuild={searchParams.get("build") === "1"}
+      />
     </div>
   );
 }

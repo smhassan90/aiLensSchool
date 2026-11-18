@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLoader } from "@/components/layout/page-loader";
+import { AiWait } from "@/components/layout/ai-wait";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
 import { academicPlannerService } from "@/services/academic-planner.service";
@@ -21,17 +22,20 @@ import { fixDisplayText } from "@/lib/fix-display-text";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/providers/toast-provider";
 import { friendlyApiErrorMessage } from "@/lib/display-labels";
+import { ApiClientError } from "@/lib/api-client";
 
 type PlannerWorkspaceProps = {
   plannerId: string;
   versionId: string;
   readOnly?: boolean;
   listHref?: string;
+  autoBuild?: boolean;
 };
 
-export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: PlannerWorkspaceProps) {
+export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref, autoBuild }: PlannerWorkspaceProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const buildStarted = useRef(false);
   const [editLesson, setEditLesson] = useState<PlannerLesson | null>(null);
   const [moveLesson, setMoveLesson] = useState<PlannerLesson | null>(null);
   const [moveDate, setMoveDate] = useState("");
@@ -47,13 +51,36 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
       academicPlannerService.generateSchedule(plannerId, versionId, data!.version.revision),
     onSuccess: (payload) => {
       queryClient.setQueryData(["planner-version", plannerId, versionId], payload);
+      if (autoBuild && typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has("build")) {
+          url.searchParams.delete("build");
+          window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+        }
+      }
       toast({
         title: "Schedule ready",
         description: "Chapters were analyzed and lessons were placed on the calendar.",
         variant: "success",
       });
     },
-    onError: (err) => {
+    onError: async (err) => {
+      if (err instanceof ApiClientError && err.status === 409) {
+        try {
+          const fresh = await academicPlannerService.getVersion(plannerId, versionId);
+          queryClient.setQueryData(["planner-version", plannerId, versionId], fresh);
+          if (fresh.lessons.length > 0) {
+            toast({
+              title: "Schedule ready",
+              description: "The planner was already built. It is on the calendar.",
+              variant: "success",
+            });
+            return;
+          }
+        } catch {
+          // Fall through to the error toast.
+        }
+      }
       toast({
         title: "Could not generate schedule",
         description: friendlyApiErrorMessage(err),
@@ -61,6 +88,14 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
       });
     },
   });
+
+  useEffect(() => {
+    if (!autoBuild || !data || buildStarted.current || generate.isPending) return;
+    if (readOnly || !data.permissions.canEdit || data.version.origin === "RECOVERY") return;
+    if (data.lessons.length > 0 || data.chapters.length === 0) return;
+    buildStarted.current = true;
+    generate.mutate();
+  }, [autoBuild, data, generate, readOnly]);
 
   const saveLesson = useMutation({
     mutationFn: (body: {
@@ -184,7 +219,7 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
         <PlannerApprovalActions plannerId={plannerId} versionId={versionId} payload={data} />
       )}
 
-      {!readOnly && data.permissions.canEdit && data.version.origin !== "RECOVERY" && (
+      {!readOnly && data.permissions.canEdit && data.version.origin !== "RECOVERY" && !generate.isPending && (
         <div className="space-y-2">
           {!data.version.summary && (
             <p className="text-sm text-muted-foreground">
@@ -196,14 +231,17 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
           <Button
             type="button"
             size="sm"
-            disabled={generate.isPending || !data.chapters.length}
+            disabled={!data.chapters.length}
             onClick={() => generate.mutate()}
           >
-            {generate.isPending ? "Analyzing chapters & building schedule…" : "Build schedule"}
+            Build schedule
           </Button>
         </div>
       )}
 
+      {generate.isPending ? (
+        <AiWait kind="planner" />
+      ) : (
       <PlannerMonthBoard
         plannerId={plannerId}
         versionId={versionId}
@@ -223,6 +261,7 @@ export function PlannerWorkspace({ plannerId, versionId, readOnly, listHref }: P
               }
         }
       />
+      )}
 
       <PlannerLessonEditDialog
         open={Boolean(editLesson)}

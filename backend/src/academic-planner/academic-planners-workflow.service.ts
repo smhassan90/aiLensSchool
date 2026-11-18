@@ -33,7 +33,7 @@ import { AcademicPlannersService } from './academic-planners.service';
 import { PlannerContentService } from './planner-content.service';
 import { buildPlannerTeachingSlots } from './academic-planners-schedule.helper';
 import { generateSchedule, ChapterForSegments } from './schedule-engine';
-import { PlannerSettings, ScheduleLessonDraft } from './planner-types';
+import { PlannerSettings, PlannerVersionPayload, ScheduleLessonDraft } from './planner-types';
 import { DEFAULT_SCHOOL_TIMEZONE } from '../teachers/teacher-checkin';
 import { PlannerAccessService } from './planner-access.service';
 import {
@@ -63,6 +63,8 @@ export class AcademicPlannersWorkflowService {
     private readonly planners: AcademicPlannersService,
     private readonly access: PlannerAccessService,
   ) {}
+
+  private readonly generateInflight = new Map<string, Promise<Partial<PlannerVersionPayload>>>();
 
   async list(
     user: AuthUser,
@@ -531,6 +533,20 @@ export class AcademicPlannersWorkflowService {
   }
 
   async generate(user: AuthUser, plannerId: string, versionId: string, expectedRevision: number) {
+    const inflight = this.generateInflight.get(versionId);
+    if (inflight) return inflight;
+    const run = this.executeGenerate(user, plannerId, versionId, expectedRevision);
+    this.generateInflight.set(versionId, run);
+    try {
+      return await run;
+    } finally {
+      if (this.generateInflight.get(versionId) === run) {
+        this.generateInflight.delete(versionId);
+      }
+    }
+  }
+
+  private async executeGenerate(user: AuthUser, plannerId: string, versionId: string, expectedRevision: number) {
     const schoolId = this.tenant.requireSchoolId(user);
     const planner = await this.prisma.academicPlanner.findFirst({
       where: { id: plannerId, schoolId },
@@ -553,6 +569,19 @@ export class AcademicPlannersWorkflowService {
       throw new UnprocessableEntityException({
         code: 'USE_RECOVERY_REGENERATE',
         message: 'Use recovery regenerate for recovery proposals',
+      });
+    }
+
+    if (version.revision !== expectedRevision) {
+      const existingLessons = await this.prisma.plannerLesson.count({ where: { versionId } });
+      if (existingLessons > 0) {
+        return this.planners.getVersionPayload(user, plannerId, versionId);
+      }
+      throw new ConflictException({
+        error: {
+          code: 'PLANNER_VERSION_CONFLICT',
+          message: 'Planner was updated elsewhere',
+        },
       });
     }
 
@@ -732,6 +761,8 @@ export class AcademicPlannersWorkflowService {
         },
       });
       if (cas.count === 0) {
+        const existingLessons = await tx.plannerLesson.count({ where: { versionId } });
+        if (existingLessons > 0) return;
         throw new ConflictException({
           error: {
             code: 'PLANNER_VERSION_CONFLICT',

@@ -422,9 +422,74 @@ export class AcademicPlannersService {
         to: planner.examDate.toISOString().slice(0, 10),
         lastTeachingDate: (settings.lastTeachingDate as string) ?? planner.examDate.toISOString().slice(0, 10),
         examDate: planner.examDate.toISOString().slice(0, 10),
-        days: [],
+        days: buildCalendarDays(
+          planner.startDate.toISOString().slice(0, 10),
+          planner.examDate.toISOString().slice(0, 10),
+          version.lessons.map((lesson) => ({
+            date: lesson.scheduledDate?.toISOString().slice(0, 10) ?? null,
+            periodNumber: lesson.periodNumber,
+            startTime: lesson.slotStartTime,
+            endTime: lesson.slotEndTime,
+            plannedMinutes: lesson.plannedMinutes,
+          })),
+        ),
       },
       warnings: [],
     };
   }
+}
+
+function buildCalendarDays(
+  from: string,
+  to: string,
+  lessons: Array<{
+    date: string | null;
+    periodNumber: number | null;
+    startTime: string | null;
+    endTime: string | null;
+    plannedMinutes: number;
+  }>,
+) {
+  if (!from || !to || from > to) return [];
+  const byDate = new Map<string, typeof lessons>();
+  for (const lesson of lessons) {
+    if (!lesson.date) continue;
+    const list = byDate.get(lesson.date) ?? [];
+    list.push(lesson);
+    byDate.set(lesson.date, list);
+  }
+  const days: Array<{
+    date: string;
+    working: boolean;
+    reason: string | null;
+    slots: Array<{
+      periodNumber: number;
+      startTime: string;
+      endTime: string;
+      minutes: number;
+    }>;
+  }> = [];
+  let cursor = from;
+  let guard = 0;
+  while (cursor <= to && guard < 400) {
+    const dayLessons = (byDate.get(cursor) ?? [])
+      .slice()
+      .sort((a, b) => (a.periodNumber ?? 0) - (b.periodNumber ?? 0));
+    days.push({
+      date: cursor,
+      working: true,
+      reason: null,
+      slots: dayLessons.map((lesson) => ({
+        periodNumber: lesson.periodNumber ?? 1,
+        startTime: lesson.startTime ?? '',
+        endTime: lesson.endTime ?? '',
+        minutes: lesson.plannedMinutes,
+      })),
+    });
+    const next = new Date(`${cursor}T00:00:00.000Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    cursor = next.toISOString().slice(0, 10);
+    guard += 1;
+  }
+  return days;
 }

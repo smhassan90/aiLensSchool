@@ -2,7 +2,7 @@
 
 import { PageLoader } from "@/components/layout/page-loader";
 
-export type AiWaitKind = "extract" | "key-points" | "homework" | "diary" | "quiz" | "exam" | "coach";
+export type AiWaitKind = "extract" | "key-points" | "homework" | "diary" | "quiz" | "exam" | "coach" | "planner";
 
 const AI_WAIT: Record<
   AiWaitKind,
@@ -76,6 +76,16 @@ const AI_WAIT: Record<
       "Almost ready",
     ],
     hint: "This is a suggestion from the numbers, not a judgement.",
+  },
+  planner: {
+    phrases: [
+      "Reading the chapters you selected",
+      "Placing reading, exercises, and revision on the calendar",
+      "Writing the classroom activity for each chapter",
+      "Checking the days before the exam",
+      "The planner is almost ready",
+    ],
+    hint: "This can take a few minutes. Stay on this page — the calendar opens when the schedule is ready.",
   },
 };
 
