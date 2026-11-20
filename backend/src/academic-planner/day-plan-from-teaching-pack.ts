@@ -206,7 +206,7 @@ export function generateDayPlanFromTeachingPacks(input: {
           usedTitles: usedActivityTitles,
           periodMinutes,
           chapterText,
-          missingReason: reason,
+          missingReason: reason ?? undefined,
         });
         teacherNotes = day.notes;
         if (day.title !== 'Chapter activity') usedActivityTitles.push(day.title);
