@@ -124,35 +124,51 @@ export function displayObjective(activity: SavedActivity): string {
   return firstDistinctSentence(activity.description ?? '', title);
 }
 
-/** A saved card with enough of its own material to put in front of a class. Length alone does not hide it. */
-export function isShowableSavedActivity(activity: SavedActivity, chapterText?: string): boolean {
+/** Why a saved activity cannot appear on an Activity day (empty means it is showable). */
+export function explainShowableSavedActivityFailures(activity: SavedActivity, chapterText?: string): string[] {
+  const failures: string[] = [];
   const title = activity.title?.trim() ?? '';
   const description = activity.description?.trim() ?? '';
   const objective = activity.learningObjective?.trim() ?? '';
-  if (!title || !description || !objective || sameLabel(objective, title)) return false;
-  if (!activity.participationTechnique?.trim()) return false;
-  if (storedSteps(activity).length < 3) return false;
-  if (!EXAMPLE_MARKER.test(description)) return false;
+  const steps = storedSteps(activity);
+  const label = title || 'Activity';
+
+  if (!title) failures.push(`${label}: missing title`);
+  if (!description) failures.push(`${label}: missing description`);
+  if (!objective) failures.push(`${label}: missing learning objective`);
+  else if (sameLabel(objective, title)) failures.push(`${label}: objective repeats the title`);
+  if (!activity.participationTechnique?.trim()) failures.push(`${label}: missing participation`);
+  if (steps.length < 3) failures.push(`${label}: fewer than 3 teacher steps (stored in teacherSteps)`);
+  if (!EXAMPLE_MARKER.test(description)) {
+    failures.push(`${label}: no example marker (Example answer, For example, Worked example, Sample)`);
+  }
   if (
     /\b(relays?|hunts?|round[- ]robins?|sorting|matching pairs|quick chains?|terminolog(?:y|ies)|whip[- ]arounds?|speed grids?|human unit circle)\b/i.test(
       `${title}\n${objective}`,
     )
   ) {
-    return false;
+    failures.push(`${label}: title or objective is only a game name`);
   }
-  if (/\bshow the idea of\b/i.test(activity.expectedOutcome ?? '')) return false;
+  if (/\bshow the idea of\b/i.test(activity.expectedOutcome ?? '')) {
+    failures.push(`${label}: expected outcome only names the idea of the title`);
+  }
   if (
     /\b(pass(?:es|ed|ing)? (?:around|on|it|one step|the next)|one step of (?:a |the )?|stand(?:ing)? in a circle|sit(?:ting)? in a circle)\b/i.test(
-      `${description}\n${storedSteps(activity).join('\n')}`,
+      `${description}\n${steps.join('\n')}`,
     )
   ) {
-    return false;
+    failures.push(`${label}: students pass one step instead of finishing a full item`);
   }
   const hasFigure = /\b(given|to prove|the figure|radius|diameter)\b/i.test(description);
   if (chapterIsSkillUnit(chapterText) && !/\d/.test(description) && !hasFigure) {
-    return false;
+    failures.push(`${label}: skill unit needs digits or given/to prove on the card`);
   }
-  return true;
+  return failures;
+}
+
+/** A saved card with enough of its own material to put in front of a class. Length alone does not hide it. */
+export function isShowableSavedActivity(activity: SavedActivity, chapterText?: string): boolean {
+  return explainShowableSavedActivityFailures(activity, chapterText).length === 0;
 }
 
 /**

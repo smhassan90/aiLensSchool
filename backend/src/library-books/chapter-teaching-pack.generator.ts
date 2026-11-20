@@ -79,7 +79,7 @@ export async function generateChapterTeachingPack(input: {
   const sectionPlans = parseSectionPlans(compiled);
   let lastError: Error | null = null;
   let correction = '';
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       if (sectionPlans.length >= 2) {
         return await packWithChapterActivities(input.chapterTitle, header, compiled, sectionPlans, correction);
@@ -145,7 +145,7 @@ async function requestChapterActivities(
   };
 }
 
-function assertConductableActivities(
+export function assertConductableActivities(
   activities: ChapterTeachingPackOutput['activities'],
   chapterText: string,
 ): void {

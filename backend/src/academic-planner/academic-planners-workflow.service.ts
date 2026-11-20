@@ -45,7 +45,13 @@ import {
   analysisFromTeachingPack,
   loadTeachingPacksByChapterIds,
 } from '../library-books/chapter-teaching-pack-analysis.loader';
+import { CHAPTER_TEACHING_PACK_PROMPT_VERSION } from '../ai/prompts';
 import { refreshChapterTeachingPack } from '../library-books/chapter-teaching-pack.refresh';
+import {
+  explainShowableSavedActivityFailures,
+  isShowableSavedActivity,
+  type SavedActivity,
+} from './saved-activity-plan';
 import { assignActivityFormatIndexes } from './classroom-activity-styles';
 import { generateDayPlanFromTeachingPacks, rebuildLessonFromPack } from './day-plan-from-teaching-pack';
 import { moveLesson as moveLessonOnSlots } from './schedule-engine';
@@ -360,6 +366,29 @@ export class AcademicPlannersWorkflowService {
       },
     });
 
+    const activityAudit = packRow
+      ? packRow.activities.map((a) => {
+          const saved: SavedActivity = {
+            sliceKey: a.sliceKey,
+            title: fixLibraryTextEncoding(a.title),
+            description: fixLibraryTextEncoding(a.description),
+            participationTechnique: fixLibraryTextEncoding(a.participationTechnique),
+            materials: a.materials ? fixLibraryTextEncoding(a.materials) : null,
+            learningObjective: fixLibraryTextEncoding(a.learningObjective),
+            teacherSteps: a.teacherSteps,
+            expectedOutcome: a.expectedOutcome ? fixLibraryTextEncoding(a.expectedOutcome) : null,
+            durationMinutes: a.durationMinutes,
+          };
+          return {
+            sortOrder: a.sortOrder,
+            sliceKey: a.sliceKey,
+            title: saved.title,
+            showable: isShowableSavedActivity(saved, compiled),
+            failures: explainShowableSavedActivityFailures(saved, compiled),
+          };
+        })
+      : [];
+
     return {
       chapter: {
         id: chapter.id,
@@ -370,6 +399,8 @@ export class AcademicPlannersWorkflowService {
         compiledCharCount: compiled.length,
         compiledWordCount: compiled.split(/\s+/).filter(Boolean).length,
       },
+      codePromptVersion: CHAPTER_TEACHING_PACK_PROMPT_VERSION,
+      activityShowableAudit: activityAudit,
       pack: packRow
         ? {
             id: packRow.id,
@@ -404,6 +435,12 @@ export class AcademicPlannersWorkflowService {
               description: fixLibraryTextEncoding(a.description),
               participationTechnique: fixLibraryTextEncoding(a.participationTechnique),
               materials: a.materials ? fixLibraryTextEncoding(a.materials) : null,
+              learningObjective: fixLibraryTextEncoding(a.learningObjective),
+              teacherSteps: Array.isArray(a.teacherSteps)
+                ? a.teacherSteps.filter((step): step is string => typeof step === 'string')
+                : [],
+              expectedOutcome: a.expectedOutcome ? fixLibraryTextEncoding(a.expectedOutcome) : null,
+              durationMinutes: a.durationMinutes,
             })),
             revisionPoints: packRow.revisionPoints.map((r) => ({
               sortOrder: r.sortOrder,
@@ -1286,10 +1323,10 @@ export class AcademicPlannersWorkflowService {
         await refreshChapterTeachingPack(this.prisma, chapter.libraryBookChapterId);
       } catch (error) {
         warnings.push({
-          code: 'TEACHING_PACK_UNAVAILABLE',
+          code: 'TEACHING_PACK_REFRESH_FAILED',
           message: `${chapter.titleSnapshot}: ${
             error instanceof Error ? error.message : 'Teaching pack could not be refreshed.'
-          }`,
+          } The previous pack was kept. Run generate again after deploy, or refresh the chapter pack when generation succeeds.`,
         });
       }
     }

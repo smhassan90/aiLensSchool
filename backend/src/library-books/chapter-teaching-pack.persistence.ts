@@ -1,7 +1,9 @@
 import { PlannerAnalysisSource, Prisma, PrismaClient } from '@prisma/client';
+import { joinCompiledChapter } from '../ai/schemas/chapter-compile.schema';
 import { assertActivityQuality } from './activity-quality';
 import { storedExpectedOutcome } from './activity-focus';
 import { assertPersistableActivities } from './chapter-teaching-pack.ground';
+import { assertConductableActivities } from './chapter-teaching-pack.generator';
 import type { ChapterTeachingPackOutput } from './schemas/chapter-teaching-pack.schema';
 import { wrapTeacherGuide, type SectionPlan } from '../academic-planner/section-teaching-plan';
 
@@ -17,8 +19,15 @@ export async function upsertChapterTeachingPack(
     promptVersion: string;
   },
 ) {
+  const chapter = await prisma.libraryBookChapter.findUnique({
+    where: { id: input.libraryBookChapterId },
+    select: { publishedText: true, exercisesText: true },
+  });
+  if (!chapter) throw new Error('Library chapter not found');
+  const compiled = joinCompiledChapter(chapter.publishedText, chapter.exercisesText).trim();
   assertPersistableActivities(input.pack);
   assertActivityQuality(input.pack.activities);
+  assertConductableActivities(input.pack.activities, compiled);
   const generatedAt = new Date();
 
   return prisma.$transaction(async (tx) => {

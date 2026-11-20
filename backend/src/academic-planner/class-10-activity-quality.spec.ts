@@ -5,6 +5,7 @@ import {
 } from '../ai/prompts/index';
 import {
   activityDayNotes,
+  explainShowableSavedActivityFailures,
   formatSavedActivityNotes,
   isPreparedClassroomActivity,
   isShowableSavedActivity,
@@ -513,6 +514,20 @@ describe('Class 10 English activity quality', () => {
     expect(saved.notes).not.toMatch(/not ready to teach/i);
     expect(saved.notes).not.toContain('Introduction: 5 minutes');
     expect(saved.notes).not.toMatch(/\w{3}…/);
+  });
+
+  it('lists gate failures for a relay-shaped card with no teacher steps', () => {
+    const mathsChapter = 'Convert degrees, minutes and seconds. Calculate the ratio 3:4.';
+    const relay = runnable(
+      'Degree–minute–second relay',
+      'Students pass one conversion step to the next student. Nobody finishes a full conversion alone.',
+      'Each student passes to the next student.',
+    );
+    relay.learningObjective = '';
+    relay.teacherSteps = [];
+    const failures = explainShowableSavedActivityFailures(relay, mathsChapter);
+    expect(failures.join(' ')).toMatch(/missing learning objective|fewer than 3|game name|example marker|one step/i);
+    expect(isShowableSavedActivity(relay, mathsChapter)).toBe(false);
   });
 
   it('shows a complete skill item and hides a relay that has no numbers', () => {
