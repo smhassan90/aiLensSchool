@@ -88,7 +88,6 @@ export async function generateChapterTeachingPack(input: {
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Teaching pack generation failed');
       correction = lastError.message;
-      if (/timed out|timeout|aborted/i.test(correction)) break;
     }
   }
   throw lastError ?? new Error('Teaching pack generation failed');
@@ -347,7 +346,9 @@ async function requestModelText(
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        signal: AbortSignal.timeout(90_000),
+        signal: AbortSignal.timeout(
+          Number(process.env.CHAPTER_TEACHING_PACK_OPENAI_TIMEOUT_MS ?? '180000') || 180_000,
+        ),
         body: JSON.stringify({
           model,
           temperature: 0.2,
@@ -407,7 +408,7 @@ async function generateTeachingPackViaCursor(
   mkdirSync(storeDir, { recursive: true });
 
   const timeoutMs =
-    Number(process.env.CHAPTER_TEACHING_PACK_CURSOR_TIMEOUT_MS ?? '150000') || 150_000;
+    Number(process.env.CHAPTER_TEACHING_PACK_CURSOR_TIMEOUT_MS ?? '300000') || 300_000;
   const prompt = `${system}\n\n${user}\n\nReturn ONLY valid JSON. Do not edit files or run tools.`;
   const result = (await Promise.race([
     Agent.prompt(prompt, {

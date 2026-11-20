@@ -1,6 +1,6 @@
 # Unit 30 activity showability gate
 
-Generated: 2026-11-20T14:48:20.730761+00:00
+Generated: 2026-11-20T15:08:53.375062+00:00
 API: `https://hawknexabackend.fynals.com/api/v1`
 
 ## Book and chapter
@@ -10,7 +10,7 @@ API: `https://hawknexabackend.fynals.com/api/v1`
 
 ## Code (deployed backend)
 
-- `CHAPTER_TEACHING_PACK_PROMPT_VERSION`: `(field missing — redeploy backend)`
+- `CHAPTER_TEACHING_PACK_PROMPT_VERSION`: `chapter-teaching-pack-v12`
 
 ## Pack
 
@@ -23,15 +23,9 @@ API: `https://hawknexabackend.fynals.com/api/v1`
 ## Activity audit (`isShowableSavedActivity`)
 
 - chapter compiledWordCount: **5919** (skill-unit gate uses chapter text when deployed)
-
-_Deployed API has no `activityShowableAudit`; failures below match `explainShowableSavedActivityFailures` in code._
-
 ### Degree–minute–second relay
 
 - showable: **False**
-- sliceKey: `s1`
-- learningObjective: "(missing)"
-- teacherSteps count: **0**
 - fail: Degree–minute–second relay: missing learning objective
 - fail: Degree–minute–second relay: fewer than 3 teacher steps (stored in teacherSteps)
 - fail: Degree–minute–second relay: no example marker (Example answer, For example, Worked example, Sample)
@@ -41,9 +35,6 @@ _Deployed API has no `activityShowableAudit`; failures below match `explainShowa
 ### Sector formula pair drill
 
 - showable: **False**
-- sliceKey: `s2`
-- learningObjective: "(missing)"
-- teacherSteps count: **0**
 - fail: Sector formula pair drill: missing learning objective
 - fail: Sector formula pair drill: fewer than 3 teacher steps (stored in teacherSteps)
 - fail: Sector formula pair drill: no example marker (Example answer, For example, Worked example, Sample)
@@ -51,9 +42,6 @@ _Deployed API has no `activityShowableAudit`; failures below match `explainShowa
 ### Quadrant human unit circle
 
 - showable: **False**
-- sliceKey: `s3`
-- learningObjective: "(missing)"
-- teacherSteps count: **0**
 - fail: Quadrant human unit circle: missing learning objective
 - fail: Quadrant human unit circle: fewer than 3 teacher steps (stored in teacherSteps)
 - fail: Quadrant human unit circle: no example marker (Example answer, For example, Worked example, Sample)
@@ -63,9 +51,6 @@ _Deployed API has no `activityShowableAudit`; failures below match `explainShowa
 ### 30–45–60 speed grid
 
 - showable: **False**
-- sliceKey: `s4`
-- learningObjective: "(missing)"
-- teacherSteps count: **0**
 - fail: 30–45–60 speed grid: missing learning objective
 - fail: 30–45–60 speed grid: fewer than 3 teacher steps (stored in teacherSteps)
 - fail: 30–45–60 speed grid: no example marker (Example answer, For example, Worked example, Sample)
@@ -74,9 +59,6 @@ _Deployed API has no `activityShowableAudit`; failures below match `explainShowa
 ### One ratio, find the rest
 
 - showable: **False**
-- sliceKey: `s4`
-- learningObjective: "(missing)"
-- teacherSteps count: **0**
 - fail: One ratio, find the rest: missing learning objective
 - fail: One ratio, find the rest: fewer than 3 teacher steps (stored in teacherSteps)
 - fail: One ratio, find the rest: no example marker (Example answer, For example, Worked example, Sample)
@@ -84,9 +66,6 @@ _Deployed API has no `activityShowableAudit`; failures below match `explainShowa
 ### Identity proof chain
 
 - showable: **False**
-- sliceKey: `s5`
-- learningObjective: "(missing)"
-- teacherSteps count: **0**
 - fail: Identity proof chain: missing learning objective
 - fail: Identity proof chain: fewer than 3 teacher steps (stored in teacherSteps)
 - fail: Identity proof chain: no example marker (Example answer, For example, Worked example, Sample)
@@ -94,9 +73,6 @@ _Deployed API has no `activityShowableAudit`; failures below match `explainShowa
 ### Elevation and depression sketch gallery
 
 - showable: **False**
-- sliceKey: `s6`
-- learningObjective: "(missing)"
-- teacherSteps count: **0**
 - fail: Elevation and depression sketch gallery: missing learning objective
 - fail: Elevation and depression sketch gallery: fewer than 3 teacher steps (stored in teacherSteps)
 - fail: Elevation and depression sketch gallery: no example marker (Example answer, For example, Worked example, Sample)
@@ -105,9 +81,6 @@ _Deployed API has no `activityShowableAudit`; failures below match `explainShowa
 ### Chapter summary whip-around
 
 - showable: **False**
-- sliceKey: `None`
-- learningObjective: "(missing)"
-- teacherSteps count: **0**
 - fail: Chapter summary whip-around: missing learning objective
 - fail: Chapter summary whip-around: fewer than 3 teacher steps (stored in teacherSteps)
 - fail: Chapter summary whip-around: no example marker (Example answer, For example, Worked example, Sample)
