@@ -86,12 +86,12 @@ function genericSectionSummary(item: unknown): boolean {
   );
 }
 
-/** Keep at most five activities. Drop a generic unit recap before a chapter task. */
+/** Keep three activities. Drop a generic unit recap before a chapter task. */
 export function capTeachingPackActivities(activities: unknown): unknown {
-  if (!Array.isArray(activities) || activities.length <= 5) return activities;
+  if (!Array.isArray(activities)) return activities;
   const specific = activities.filter((item) => !genericSectionSummary(item));
   const source = specific.length >= 3 ? specific : activities;
-  return source.slice(0, 5);
+  return source.slice(0, 3);
 }
 
 /** Trim AI overflow so Zod validation succeeds without dropping the whole pack. */

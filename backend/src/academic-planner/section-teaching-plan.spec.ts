@@ -147,18 +147,29 @@ describe('Unit 1 section teaching plans', () => {
   });
 
   it('uses the activity prepared for the chapter before a later section task', () => {
+    const steps = [
+      '(8 min) Read the task and the example.',
+      '(20 min) Each student completes the task.',
+      '(12 min) Hear two results and compare them with the example.',
+    ];
     const activities: SavedActivity[] = [
       {
         sliceKey: 's1',
         title: 'Oral debate about the story',
-        description: 'Groups discuss and debate the story in a group.',
+        description: 'Groups discuss and debate the story in a group. For example: one reason from the text.',
         participationTechnique: 'Each student speaks once.',
+        learningObjective: 'Students can defend one reason from the story.',
+        teacherSteps: steps,
+        expectedOutcome: 'Each student has spoken one reason.',
       },
       {
         sliceKey: 's2',
         title: 'Write the paragraph',
-        description: 'Each student writes one paragraph from the textbook task.',
+        description: 'Each student writes one paragraph from the textbook task. For example: a topic sentence and one reason.',
         participationTechnique: 'Each student writes in their own notebook.',
+        learningObjective: 'Students can write one paragraph from the textbook task.',
+        teacherSteps: steps,
+        expectedOutcome: 'Each notebook has one paragraph.',
       },
     ];
     const selected = selectSavedActivity({

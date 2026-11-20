@@ -7,6 +7,7 @@ import {
   activityDayNotes,
   formatSavedActivityNotes,
   isPreparedClassroomActivity,
+  isShowableSavedActivity,
   selectSavedActivity,
   type SavedActivity,
 } from './saved-activity-plan';
@@ -23,12 +24,23 @@ function saved(
   spoken: string,
   correction: string,
 ): SavedActivity {
+  const task = /for example|example answer|worked example|sample\s*:/i.test(description)
+    ? description
+    : `${description} For example: use one fact from this chapter.`;
   return {
     sliceKey,
     title,
-    description,
+    description: task,
     participationTechnique: participation(spoken, correction),
     materials: 'Textbook and notebooks',
+    learningObjective: `Students apply one idea from ${title} in their own work.`,
+    teacherSteps: [
+      '(8 min) Read the task and the example.',
+      '(20 min) Each student completes the task.',
+      '(12 min) Hear two results and compare them with the example.',
+    ],
+    expectedOutcome: `Each student finishes the task for ${title}.`,
+    durationMinutes: 40,
   };
 }
 
@@ -36,7 +48,7 @@ const genericRecap = (chapter: string): SavedActivity =>
   saved(
     'Unit recap',
     null,
-    `Teacher writes all section names of ${chapter} on the board. Each group owns one section and writes (a) its meaning in simple words, (b) one line from the textbook, (c) one real-life example.`,
+    `Teacher writes all section names of ${chapter} on the board. Each group owns one section and writes (a) its meaning in simple words, (b) one line from the textbook, (c) one real-life example. For example: use one line from the textbook.`,
     'Oral communication is just talking freely.',
     'Use the textbook line for that section.',
   );
@@ -184,8 +196,8 @@ describe('Class 10 English activity quality', () => {
   it('selects a different chapter task instead of the same unit recap', () => {
     const titles = chapters.map((chapter) => chosen(chapter.activities).title);
     expect(titles).toEqual([
-      'Dream twist discussion',
-      'Gorakh Hills travel diary',
+      'Draft letter to the editor',
+      'Consensus on a class trip',
       'Helmet-law scenarios',
     ]);
     expect(new Set(titles).size).toBe(3);
@@ -451,18 +463,20 @@ describe('Class 10 English activity quality', () => {
     expect(shown.notes).not.toContain('Other saved activities');
 
     const empty = activityDayNotes({ chapterTitle: 'Perimeter', activities: [] });
-    expect(empty.notes).toMatch(/Teach the next printed application/);
+    expect(empty.notes).toMatch(/No saved activity for Perimeter/);
+    expect(empty.notes).toMatch(/Use the next numbered application in the textbook/);
     expect(empty.notes).not.toMatch(/not ready to teach/i);
+    expect(empty.notes).not.toMatch(/sections already taught/i);
     expect(empty.notes).not.toContain('Introduction: 5 minutes');
     expect(empty.notes).not.toContain('Write your own paragraph');
-    expect(empty.notes.match(/Teach the next printed application/g)?.length).toBe(1);
+    expect(empty.notes.match(/Use the next numbered application in the textbook/g)?.length).toBe(1);
   });
 
   it('asks the model to read the unit instead of picking from a format menu', () => {
-    expect(CHAPTER_TEACHING_PACK_PROMPT_VERSION).toBe('chapter-teaching-pack-v11');
+    expect(CHAPTER_TEACHING_PACK_PROMPT_VERSION).toBe('chapter-teaching-pack-v12');
     const prompts = `${CHAPTER_TEACHING_PACK_SYSTEM_PROMPT}\n${CHAPTER_ACTIVITY_SYSTEM_PROMPT}`;
     expect(prompts).toMatch(/Read the whole supplied unit/i);
-    expect(prompts).toMatch(/complete item/i);
+    expect(prompts).toMatch(/complete numbered problem from this unit/i);
     expect(prompts).toMatch(/worked example/i);
     expect(prompts).not.toMatch(/\n\s*\d+\.\s+Narrative/i);
     expect(prompts).not.toMatch(/keep \/ change \/ stop/i);
@@ -537,7 +551,8 @@ describe('Class 10 English activity quality', () => {
       activities: [relay],
       chapterText: ratioChapter,
     });
-    expect(hidden.notes).toMatch(/Teach the next printed application/);
+    expect(hidden.notes).toMatch(/not complete enough to teach/);
+    expect(hidden.notes).not.toMatch(/sections already taught/i);
     expect(hidden.notes).not.toContain('Ratio relay');
     expect(hidden.notes).not.toContain('Use the student task below');
   });
@@ -577,7 +592,8 @@ describe('Class 10 English activity quality', () => {
     expect(notes).not.toContain('Use the student task below');
     expect(notes).not.toMatch(/show the idea of/i);
     const day = activityDayNotes({ chapterTitle: 'Ratios', activities: [bare] });
-    expect(day.notes).toMatch(/Teach the next printed application/);
+    expect(day.notes).toMatch(/not complete enough to teach/);
+    expect(day.notes).not.toMatch(/sections already taught/i);
     expect(day.notes).not.toContain('Use the student task below');
   });
 
@@ -588,6 +604,7 @@ describe('Class 10 English activity quality', () => {
     );
     expect(story.description).not.toMatch(/\d/);
     expect(isPreparedClassroomActivity(story)).toBe(true);
+    expect(isShowableSavedActivity(story, 'The traveller and the shopkeeper argue. The horse follows the person it trusts.')).toBe(true);
     expect(collectActivityCardIssues(withSteps(story)).join(' ')).not.toMatch(/worked example|numeral|skill from this chapter/);
     const storyChapter = 'The traveller and the shopkeeper argue. The horse follows the person it trusts.';
     expect(collectClassroomFocusIssues(withSteps(story), storyChapter).join(' ')).not.toMatch(/skill from this chapter/);

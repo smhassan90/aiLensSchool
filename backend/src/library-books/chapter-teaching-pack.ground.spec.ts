@@ -65,7 +65,7 @@ describe('teaching pack activity limits', () => {
     ).toThrow(/unknown slice s9/);
   });
 
-  it('drops a generic unit recap before a chapter task when there are more than five', () => {
+  it('drops a generic unit recap before a chapter task when there are more than three', () => {
     const raw = pack([
       activity('Dream twist discussion', 's1'),
       activity('Mini presentation', 's1'),
@@ -75,10 +75,10 @@ describe('teaching pack activity limits', () => {
       activity('Unit recap', null),
     ]);
     const capped = capTeachingPackActivities(raw.activities) as ChapterTeachingPackOutput['activities'];
-    expect(capped).toHaveLength(5);
+    expect(capped).toHaveLength(3);
     expect(capped.map((item) => item.title)).not.toContain('Unit recap');
     const parsed = parseChapterTeachingPackJson(JSON.stringify({ ...raw, activities: capped }));
-    expect(parsed.activities).toHaveLength(5);
+    expect(parsed.activities).toHaveLength(3);
   });
 
   it('rejects a reading quote that is not in the chapter and keeps a real quote', () => {

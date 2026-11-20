@@ -19,10 +19,6 @@ export type SavedActivity = {
   durationMinutes?: number | null;
 };
 
-function isRecap(activity: SavedActivity): boolean {
-  return activity.sliceKey == null || /\brecap\b/i.test(activity.title);
-}
-
 function storedSteps(activity: SavedActivity): string[] {
   if (!Array.isArray(activity.teacherSteps)) return [];
   return activity.teacherSteps
@@ -42,10 +38,50 @@ export function isPreparedClassroomActivity(activity: SavedActivity): boolean {
   return collectActivityCardIssues({ ...activity, steps: storedSteps(activity) }).length === 0;
 }
 
+function isRecapLike(activity: SavedActivity): boolean {
+  return activity.sliceKey == null || /\b(recap|whip[- ]around|summary)\b/i.test(activity.title);
+}
+
+function hasCompleteItem(description: string): boolean {
+  return /\d/.test(description) || /\b(given|to prove)\b/i.test(description);
+}
+
+function rankShowable(activities: SavedActivity[]): SavedActivity | null {
+  if (!activities.length) return null;
+  return [...activities].sort((left, right) => {
+    const recap = Number(isRecapLike(left)) - Number(isRecapLike(right));
+    if (recap !== 0) return recap;
+    return Number(!hasCompleteItem(left.description)) - Number(!hasCompleteItem(right.description));
+  })[0];
+}
+
+/**
+ * Best activity a teacher can run for this chapter.
+ * A showable card on a slice already taught comes first.
+ * If that slice has none, any other showable card in the chapter is used.
+ */
+export function chooseShowableChapterActivity(input: {
+  activities: SavedActivity[];
+  coveredSliceKeys?: string[];
+  usedTitles?: string[];
+  chapterText?: string;
+}): SavedActivity | null {
+  const used = new Set((input.usedTitles ?? []).map((title) => title.trim().toLowerCase()));
+  const covered = new Set(input.coveredSliceKeys ?? []);
+  const showable = input.activities.filter((activity) => {
+    if (used.has(activity.title.trim().toLowerCase())) return false;
+    if (isGenericSectionSummary(activity)) return false;
+    return isShowableSavedActivity(activity, input.chapterText) && !activityMismatchesSkill(activity, input.chapterText);
+  });
+  const onTaught = showable.filter(
+    (activity) => activity.sliceKey != null && covered.has(activity.sliceKey) && isPreparedClassroomActivity(activity),
+  );
+  return rankShowable(onTaught) ?? rankShowable(showable);
+}
+
 /**
  * Use the activity the model prepared for this chapter.
- * Title words such as oral, debate, or group do not change the choice.
- * A section-summary recap is used only when nothing else fits.
+ * A later slice is used when the slices already taught have no showable card.
  */
 export function selectSavedActivity(input: {
   activities: SavedActivity[];
@@ -53,25 +89,16 @@ export function selectSavedActivity(input: {
   usedTitles: string[];
   preferRecap: boolean;
   preferredSliceKeys?: string[];
+  chapterText?: string;
 }): SavedActivity | null {
-  const used = new Set(input.usedTitles.map((title) => title.trim().toLowerCase()));
-  const unused = input.activities.filter((activity) => !used.has(activity.title.trim().toLowerCase()));
-  const covered = new Set(input.coveredSliceKeys);
-  const studied = (activity: SavedActivity) => activity.sliceKey == null || covered.has(activity.sliceKey);
-  const specific = unused.filter(
-    (activity) => studied(activity) && activity.sliceKey != null && !isGenericSectionSummary(activity),
-  );
-
-  if (!specific.length) {
-    return unused.find((activity) => isRecap(activity) && studied(activity)) ?? null;
-  }
   void input.preferRecap;
-  const preferred = new Set(input.preferredSliceKeys ?? []);
-  const prepared = specific.filter((activity) => isPreparedClassroomActivity(activity));
-  const onMain = prepared.find((activity) => activity.sliceKey != null && preferred.has(activity.sliceKey));
-  if (onMain) return onMain;
-  if (prepared[0]) return prepared[0];
-  return specific[0] ?? null;
+  const covered = [...new Set([...input.coveredSliceKeys, ...(input.preferredSliceKeys ?? [])])];
+  return chooseShowableChapterActivity({
+    activities: input.activities,
+    coveredSliceKeys: covered,
+    usedTitles: input.usedTitles,
+    chapterText: input.chapterText,
+  });
 }
 
 const EXAMPLE_MARKER =
@@ -106,7 +133,11 @@ export function isShowableSavedActivity(activity: SavedActivity, chapterText?: s
   if (!activity.participationTechnique?.trim()) return false;
   if (storedSteps(activity).length < 3) return false;
   if (!EXAMPLE_MARKER.test(description)) return false;
-  if (/\b(relays?|hunts?|round[- ]robins?|sorting|matching pairs|quick chains?|terminolog(?:y|ies))\b/i.test(`${title}\n${objective}`)) {
+  if (
+    /\b(relays?|hunts?|round[- ]robins?|sorting|matching pairs|quick chains?|terminolog(?:y|ies)|whip[- ]arounds?|speed grids?|human unit circle)\b/i.test(
+      `${title}\n${objective}`,
+    )
+  ) {
     return false;
   }
   if (/\bshow the idea of\b/i.test(activity.expectedOutcome ?? '')) return false;
@@ -118,7 +149,7 @@ export function isShowableSavedActivity(activity: SavedActivity, chapterText?: s
     return false;
   }
   const hasFigure = /\b(given|to prove|the figure|radius|diameter)\b/i.test(description);
-  if (chapterIsSkillUnit(chapterText) && !/\d/.test(description) && !hasFigure && !EXAMPLE_MARKER.test(description)) {
+  if (chapterIsSkillUnit(chapterText) && !/\d/.test(description) && !hasFigure) {
     return false;
   }
   return true;
@@ -126,33 +157,25 @@ export function isShowableSavedActivity(activity: SavedActivity, chapterText?: s
 
 /**
  * Notes for an Activity day.
- * A prepared activity is preferred. A saved card is still shown when it has its own objective, steps, and example.
- * A hollow game, or a pack with no activity, uses the short missing note.
+ * A showable card on a taught slice is preferred. Any other showable card in the chapter is still used.
+ * The short note is only for a pack with no showable activity.
  */
 export function activityDayNotes(input: {
   chapterTitle: string;
   activities: SavedActivity[];
   preferredSliceKeys?: string[];
+  coveredSliceKeys?: string[];
+  usedTitles?: string[];
   periodMinutes?: number;
   chapterText?: string;
   missingReason?: string;
 }): { notes: string; title: string; objective: string } {
-  const sliceKeys = input.activities
-    .map((activity) => activity.sliceKey)
-    .filter((key): key is string => Boolean(key));
-  const covered = [...new Set([...sliceKeys, ...(input.preferredSliceKeys ?? [])])];
-  const ranked = (covered.length
-    ? input.activities.filter((activity) => activity.sliceKey == null || covered.includes(activity.sliceKey))
-    : input.activities
-  ).filter((activity) => !isGenericSectionSummary(activity) && !isRecap(activity));
-  const usable = (activity: SavedActivity) =>
-    isPreparedClassroomActivity(activity) && !activityMismatchesSkill(activity, input.chapterText);
-  const preferredReady = ranked.find(
-    (activity) => activity.sliceKey != null && (input.preferredSliceKeys ?? []).includes(activity.sliceKey) && usable(activity),
-  );
-  const showable = (activity: SavedActivity) =>
-    isShowableSavedActivity(activity, input.chapterText) && !activityMismatchesSkill(activity, input.chapterText);
-  const selected = preferredReady ?? ranked.find(usable) ?? ranked.find(showable) ?? null;
+  const selected = chooseShowableChapterActivity({
+    activities: input.activities,
+    coveredSliceKeys: [...new Set([...(input.coveredSliceKeys ?? []), ...(input.preferredSliceKeys ?? [])])],
+    usedTitles: input.usedTitles,
+    chapterText: input.chapterText,
+  });
   if (selected) {
     return {
       notes: formatSavedActivityNotes(selected, input.chapterTitle, [], input.periodMinutes ?? 40),
@@ -160,12 +183,12 @@ export function activityDayNotes(input: {
       objective: displayObjective(selected) || `Apply the main idea of ${input.chapterTitle}.`,
     };
   }
+  const hasActivities = input.activities.some((activity) => activity.title?.trim() || activity.description?.trim());
+  const reason = hasActivities
+    ? `The saved activity for ${input.chapterTitle} is not complete enough to teach. Use the next numbered application in the textbook.`
+    : input.missingReason?.trim() || '';
   return {
-    notes: formatUnavailableChapterNotes(
-      input.chapterTitle,
-      input.missingReason ?? `No saved activity for ${input.chapterTitle}.`,
-      'ACTIVITY',
-    ),
+    notes: formatUnavailableChapterNotes(input.chapterTitle, reason, 'ACTIVITY'),
     title: 'Chapter activity',
     objective: `Apply the main idea of ${input.chapterTitle}.`,
   };
@@ -224,9 +247,9 @@ export function formatSavedActivityNotes(
 export function formatUnavailableChapterNotes(chapterTitle: string, reason: string, role: string): string {
   if (role === 'ACTIVITY') {
     const why = reason?.trim();
-    return why
-      ? `${why} Teach the next printed application in ${chapterTitle} from the textbook.`
-      : `Teach the next printed application in ${chapterTitle} from the textbook.`;
+    if (!why) return `No saved activity for ${chapterTitle}. Use the next numbered application in the textbook.`;
+    if (/use the next numbered application in the textbook/i.test(why)) return why;
+    return `${why} Use the next numbered application in the textbook.`;
   }
   return [
     `Teaching pack unavailable for ${chapterTitle}`,

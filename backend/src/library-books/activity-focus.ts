@@ -90,7 +90,7 @@ const STUDENT_ACTION =
 const BROKEN_PHRASE = /\bkeep moderated\b|…|\.{3}/i;
 const LECTURE_STAMP = /\bteacher explanation\b|\bguided practice\b|\bstudent practice\b|\bintroduction and instructions\b/i;
 const GAME_WRAPPER =
-  /\b(relays?|hunts?|round[- ]robins?|sorting|matching pairs|quick chains?|terminolog(?:y|ies)|stand(?:ing)? in a circle|sit(?:ting)? in a circle)\b/i;
+  /\b(relays?|hunts?|round[- ]robins?|sorting|matching pairs|quick chains?|terminolog(?:y|ies)|whip[- ]arounds?|speed grids?|human unit circle|stand(?:ing)? in a circle|sit(?:ting)? in a circle)\b/i;
 const ONE_STEP_PASS =
   /\b(pass(?:es|ed|ing)? (?:around|on|it|one step|the next)|one step of (?:a |the )?(?:conversion|method|solution)|each (?:student|person|member) (?:only )?(?:does|writes|completes) one step|next (?:student|person) (?:does|finishes|writes) the next step|stand(?:ing)? in a circle|sit(?:ting)? in a circle)\b/i;
 const SHOW_THE_IDEA = /\bshow the idea of\b/i;

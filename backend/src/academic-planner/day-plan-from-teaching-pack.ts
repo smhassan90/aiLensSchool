@@ -18,12 +18,9 @@ import {
 import {
   exerciseLessonNotes,
   activityDayNotes,
-  formatSavedActivityNotes,
   formatUnavailableChapterNotes,
-  isShowableSavedActivity,
   introLessonNotes,
   readingLessonNotes,
-  selectSavedActivity,
   slicesForReadingDay,
 } from './saved-activity-plan';
 import {
@@ -202,26 +199,19 @@ export function generateDayPlanFromTeachingPacks(input: {
         objectives = [`Do the textbook exercises for ${sectionTitle || chapterTitle}.`];
       }
       if (role === 'ACTIVITY') {
-        const selected = pack
-          ? selectSavedActivity({
-              activities: pack.activities,
-              coveredSliceKeys,
-              usedTitles: usedActivityTitles,
-              preferRecap: true,
-            })
-          : null;
-        if (selected && pack && isShowableSavedActivity(selected, chapterText)) {
-          usedActivityTitles.push(selected.title);
-          teacherNotes = formatSavedActivityNotes(selected, chapterTitle, pack.activities, periodMinutes);
-          objectives = [selected.title];
-          titleSuffix = selected.title.slice(0, 80);
-        } else if (!teacherNotes) {
-          teacherNotes = formatUnavailableChapterNotes(
-            chapterTitle,
-            'No saved activity matches the sections already taught.',
-            role,
-          );
-        }
+        const day = activityDayNotes({
+          chapterTitle,
+          activities: pack?.activities ?? [],
+          coveredSliceKeys,
+          usedTitles: usedActivityTitles,
+          periodMinutes,
+          chapterText,
+          missingReason: reason,
+        });
+        teacherNotes = day.notes;
+        if (day.title !== 'Chapter activity') usedActivityTitles.push(day.title);
+        objectives = [day.title === 'Chapter activity' ? day.objective : day.title];
+        titleSuffix = day.title.slice(0, 80);
       }
 
       const plan = buildMinimalDayPlan({
@@ -369,23 +359,16 @@ export function rebuildLessonFromPack(input: {
   let objectives: string[] | undefined;
   let titleSuffix: string | undefined;
   if (role === 'ACTIVITY') {
-    const selected = selectSavedActivity({
+    const day = activityDayNotes({
+      chapterTitle,
       activities: input.pack.activities,
       coveredSliceKeys: covered,
-      usedTitles: [],
-      preferRecap: true,
+      periodMinutes: input.periodMinutes,
+      chapterText: input.chapterText,
     });
-    if (selected && isShowableSavedActivity(selected, input.chapterText)) {
-      teacherNotes = formatSavedActivityNotes(selected, chapterTitle, input.pack.activities, input.periodMinutes);
-      objectives = [selected.title];
-      titleSuffix = selected.title.slice(0, 80);
-    } else {
-      teacherNotes = formatUnavailableChapterNotes(
-        chapterTitle,
-        'No saved activity matches the sections already taught.',
-        role,
-      );
-    }
+    teacherNotes = day.notes;
+    objectives = [day.title === 'Chapter activity' ? day.objective : day.title];
+    titleSuffix = day.title.slice(0, 80);
   } else if (role === 'EXERCISE') {
     teacherNotes = exerciseLessonNotes(chapterTitle, input.pack.questions);
     objectives = [`Do the textbook exercises for ${chapterTitle}.`];

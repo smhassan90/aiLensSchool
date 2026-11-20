@@ -111,7 +111,12 @@ function slots(count: number): TeachingSlot[] {
   }));
 }
 
-function planFor(chapters: Array<{ key: string; title: string; hash: string | null; libraryId: string | null }>, packs: Map<string, TeachingPackForAnalysis>) {
+function planFor(
+  chapters: Array<{ key: string; title: string; hash: string | null; libraryId: string | null }>,
+  packs: Map<string, TeachingPackForAnalysis>,
+  chapterText = 'A bad dream woke him before the presentation. '.repeat(40),
+  dayCount = 8,
+) {
   return generateDayPlanFromTeachingPacks({
     chapters: chapters.map((chapter, index) => ({
       chapterKey: chapter.key,
@@ -119,17 +124,17 @@ function planFor(chapters: Array<{ key: string; title: string; hash: string | nu
       libraryBookChapterId: chapter.libraryId,
       contentHash: chapter.hash,
       sortOrder: index,
-      chapterText: 'A bad dream woke him before the presentation. '.repeat(30),
+      chapterText,
     })),
     packsByChapterId: packs,
     chapterTextsByLibraryId: new Map(
       chapters
         .filter((chapter) => chapter.libraryId)
-        .map((chapter) => [chapter.libraryId as string, 'A bad dream woke him before the presentation. '.repeat(40)]),
+        .map((chapter) => [chapter.libraryId as string, chapterText]),
     ),
     subjectName: 'English',
-    teachingSlots: slots(8),
-    settings: { ...defaultPlannerSettings('2026-12-20'), revisionSlots: 1, fallbackPeriodMinutes: 40 },
+    teachingSlots: slots(dayCount),
+    settings: { ...defaultPlannerSettings('2026-12-20'), revisionSlots: dayCount === 2 ? 0 : 1, fallbackPeriodMinutes: 40 },
     timetableSource: 'FALLBACK',
     keyFactory: (() => {
       let n = 0;
@@ -182,7 +187,8 @@ describe('saved teaching-pack activities in the day plan', () => {
     );
     expect(unit5?.notes).toContain('Dream twist discussion');
     expect(unit5?.notes).not.toMatch(/Finish the line/i);
-    expect(unit6?.notes).toContain('Teach the next printed application');
+    expect(unit6?.notes).toContain('Use the next numbered application in the textbook');
+    expect(unit6?.notes).not.toMatch(/sections already taught/i);
     expect(unit6?.notes).toContain('out of date');
     expect(unit6?.notes).not.toContain('Unit recap');
     expect(result!.summary.warnings.some((warning) => warning.code === 'TEACHING_PACK_UNAVAILABLE')).toBe(true);
@@ -204,7 +210,7 @@ describe('saved teaching-pack activities in the day plan', () => {
     expect(exercise?.notes).not.toContain('UNIQUE_SUMMARY_SENTENCE_SHOULD_NOT_REPEAT');
   });
 
-  it('does not select an activity for a section that has not been taught', () => {
+  it('uses a showable activity from a later slice when the taught slice has none', () => {
     const pack = unit5Pack('hash-unit-5');
     const early = selectSavedActivity({
       activities: pack.activities,
@@ -219,7 +225,7 @@ describe('saved teaching-pack activities in the day plan', () => {
       usedTitles: [],
       preferRecap: false,
     });
-    expect(unseen).toBeNull();
+    expect(unseen?.title).toBe('Draft letter to the editor');
     const second = selectSavedActivity({
       activities: pack.activities,
       coveredSliceKeys: ['s1', 's2'],
@@ -227,6 +233,81 @@ describe('saved teaching-pack activities in the day plan', () => {
       preferRecap: false,
     });
     expect(second?.title).toBe('Mini presentation with feedback');
+  });
+
+  it('shows a later complete activity on a two-day chapter and does not blame the sections', () => {
+    const chapterText = 'Convert a ratio by multiplying both terms. Simplify 3:4. Calculate the missing term with the product of the means.';
+    const steps = [
+      '(8 min) Write 3:4 on the board.',
+      '(20 min) Each student calculates the missing term.',
+      '(12 min) Check that both products are 24.',
+    ];
+    const complete = {
+      sliceKey: 's6',
+      title: 'Find the missing term',
+      description:
+        'A shop keeps the ratio 3:4. The short piece is 6 metres. What is the long piece? Worked example: 3:4 = 6:8, because 3 times 8 is 24 and 4 times 6 is 24. The correct answer is 8 metres. Each student calculates the missing term.',
+      participationTechnique: 'Each student calculates the missing term alone.',
+      materials: 'None',
+      learningObjective: 'Students can find the missing term in an equal ratio.',
+      teacherSteps: steps,
+      expectedOutcome: 'Each notebook shows 3:4 = 6:8.',
+      durationMinutes: 40,
+    };
+    const relay = {
+      sliceKey: 's1',
+      title: 'Term relay',
+      description: 'Students pass one step of the method to the next person. Nobody finishes a full item.',
+      participationTechnique: 'Each student passes one step.',
+      materials: 'None',
+      learningObjective: '',
+      teacherSteps: [],
+      expectedOutcome: '',
+      durationMinutes: 20,
+    };
+    const base = unit5Pack('hash-ratio');
+    const withLater = {
+      ...base,
+      summary: 'A short ratio chapter.',
+      readingSlices: [
+        { sliceKey: 's1', title: 'Equal ratios', readingFrom: 'Convert a ratio by multiplying both terms.', readingTo: null, explainPoints: ['Both terms change by the same factor.'] },
+        { sliceKey: 's6', title: 'A missing term', readingFrom: 'Calculate the missing term with the product of the means.', readingTo: null, explainPoints: ['The products match.'] },
+      ],
+      activities: [relay, complete],
+    };
+    const shown = planFor(
+      [{ key: 'ratio', title: 'Ratios', hash: 'hash-ratio', libraryId: 'lib-ratio' }],
+      new Map([['lib-ratio', withLater]]),
+      chapterText,
+      3,
+    );
+    const activity = shown!.lessons.find((lesson) => lesson.kind === PlannerLessonKind.ACTIVITY);
+    expect(activity?.notes).toContain('3:4');
+    expect(activity?.notes).toContain('6:8');
+    expect(activity?.title).toContain('Find the missing term');
+    expect(activity?.notes).not.toMatch(/relay/i);
+    expect(activity?.notes).not.toMatch(/sections already taught/i);
+
+    const onlyRelay = planFor(
+      [{ key: 'ratio', title: 'Ratios', hash: 'hash-ratio', libraryId: 'lib-ratio' }],
+      new Map([['lib-ratio', { ...withLater, activities: [relay] }]]),
+      chapterText,
+      3,
+    );
+    const hidden = onlyRelay!.lessons.find((lesson) => lesson.kind === PlannerLessonKind.ACTIVITY);
+    expect(hidden?.notes).toMatch(/not complete enough to teach/);
+    expect(hidden?.notes).not.toMatch(/relay/i);
+    expect(hidden?.notes).not.toMatch(/sections already taught/i);
+
+    const empty = planFor(
+      [{ key: 'ratio', title: 'Ratios', hash: 'hash-ratio', libraryId: 'lib-ratio' }],
+      new Map([['lib-ratio', { ...withLater, activities: [] }]]),
+      chapterText,
+      3,
+    );
+    const missing = empty!.lessons.find((lesson) => lesson.kind === PlannerLessonKind.ACTIVITY);
+    expect(missing?.notes).toMatch(/No saved activity for Ratios/);
+    expect(missing?.notes).not.toMatch(/sections already taught/i);
   });
 });
 

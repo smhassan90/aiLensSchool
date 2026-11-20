@@ -10,6 +10,7 @@ import {
   CHAPTER_TEACHING_PACK_SYSTEM_PROMPT,
 } from '../ai/prompts';
 import { buildTeachingPackHeader } from './class-age-hint';
+import { isShowableSavedActivity } from '../academic-planner/saved-activity-plan';
 import { activitiesRepeatEachOther, collectClassroomFocusIssues } from './activity-focus';
 import { assertActivityQuality } from './activity-quality';
 import { groundTeachingPack } from './chapter-teaching-pack.ground';
@@ -156,6 +157,28 @@ function assertConductableActivities(
   }
   const titles = activities.map((activity) => activity.title.trim().toLowerCase());
   if (new Set(titles).size < titles.length) throw new Error('The activities repeat one title');
+  if (activities.some((activity) => /\b(recap|whip[- ]around)\b/i.test(activity.title))) {
+    throw new Error('Recap and whip-around activities are not valid');
+  }
+  const showable = isShowableSavedActivity(
+    {
+      sliceKey: first.sliceKey ?? null,
+      title: first.title,
+      description: first.description,
+      participationTechnique: first.participationTechnique,
+      materials: first.materials,
+      learningObjective: first.learningObjective,
+      teacherSteps: first.steps,
+      expectedOutcome: first.expectedOutcome,
+      durationMinutes: first.durationMinutes,
+    },
+    chapterText,
+  );
+  if (!showable || first.durationMinutes !== 40) {
+    throw new Error(
+      'Activity 1 cannot be taught. It needs a distinct objective, 3 to 5 teacher steps, an example, a 40-minute duration, and a complete numbered item when this unit is a skill.',
+    );
+  }
   const firstIssues = collectClassroomFocusIssues(first, chapterText);
   const restIssues = activities.slice(1).flatMap((activity) => collectClassroomFocusIssues(activity, chapterText));
   const focus = [
