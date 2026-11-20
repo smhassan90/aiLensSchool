@@ -374,7 +374,9 @@ export class AcademicPlannersWorkflowService {
             description: fixLibraryTextEncoding(a.description),
             participationTechnique: fixLibraryTextEncoding(a.participationTechnique),
             materials: a.materials ? fixLibraryTextEncoding(a.materials) : null,
-            learningObjective: fixLibraryTextEncoding(a.learningObjective),
+            learningObjective: a.learningObjective
+              ? fixLibraryTextEncoding(a.learningObjective)
+              : null,
             teacherSteps: a.teacherSteps,
             expectedOutcome: a.expectedOutcome ? fixLibraryTextEncoding(a.expectedOutcome) : null,
             durationMinutes: a.durationMinutes,
@@ -435,7 +437,9 @@ export class AcademicPlannersWorkflowService {
               description: fixLibraryTextEncoding(a.description),
               participationTechnique: fixLibraryTextEncoding(a.participationTechnique),
               materials: a.materials ? fixLibraryTextEncoding(a.materials) : null,
-              learningObjective: fixLibraryTextEncoding(a.learningObjective),
+              learningObjective: a.learningObjective
+                ? fixLibraryTextEncoding(a.learningObjective)
+                : null,
               teacherSteps: Array.isArray(a.teacherSteps)
                 ? a.teacherSteps.filter((step): step is string => typeof step === 'string')
                 : [],
