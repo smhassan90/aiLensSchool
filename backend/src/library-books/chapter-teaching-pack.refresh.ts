@@ -8,6 +8,7 @@ import { packNeedsRefresh } from '../academic-planner/section-teaching-plan';
 
 /**
  * Regenerates a teaching pack when the chapter text or the pack prompt version changed.
+ * Stale rows (e.g. `chapter-teaching-pack-v1`) refresh on planner generate once code is deployed.
  * A failed generation throws and leaves the previous pack untouched.
  */
 export async function refreshChapterTeachingPack(

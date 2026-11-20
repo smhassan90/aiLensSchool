@@ -16,6 +16,78 @@ BASE = os.environ.get("HAWKNEXA_API", "https://hawknexabackend.fynals.com/api/v1
 OUT = Path(__file__).resolve().parents[1] / "docs" / "analysis" / "unit-30-activity-gate.md"
 CHAPTER_HINT = re.compile(r"unit\s*30|introduction\s+to\s+trigonometry", re.I)
 MATHS_BOOK = re.compile(r"math", re.I)
+EXAMPLE_MARKER = re.compile(
+    r"\bexample\s+(answer|argument|verdict|question|decision|working)\b|\bworked example\b|\bfor example\b|\bsample\s*:|\bexample\s*:",
+    re.I,
+)
+GAME_NAME = re.compile(
+    r"\b(relays?|hunts?|round[- ]robins?|sorting|matching pairs|quick chains?|terminolog(?:y|ies)|whip[- ]arounds?|speed grids?|human unit circle)\b",
+    re.I,
+)
+PASS_ONE = re.compile(
+    r"\b(pass(?:es|ed|ing)? (?:around|on|it|one step|the next)|one step of (?:a |the )?|stand(?:ing)? in a circle|sit(?:ting)? in a circle)\b",
+    re.I,
+)
+SKILL_SIGNAL = re.compile(
+    r"\b(convert|construct|compass|prove|proving|ratio|proportion|degrees|minutes|chord|tangent|equation|formula|calculate|measure|simplify)\b",
+    re.I,
+)
+SKILL_PROCEDURE = re.compile(r"\b(step|method|formula|calculate|convert|construct|solve|simplify|prove)\b", re.I)
+
+
+def same_label(left: str, right: str) -> bool:
+    return left.strip().lower().split() == right.strip().lower().split()
+
+
+def stored_steps(activity: dict) -> list[str]:
+    raw = activity.get("teacherSteps")
+    if not isinstance(raw, list):
+        return []
+    return [s.strip() for s in raw if isinstance(s, str) and s.strip()]
+
+
+def chapter_is_skill_unit(chapter_text: str) -> bool:
+    chapter = chapter_text or ""
+    if not chapter.strip():
+        return False
+    if SKILL_SIGNAL.search(chapter):
+        return True
+    digits = len(re.findall(r"\d", chapter))
+    return digits >= 3 and bool(SKILL_PROCEDURE.search(chapter))
+
+
+def explain_showable_failures(activity: dict, chapter_text: str) -> list[str]:
+    failures: list[str] = []
+    title = (activity.get("title") or "").strip()
+    description = (activity.get("description") or "").strip()
+    objective = (activity.get("learningObjective") or "").strip()
+    steps = stored_steps(activity)
+    label = title or "Activity"
+
+    if not title:
+        failures.append(f"{label}: missing title")
+    if not description:
+        failures.append(f"{label}: missing description")
+    if not objective:
+        failures.append(f"{label}: missing learning objective")
+    elif same_label(objective, title):
+        failures.append(f"{label}: objective repeats the title")
+    if not (activity.get("participationTechnique") or "").strip():
+        failures.append(f"{label}: missing participation")
+    if len(steps) < 3:
+        failures.append(f"{label}: fewer than 3 teacher steps (stored in teacherSteps)")
+    if not EXAMPLE_MARKER.search(description):
+        failures.append(f"{label}: no example marker (Example answer, For example, Worked example, Sample)")
+    if GAME_NAME.search(f"{title}\n{objective}"):
+        failures.append(f"{label}: title or objective is only a game name")
+    if re.search(r"\bshow the idea of\b", activity.get("expectedOutcome") or "", re.I):
+        failures.append(f"{label}: expected outcome only names the idea of the title")
+    if PASS_ONE.search(f"{description}\n" + "\n".join(steps)):
+        failures.append(f"{label}: students pass one step instead of finishing a full item")
+    has_figure = bool(re.search(r"\b(given|to prove|the figure|radius|diameter)\b", description, re.I))
+    if chapter_is_skill_unit(chapter_text) and not re.search(r"\d", description) and not has_figure:
+        failures.append(f"{label}: skill unit needs digits or given/to prove on the card")
+    return failures
 
 
 def post_json(path: str, body: dict) -> dict:
@@ -64,28 +136,39 @@ def main() -> int:
     t_token = login(t_user, t_pass)
 
     books = get_json("/library-books", sa_token)
-    maths = [
-        b
-        for b in books
-        if MATHS_BOOK.search(b.get("subjectLabel", "") or "")
-        and re.search(r"\b10\b|class\s*10", str(b.get("classLabel", "")), re.I)
-    ]
-    if not maths:
-        maths = [b for b in books if MATHS_BOOK.search(b.get("subjectLabel", "") or "")]
+    maths = [b for b in books if MATHS_BOOK.search(b.get("subjectLabel", "") or "")]
     if not maths:
         raise RuntimeError("No Maths book found for this school.")
 
-    book = maths[0]
+    def find_unit_30_chapter(detail: dict) -> dict | None:
+        chapters = detail.get("chapters") or []
+        return next(
+            (c for c in chapters if CHAPTER_HINT.search(c.get("title", "") or "") or c.get("chapterNumber") == 30),
+            None,
+        )
+
+    def class_x_score(book: dict) -> int:
+        label = f"{book.get('classLabel', '')} {book.get('title', '')}"
+        if re.search(r"class\s*x\b|\bclass\s*10\b|\bgrade\s*10\b", label, re.I):
+            return 2
+        if re.search(r"\bx\b", label, re.I) and not re.search(r"\bix\b", label, re.I):
+            return 2
+        return 0
+
+    book = None
+    chapter = None
+    detail = None
+    ranked = sorted(maths, key=class_x_score, reverse=True)
+    for candidate in ranked:
+        d = get_json(f"/library-books/{candidate['id']}", sa_token)
+        ch = find_unit_30_chapter(d)
+        if ch:
+            book, detail, chapter = candidate, d, ch
+            break
+    if not book or not chapter or not detail:
+        raise RuntimeError("Unit 30 chapter not found in any Maths library book.")
+
     book_id = book["id"]
-    detail = get_json(f"/library-books/{book_id}", sa_token)
-    chapters = detail.get("chapters") or []
-    chapter = next(
-        (c for c in chapters if CHAPTER_HINT.search(c.get("title", "") or "")),
-        None,
-    )
-    if not chapter:
-        titles = [f"{c.get('chapterNumber')}: {c.get('title')}" for c in chapters[:40]]
-        raise RuntimeError(f"Unit 30 chapter not found. Sample: {titles}")
 
     ch_id = chapter["id"]
     debug = get_json(f"/academic-planners/books/{book_id}/chapters/{ch_id}/teaching-pack-debug", t_token)
@@ -124,17 +207,28 @@ def main() -> int:
                 "",
             ]
         )
+        chapter_text = ""
+        ch = debug.get("chapter") or {}
+        compiled_words = ch.get("compiledWordCount")
+        if compiled_words:
+            lines.append(f"- chapter compiledWordCount: **{compiled_words}** (skill-unit gate uses chapter text when deployed)")
         audit = debug.get("activityShowableAudit") or []
         if not audit:
-            lines.append("_No `activityShowableAudit` in API response — deploy the backend that exposes this field._")
             lines.append("")
+            lines.append("_Deployed API has no `activityShowableAudit`; failures below match `explainShowableSavedActivityFailures` in code._")
+            lines.append("")
+            sa_ch = get_json(f"/library-books/{book_id}/chapters/{ch_id}", sa_token)
+            chapter_text = (sa_ch.get("publishedText") or "") + "\n" + (sa_ch.get("exercisesText") or "")
             for act in pack.get("activities") or []:
+                failures = explain_showable_failures(act, chapter_text)
                 lines.append(f"### {act.get('title')}")
                 lines.append("")
+                lines.append(f"- showable: **{not failures}**")
                 lines.append(f"- sliceKey: `{act.get('sliceKey')}`")
-                lines.append(f"- learningObjective: {json.dumps(act.get('learningObjective', '(missing from API)'))}")
-                steps = act.get("teacherSteps") or []
-                lines.append(f"- teacherSteps count: **{len(steps) if isinstance(steps, list) else 0}**")
+                lines.append(f"- learningObjective: {json.dumps(act.get('learningObjective') or '(missing)')}")
+                lines.append(f"- teacherSteps count: **{len(stored_steps(act))}**")
+                for item in failures:
+                    lines.append(f"- fail: {item}")
                 lines.append("")
         else:
             for row in audit:

@@ -1,68 +1,121 @@
 # Unit 30 activity showability gate
 
-Generated during deploy fix work (production audit pending `TEACHER_PASSWORD` / `SUPERADMIN_PASSWORD`).
+Generated: 2026-11-20T14:48:20.730761+00:00
+API: `https://hawknexabackend.fynals.com/api/v1`
 
-Run after deploy:
+## Book and chapter
 
-```bash
-SUPERADMIN_PASSWORD=… TEACHER_PASSWORD=… python3 scripts/diagnose-unit-30-activity-gate.py
-```
+- Book: **Mathematics for Class X** (`43ebed7d-48fa-4984-a75f-be1462a4c545`)
+- Chapter: **Unit 30 — Introduction to Trigonometry** (`200777c4-21ac-42aa-a545-892473065928`), number 30
 
-## Code checks (`isShowableSavedActivity` / `explainShowableSavedActivityFailures`)
+## Code (deployed backend)
 
-Current prompt version in repo: **`chapter-teaching-pack-v12`**
+- `CHAPTER_TEACHING_PACK_PROMPT_VERSION`: `(field missing — redeploy backend)`
 
-An activity must have all of:
+## Pack
 
-| Check | Failure message |
-| --- | --- |
-| Non-empty title | missing title |
-| Non-empty description | missing description |
-| Non-empty `learningObjective` not equal to title | missing learning objective / objective repeats the title |
-| Non-empty `participationTechnique` | missing participation |
-| `teacherSteps` with at least 3 strings | fewer than 3 teacher steps |
-| Example marker in description | no example marker |
-| Title/objective not a game name (relay, hunt, round-robin, …) | title or objective is only a game name |
-| Expected outcome not “show the idea of …” | expected outcome only names the idea |
-| No one-step-pass language in description/steps | students pass one step… |
-| Skill chapter: digit or given/to prove in description | skill unit needs digits… |
+- promptVersion: `chapter-teaching-pack-v1`
+- hashMatchesChapter: **True**
+- source: `AI`
+- generatedAt: `2026-10-28T20:11:22.801Z`
+- activity count: **8**
 
-`storedSteps` reads **`teacherSteps`**, not `steps`. Old packs saved without `learningObjective` / `teacherSteps` always fail.
+## Activity audit (`isShowableSavedActivity`)
 
-## Confirmed relay shape (production report, pre–v12 deploy)
+- chapter compiledWordCount: **5919** (skill-unit gate uses chapter text when deployed)
 
-`Degree–minute–second relay` (and similar cards) fail because:
+_Deployed API has no `activityShowableAudit`; failures below match `explainShowableSavedActivityFailures` in code._
 
-1. **missing learning objective** (field empty in DB)
-2. **fewer than 3 teacher steps**
-3. **no example marker** in description
-4. **title or objective is only a game name** (`relay`)
-5. **students pass one step…** when participation/description says pass to next student
-6. **skill unit needs digits** when the description has no numbers or worked example
+### Degree–minute–second relay
 
-Planner `activityDayNotes` then shows:
+- showable: **False**
+- sliceKey: `s1`
+- learningObjective: "(missing)"
+- teacherSteps count: **0**
+- fail: Degree–minute–second relay: missing learning objective
+- fail: Degree–minute–second relay: fewer than 3 teacher steps (stored in teacherSteps)
+- fail: Degree–minute–second relay: no example marker (Example answer, For example, Worked example, Sample)
+- fail: Degree–minute–second relay: title or objective is only a game name
+- fail: Degree–minute–second relay: skill unit needs digits or given/to prove on the card
 
-`The saved activity for {chapter} is not complete enough to teach. Use the next numbered application in the textbook.`
+### Sector formula pair drill
 
-That is **correct** for an unshowable pack. The bug is the **stored pack**, not the stub copy.
+- showable: **False**
+- sliceKey: `s2`
+- learningObjective: "(missing)"
+- teacherSteps count: **0**
+- fail: Sector formula pair drill: missing learning objective
+- fail: Sector formula pair drill: fewer than 3 teacher steps (stored in teacherSteps)
+- fail: Sector formula pair drill: no example marker (Example answer, For example, Worked example, Sample)
 
-## Planner generate vs pack generation
+### Quadrant human unit circle
 
-`AcademicPlannersWorkflowService.generate` calls **`refreshTeachingPacks`** for each planner chapter **before** `generateDayPlanFromTeachingPacks`.
+- showable: **False**
+- sliceKey: `s3`
+- learningObjective: "(missing)"
+- teacherSteps count: **0**
+- fail: Quadrant human unit circle: missing learning objective
+- fail: Quadrant human unit circle: fewer than 3 teacher steps (stored in teacherSteps)
+- fail: Quadrant human unit circle: no example marker (Example answer, For example, Worked example, Sample)
+- fail: Quadrant human unit circle: title or objective is only a game name
+- fail: Quadrant human unit circle: skill unit needs digits or given/to prove on the card
 
-- Refresh runs when `contentHash` or `promptVersion` ≠ `CHAPTER_TEACHING_PACK_PROMPT_VERSION`.
-- If AI generation fails `assertConductableActivities` / `isShowableSavedActivity`, refresh **throws** and the **old pack remains** (warning `TEACHING_PACK_REFRESH_FAILED`).
-- Planner build still runs; Activity days use the stale activities.
+### 30–45–60 speed grid
 
-After deploy, teachers must **generate the planner again** so refresh can attempt a v12 pack. If refresh still fails, the stub remains until generation succeeds.
+- showable: **False**
+- sliceKey: `s4`
+- learningObjective: "(missing)"
+- teacherSteps count: **0**
+- fail: 30–45–60 speed grid: missing learning objective
+- fail: 30–45–60 speed grid: fewer than 3 teacher steps (stored in teacherSteps)
+- fail: 30–45–60 speed grid: no example marker (Example answer, For example, Worked example, Sample)
+- fail: 30–45–60 speed grid: title or objective is only a game name
 
-## Selection across slices
+### One ratio, find the rest
 
-`chooseShowableChapterActivity` picks any **showable** activity in the chapter (not only `coveredSliceKeys`). A complete card on `s6` can appear on a 2-day Intro+Activity plan even when only `s1` was “taught” — **if** that card is showable in the DB.
+- showable: **False**
+- sliceKey: `s4`
+- learningObjective: "(missing)"
+- teacherSteps count: **0**
+- fail: One ratio, find the rest: missing learning objective
+- fail: One ratio, find the rest: fewer than 3 teacher steps (stored in teacherSteps)
+- fail: One ratio, find the rest: no example marker (Example answer, For example, Worked example, Sample)
 
-## Fixes in this deploy
+### Identity proof chain
 
-1. Teaching-pack debug API returns `learningObjective`, `teacherSteps`, `expectedOutcome`, `codePromptVersion`, and `activityShowableAudit`.
-2. `upsertChapterTeachingPack` calls **`assertConductableActivities`** so unshowable activity 1 cannot be saved.
-3. Pack generation gets **3 attempts** when activities are rejected.
-4. Script `scripts/diagnose-unit-30-activity-gate.py` writes an updated copy of this file from production.
+- showable: **False**
+- sliceKey: `s5`
+- learningObjective: "(missing)"
+- teacherSteps count: **0**
+- fail: Identity proof chain: missing learning objective
+- fail: Identity proof chain: fewer than 3 teacher steps (stored in teacherSteps)
+- fail: Identity proof chain: no example marker (Example answer, For example, Worked example, Sample)
+
+### Elevation and depression sketch gallery
+
+- showable: **False**
+- sliceKey: `s6`
+- learningObjective: "(missing)"
+- teacherSteps count: **0**
+- fail: Elevation and depression sketch gallery: missing learning objective
+- fail: Elevation and depression sketch gallery: fewer than 3 teacher steps (stored in teacherSteps)
+- fail: Elevation and depression sketch gallery: no example marker (Example answer, For example, Worked example, Sample)
+- fail: Elevation and depression sketch gallery: skill unit needs digits or given/to prove on the card
+
+### Chapter summary whip-around
+
+- showable: **False**
+- sliceKey: `None`
+- learningObjective: "(missing)"
+- teacherSteps count: **0**
+- fail: Chapter summary whip-around: missing learning objective
+- fail: Chapter summary whip-around: fewer than 3 teacher steps (stored in teacherSteps)
+- fail: Chapter summary whip-around: no example marker (Example answer, For example, Worked example, Sample)
+- fail: Chapter summary whip-around: title or objective is only a game name
+- fail: Chapter summary whip-around: students pass one step instead of finishing a full item
+- fail: Chapter summary whip-around: skill unit needs digits or given/to prove on the card
+
+## Planner generate
+
+`generate` on a planner version calls `refreshTeachingPacks` before building days. 
+If refresh fails, the previous pack is kept and Activity days use whatever is still stored.
