@@ -1,6 +1,6 @@
 # Unit 30 activity showability gate
 
-Generated: 2026-11-20T15:28:12.516385+00:00
+Generated: 2026-11-20T15:35:55.578504+00:00
 API: `https://hawknexabackend.fynals.com/api/v1`
 
 ## Book and chapter
@@ -14,79 +14,29 @@ API: `https://hawknexabackend.fynals.com/api/v1`
 
 ## Pack
 
-- promptVersion: `chapter-teaching-pack-v1`
+- promptVersion: `chapter-teaching-pack-v12`
 - hashMatchesChapter: **True**
 - source: `AI`
-- generatedAt: `2026-10-28T20:11:22.801Z`
-- activity count: **8**
+- generatedAt: `2026-11-20T15:35:33.804Z`
+- activity count: **3**
 
 ## Activity audit (`isShowableSavedActivity`)
 
 - chapter compiledWordCount: **5919** (skill-unit gate uses chapter text when deployed)
-### Degree–minute–second relay
+### Convert 30° 30′ 10″ into decimal degrees rounded to two places
 
-- showable: **False**
-- fail: Degree–minute–second relay: missing learning objective
-- fail: Degree–minute–second relay: fewer than 3 teacher steps (stored in teacherSteps)
-- fail: Degree–minute–second relay: no example marker (Example answer, For example, Worked example, Sample)
-- fail: Degree–minute–second relay: title or objective is only a game name
-- fail: Degree–minute–second relay: skill unit needs digits or given/to prove on the card
+- showable: **True**
+- fail: (none)
 
-### Sector formula pair drill
+### Find the arc length of a 5 cm radius circle for angle 2π/5 radian
 
-- showable: **False**
-- fail: Sector formula pair drill: missing learning objective
-- fail: Sector formula pair drill: fewer than 3 teacher steps (stored in teacherSteps)
-- fail: Sector formula pair drill: no example marker (Example answer, For example, Worked example, Sample)
+- showable: **True**
+- fail: (none)
 
-### Quadrant human unit circle
+### Find the height of an electric pole from a 30° angle of elevation
 
-- showable: **False**
-- fail: Quadrant human unit circle: missing learning objective
-- fail: Quadrant human unit circle: fewer than 3 teacher steps (stored in teacherSteps)
-- fail: Quadrant human unit circle: no example marker (Example answer, For example, Worked example, Sample)
-- fail: Quadrant human unit circle: title or objective is only a game name
-- fail: Quadrant human unit circle: skill unit needs digits or given/to prove on the card
-
-### 30–45–60 speed grid
-
-- showable: **False**
-- fail: 30–45–60 speed grid: missing learning objective
-- fail: 30–45–60 speed grid: fewer than 3 teacher steps (stored in teacherSteps)
-- fail: 30–45–60 speed grid: no example marker (Example answer, For example, Worked example, Sample)
-- fail: 30–45–60 speed grid: title or objective is only a game name
-
-### One ratio, find the rest
-
-- showable: **False**
-- fail: One ratio, find the rest: missing learning objective
-- fail: One ratio, find the rest: fewer than 3 teacher steps (stored in teacherSteps)
-- fail: One ratio, find the rest: no example marker (Example answer, For example, Worked example, Sample)
-
-### Identity proof chain
-
-- showable: **False**
-- fail: Identity proof chain: missing learning objective
-- fail: Identity proof chain: fewer than 3 teacher steps (stored in teacherSteps)
-- fail: Identity proof chain: no example marker (Example answer, For example, Worked example, Sample)
-
-### Elevation and depression sketch gallery
-
-- showable: **False**
-- fail: Elevation and depression sketch gallery: missing learning objective
-- fail: Elevation and depression sketch gallery: fewer than 3 teacher steps (stored in teacherSteps)
-- fail: Elevation and depression sketch gallery: no example marker (Example answer, For example, Worked example, Sample)
-- fail: Elevation and depression sketch gallery: skill unit needs digits or given/to prove on the card
-
-### Chapter summary whip-around
-
-- showable: **False**
-- fail: Chapter summary whip-around: missing learning objective
-- fail: Chapter summary whip-around: fewer than 3 teacher steps (stored in teacherSteps)
-- fail: Chapter summary whip-around: no example marker (Example answer, For example, Worked example, Sample)
-- fail: Chapter summary whip-around: title or objective is only a game name
-- fail: Chapter summary whip-around: students pass one step instead of finishing a full item
-- fail: Chapter summary whip-around: skill unit needs digits or given/to prove on the card
+- showable: **True**
+- fail: (none)
 
 ## Planner generate
 
