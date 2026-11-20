@@ -1,5 +1,6 @@
 import {
   activityMismatchesSkill,
+  chapterIsSkillUnit,
   collectActivityCardIssues,
   splitStoredOutcome,
 } from '../library-books/activity-focus';
@@ -73,14 +74,60 @@ export function selectSavedActivity(input: {
   return specific[0] ?? null;
 }
 
-function showableChapterActivity(activity: SavedActivity): boolean {
-  return Boolean(activity.title?.trim()) && Boolean(activity.description?.trim()) && storedSteps(activity).length >= 2;
+const EXAMPLE_MARKER =
+  /\bexample\s+(answer|argument|verdict|question|decision|working)\b|\bworked example\b|\bfor example\b|\bsample\s*:|\bexample\s*:/i;
+
+function sameLabel(left: string, right: string): boolean {
+  return left.trim().toLowerCase().replace(/\s+/g, ' ') === right.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function firstDistinctSentence(description: string, title: string): string {
+  const text = description.trim();
+  const match = text.match(/^(.{12,}?[.!?])(?:\s|$)/);
+  const sentence = (match?.[1] ?? '').trim();
+  if (!sentence || sameLabel(sentence, title) || sameLabel(sentence, text)) return '';
+  return sentence;
+}
+
+/** An objective a teacher can read. The title is not used as a stand-in. */
+export function displayObjective(activity: SavedActivity): string {
+  const title = activity.title?.trim() ?? '';
+  const stored = activity.learningObjective?.trim() ?? '';
+  if (stored && !sameLabel(stored, title)) return stored;
+  return firstDistinctSentence(activity.description ?? '', title);
+}
+
+/** A saved card with enough of its own material to put in front of a class. Length alone does not hide it. */
+export function isShowableSavedActivity(activity: SavedActivity, chapterText?: string): boolean {
+  const title = activity.title?.trim() ?? '';
+  const description = activity.description?.trim() ?? '';
+  const objective = activity.learningObjective?.trim() ?? '';
+  if (!title || !description || !objective || sameLabel(objective, title)) return false;
+  if (!activity.participationTechnique?.trim()) return false;
+  if (storedSteps(activity).length < 3) return false;
+  if (!EXAMPLE_MARKER.test(description)) return false;
+  if (/\b(relays?|hunts?|round[- ]robins?|sorting|matching pairs|quick chains?|terminolog(?:y|ies))\b/i.test(`${title}\n${objective}`)) {
+    return false;
+  }
+  if (/\bshow the idea of\b/i.test(activity.expectedOutcome ?? '')) return false;
+  if (
+    /\b(pass(?:es|ed|ing)? (?:around|on|it|one step|the next)|one step of (?:a |the )?|stand(?:ing)? in a circle|sit(?:ting)? in a circle)\b/i.test(
+      `${description}\n${storedSteps(activity).join('\n')}`,
+    )
+  ) {
+    return false;
+  }
+  const hasFigure = /\b(given|to prove|the figure|radius|diameter)\b/i.test(description);
+  if (chapterIsSkillUnit(chapterText) && !/\d/.test(description) && !hasFigure && !EXAMPLE_MARKER.test(description)) {
+    return false;
+  }
+  return true;
 }
 
 /**
  * Notes for an Activity day.
- * A prepared activity is preferred. Any saved chapter activity is still shown.
- * The empty note is only for a pack that has no activities.
+ * A prepared activity is preferred. A saved card is still shown when it has its own objective, steps, and example.
+ * A hollow game, or a pack with no activity, uses the short missing note.
  */
 export function activityDayNotes(input: {
   chapterTitle: string;
@@ -104,19 +151,13 @@ export function activityDayNotes(input: {
     (activity) => activity.sliceKey != null && (input.preferredSliceKeys ?? []).includes(activity.sliceKey) && usable(activity),
   );
   const showable = (activity: SavedActivity) =>
-    showableChapterActivity(activity) && !activityMismatchesSkill(activity, input.chapterText);
-  const selected =
-    preferredReady ??
-    ranked.find(usable) ??
-    ranked.find(showable) ??
-    ranked.find(showableChapterActivity) ??
-    input.activities.find((activity) => activity.title?.trim() && activity.description?.trim()) ??
-    null;
+    isShowableSavedActivity(activity, input.chapterText) && !activityMismatchesSkill(activity, input.chapterText);
+  const selected = preferredReady ?? ranked.find(usable) ?? ranked.find(showable) ?? null;
   if (selected) {
     return {
       notes: formatSavedActivityNotes(selected, input.chapterTitle, [], input.periodMinutes ?? 40),
       title: selected.title,
-      objective: selected.learningObjective?.trim() || selected.title,
+      objective: displayObjective(selected) || `Apply the main idea of ${input.chapterTitle}.`,
     };
   }
   return {
@@ -153,33 +194,29 @@ export function formatSavedActivityNotes(
   periodMinutes = 40,
 ): string {
   const minutes = Math.max(20, Math.min(80, periodMinutes || activity.durationMinutes || 40));
-  const steps = fittedSteps(storedSteps(activity), minutes);
-  const objective = activity.learningObjective?.trim() || activity.title;
+  const rawSteps = storedSteps(activity).filter((step) => !/use the student task below/i.test(step));
+  const steps = rawSteps.length ? fittedSteps(rawSteps, minutes) : [];
+  const objective = displayObjective(activity);
   const materials = activity.materials?.trim();
   const participation = activity.participationTechnique.trim();
-  const stored = splitStoredOutcome(
-    activity.expectedOutcome?.trim() || `Students show the idea of ${activity.title} in their own work.`,
-  );
-  const outcome = stored.outcome;
+  const stored = splitStoredOutcome(activity.expectedOutcome?.trim() ?? '');
+  const outcome = /\bshow the idea of\b/i.test(stored.outcome) ? '' : stored.outcome;
   const check = stored.check;
   void alternatives;
   const lines = [
     `Chapter: ${chapterTitle}`,
-    `Learning objective: ${objective}`,
+    ...(objective ? [`Learning objective: ${objective}`] : []),
     ...(materials && !/^none$/i.test(materials) ? [`You need: ${materials}`] : []),
     `Duration: ${minutes} minutes`,
     '',
     'What students do:',
     activity.description.trim(),
-    '',
-    'What the teacher does:',
     ...(steps.length
-      ? steps.map((step, index) => `${index + 1}. (${step.minutes} min) ${step.text}`)
-      : ['1. Use the student task below. Do not replace it with a different activity.']),
+      ? ['', 'What the teacher does:', ...steps.map((step, index) => `${index + 1}. (${step.minutes} min) ${step.text}`)]
+      : []),
     ...(participation ? ['', 'How every student participates:', participation] : []),
     ...(check ? ['', 'Check understanding:', check] : []),
-    '',
-    `Expected outcome: ${outcome}`,
+    ...(outcome ? ['', `Expected outcome: ${outcome}`] : []),
   ];
   return lines.join('\n');
 }

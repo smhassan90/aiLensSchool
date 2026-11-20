@@ -156,7 +156,12 @@ function assertConductableActivities(
   }
   const titles = activities.map((activity) => activity.title.trim().toLowerCase());
   if (new Set(titles).size < titles.length) throw new Error('The activities repeat one title');
-  const focus = activities.flatMap((activity) => collectClassroomFocusIssues(activity, chapterText));
+  const firstIssues = collectClassroomFocusIssues(first, chapterText);
+  const restIssues = activities.slice(1).flatMap((activity) => collectClassroomFocusIssues(activity, chapterText));
+  const focus = [
+    ...(firstIssues.length ? [`Activity 1 cannot be taught. ${firstIssues.slice(0, 6).join('; ')}`] : []),
+    ...restIssues,
+  ];
   const repeated = activitiesRepeatEachOther(activities);
   if (repeated) focus.push(repeated);
   if (focus.length) throw new Error(focus.slice(0, 8).join('; '));

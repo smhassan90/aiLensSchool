@@ -19,7 +19,7 @@ function activity(
   return {
     sliceKey,
     title,
-    description,
+    description: `${description} For example: use one fact from this chapter.`,
     participationTechnique: participation,
     materials: 'Board, textbook, notebooks',
     learningObjective: `Students use ${title} from Unit 5.`,
@@ -180,7 +180,7 @@ describe('saved teaching-pack activities in the day plan', () => {
     const unit6 = result!.lessons.find(
       (lesson) => lesson.chapterKey === 'u6' && lesson.kind === PlannerLessonKind.ACTIVITY,
     );
-    expect(unit5?.notes).toContain('Draft letter to the editor');
+    expect(unit5?.notes).toContain('Dream twist discussion');
     expect(unit5?.notes).not.toMatch(/Finish the line/i);
     expect(unit6?.notes).toContain('Teach the next printed application');
     expect(unit6?.notes).toContain('out of date');

@@ -1,4 +1,4 @@
-import { activitiesRepeatEachOther, collectClassroomFocusIssues } from './activity-focus';
+import { activitiesRepeatEachOther, activityMismatchesSkill, collectActivityCardIssues, collectClassroomFocusIssues } from './activity-focus';
 
 const chapter =
   'Caliph Haroon-ur-Rashid heard the dispute. The beggar and the rich man each claimed the white horse. The horse neighed when the rich man touched it.';
@@ -58,6 +58,29 @@ describe('classroom focus', () => {
         'Fictional scenario, inspired by this chapter. Six people argue over one horse. Groups of four or five. Roles: judge, clerk, beggar, rich man, guard, witness. Who should keep the horse? Example answer: the rich man keeps it if the horse walks to him.',
     };
     expect(collectClassroomFocusIssues(crowded, chapter).join(' ')).toMatch(/group size/);
+  });
+
+  it('rejects a skill card with no item and accepts one that carries the numbers', () => {
+    const ratioChapter = 'Simplify a ratio. Convert 3:4 to an equal ratio by the product of the means.';
+    const hollow = {
+      ...focused(),
+      title: 'Ratio sorting',
+      learningObjective: 'Students sort the words for a ratio.',
+      description:
+        'Students sort word cards about ratios and pass one step to the next person. Nobody writes a full ratio. The teacher gives no number and no worked line. The class only says the names of the terms until the period ends and the board stays empty.',
+    };
+    expect(activityMismatchesSkill(hollow, ratioChapter)).toBe(true);
+    expect(collectActivityCardIssues(hollow).join(' ')).toMatch(/one step passed|relay, hunt|example answer/);
+    expect(collectClassroomFocusIssues(hollow, ratioChapter).join(' ')).toMatch(/skill from this chapter/);
+
+    const complete = {
+      ...focused(),
+      title: 'Find the missing term',
+      learningObjective: 'Students can find the missing term in an equal ratio.',
+      description:
+        'Fictional scenario, inspired by this chapter. A shop cuts ribbon in the ratio 3:4. The short piece is 6 metres. What is the long piece? Worked example: 3:4 = 6:8, because 3 times 8 is 24 and 4 times 6 is 24. The correct answer is 8 metres. Each student calculates the missing length and writes the product check.',
+    };
+    expect(activityMismatchesSkill(complete, ratioChapter)).toBe(false);
   });
 
   it('rejects two activities that are the same experience', () => {

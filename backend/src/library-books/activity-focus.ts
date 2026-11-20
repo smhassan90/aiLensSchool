@@ -86,22 +86,49 @@ const EXTRA_TASK = /\bwrite a motto\b|\bcollect slips\b|\bread tomorrow\b|\b1\s*
 const EXAMPLE_ANSWER =
   /\bexample\s+(answer|argument|verdict|question|decision|working)\b|\bworked example\b|\bfor example\b|\bsample\s*:|\bexample\s*:/i;
 const STUDENT_ACTION =
-  /\b(decid\w*|defend\w*|advis\w*|keep|limit|stop|writ\w*|perform\w*|judg\w*|solv\w*|calculat\w*|measur\w*|classif\w*|predict\w*|construct\w*|experiment\w*|locat\w*|build\w*|draw\w*|compar\w*|count\w*|observ\w*|test\w*|speak\w*|argu\w*|debat\w*|answer\w*)\b/i;
+  /\b(decid\w*|defend\w*|advis\w*|keep|limit|stop|writ\w*|perform\w*|judg\w*|solv\w*|calculat\w*|measur\w*|classif\w*|predict\w*|construct\w*|experiment\w*|locat\w*|build\w*|draw\w*|compar\w*|count\w*|observ\w*|test\w*|speak\w*|argu\w*|debat\w*|answer\w*|convert\w*|simplif\w*|prov\w*)\b/i;
 const BROKEN_PHRASE = /\bkeep moderated\b|…|\.{3}/i;
 const LECTURE_STAMP = /\bteacher explanation\b|\bguided practice\b|\bstudent practice\b|\bintroduction and instructions\b/i;
+const GAME_WRAPPER =
+  /\b(relays?|hunts?|round[- ]robins?|sorting|matching pairs|quick chains?|terminolog(?:y|ies)|stand(?:ing)? in a circle|sit(?:ting)? in a circle)\b/i;
+const ONE_STEP_PASS =
+  /\b(pass(?:es|ed|ing)? (?:around|on|it|one step|the next)|one step of (?:a |the )?(?:conversion|method|solution)|each (?:student|person|member) (?:only )?(?:does|writes|completes) one step|next (?:student|person) (?:does|finishes|writes) the next step|stand(?:ing)? in a circle|sit(?:ting)? in a circle)\b/i;
+const SHOW_THE_IDEA = /\bshow the idea of\b/i;
+const SKILL_SIGNAL =
+  /\b(convert|construct|compass|prove|proving|ratio|proportion|degrees|minutes|chord|tangent|equation|formula|calculate|measure|simplify)\b/i;
+const SKILL_PROCEDURE = /\b(step|method|formula|calculate|convert|construct|solve|simplify|prove)\b/i;
 
-/** A skill chapter asks students to calculate or measure. A court or a vote with no numbers is the wrong job. */
-export function activityMismatchesSkill(activity: FocusActivity, chapterText?: string): boolean {
+/** A unit that teaches a procedure, read from the chapter text rather than the book title. */
+export function chapterIsSkillUnit(chapterText?: string): boolean {
   const chapter = chapterText ?? '';
-  const skillChapter =
-    /\b(calculate|equation|formula|perimeter|missing length|solve for)\b/i.test(chapter) &&
-    (chapter.match(/\d/g)?.length ?? 0) >= 3;
-  if (!skillChapter) return false;
+  if (!chapter.trim()) return false;
+  if (SKILL_SIGNAL.test(chapter)) return true;
+  const digits = chapter.match(/\d/g)?.length ?? 0;
+  return digits >= 3 && SKILL_PROCEDURE.test(chapter);
+}
+
+function hasSkillItem(description: string): boolean {
+  if (/\d/.test(description)) return true;
+  if (/\b(given|to prove|the figure|radius|diameter|chord)\b/i.test(description)) return true;
+  return EXAMPLE_ANSWER.test(description);
+}
+
+function sameLabel(left: string, right: string): boolean {
+  return left.trim().toLowerCase().replace(/\s+/g, ' ') === right.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * A skill chapter needs the item on the card.
+ * A court or a vote with no numbers is the wrong job, and so is a card with neither numbers nor a worked example.
+ */
+export function activityMismatchesSkill(activity: FocusActivity, chapterText?: string): boolean {
+  if (!chapterIsSkillUnit(chapterText)) return false;
   const description = activity.description ?? '';
   const voteOrCourt = /\b(courtroom|verdict|\bcourt\b|keep,\s*limit,\s*or\s*stop|keep \/ limit \/ stop)\b/i.test(
     description,
   );
-  return voteOrCourt && !/\d/.test(description);
+  if (voteOrCourt && !/\d/.test(description)) return true;
+  return !hasSkillItem(description);
 }
 
 /** A card a teacher can run: one finished case, not a padded chapter summary. */
@@ -145,6 +172,23 @@ export function collectActivityCardIssues(activity: FocusActivity): string[] {
   if (roles != null && size && (roles < size.min || roles > size.max)) {
     issues.push(`${label}: named roles do not match the group size`);
   }
+  const objective = activity.learningObjective?.trim() ?? '';
+  const title = activity.title?.trim() ?? '';
+  if (objective && title && sameLabel(objective, title)) {
+    issues.push(`${label}: the objective must say what students can do, not repeat the title`);
+  }
+  if (GAME_WRAPPER.test(title) || GAME_WRAPPER.test(objective)) {
+    issues.push(`${label}: do not replace the task with a relay, hunt, or other game`);
+  }
+  if (SHOW_THE_IDEA.test(activity.expectedOutcome ?? '')) {
+    issues.push(`${label}: name the finished work, not the idea of the title`);
+  }
+  if (ONE_STEP_PASS.test(card)) {
+    issues.push(`${label}: each student finishes one full item, not one step passed around`);
+  }
+  if (/use the student task below/i.test(steps.join('\n'))) {
+    issues.push(`${label}: write the teacher moves for this item`);
+  }
   return issues;
 }
 
@@ -163,7 +207,7 @@ export function collectClassroomFocusIssues(activity: FocusActivity, chapterText
 
   issues.push(...collectActivityCardIssues(activity));
   if (activityMismatchesSkill(activity, chapterText)) {
-    issues.push(`${label}: students must do the skill from this chapter, not a court or a vote`);
+    issues.push(`${label}: students must do the skill from this chapter, with the numbers and a worked example`);
   }
 
   const parts = description.match(/\b(?:Part|Task)\s+(?:[A-E]|[1-5])\b/gi) ?? [];

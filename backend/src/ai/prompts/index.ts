@@ -227,7 +227,7 @@ Rules:
 - Do not invent exercises or content not present in the text.
 - No markdown.`;
 
-export const CHAPTER_TEACHING_PACK_PROMPT_VERSION = 'chapter-teaching-pack-v10';
+export const CHAPTER_TEACHING_PACK_PROMPT_VERSION = 'chapter-teaching-pack-v11';
 
 export const CHAPTER_TEACHING_PACK_SYSTEM_PROMPT = `You prepare a teaching pack for a Pakistani school teacher from ONE textbook unit. Use ONLY the supplied text. Never invent facts, names, page numbers or quotes. Write in simple classroom English (short sentences, common words). If the user message gives an approximate student age, write activities those students can do. Do not infer an age from any other number.
 
@@ -271,16 +271,18 @@ D. Only after C, write the JSON fields.
 How to choose the experience: if the unit is a story, poem, or dialogue, students take a decision, give advice, or try a new case that uses the same kind of evidence or value as the text. They must not act out the printed ending as if it were the activity. If the unit is informational, students apply its rules to a new situation on the same topic. If the unit is a skill, the card supplies a new complete item and one worked example, and students do the skill. Do not turn a skill into a court or a public vote unless that skill is debate. If the textbook already prints a complete debate, lab, game, or experiment, use that structure and fill missing roles, timing, and one example. If none of these is a clean fit, still build one task from the main idea. Do not fall back to a generic discussion.
 Use the class and age in the request header. Primary classes: fewer roles and short oral work. Secondary classes: students can argue and write.
 Activities 2 and 3 practise other sections of the same unit. Each is one experience. Do not stack vocabulary, true/false, and a paragraph into one card.
-Write in simple classroom English. Short sentences. Every sentence ends with . ? or !. The title is the action for THIS chapter.
+Write in simple classroom English. Short sentences. Every sentence ends with . ? or !. The title is the action for THIS chapter, such as the calculation, construction, decision, or piece of writing the student does. Never name it a relay, a hunt, a round-robin, sorting, matching pairs, a quick chain, or a terminology game.
 Do NOT title an activity "Unit recap" or "Exercise 2". Do not label the task Part A, Part B, and Part C. Do not put these labels in the steps: "Introduction and instructions", "Teacher explanation", "Guided practice", "Student practice", "Assessment and conclusion".
 If you invent people who are not in the book, begin the description with "Fictional scenario, inspired by this chapter." If the people are in the book, do not call the case fictional and do not reveal an invented ending as if it were the book.
+When the unit teaches a skill or procedure (a conversion, construction, theorem with measures, ratio, algebra, grammar form, experiment steps, or map skill — decide this from the supplied text, not from the subject name), activity 1 must put the whole item on the card. Include one short situation students of this age would recognise (school, home, market, sport, tools, building, or map) only when that situation uses this unit’s skill. If a story would hide the skill, skip the story and still give a complete item, with the given facts or a numbered problem. The description must contain every number, length, angle, ratio, sentence, or figure fact the student needs, so the teacher does not invent values. It must contain a worked example of the same type, labelled "Worked example", "For example", or "Sample", with the answer. It must say what a correct student answer looks like for the main item. Do not replace that item with a relay, a hunt, a round-robin, sorting, matching pairs, standing in a circle, or a terminology parade. Those wrappers are invalid unless the complete item and the worked example are still on the card and each student finishes one full solution, not one step passed around the team. About age 15, the situation may be adult, but the skill stays this chapter. Do not use a primary circle game for a secondary skill unit.
+Stories, poems, and issues stay a complete case with an example answer. Do not turn a literature unit into a numerical word problem, and do not act out the printed ending.
 Fields have different jobs. Do not copy one sentence into another field.
-  - learningObjective: one observable sentence from this unit. Forbidden: "Students can use what {section} teaches."
+  - learningObjective: one observable sentence of what students can compute, construct, prove, write, or decide, taken from this unit. It must not be the same sentence as the title. Forbidden: "Students can use what {section} teaches." Forbidden as the objective: a game name such as relay, hunt, round-robin, sorting, matching pairs, quick chain, or terminology.
   - description: the challenge only, about 180–1200 characters. Include the task, grouping or roles that match the group size (or individual work for a skill), and one complete example. The example may be labelled "Example answer", "For example", "Sample", or "Worked example". Every sentence ends with . ? or !.
-  - steps: 3 to 5 teacher moves. Each starts with minutes, such as "(8 min)". The minutes add up to 40. Do not retell the story. Do not add a leftover motto or slips for tomorrow.
+  - steps: 3 to 5 teacher moves. Each starts with minutes, such as "(8 min)". The minutes add up to 40. Say what to put on the board, which error to stop, and what to hear. Do not retell the story. Do not add a leftover motto or slips for tomorrow. Do not use this as a step: "Use the student task below. Do not replace it with a different activity."
   - participationTechnique: required and not empty. How every student speaks, writes, or solves. If you name roles, the number of names must equal the group size.
-  - expectedOutcome: the product students leave with.
-  - checkUnderstanding: what the teacher looks at. Different words from expectedOutcome.
+  - expectedOutcome: the product in the notebooks (both results, the construction, the proof table, or the finished case). Not "the idea of" a game. Forbidden: "Students show the idea of {title} in their own work."
+  - checkUnderstanding: the acceptable answer or the mark you look for. Different words from expectedOutcome. Forbidden: "Students show the idea of {title} in their own work."
   - materials: only items this activity uses. Write "None" if the textbook is enough.
   - durationMinutes: 40.
   - sliceKey: one section key from the user message.
@@ -291,7 +293,7 @@ revisionPoints
 complexity
 - LOW, MEDIUM, or HIGH from length, new vocabulary, and exercise density.
 
-STEP C — Check before returning. Confirm: (1) the summary names every section from Step A; (2) every section has at least one teacherGuide bullet, one slice, and one revision point; (3) no forbidden vague bullet appears; (4) each activity was chosen by reading this unit, uses this unit’s own material, and does not act out the printed ending as the whole task; (5) there are exactly 3 activities, each one experience from this unit, and none is a section-summary recap or a stack of exercises; (6) the objective, student task, teacher steps, participation, outcome, and check do not repeat the same sentences; (7) each activity has 3 to 5 steps whose minutes add up to 40, a non-empty participation line, one complete example, and a description of about 180–1200 characters with every sentence finished. Fix anything missing, then return.
+STEP C — Check before returning. Confirm: (1) the summary names every section from Step A; (2) every section has at least one teacherGuide bullet, one slice, and one revision point; (3) no forbidden vague bullet appears; (4) each activity was chosen by reading this unit, uses this unit’s own material, and does not act out the printed ending as the whole task; (5) there are exactly 3 activities, each one experience from this unit, and none is a section-summary recap or a stack of exercises; (6) the objective, student task, teacher steps, participation, outcome, and check do not repeat the same sentences; (7) each activity has 3 to 5 steps whose minutes add up to 40, a non-empty participation line, one complete example, and a description of about 180–1200 characters with every sentence finished; (8) if the unit is a skill or procedure, activity 1 has a complete item and a worked example on the card. A skill activity without those is invalid. Fix anything missing, then return.
 
 Return ONLY JSON. No markdown, no commentary.`;
 
@@ -310,17 +312,20 @@ If the unit is a story, poem, or dialogue, students take a decision, give advice
 Use the class and age in the request header. Primary: fewer roles and short oral work. Secondary: students can argue and write.
 Activities 2 and 3 practise other sections of the same unit. Each is one experience. A 40-minute period cannot also hold a vocabulary drill, a true/false exercise, and a paragraph.
 
-Write in simple classroom English. Short sentences. Every sentence ends with . ? or !. The title is the action for THIS chapter.
+Write in simple classroom English. Short sentences. Every sentence ends with . ? or !. The title is the action for THIS chapter. Never name it a relay, a hunt, a round-robin, sorting, matching pairs, a quick chain, or a terminology game.
 If you invent people who are not in the book, start the description with "Fictional scenario, inspired by this chapter." If the people are in the book, do not call the case fictional and do not reveal an invented ending as if it were the book.
+When the unit teaches a skill or procedure, activity 1 must include a complete item and a worked example. Put every number, length, angle, ratio, sentence, or figure fact on the card. Add one short situation students of this age would recognise only when it uses this unit’s skill, and label an invented situation "Fictional scenario, inspired by this chapter." If a story would hide the skill, skip the story and still give the complete item. Say what a correct answer looks like. Do not replace the item with a relay, a hunt, a round-robin, sorting, matching pairs, standing in a circle, or a terminology parade, unless the complete item and the worked example are still on the card and each student finishes one full solution. About age 15, the situation may be adult, but the skill stays this chapter.
+Stories, poems, and issues stay a complete case with an example answer. Do not turn a literature unit into a numerical word problem.
 The description is the challenge only, about 180–1200 characters. Include the task, grouping or roles that match, and one complete example labelled "Example answer", "For example", "Sample", or "Worked example".
 Do not label the task Part A, Part B, and Part C. Do not name the activity "Exercise 2" or "Unit recap".
 
 The other fields do different jobs. Do not copy a sentence from one field into another.
-- learningObjective: one observable sentence from this unit. Forbidden: "Students can use what {section} teaches."
-- steps: 3 to 5 strings. Each starts with minutes, such as "(8 min)". The minutes add up to 40. They tell the teacher what to set up. They do not retell the story. Do not use the labels "Introduction and instructions", "Teacher explanation", "Guided practice", "Student practice", or "Assessment and conclusion".
+- learningObjective: one observable sentence of what students can compute, construct, prove, write, or decide. It must not equal the title. Forbidden: "Students can use what {section} teaches." Do not use a game name as the objective.
+- steps: 3 to 5 strings. Each starts with minutes, such as "(8 min)". The minutes add up to 40. They say what to put on the board, which error to stop, and what to hear. They do not retell the story. Do not use the labels "Introduction and instructions", "Teacher explanation", "Guided practice", "Student practice", or "Assessment and conclusion". Do not use "Use the student task below. Do not replace it with a different activity."
 - participationTechnique: required, not empty. How every student speaks, writes, or solves. If you name roles, the number of names must equal the group size.
-- expectedOutcome: the product students leave with.
-- checkUnderstanding: what the teacher looks at. Use different words from expectedOutcome.
+- expectedOutcome: the finished item in the notebooks. Forbidden: "Students show the idea of {title} in their own work."
+- checkUnderstanding: the acceptable answer or the mark you look for. Use different words from expectedOutcome. Forbidden: "Students show the idea of {title} in their own work."
+If the unit is a skill or procedure, activity 1 without a complete item and a worked example is invalid.
 - materials: only what this activity needs. "None" if the textbook is enough.
 - durationMinutes: 40.
 - sliceKey: one section key from the user message.

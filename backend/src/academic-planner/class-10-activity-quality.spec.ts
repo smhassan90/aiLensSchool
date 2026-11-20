@@ -199,7 +199,9 @@ describe('Class 10 English activity quality', () => {
       const student = notes.split('What students do:\n')[1]?.split('\n\n')[0] ?? '';
       expect(objective.toLowerCase()).not.toBe(student.toLowerCase());
       expect(notes.split(student).length - 1).toBe(1);
-      expect(notes).toContain('What the teacher does:');
+      expect(notes).not.toContain('Use the student task below');
+      expect(notes).not.toMatch(/show the idea of/i);
+      expect(notes).not.toMatch(new RegExp(`Learning objective:\\s*${activity.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
       expect(notes).toContain('How every student participates:');
       expect(notes).not.toContain('Every student produces an individual result');
       expect(notes).not.toContain('Introduction and instructions');
@@ -457,9 +459,11 @@ describe('Class 10 English activity quality', () => {
   });
 
   it('asks the model to read the unit instead of picking from a format menu', () => {
-    expect(CHAPTER_TEACHING_PACK_PROMPT_VERSION).toBe('chapter-teaching-pack-v10');
+    expect(CHAPTER_TEACHING_PACK_PROMPT_VERSION).toBe('chapter-teaching-pack-v11');
     const prompts = `${CHAPTER_TEACHING_PACK_SYSTEM_PROMPT}\n${CHAPTER_ACTIVITY_SYSTEM_PROMPT}`;
     expect(prompts).toMatch(/Read the whole supplied unit/i);
+    expect(prompts).toMatch(/complete item/i);
+    expect(prompts).toMatch(/worked example/i);
     expect(prompts).not.toMatch(/\n\s*\d+\.\s+Narrative/i);
     expect(prompts).not.toMatch(/keep \/ change \/ stop/i);
     expect(prompts).not.toMatch(/freeze before the resolution/i);
@@ -495,6 +499,98 @@ describe('Class 10 English activity quality', () => {
     expect(saved.notes).not.toMatch(/not ready to teach/i);
     expect(saved.notes).not.toContain('Introduction: 5 minutes');
     expect(saved.notes).not.toMatch(/\w{3}…/);
+  });
+
+  it('shows a complete skill item and hides a relay that has no numbers', () => {
+    const ratioChapter = 'Simplify a ratio and find the missing term. Use the product of the means as the check. Convert 3:4 into an equal ratio.';
+    const skill = runnable(
+      'Find the missing term',
+      'Fictional scenario, inspired by this chapter. A shop cuts ribbon in the same ratio the class just learned. The short piece and the long piece stay in the ratio 3:4. One order uses 6 metres for the short piece. What length is the long piece? Worked example: 3:4 = 6:8, because 3 times 8 is 24 and 4 times 6 is 24. The correct answer for a short piece of 6 metres is 8 metres. Each student calculates that missing length alone and writes the product check.',
+      'Each student calculates the missing length, then writes the product of the means.',
+    );
+    skill.learningObjective = 'Students can find a missing term in a ratio and check it with the product of the means.';
+    skill.expectedOutcome = 'Each notebook shows 3:4 = 6:8 and the product check 24 = 24.';
+    expect(skill.description.length).toBeGreaterThanOrEqual(180);
+    expect(isPreparedClassroomActivity(skill)).toBe(true);
+    const shown = activityDayNotes({
+      chapterTitle: 'Ratios',
+      activities: [skill],
+      chapterText: ratioChapter,
+      preferredSliceKeys: ['s1'],
+    });
+    expect(shown.notes).toContain('3:4');
+    expect(shown.notes).toContain('6:8');
+    expect(shown.notes).toContain('What the teacher does:');
+    expect(shown.notes).not.toContain('Use the student task below');
+    expect(shown.objective).not.toBe(skill.title);
+
+    const relay = runnable(
+      'Ratio relay',
+      'Students stand in a circle for a round-robin sorting game. Each student does one step of the method and passes it to the next person. Nobody finishes a full ratio. The class only shouts the names of the terms. There is no length and no product check on the card. Example answer: the next student says the next word, and the group still has no number.',
+      'Each person passes one step to the next student.',
+    );
+    expect(relay.description.length).toBeGreaterThanOrEqual(180);
+    expect(isPreparedClassroomActivity(relay)).toBe(false);
+    expect(collectActivityCardIssues(withSteps(relay)).join(' ')).toMatch(/relay, hunt|one step passed/);
+    const hidden = activityDayNotes({
+      chapterTitle: 'Ratios',
+      activities: [relay],
+      chapterText: ratioChapter,
+    });
+    expect(hidden.notes).toMatch(/Teach the next printed application/);
+    expect(hidden.notes).not.toContain('Ratio relay');
+    expect(hidden.notes).not.toContain('Use the student task below');
+  });
+
+  it('rejects a game title, a title used as the objective, and an outcome that only names the idea', () => {
+    const hunt = runnable(
+      'Centre hunt relay',
+      'Fictional scenario, inspired by this chapter. A wheel has centre O and a spoke of 5 cm. Each student constructs the centre and checks that O is the same distance from two points on the rim. Worked example: a spoke of 5 cm means every radius is 5 cm. The correct check is that both radii measure 5 cm. Each student draws the full figure.',
+      'Each student draws the wheel and measures both radii.',
+    );
+    hunt.learningObjective = 'Centre hunt relay';
+    expect(isPreparedClassroomActivity(hunt)).toBe(false);
+    expect(collectActivityCardIssues(withSteps(hunt)).join(' ')).toMatch(/repeat the title|relay, hunt/);
+
+    const named = runnable(
+      'Find the centre of the wheel',
+      'Fictional scenario, inspired by this chapter. A wheel has centre O and a spoke of 5 cm. Each student constructs the centre and checks that O is the same distance from two points on the rim. Worked example: a spoke of 5 cm means every radius is 5 cm. The correct check is that both radii measure 5 cm. Each student draws the full figure.',
+      'Each student draws the wheel and measures both radii.',
+    );
+    named.learningObjective = 'Students can construct the centre and check that the radii are equal.';
+    named.expectedOutcome = 'Students show the idea of Find the centre of the wheel in their own work.';
+    expect(isPreparedClassroomActivity(named)).toBe(false);
+    expect(collectActivityCardIssues(withSteps(named)).join(' ')).toMatch(/idea of the title/);
+  });
+
+  it('does not turn a missing objective or missing steps into a lesson', () => {
+    const bare = runnable(
+      'Find the missing term',
+      'Fictional scenario, inspired by this chapter. A shop cuts ribbon in the ratio 3:4. The short piece in one order is 6 metres. What is the long piece? Worked example: 3:4 = 6:8, because 3 times 8 is 24 and 4 times 6 is 24. The correct answer is 8 metres. Each student calculates the missing term.',
+      'Each student calculates the missing length, then writes the product of the means.',
+    );
+    bare.learningObjective = '';
+    bare.teacherSteps = [];
+    bare.expectedOutcome = '';
+    const notes = formatSavedActivityNotes(bare, 'Ratios', [], 40);
+    expect(notes).not.toMatch(/Learning objective:\s*Find the missing term/i);
+    expect(notes).not.toContain('Use the student task below');
+    expect(notes).not.toMatch(/show the idea of/i);
+    const day = activityDayNotes({ chapterTitle: 'Ratios', activities: [bare] });
+    expect(day.notes).toMatch(/Teach the next printed application/);
+    expect(day.notes).not.toContain('Use the student task below');
+  });
+
+  it('keeps a literature case complete without forcing a numerical problem', () => {
+    const story = runnable(
+      'Advise the traveller',
+      'Fictional scenario, inspired by this chapter. A traveller and a shopkeeper both claim one horse. The horse follows the traveller and pulls away from the shopkeeper. What should the judge decide, and which event in the chapter is the same kind of evidence? Example answer: the traveller keeps the horse, because it shows trust in the same way the horse in the story did.',
+    );
+    expect(story.description).not.toMatch(/\d/);
+    expect(isPreparedClassroomActivity(story)).toBe(true);
+    expect(collectActivityCardIssues(withSteps(story)).join(' ')).not.toMatch(/worked example|numeral|skill from this chapter/);
+    const storyChapter = 'The traveller and the shopkeeper argue. The horse follows the person it trusts.';
+    expect(collectClassroomFocusIssues(withSteps(story), storyChapter).join(' ')).not.toMatch(/skill from this chapter/);
   });
 
   it('builds a 40-minute breakdown that adds up', () => {

@@ -20,6 +20,7 @@ import {
   activityDayNotes,
   formatSavedActivityNotes,
   formatUnavailableChapterNotes,
+  isShowableSavedActivity,
   introLessonNotes,
   readingLessonNotes,
   selectSavedActivity,
@@ -209,7 +210,7 @@ export function generateDayPlanFromTeachingPacks(input: {
               preferRecap: true,
             })
           : null;
-        if (selected && pack) {
+        if (selected && pack && isShowableSavedActivity(selected, chapterText)) {
           usedActivityTitles.push(selected.title);
           teacherNotes = formatSavedActivityNotes(selected, chapterTitle, pack.activities, periodMinutes);
           objectives = [selected.title];
@@ -374,7 +375,7 @@ export function rebuildLessonFromPack(input: {
       usedTitles: [],
       preferRecap: true,
     });
-    if (selected) {
+    if (selected && isShowableSavedActivity(selected, input.chapterText)) {
       teacherNotes = formatSavedActivityNotes(selected, chapterTitle, input.pack.activities, input.periodMinutes);
       objectives = [selected.title];
       titleSuffix = selected.title.slice(0, 80);
