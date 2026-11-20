@@ -2,7 +2,10 @@ import {
   activityMismatchesSkill,
   chapterIsSkillUnit,
   collectActivityCardIssues,
+  isSituationWithQuantity,
   splitStoredOutcome,
+  splitStudentTaskAndExample,
+  workedExampleIsDifferentItem,
 } from '../library-books/activity-focus';
 import { isGenericSectionSummary } from '../library-books/activity-quality';
 import { teacherGuideBullets } from './section-teaching-plan';
@@ -46,9 +49,23 @@ function hasCompleteItem(description: string): boolean {
   return /\d/.test(description) || /\b(given|to prove)\b/i.test(description);
 }
 
+/** Lower is better. An application with a different board example beats an opening procedure. */
+function situationRank(activity: SavedActivity): number {
+  const description = activity.description ?? '';
+  const { task } = splitStudentTaskAndExample(description);
+  if (isSituationWithQuantity(task) && workedExampleIsDifferentItem(description)) return 0;
+  if (workedExampleIsDifferentItem(description) && /\d/.test(task)) return 1;
+  if (isRecapLike(activity)) return 3;
+  return 2;
+}
+
 function rankShowable(activities: SavedActivity[]): SavedActivity | null {
   if (!activities.length) return null;
   return [...activities].sort((left, right) => {
+    const situation = situationRank(left) - situationRank(right);
+    if (situation !== 0) return situation;
+    const prepared = Number(!isPreparedClassroomActivity(left)) - Number(!isPreparedClassroomActivity(right));
+    if (prepared !== 0) return prepared;
     const recap = Number(isRecapLike(left)) - Number(isRecapLike(right));
     if (recap !== 0) return recap;
     return Number(!hasCompleteItem(left.description)) - Number(!hasCompleteItem(right.description));
@@ -57,8 +74,8 @@ function rankShowable(activities: SavedActivity[]): SavedActivity | null {
 
 /**
  * Best activity a teacher can run for this chapter.
- * A showable card on a slice already taught comes first.
- * If that slice has none, any other showable card in the chapter is used.
+ * A situation that asks for a result, with a different worked example, comes first.
+ * A card that only repeats the opening procedure ranks lower, even on a slice already taught.
  */
 export function chooseShowableChapterActivity(input: {
   activities: SavedActivity[];
@@ -67,16 +84,13 @@ export function chooseShowableChapterActivity(input: {
   chapterText?: string;
 }): SavedActivity | null {
   const used = new Set((input.usedTitles ?? []).map((title) => title.trim().toLowerCase()));
-  const covered = new Set(input.coveredSliceKeys ?? []);
+  void input.coveredSliceKeys;
   const showable = input.activities.filter((activity) => {
     if (used.has(activity.title.trim().toLowerCase())) return false;
     if (isGenericSectionSummary(activity)) return false;
     return isShowableSavedActivity(activity, input.chapterText) && !activityMismatchesSkill(activity, input.chapterText);
   });
-  const onTaught = showable.filter(
-    (activity) => activity.sliceKey != null && covered.has(activity.sliceKey) && isPreparedClassroomActivity(activity),
-  );
-  return rankShowable(onTaught) ?? rankShowable(showable);
+  return rankShowable(showable);
 }
 
 /**
@@ -173,7 +187,7 @@ export function isShowableSavedActivity(activity: SavedActivity, chapterText?: s
 
 /**
  * Notes for an Activity day.
- * A showable card on a taught slice is preferred. Any other showable card in the chapter is still used.
+ * Prefer a showable application. A procedure card is used when the chapter has no application card.
  * The short note is only for a pack with no showable activity.
  */
 export function activityDayNotes(input: {

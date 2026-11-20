@@ -14,12 +14,12 @@ hawknexabackend.fynals.com {
 	}
 
 	handle {
-		# Exam / OCR AI jobs can exceed Caddy's default idle timeouts.
+		# Exam / OCR / chapter teaching-pack refresh can exceed default idle timeouts.
 		reverse_proxy backend:3001 {
 			transport http {
-				read_timeout 300s
-				write_timeout 300s
-				response_header_timeout 300s
+				read_timeout 900s
+				write_timeout 900s
+				response_header_timeout 900s
 			}
 		}
 	}

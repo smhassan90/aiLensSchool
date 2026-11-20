@@ -98,6 +98,83 @@ const SKILL_SIGNAL =
   /\b(convert|construct|compass|prove|proving|ratio|proportion|degrees|minutes|chord|tangent|equation|formula|calculate|measure|simplify)\b/i;
 const SKILL_PROCEDURE = /\b(step|method|formula|calculate|convert|construct|solve|simplify|prove)\b/i;
 
+const APPLICATION_ASK =
+  /\b(?:find|calculate|determine|work out)\s+(?:the\s+)?[a-z]|\bhow\s+(?:tall|far|long|much|many)\b|\bwhat\s+is\s+the\b/i;
+const EXAMPLE_SPLIT = /\b(?:worked example|example answer|for example|sample)\b/i;
+
+function numberTokens(text: string): string[] {
+  return [...text.matchAll(/\d+(?:\.\d+)?/g)].map((match) => match[0]);
+}
+
+/** Student task versus the labelled board example. */
+export function splitStudentTaskAndExample(description: string): { task: string; example: string } {
+  const parts = description.split(EXAMPLE_SPLIT);
+  if (parts.length < 2) return { task: description, example: '' };
+  return { task: parts[0], example: parts.slice(1).join(' ') };
+}
+
+/** A situation that asks for a result, read from the wording rather than a subject list. */
+export function isSituationWithQuantity(task: string): boolean {
+  return APPLICATION_ASK.test(task) && /\d/.test(task);
+}
+
+/**
+ * The unit’s own later exercise asks for a result.
+ * An opening “Example” that only converts a measure does not count.
+ */
+export function chapterHasApplicationProblem(chapterText?: string): boolean {
+  const text = chapterText ?? '';
+  const chunks = text.split(/\n+| (?=Example\s+\d|Exercise\b)/);
+  return chunks.some((chunk) => {
+    if (!APPLICATION_ASK.test(chunk) || !/\d/.test(chunk)) return false;
+    const onlyOpeningConvert =
+      /^\s*example\b/i.test(chunk) &&
+      /\b(?:convert|express|simplify|change)\b/i.test(chunk) &&
+      !/\b(?:find|calculate|determine|work out)\b/i.test(chunk);
+    return !onlyOpeningConvert;
+  });
+}
+
+function exampleLeadNumbers(example: string): string[] {
+  const lead = example.split(/[.!?]/)[0] ?? example;
+  return numberTokens(lead);
+}
+
+/** The board example uses different numbers from the student task. */
+export function workedExampleIsDifferentItem(description: string): boolean {
+  const { task, example } = splitStudentTaskAndExample(description);
+  if (!example.trim()) return false;
+  const taskNums = numberTokens(task).join(',');
+  const exampleNums = exampleLeadNumbers(example).join(',');
+  if (!taskNums || !exampleNums) return false;
+  if (exampleNums === taskNums || exampleNums.startsWith(`${taskNums},`) || exampleNums.includes(taskNums)) return false;
+  return true;
+}
+
+/** Activity 1 copied the opening worked example while a later application exists in the unit. */
+export function repeatsOpeningWorkedExample(description: string, chapterText?: string): boolean {
+  if (!chapterHasApplicationProblem(chapterText)) return false;
+  const { task } = splitStudentTaskAndExample(description);
+  if (isSituationWithQuantity(task) && workedExampleIsDifferentItem(description)) return false;
+  const opening = (chapterText ?? '').match(/example\s*\d*[^\n.]*[.!](?:\s+[^\n.]+[.!])?/i)?.[0] ?? '';
+  const openingNums = numberTokens(opening).join(',');
+  const taskNums = numberTokens(task).join(',');
+  if (openingNums && taskNums && (openingNums.startsWith(taskNums) || taskNums.startsWith(openingNums))) return true;
+  return /\b(?:convert\w*|express\w*|simplif\w*)\b/i.test(task) && !isSituationWithQuantity(task);
+}
+
+/** The student task prints the result that belongs only in the check. */
+export function studentTaskStatesCheckedResult(description: string, check?: string | null): boolean {
+  const nums = numberTokens(check ?? '');
+  const result = nums[nums.length - 1];
+  if (!result) return false;
+  const { task } = splitStudentTaskAndExample(description);
+  if (!task.includes(result)) return false;
+  const givens = new Set(numberTokens(task));
+  if (!givens.has(result)) return true;
+  return new RegExp(`(?:answer|result|equals|=)\\s*(?:is\\s+)?${result}\\b`, 'i').test(task);
+}
+
 /** A unit that teaches a procedure, read from the chapter text rather than the book title. */
 export function chapterIsSkillUnit(chapterText?: string): boolean {
   const chapter = chapterText ?? '';
@@ -208,6 +285,17 @@ export function collectClassroomFocusIssues(activity: FocusActivity, chapterText
   issues.push(...collectActivityCardIssues(activity));
   if (activityMismatchesSkill(activity, chapterText)) {
     issues.push(`${label}: students must do the skill from this chapter, with the numbers and a worked example`);
+  }
+  if (chapterIsSkillUnit(chapterText)) {
+    if (repeatsOpeningWorkedExample(description, chapterText)) {
+      issues.push(`${label}: use an application from this unit, not only the opening worked example`);
+    }
+    if (splitStudentTaskAndExample(description).example && !workedExampleIsDifferentItem(description)) {
+      issues.push(`${label}: the worked example must use a different item from the student task`);
+    }
+    if (studentTaskStatesCheckedResult(description, check)) {
+      issues.push(`${label}: keep the student item’s result in the check, not in the student task`);
+    }
   }
 
   const parts = description.match(/\b(?:Part|Task)\s+(?:[A-E]|[1-5])\b/gi) ?? [];

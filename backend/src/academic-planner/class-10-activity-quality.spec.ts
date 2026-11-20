@@ -474,11 +474,13 @@ describe('Class 10 English activity quality', () => {
   });
 
   it('asks the model to read the unit instead of picking from a format menu', () => {
-    expect(CHAPTER_TEACHING_PACK_PROMPT_VERSION).toBe('chapter-teaching-pack-v12');
+    expect(CHAPTER_TEACHING_PACK_PROMPT_VERSION).toBe('chapter-teaching-pack-v13');
     const prompts = `${CHAPTER_TEACHING_PACK_SYSTEM_PROMPT}\n${CHAPTER_ACTIVITY_SYSTEM_PROMPT}`;
     expect(prompts).toMatch(/Read the whole supplied unit/i);
-    expect(prompts).toMatch(/complete numbered problem from this unit/i);
+    expect(prompts).toMatch(/application/i);
+    expect(prompts).toMatch(/different numbers/i);
     expect(prompts).toMatch(/worked example/i);
+    expect(prompts).toMatch(/does not include the (?:student item’s final answer|final answer of the student item)/i);
     expect(prompts).not.toMatch(/\n\s*\d+\.\s+Narrative/i);
     expect(prompts).not.toMatch(/keep \/ change \/ stop/i);
     expect(prompts).not.toMatch(/freeze before the resolution/i);
@@ -623,6 +625,103 @@ describe('Class 10 English activity quality', () => {
     expect(collectActivityCardIssues(withSteps(story)).join(' ')).not.toMatch(/worked example|numeral|skill from this chapter/);
     const storyChapter = 'The traveller and the shopkeeper argue. The horse follows the person it trusts.';
     expect(collectClassroomFocusIssues(withSteps(story), storyChapter).join(' ')).not.toMatch(/skill from this chapter/);
+  });
+
+  it('prefers a later application over the opening procedure and keeps the result in the check', () => {
+    const chapter = [
+      'Example 1. Convert 12 degrees 20 minutes into a decimal. 12 degrees 20 minutes equals 12.33 degrees.',
+      'Exercise. A person stands 20 metres from a wall. The angle up to the top is 45 degrees. Find the height of the wall. The height is 20 metres.',
+    ].join(' ');
+    const opening = runnable(
+      'Convert 12 degrees 20 minutes',
+      'Each student converts 12 degrees 20 minutes into a decimal. Worked example: 12 degrees 20 minutes equals 12.33 degrees. Each student writes that decimal.',
+      'Each student converts the measure alone.',
+    );
+    opening.sliceKey = 's1';
+    opening.learningObjective = 'Students can convert a measure written in degrees and minutes.';
+    opening.expectedOutcome = 'Each notebook shows the decimal for 12 degrees 20 minutes.';
+    const height = runnable(
+      'Find the height of the wall',
+      'A person stands 20 metres from a wall. The angle up to the top is 45 degrees. Find the height of the wall. Worked example: a fence is 8 metres away and the angle is 30 degrees, so the worked height is 4 metres. Each student finds the wall height alone.',
+      'Each student finds the height, then writes the working.',
+    );
+    height.sliceKey = 's4';
+    height.learningObjective = 'Students can find a height from a distance and an angle.';
+    height.expectedOutcome = 'Each notebook shows the triangle and the ratio.\n\nTeacher looks for: The height of the wall is 15 metres.';
+    const relay = runnable(
+      'Measure relay',
+      'Students pass one step to the next student. Nobody finishes a full item. Example answer: the next student says one word.',
+      'Each student passes one step.',
+    );
+    relay.learningObjective = '';
+    relay.teacherSteps = [];
+    const day = activityDayNotes({
+      chapterTitle: 'Measures',
+      activities: [opening, height, relay],
+      coveredSliceKeys: ['s1'],
+      chapterText: chapter,
+    });
+    expect(day.title).toBe('Find the height of the wall');
+    const student = day.notes.split('What the teacher does:')[0];
+    expect(student).toContain('20 metres');
+    expect(student).toContain('45 degrees');
+    expect(student).not.toContain('15 metres');
+    expect(day.notes).toMatch(/Check understanding:[\s\S]*15 metres/);
+    expect(day.notes).not.toContain('12 degrees 20 minutes');
+    expect(day.notes).not.toMatch(/relay/i);
+    expect(isShowableSavedActivity(relay, chapter)).toBe(false);
+    expect(collectClassroomFocusIssues(withSteps(opening), chapter).join(' ')).toMatch(/opening worked example/);
+    const leaked = height.description.replace(
+      'Find the height of the wall.',
+      'Find the height of the wall. The answer is 15 metres.',
+    );
+    expect(collectClassroomFocusIssues(withSteps({ ...height, description: leaked, checkUnderstanding: 'The height is 15 metres.' }), chapter).join(' ')).toMatch(
+      /keep the student item/,
+    );
+  });
+
+  it('does not force a story into a numerical situation', () => {
+    const storyChapter = 'The traveller and the shopkeeper argue. The horse follows the person it trusts.';
+    const story = runnable(
+      'Advise the judge',
+      'Fictional scenario, inspired by this chapter. A traveller and a shopkeeper both claim one horse. The horse follows the traveller. What should the judge decide? Example answer: the traveller keeps the horse, because it shows trust.',
+    );
+    const day = activityDayNotes({
+      chapterTitle: 'The horse',
+      activities: [story],
+      chapterText: storyChapter,
+    });
+    expect(day.title).toBe('Advise the judge');
+    expect(day.notes).toContain('horse');
+    expect(day.notes).not.toMatch(/find the height|metres|calculate the/i);
+    expect(collectClassroomFocusIssues(withSteps(story), storyChapter).join(' ')).not.toMatch(/opening worked example/);
+  });
+
+  it('keeps a procedure when the unit has no application, with a different board example', () => {
+    const chapter = 'Example 1. Convert 8 hours 30 minutes into minutes. That is 510 minutes. Example 2. Convert 2 hours 15 minutes into minutes.';
+    const same = runnable(
+      'Convert 8 hours 30 minutes',
+      'Each student converts 8 hours 30 minutes into minutes. Worked example: 8 hours 30 minutes equals 510 minutes. Each student writes 510.',
+      'Each student converts the time alone.',
+    );
+    same.learningObjective = 'Students can convert hours and minutes into minutes.';
+    const different = runnable(
+      'Convert 2 hours 15 minutes',
+      'Each student converts 2 hours 15 minutes into minutes. Worked example: 8 hours 30 minutes equals 510 minutes. Each student converts 2 hours 15 minutes alone.',
+      'Each student converts the time alone.',
+    );
+    different.sliceKey = 's2';
+    different.learningObjective = 'Students can convert a different time into minutes.';
+    const day = activityDayNotes({
+      chapterTitle: 'Time',
+      activities: [same, different],
+      coveredSliceKeys: ['s1'],
+      chapterText: chapter,
+    });
+    expect(day.title).toBe('Convert 2 hours 15 minutes');
+    expect(day.notes).toContain('2 hours 15 minutes');
+    expect(day.notes).toContain('8 hours 30 minutes');
+    expect(collectClassroomFocusIssues(withSteps(same), chapter).join(' ')).toMatch(/different item/);
   });
 
   it('builds a 40-minute breakdown that adds up', () => {
